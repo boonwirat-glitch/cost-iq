@@ -101,6 +101,132 @@ function nrrPortfolioRiskSummary(kamEmail) {
 }
 window.nrrPortfolioRiskSummary = nrrPortfolioRiskSummary;
 
+// ══ PM Portfolio Mode (v_pmmode, 2026-07-21) ═══════════════════════════════
+// A PM holds 400+ accounts — the flat per-account card list that works for a
+// 20-account KAM is unusable at that scale, and per-account metrics don't
+// match the inputs a PM actually controls (one-to-many campaigns, not
+// per-account calls). Three layers, all computed from data ALREADY loaded
+// client-side (nrrKamResult / bulkPortviewData) — no new SQL:
+//   1. nrrPortfolioWaterfall — NRR flow decomposition (base → churn/
+//      contraction/comeback/new → current), a pure re-presentation of
+//      _qnrrCompute's own segments so it can never disagree with the %NRR
+//      shown elsewhere on the page.
+//   2. nrrRiskQueue — the ฿-ranked "ต้องดูแล" triage list, extracted from
+//      nrr_pulse.js's proven inline logic (Pulse now calls this too).
+//   3. nrrPortfolioTiers — Pareto A/B/C by account size, so the top ~40
+//      accounts (60% of GMV) can be worked KAM-style and the tail managed
+//      as a cohort.
+// Activation is by PORTFOLIO SIZE, not role (>= NRR_PM_MODE_MIN_ACCOUNTS),
+// so an admin opening a PM's portfolio gets the same treatment with zero
+// new role plumbing, and small KAM portfolios keep the existing view.
+var NRR_PM_MODE_MIN_ACCOUNTS = 100;
+
+// Flow decomposition for one owner+period, derived 1:1 from
+// nrrKamResult(email).by_month[period] (nrr_aggregate.js/_qnrrCompute):
+//   base − churn + contraction + comeback + newStores + inflow === curr
+// holds EXACTLY (contraction = segments.core_nrr − core_nrr_base by
+// definition, so the sum telescopes back to total_gmv). All ฿ values are
+// the same day-normalized (÷days×30) figures _qnrrCompute produces.
+function nrrPortfolioWaterfall(email, period) {
+  var result = (typeof nrrKamResult === 'function') ? nrrKamResult(email) : null;
+  var bm = result && period ? result.by_month[period] : null;
+  if (!bm) return null;
+  var seg = bm.segments || {}, out = bm.outlets || {};
+  var churn = seg.core_nrr_churn || 0;
+  var activeN = out.core_nrr || 0, churnedN = out.core_nrr_churn || 0;
+  return {
+    base: (bm.core_nrr_base || 0) + churn,
+    churn: churn,
+    contraction: bm.contraction || 0,   // core cohort's own delta vs base — can be + (growth) or − (shrink)
+    comeback: seg.comeback || 0,
+    newStores: (seg.expansion || 0) + (seg.new_sales || 0),
+    inflow: (seg.handover || 0) + (seg.transfer_in || 0),
+    curr: bm.total_gmv || 0,
+    counts: {
+      active: activeN, churned: churnedN,
+      comeback: out.comeback || 0,
+      newStores: (out.expansion || 0) + (out.new_sales || 0),
+      inflow: (out.handover || 0) + (out.transfer_in || 0)
+    },
+    activeRatio: (activeN + churnedN) > 0 ? activeN / (activeN + churnedN) * 100 : null,
+    nrr_pct: bm.nrr_pct
+  };
+}
+window.nrrPortfolioWaterfall = nrrPortfolioWaterfall;
+
+// ฿-ranked at-risk queue. Extracted VERBATIM from nrr_pulse.js's inline
+// "ต้องดูแล" computation (v49 threshold: run-rate >20% below the quarter's
+// fixed base month, i.e. pace.pct < 80 — deliberately stricter than
+// nrrPaceSignal's own 'danger' band so the list stays actionable, see the
+// original v49 note now living here). Pulse calls this with
+// opts.bigOutletByAcct (its account→biggest-outlet name map) to keep its
+// display names identical; the Portfolio queue passes no opts and shows
+// plain account names (rows deep-link to the Account page anyway).
+function nrrRiskQueue(rows, opts) {
+  var out = [];
+  (rows || []).forEach(function (row) {
+    var pace = (typeof nrrPaceSignal === 'function') ? nrrPaceSignal(row) : { pct: null, cls: 'unknown', baseline_gmv: 0 };
+    if (pace.pct == null) return; // no baseline (brand-new account) — nothing to compare
+    if (pace.cls === 'great' || pace.cls === 'safe') return;
+    if (pace.pct >= 80) return;
+    var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
+    var shortfall = Math.max(0, baseline - runrate);
+    var dropPct = Math.max(0, Math.round(100 - pace.pct));
+    var quiet = pace.pct < 50 || (row.churned_gmv || 0) > runrate;
+    var acctName = row.account_name || row.account_id;
+    var big = (opts && opts.bigOutletByAcct) ? opts.bigOutletByAcct[row.account_id] : null;
+    out.push({
+      account_id: row.account_id,
+      name: (big && big.name) || acctName,
+      sub: (big && big.name && big.name !== acctName) ? acctName : '',
+      kam: row.kam_name || row.kam_email || '',
+      risk: shortfall,
+      reason: quiet ? 'เงียบ' : 'ต่ำกว่าฐาน ' + dropPct + '%'
+    });
+  });
+  out.sort(function (a, b) { return b.risk - a.risk; });
+  return out;
+}
+window.nrrRiskQueue = nrrRiskQueue;
+
+// Pareto tiers: sort by account size (fixed-base-month GMV; run-rate as the
+// fallback for baseline-less new accounts so a big new account isn't buried
+// in C), then cumulative share — A = accounts covering the first 60% of
+// portfolio GMV, B = to 90%, C = the tail. The account that CROSSES a
+// boundary stays in the earlier tier (cum measured before adding it).
+var NRR_TIER_BOUNDS = { A: 0.60, B: 0.90 };
+function nrrPortfolioTiers(email) {
+  function mk() { return { count: 0, gmv: 0, baseline: 0, runrate: 0, byId: {} }; }
+  var tiers = { A: mk(), B: mk(), C: mk() };
+  var sized = nrrPortfolioRowsFor(email).map(function (it) {
+    return { it: it, size: (it.pace.baseline_gmv || 0) > 0 ? it.pace.baseline_gmv : (it.row.runrate_gmv || 0) };
+  }).sort(function (a, b) { return b.size - a.size; });
+  var total = sized.reduce(function (s, x) { return s + x.size; }, 0);
+  var cum = 0;
+  sized.forEach(function (x) {
+    var key = total <= 0 ? 'C'
+      : cum < total * NRR_TIER_BOUNDS.A ? 'A'
+      : cum < total * NRR_TIER_BOUNDS.B ? 'B' : 'C';
+    cum += x.size;
+    var t = tiers[key];
+    t.count++;
+    t.gmv += x.size;
+    t.baseline += x.it.pace.baseline_gmv || 0;
+    t.runrate += x.it.row.runrate_gmv || 0;
+    t.byId[x.it.row.account_id] = true;
+  });
+  ['A', 'B', 'C'].forEach(function (k) {
+    var t = tiers[k];
+    t.share = total > 0 ? t.gmv / total * 100 : 0;
+    // "retention" here = tier's pooled run-rate vs its pooled fixed base —
+    // the same ratio nrrPaceSignal computes per account, pooled per tier.
+    t.retention = t.baseline > 0 ? t.runrate / t.baseline * 100 : null;
+  });
+  tiers.total = total;
+  return tiers;
+}
+window.nrrPortfolioTiers = nrrPortfolioTiers;
+
 // Mini 6-month bar chart per account (Sense's _buildSparkline pattern,
 // 06_portview_teamview.js:987-1017, ghost/solid two-tone last bar) — the
 // 5 closed months come straight from bulk_history.csv; the current

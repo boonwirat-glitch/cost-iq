@@ -20,7 +20,12 @@
 // simultaneous list content, which the pre-v65 "3 heroes + 4 lists on one
 // page" layout required).
 var NRR_PULSE_ROT_MS = 8000;                // default: advance to the next scene every 8s
-var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [] };
+// v_market1 (2026-07-21): sceneToggles lets an admin hide a scene from
+// rotation entirely (e.g. skus off by default per explicit request) — same
+// session-only convention as rotMs above (no localStorage anywhere in /nrr).
+var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [], tvMode: false,
+  sceneToggles: { wins: true, month: true, skus: false, risk: true } };
+var NRR_PULSE_SCENE_LABELS = [['wins', 'ชนะวันนี้'], ['month', 'เดือนนี้'], ['skus', 'SKU ใหม่'], ['risk', 'ต้องดูแล']];
 var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
 var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
@@ -168,6 +173,12 @@ function _nrrPulseRiskAmtWidth(items) {
   // string in the list clips itself by ~1px and silently ellipsizes.
   return maxW > 0 ? Math.ceil(maxW) + 3 : 0;
 }
+// v_market2 (2026-07-21): back on the right-aligned measured slot — v_market1
+// briefly moved the chip to its own line under the store name, but on a real
+// TV that read as the chip floating detached from everything else (user:
+// "ชื่อ owner ทำไมไปอยู่ตรงนั้น? ควรจะอยู่ทางขวาดีกว่ามั้ย"). The prominence ask is
+// kept via SIZE instead (17px/800 embedded, own bigger clamp() in fullscreen
+// — see .nrr-pulse-owner-chip in nrr_components.css), not via position.
 function _nrrPulseOwnerChip(fullName, slotWidth) {
   var nick = _nrrPulseNick(fullName);
   var chip = nick ? '<span class="nrr-pulse-owner-chip" style="background:' + _nrrPulseOwnerColor(nick) + '">' + nrrEsc(nick) + '</span>' : '';
@@ -311,46 +322,24 @@ function nrrPulseModel() {
   // todayGmv specifically).
   var monthItems = salesItems.concat(expItems).sort(function (a, b) { return b.gmv - a.gmv; });
 
-  // ── At-risk accounts, from portview + history (nrrPaceSignal) ──
+  // ── At-risk accounts, from portview + history ──
+  // v_pmmode (2026-07-21): the inline v49 computation that used to live here
+  // (pace.pct < 80 threshold, เงียบ split, shortfall sort) moved VERBATIM to
+  // the shared nrrRiskQueue helper (nrr_portfolio.js) so the new PM
+  // Portfolio mode shows the exact same queue — behavior here is unchanged
+  // (verified by fixture comparison against the old inline version).
   var pv = window.bulkPortviewData;
-  var dangerCount = 0, newSkuAdded = 0;
+  var newSkuAdded = 0;
   var riskItems = [];
   if (pv && pv.loaded && pv.allRows) {
     pv.allRows.forEach(function (row) {
       // new-SKU count (v1: count only, no names — no portfolio-wide SKU source)
       var added = (row.cur_sku_count || 0) - (row.last_month_sku_count || 0);
       if (added > 0) newSkuAdded += added;
-
-      var pace = (typeof nrrPaceSignal === 'function') ? nrrPaceSignal(row) : { pct: null, cls: 'unknown', baseline_gmv: 0 };
-      if (pace.pct == null) return; // no baseline (brand-new account) — nothing to compare
-      var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
-      if (pace.cls !== 'great' && pace.cls !== 'safe') {
-        // v49: "ต้องดูแล" now requires a drop of MORE than 20% below baseline
-        // (pct < 80) — was nrrPaceSignal's own 'danger' band (pct < 90, i.e.
-        // >10% drop), which the user found too inclusive/noisy for a "act on
-        // this today" TV list. This is a Pulse-page-only threshold — does
-        // NOT change nrrPaceSignal itself or anything else in the app that
-        // reads pace.cls (e.g. the Account page's own pace coloring).
-        if (pace.pct < 80) {
-          dangerCount++;
-          var shortfall = Math.max(0, baseline - runrate);
-          var dropPct = Math.max(0, Math.round(100 - pace.pct));
-          var quiet = pace.pct < 50 || (row.churned_gmv || 0) > runrate;
-          var acctName = row.account_name || row.account_id;
-          var bigOutlet = acctBigOutlet[row.account_id];
-          var primaryName = (bigOutlet && bigOutlet.name) || acctName;
-          riskItems.push({
-            name: primaryName,
-            sub: (bigOutlet && bigOutlet.name && bigOutlet.name !== acctName) ? acctName : '',
-            kam: row.kam_name || row.kam_email || '',
-            risk: shortfall,
-            reason: quiet ? 'เงียบ' : 'ต่ำกว่าฐาน ' + dropPct + '%'
-          });
-        }
-      }
     });
+    riskItems = nrrRiskQueue(pv.allRows, { bigOutletByAcct: acctBigOutlet });
   }
-  riskItems.sort(function (a, b) { return b.risk - a.risk; });
+  var dangerCount = riskItems.length;
   // v48: sum across ALL 156 danger-band accounts (riskItems already holds
   // every one, not just the rotating top-N shown) — user asked for the real
   // total ฿ at risk, not just individual row amounts.
@@ -405,46 +394,87 @@ function _nrrPulseRotControlHtml() {
     '</div>';
 }
 
+// v_market1 (2026-07-21): multi-toggle, not the single-select .seg pattern
+// _nrrCoSegHtml renders — several scenes can be on at once, so this builds
+// its own row of independently-toggleable buttons sharing the same .seg/
+// button.on classes (see nrr_components.css for why reusing .seg is safe
+// here: the visual is identical whether one or several buttons carry .on).
+function _nrrPulseSceneToggleHtml() {
+  var t = nrrPulseState.sceneToggles;
+  return '<div class="nrr-pulse-scene-toggle-ctrl"><span class="nrr-pulse-rot-lbl">แสดงฉาก</span>' +
+    '<div class="seg" id="nrr-pulse-scene-toggle-seg">' +
+    NRR_PULSE_SCENE_LABELS.map(function (kv) {
+      return '<button type="button"' + (t[kv[0]] ? ' class="on"' : '') + ' data-scenekey="' + kv[0] + '">' + kv[1] + '</button>';
+    }).join('') +
+    '</div></div>';
+}
+
 function _nrrPulseDatelineHtml(m) {
   var d = m.asOf;
   var dow = _NRR_PULSE_TH_DOW[d.getDay()];
   var dateTh = nrrThMonthLabel ? (d.getDate() + ' ' + nrrThMonthLabel(d)) : (d.getDate() + '/' + (d.getMonth() + 1));
   var upd = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  var isFs = !!document.fullscreenElement;
   return '<div class="nrr-pulse-dateline">' +
     '<div><div class="nrr-pulse-dateline-main">เช้าวัน' + dow + ' · ' + nrrEsc(dateTh) + '</div>' +
     '<div class="nrr-pulse-dateline-sub">ภาพรวม portfolio · ข้อมูลถึงเมื่อวาน · อัปเดต ' + upd + '</div></div>' +
     '<div class="nrr-pulse-dateline-controls">' +
+    _nrrPulseSceneToggleHtml() +
     _nrrPulseRotControlHtml() +
     '<button type="button" class="nrr-pulse-fs-btn" id="nrr-pulse-fs-btn">' +
-    (isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
+    (nrrPulseState.tvMode ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
     '</div>' +
     '</div>';
 }
 
 // ── Fullscreen / TV mode ─────────────────────────────────────────────────
-// Uses the standard Fullscreen API (a user gesture is required to invoke
-// it, hence the button — can't auto-trigger on page load). Hides the app's
-// masthead/nav while active so the board is pure signage on the TV, no
-// browser chrome or app nav competing for space. Tied to the SAME cleanup
-// hook that already clears the rotation/refresh timers on route-away, so
-// leaving #/pulse always exits fullscreen too.
-function _nrrPulseToggleFullscreen() {
-  if (!document.fullscreenElement) {
-    (document.documentElement.requestFullscreen() || Promise.resolve()).catch(function () {});
-  } else {
-    (document.exitFullscreen() || Promise.resolve()).catch(function () {});
-  }
-}
-document.addEventListener('fullscreenchange', function () {
-  var isFs = !!document.fullscreenElement;
-  document.body.classList.toggle('nrr-pulse-fs-active', isFs);
+// v_signage8 (2026-07-21): TV mode is driven by OUR OWN button-click state
+// (nrrPulseState.tvMode / .nrr-pulse-fs-active), NOT by document.fullscreen-
+// Element / the fullscreenchange event. Root-caused a real report: several
+// Smart TV "internet browser" apps don't support (or silently reject) the
+// standard Fullscreen API at all — requestFullscreen()'s promise never
+// resolves/rejects usefully there, fullscreenchange never fires, so the old
+// design (gating .nrr-pulse-fs-active on that event) left the board stuck
+// in its small "desktop preview" layout forever on those TVs, with its
+// vh/vw-based sizing computed against whatever narrow width that TV's
+// browser reports — that's what produced the "content only fills the left
+// half of the screen, fonts/boxes distorted" bug (same in both the button's
+// 'fullscreen' and 'normal' state, because fs-active never actually
+// engaged either way). Now the full-bleed CSS applies the instant the
+// button is clicked, independent of whether real browser fullscreen ever
+// engages. Real Fullscreen API support (where it exists, e.g. an actual
+// desktop Chrome) is still requested as a bonus — it hides the browser's
+// own chrome — but its success/failure no longer gates the board's layout.
+function _nrrPulseSetTvMode(on) {
+  nrrPulseState.tvMode = on;
+  document.body.classList.toggle('nrr-pulse-fs-active', on);
   var btn = document.getElementById('nrr-pulse-fs-btn');
-  if (btn) btn.textContent = isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
-  // v56/v65: row cap (_nrrPulseEffMax) depends on document.fullscreenElement —
-  // re-show the current scene immediately so the row count changes the
-  // instant fullscreen toggles, not just on the next rotation tick.
+  if (btn) btn.textContent = on ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
+  // v56/v65: re-show the current scene immediately so any layout-dependent
+  // sizing updates the instant TV mode toggles, not just on the next
+  // rotation tick.
   if (nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
+}
+function _nrrPulseToggleFullscreen() {
+  var goingOn = !nrrPulseState.tvMode;
+  _nrrPulseSetTvMode(goingOn);
+  // Best-effort only — guarded so a TV browser with no Fullscreen API at
+  // all (requestFullscreen undefined) can't throw synchronously and abort
+  // the state change above.
+  try {
+    if (goingOn && document.documentElement.requestFullscreen) {
+      (document.documentElement.requestFullscreen() || Promise.resolve()).catch(function () {});
+    } else if (!goingOn && document.fullscreenElement && document.exitFullscreen) {
+      (document.exitFullscreen() || Promise.resolve()).catch(function () {});
+    }
+  } catch (e) {}
+}
+// One-way top-up: if a REAL Fullscreen API exit happens by some other means
+// (e.g. user presses Esc on a desktop browser that does support it), turn
+// our own layout off too. Never the sole trigger for turning tvMode ON —
+// TVs that never fire this event at all simply don't hit this listener,
+// which is fine, since the button click above is already authoritative.
+document.addEventListener('fullscreenchange', function () {
+  if (!document.fullscreenElement && nrrPulseState.tvMode) _nrrPulseSetTvMode(false);
 });
 
 // ── Scenes ───────────────────────────────────────────────────────────────
@@ -607,10 +637,12 @@ function _nrrPulseFillLists(sceneKey) {
 // let its own empty-state message ("— ยังไม่มีร้านใหม่วันนี้ —") communicate
 // "system's working, just nothing yet" instead of the scene vanishing.
 function _nrrPulseActiveScenes(m) {
-  var scenes = ['wins'];
-  if (m.monthItems.length > 0) scenes.push('month');
-  if (m.newSkuItems.length > 0 || m.newSkuAdded > 0) scenes.push('skus');
-  if (m.risk.length > 0) scenes.push('risk');
+  var t = nrrPulseState.sceneToggles;
+  var scenes = [];
+  if (t.wins) scenes.push('wins');
+  if (t.month && m.monthItems.length > 0) scenes.push('month');
+  if (t.skus && (m.newSkuItems.length > 0 || m.newSkuAdded > 0)) scenes.push('skus');
+  if (t.risk && m.risk.length > 0) scenes.push('risk');
   return scenes;
 }
 
@@ -701,6 +733,14 @@ function _nrrPulseArmSceneSubRotation(key) {
 function nrrRenderPulseView() {
   var page = document.getElementById('nrr-pulse-page');
   if (!page) return;
+  // v_market2 (2026-07-21): paint the WHOLE page dark while Pulse is on
+  // screen — the scene card alone being dark left the body's light
+  // background showing around it ("dark theme ไม่ได้คลุมทั้งจอ ดีไซน์แหว่งๆ"),
+  // and the cream dateline text was near-invisible on that light gap.
+  // Removed by the hashchange listener below the instant the route leaves
+  // #/pulse (NOT in _nrrPulseClearTimers — that also runs on every timer
+  // re-arm while still on this page, which would flash the light bg back).
+  document.body.classList.add('nrr-pulse-on');
   // Ensure the portfolio-level data this page needs is loaded (dashboard init
   // only fetches movement/company data; portview + history come from the
   // portfolio/account flows). Idempotent + cached — safe to await every entry.
@@ -769,6 +809,20 @@ function _nrrPulseRender() {
     // not worth splitting into two separate arm functions for this scope.
     _nrrPulseArmTimers();
   });
+  // v_market1 (2026-07-21): scene-visibility toggle — unlike rotSeg (timing
+  // only), toggling a scene changes which DOM nodes exist at all, so the
+  // simplest correct response is a full re-render, same as a data refresh.
+  var toggleSeg = document.getElementById('nrr-pulse-scene-toggle-seg');
+  if (toggleSeg) toggleSeg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-scenekey]');
+    if (!btn) return;
+    var key = btn.dataset.scenekey;
+    var t = nrrPulseState.sceneToggles;
+    var onCount = Object.keys(t).filter(function (k) { return t[k]; }).length;
+    if (t[key] && onCount <= 1) return; // keep at least one scene on — never let the board go fully blank
+    t[key] = !t[key];
+    _nrrPulseRender();
+  });
 }
 
 // ── Timers (auto-refresh + spotlight rotation) ──────────────────────────────
@@ -805,9 +859,20 @@ function _nrrPulseClearTimers() {
   if (_nrrPulseRotTimer) { clearInterval(_nrrPulseRotTimer); _nrrPulseRotTimer = null; }
   if (_nrrPulseRefreshTimer) { clearInterval(_nrrPulseRefreshTimer); _nrrPulseRefreshTimer = null; }
   if (_nrrPulseSceneSubTimer) { clearInterval(_nrrPulseSceneSubTimer); _nrrPulseSceneSubTimer = null; }
-  // Leaving #/pulse always exits TV fullscreen too — same cleanup hook.
-  if (document.fullscreenElement) (document.exitFullscreen() || Promise.resolve()).catch(function () {});
+  // Leaving #/pulse always exits TV mode too — same cleanup hook. Reset our
+  // own state directly (don't rely on the fullscreenchange event, which may
+  // never fire on TV browsers without real Fullscreen API support).
+  if (nrrPulseState.tvMode) { nrrPulseState.tvMode = false; document.body.classList.remove('nrr-pulse-fs-active'); }
+  try { if (document.fullscreenElement && document.exitFullscreen) (document.exitFullscreen() || Promise.resolve()).catch(function () {}); } catch (e) {}
 }
+
+// v_market2: drop the dark page background the moment the route leaves
+// #/pulse. Registered AFTER nrr_router.js's own hashchange listener (that
+// file is injected before this module), so nrrCurrentRoute is already
+// updated by the time this runs.
+window.addEventListener('hashchange', function () {
+  if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') document.body.classList.remove('nrr-pulse-on');
+});
 
 // ── Route registration (nrr_router.js is injected before this module) ────────
 nrrRouterRegister('pulse', nrrRenderPulseView);

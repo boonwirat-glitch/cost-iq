@@ -49,7 +49,10 @@ function isADTLRole(role){ return normalizeRole(role) === 'ad_tl'; }
 function isADAny(role){ const r=normalizeRole(role); return r==='ad'||r==='ad_tl'; }
 // PM role helper (no pm_tl variant — see plan)
 function isPMRole(role){ return normalizeRole(role) === 'pm'; }
-function isEchoUser(role){ const r=normalizeRole(role); return r==='rep'||r==='sales'||r==='sales_tl'||r==='ad'||r==='ad_tl'||r==='pm'; }
+// v_echofix (2026-07-21): deleted isEchoUser — it was never called anywhere
+// and its role list (excluding tl/admin) contradicted the REAL gate,
+// NAV_CONFIG in 12_nav_config.js, which deliberately shows Echo to
+// tl/admin too (for the TL coaching feed). Misleading dead code.
 function roleLabel(role){
   const r = normalizeRole(role);
   if(r === 'rep') return 'KAM';

@@ -109,7 +109,11 @@ async function nrrInitApp() {
 // KAM, switcher grouped by team. All three render the SAME two blocks —
 // self-summary (commission receipt, reused verbatim from the drawer) +
 // account card list (portview.csv) — "ภาษาเดียวกัน" across every role.
-var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn: false, danger: false }, skuFilter: false };
+var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn: false, danger: false }, skuFilter: false,
+  // v_pmmode (2026-07-21): PM Portfolio mode — tier chip filter ('A'|'B'|'C'
+  // or '' = off) + risk-queue expand toggle. Both reset on portfolio switch
+  // (nrrRenderPortfolioLayerView) since tier membership is per-portfolio.
+  tierFilter: '', queueExpanded: false };
 
 // { email, name } list this profile is allowed to switch between — also
 // what nrr_router.js's TL guard checks against, so "what the switcher
@@ -261,7 +265,13 @@ function _nrrAccountOutletNameMatches(accountId, query) {
 function nrrPortfolioAcctGridHtml(email) {
   var pf = nrrPortfolioState.paceFilter;
   var anyPaceSelected = pf.ok || pf.warn || pf.danger;
+  // v_pmmode: tier chip filter — tiers only recomputed when one is active
+  // (the tier cards themselves only render in PM mode, and the filter is
+  // reset on portfolio switch, so this never leaks into small portfolios).
+  var tierSel = nrrPortfolioState.tierFilter;
+  var tierMap = tierSel ? nrrPortfolioTiers(email) : null;
   var filtered = nrrPortfolioRowsFor(email).filter(function (item) {
+    if (tierSel && tierMap && !tierMap[tierSel].byId[item.row.account_id]) return false;
     if (anyPaceSelected) {
       var bucket = (item.pace.cls === 'great' || item.pace.cls === 'safe') ? 'ok' : (item.pace.cls === 'warn' ? 'warn' : (item.pace.cls === 'danger' ? 'danger' : null));
       if (!bucket || !pf[bucket]) return false;
@@ -309,6 +319,115 @@ function nrrPortfolioPulseHtml(email, period) {
     '<div class="num nrr-port-pulse-pct" style="color:' + (pct != null ? nrrThresholdColorVar(pct) : 'var(--ink3)') + '">' + nrrFmtPct(pct) + '</div>' +
     nrrTripleHtml('lg', triple) +
     '</div>';
+}
+
+// ══ PM Portfolio Mode render layer (v_pmmode, 2026-07-21) ══════════════════
+// Shown only when the portfolio has >= NRR_PM_MODE_MIN_ACCOUNTS accounts
+// (see nrr_portfolio.js header for the full rationale). Three layers:
+// waterfall+KPIs, ฿-ranked risk queue, Pareto tier cards. All hairline
+// analyst-view styling — NOT the Pulse signage look.
+
+// Layer 1 — flow "ladder": base at the top, each signed flow as its own
+// labeled row with a proportional mini-bar, current at the bottom. Chosen
+// over a classic floating-bar waterfall chart: same information, readable
+// at a glance, zero chart-library/positioning risk.
+function nrrPortfolioWaterfallHtml(email, period) {
+  var w = nrrPortfolioWaterfall(email, period);
+  if (!w) return '';
+  var maxRef = Math.max(w.base, w.curr, 1);
+  function row(label, val, kind, count) {
+    var isFlow = kind === 'flow';
+    var color = !isFlow ? 'var(--ink)' : (val >= 0 ? 'var(--green-deep)' : 'var(--coral)');
+    var wPct = Math.max(0.5, Math.abs(val) / maxRef * 100);
+    var sign = isFlow ? (val >= 0 ? '+' : '−') : '';
+    return '<div class="nrr-pm-flow-row' + (isFlow ? '' : ' anchor') + '">' +
+      '<div class="nrr-pm-flow-label">' + nrrEsc(label) +
+      (count != null ? ' <span class="micro">' + count + ' สาขา</span>' : '') + '</div>' +
+      '<div class="nrr-pm-flow-bar"><div class="nrr-pm-flow-fill" style="width:' + wPct.toFixed(1) + '%;background:' + color + '"></div></div>' +
+      '<div class="num nrr-pm-flow-val" style="color:' + color + '">' + sign + nrrFmtGMV(Math.abs(val)) + '</div>' +
+      '</div>';
+  }
+  function kpi(label, big, sub, color) {
+    return '<div class="nrr-pm-kpi-tile">' +
+      '<div class="nrr-pm-kpi-label">' + nrrEsc(label) + '</div>' +
+      '<div class="num nrr-pm-kpi-value"' + (color ? ' style="color:' + color + '"' : '') + '>' + big + '</div>' +
+      '<div class="micro">' + nrrEsc(sub) + '</div>' +
+      '</div>';
+  }
+  var totalCohort = w.counts.active + w.counts.churned;
+  var kpisHtml =
+    kpi('สาขาที่ยังสั่งอยู่', w.activeRatio != null ? Math.round(w.activeRatio) + '%' : '—',
+      w.counts.active + ' / ' + totalCohort + ' สาขาฐาน',
+      w.activeRatio != null ? nrrThresholdColorVar(w.activeRatio) : null) +
+    kpi('ยอดหาย (หยุดสั่ง)', '−' + nrrFmtGMV(w.churn), w.counts.churned + ' สาขา', 'var(--coral)') +
+    kpi('ร้านกลับมา', '+' + nrrFmtGMV(w.comeback), w.counts.comeback + ' สาขา', 'var(--green-deep)') +
+    kpi('ร้านใหม่', '+' + nrrFmtGMV(w.newStores), w.counts.newStores + ' สาขา', 'var(--green-deep)');
+  // Row order mirrors the exact identity: base − churn + contraction +
+  // comeback + new + inflow = curr (nrrPortfolioWaterfall's contract).
+  return '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ยอดพอร์ตไหลจากไหนไปไหน</div></div>' +
+    '<div class="nrr-pm-kpi-strip">' + kpisHtml + '</div>' +
+    '<div class="nrr-pm-flow">' +
+    row('ฐานเดือน ' + nrrBaseMonthThLabel(), w.base, 'anchor', totalCohort) +
+    row('หยุดสั่ง (churn)', -w.churn, 'flow', w.counts.churned) +
+    row(w.contraction >= 0 ? 'ร้านเดิมซื้อเพิ่ม' : 'ร้านเดิมซื้อลด', w.contraction, 'flow', w.counts.active) +
+    row('ร้านกลับมา', w.comeback, 'flow', w.counts.comeback) +
+    row('ร้านใหม่ (Sales + Expansion)', w.newStores, 'flow', w.counts.newStores) +
+    row('รับโอนเข้า (handover/transfer)', w.inflow, 'flow', w.counts.inflow) +
+    row('ยอดปัจจุบัน (normalized/30วัน)', w.curr, 'anchor', null) +
+    '</div>';
+}
+
+// Layer 2 — the ฿-ranked "ต้องดูแล" queue (same nrrRiskQueue the Pulse TV
+// board uses), capped at 20 with an expander. Rows deep-link to the
+// Account page.
+var NRR_PM_QUEUE_CAP = 20;
+function nrrPortfolioRiskQueueHtml(email) {
+  var pv = window.bulkPortviewData;
+  var rows = (pv && pv.loaded && pv.byKamEmail[email]) || [];
+  var q = nrrRiskQueue(rows);
+  if (!q.length) return '<div id="nrr-port-risk-queue"></div>';
+  var total = q.reduce(function (s, x) { return s + x.risk; }, 0);
+  var shown = nrrPortfolioState.queueExpanded ? q : q.slice(0, NRR_PM_QUEUE_CAP);
+  var rowsHtml = shown.map(function (x, i) {
+    return '<a class="nrr-pm-queue-row" href="#/account/' + encodeURIComponent(x.account_id) + '">' +
+      '<span class="num nrr-pm-queue-rank">' + (i + 1) + '</span>' +
+      '<span class="nrr-pm-queue-name">' + nrrEsc(x.name) + '</span>' +
+      '<span class="micro nrr-pm-queue-reason">' + nrrEsc(x.reason) + '</span>' +
+      '<span class="num nrr-pm-queue-amt">−' + nrrFmtGMV(x.risk) + '</span>' +
+      '</a>';
+  }).join('');
+  var moreHtml = q.length > NRR_PM_QUEUE_CAP
+    ? '<button type="button" class="nrr-chip" id="nrr-port-queue-expand">' +
+      (nrrPortfolioState.queueExpanded ? 'ย่อเหลือ ' + NRR_PM_QUEUE_CAP + ' อันดับแรก' : 'แสดงทั้งหมด ' + q.length + ' ร้าน') + '</button>'
+    : '';
+  return '<div id="nrr-port-risk-queue">' +
+    '<div class="nrr-panel-head" style="margin-top:22px"><div><div class="h2" style="font-size:18px">ต้องดูแลก่อน (' + q.length + ' ร้าน · −' + nrrFmtGMV(total) + ')</div>' +
+    '<div class="micro">ยอดวิ่งต่ำกว่าฐานเกิน 20% เรียงตามเงินที่หายมากสุด — จัดการจากบนลงล่าง</div></div></div>' +
+    '<div class="nrr-pm-queue">' + rowsHtml + '</div>' + moreHtml +
+    '</div>';
+}
+
+// Layer 3 — Pareto tier cards, click-to-filter the account list below
+// (same interaction contract as the pace tiles / SKU chip above them).
+var NRR_PM_TIER_META = {
+  A: { label: 'Tier A — หัวพอร์ต', desc: '60% แรกของยอด ดูแลรายร้าน' },
+  B: { label: 'Tier B — กลาง', desc: 'ถัดมาถึง 90% ของยอด' },
+  C: { label: 'Tier C — หาง', desc: 'ที่เหลือ ดูแลแบบกลุ่ม/แคมเปญ' }
+};
+function nrrPortfolioTierStripHtml(email) {
+  var t = nrrPortfolioTiers(email);
+  var cards = ['A', 'B', 'C'].map(function (k) {
+    var tier = t[k], meta = NRR_PM_TIER_META[k];
+    var sel = nrrPortfolioState.tierFilter === k;
+    var retColor = tier.retention != null ? nrrThresholdColorVar(tier.retention) : 'var(--ink3)';
+    return '<div class="nrr-pm-tier-card' + (sel ? ' selected' : '') + '" data-tier-filter="' + k + '">' +
+      '<div class="nrr-pm-tier-label">' + nrrEsc(meta.label) + '</div>' +
+      '<div class="nrr-pm-tier-nums"><span class="num">' + tier.count + '</span> ร้าน · <span class="num">' + Math.round(tier.share) + '%</span> ของยอด</div>' +
+      '<div class="nrr-pm-tier-ret">เทียบฐาน <span class="num" style="color:' + retColor + '">' + (tier.retention != null ? Math.round(tier.retention) + '%' : '—') + '</span></div>' +
+      '<div class="micro">' + nrrEsc(meta.desc) + '</div>' +
+      '</div>';
+  }).join('');
+  return '<div class="nrr-pm-tier-strip" id="nrr-port-tier-strip">' + cards + '</div>';
 }
 
 // ── Company-wide account search (v31) ────────────────────────────────────
@@ -381,6 +500,18 @@ function nrrRenderPortfolioBody() {
     summaryHtml = '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูล %NRR ของเดือนนี้</div></div>';
   }
 
+  // v_pmmode (2026-07-21): portfolios at PM scale (>= NRR_PM_MODE_MIN_ACCOUNTS)
+  // get the 3-layer triage view (flow waterfall + risk queue + Pareto tiers)
+  // between the NRR hero and the commission section. Smaller (KAM-scale)
+  // portfolios are completely untouched. Gated on SIZE, not role — an admin
+  // opening a PM's portfolio gets the same treatment.
+  var pmMode = nrrPortfolioRowsFor(email).length >= NRR_PM_MODE_MIN_ACCOUNTS;
+  var pmHtml = pmMode
+    ? nrrPortfolioWaterfallHtml(email, period) +
+      nrrPortfolioRiskQueueHtml(email) +
+      nrrPortfolioTierStripHtml(email)
+    : '';
+
   body.innerHTML =
     nrrPortfolioGlobalSearchHtml() +
     '<div class="nrr-panel-head">' +
@@ -388,6 +519,7 @@ function nrrRenderPortfolioBody() {
     switcherHtml +
     '</div>' +
     pulseHtml +
+    pmHtml +
     '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ค่าคอมมิชชั่น</div></div>' +
     summaryHtml +
     nrrPortfolioAcctListHtml(email);
@@ -420,6 +552,10 @@ function nrrRenderPortfolioLayerView(route) {
     // "no email selected" branch (below) shows the company-wide search box
     // + a KAM switcher with no default choice, so the user picks explicitly.
     var email = route.param || (nrrProfile.role === 'rep' ? nrrProfile.email : null);
+    // v_pmmode: tier membership + queue expansion are per-portfolio — a
+    // stale Tier-A filter from one PM would silently hide accounts on the
+    // next portfolio viewed.
+    if (nrrPortfolioState.email !== email) { nrrPortfolioState.tierFilter = ''; nrrPortfolioState.queueExpanded = false; }
     nrrPortfolioState.email = email;
     nrrRenderPortfolioBody();
   });
@@ -449,6 +585,25 @@ function nrrRenderPortfolioLayerView(route) {
 // persistent #nrr-portfolio-body container (the router re-renders its
 // innerHTML on every route change, so listeners must live on the parent).
 function nrrHandlePortfolioClick(e) {
+  // v_pmmode: tier card toggle (click the selected one again to clear) —
+  // same repaint contract as the pace tiles below (strip + grid only).
+  var tierCard = e.target.closest('[data-tier-filter]');
+  if (tierCard) {
+    var tk = tierCard.dataset.tierFilter;
+    nrrPortfolioState.tierFilter = nrrPortfolioState.tierFilter === tk ? '' : tk;
+    var stripT = document.getElementById('nrr-port-tier-strip');
+    if (stripT) stripT.outerHTML = nrrPortfolioTierStripHtml(nrrPortfolioState.email);
+    var gridT = document.getElementById('nrr-port-acct-grid');
+    if (gridT) gridT.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
+    return;
+  }
+  // v_pmmode: risk-queue expander.
+  if (e.target.closest('#nrr-port-queue-expand')) {
+    nrrPortfolioState.queueExpanded = !nrrPortfolioState.queueExpanded;
+    var qEl = document.getElementById('nrr-port-risk-queue');
+    if (qEl) qEl.outerHTML = nrrPortfolioRiskQueueHtml(nrrPortfolioState.email);
+    return;
+  }
   var riskTile = e.target.closest('[data-risk-filter]');
   if (riskTile) {
     var key = riskTile.dataset.riskFilter;
@@ -2291,14 +2446,24 @@ function nrrRenderCommissionSection() {
     nrrFetchAvailablePeriods().then(function (periods) {
       var sel = document.getElementById('nrr-comm-period-select');
       if (!sel) return;
-      if (!periods.length) {
+      // Prepend the live in-progress month (nrrState.period) as a selectable
+      // "(ประมาณการ)" option when it has no real snapshot yet — the dropdown
+      // otherwise only ever lists periods someone has already run Compute
+      // for, so the current month can never appear on its own.
+      var livePeriod = nrrState.period;
+      var liveHasSnapshot = livePeriod && periods.indexOf(livePeriod) !== -1;
+      var displayPeriods = periods.slice();
+      if (livePeriod && !liveHasSnapshot) displayPeriods.unshift(livePeriod);
+      if (!displayPeriods.length) {
         sel.innerHTML = '<option>ไม่มีข้อมูล</option>';
         document.getElementById('nrr-comm-fulltable-body').innerHTML = '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี snapshot ในระบบเลย</div></div>';
         return;
       }
-      if (!nrrCommSelectedPeriod || periods.indexOf(nrrCommSelectedPeriod) === -1) nrrCommSelectedPeriod = periods[0];
-      sel.innerHTML = periods.map(function (p) {
-        return '<option value="' + p + '"' + (p === nrrCommSelectedPeriod ? ' selected' : '') + '>' + nrrEsc(QNRR_CFG.months_th[p] || p) + '</option>';
+      if (!nrrCommSelectedPeriod || displayPeriods.indexOf(nrrCommSelectedPeriod) === -1) nrrCommSelectedPeriod = displayPeriods[0];
+      sel.innerHTML = displayPeriods.map(function (p) {
+        var isLiveEstimate = p === livePeriod && !liveHasSnapshot;
+        var label = (QNRR_CFG.months_th[p] || p) + (isLiveEstimate ? ' (ประมาณการ)' : '');
+        return '<option value="' + p + '"' + (p === nrrCommSelectedPeriod ? ' selected' : '') + '>' + nrrEsc(label) + '</option>';
       }).join('');
       nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
     });
@@ -2683,6 +2848,92 @@ function nrrCommGateClass(mult) {
   return 'nrr-comm-gate-full';
 }
 
+// Recover the raw P1/P3/outlet GMV behind a KAM's live-estimate commission
+// figures — nrrEstimateKamCommission() computes commission FROM these but
+// doesn't return them, and the full table displays "จาก ฿X" GMV under each
+// money cell (_nrrCommMoneyCell). Mirrors that function's own group-grain-
+// vs-flat-CSV branch exactly so the GMV shown always matches the base that
+// actually produced the adjacent commission number.
+function _nrrEstimateKamGmvSources(kamEmail) {
+  var email = (kamEmail || '').toLowerCase();
+  var flat = nrrUpsellTeamCache.byEmail[email] || { p1_gmv: 0, p3_incremental: 0, outlet_gmv: 0 };
+  var grpRows = nrrUpsellTeamGroupsCache.byEmail[email];
+  if (grpRows && grpRows.length) {
+    var p1 = 0, p3 = 0;
+    grpRows.forEach(function (gr) { p1 += gr.p1_gmv || 0; p3 += gr.p3_incremental || 0; });
+    return { p1_gmv: p1, p3_incremental: p3, outlet_gmv: flat.outlet_gmv };
+  }
+  return { p1_gmv: flat.p1_gmv, p3_incremental: flat.p3_incremental, outlet_gmv: flat.outlet_gmv };
+}
+
+// Build a synthetic "snapshot row" for a TL from the live pace-based
+// estimate engine — shaped exactly like a real commission_payout_snapshots
+// row so nrrCommissionFullTableHtml/nrrCommFullTlTableHtml need no
+// real-vs-synthetic branch at all. upsell_mult is built as the object shape
+// {multiplier, team_upsell_pct} — the same shape the live engine's own
+// _commBuildSnapshotRows() already writes for real computed snapshots — so
+// one display code path (nrrCommFullTlTableHtml) handles both sources.
+function _nrrEstimateTlSnapshotRow(team, periodMonth) {
+  var result = nrrTeamResult(team.email);
+  var bm = result && result.by_month ? result.by_month[periodMonth] : null;
+  if (!bm || bm.nrr_pct == null) return null;
+  var est = nrrEstimateTlCommission(team.email, periodMonth, bm.nrr_pct);
+  if (!est) return null;
+  return {
+    beneficiary_role: 'tl', beneficiary_email: team.email, team_lead_email: team.email,
+    raw_nrr_pct: bm.nrr_pct, governed_nrr_pct: bm.nrr_pct,
+    payout_amount: est.est, snapshot_status: 'estimate',
+    breakdown: {
+      nrr_pct: bm.nrr_pct, nrr_payout: est.nrr_payout, team_lead_name: team.name,
+      team_upsell_gmv: null, // renderer falls back to summing the KAM rows under this TL, same as today
+      upsell_mult: { multiplier: est.multiplier, team_upsell_pct: est.upsell_pct }
+    }
+  };
+}
+
+// Same idea for a KAM row — every field nrrCommFullKamTableHtml reads
+// (bd.handover, bd.upsell_outlet, bd.upsell_sku.p1/p3, bd.gmv_gate) mapped
+// straight from nrrEstimateKamCommission()'s already-computed output.
+function _nrrEstimateKamSnapshotRow(kam, tlEmail, periodMonth) {
+  var result = nrrKamResult(kam.email);
+  var bm = result && result.by_month ? result.by_month[periodMonth] : null;
+  if (!bm || bm.nrr_pct == null) return null;
+  var est = nrrEstimateKamCommission(kam.email, periodMonth, bm.nrr_pct);
+  if (!est) return null;
+  var gmv = _nrrEstimateKamGmvSources(kam.email);
+  return {
+    beneficiary_role: 'kam', beneficiary_email: kam.email, team_lead_email: tlEmail,
+    raw_nrr_pct: bm.nrr_pct, governed_nrr_pct: bm.nrr_pct,
+    payout_amount: est.est, snapshot_status: 'estimate',
+    breakdown: {
+      nrr_pct: bm.nrr_pct, nrr_payout: est.nrr_payout, kam_name: kam.name,
+      handover: est.handover, // nrrComputeHandoverForKam's shape already matches bd.handover verbatim
+      upsell_outlet: { commission: est.outlet_comm, outlet_gmv: gmv.outlet_gmv },
+      upsell_sku: {
+        p1: { comm: est.p1_comm, gmv: gmv.p1_gmv },
+        p3: { comm: est.p3_comm, gmv_incremental: gmv.p3_incremental },
+        total_commission: est.upsell_comm
+      },
+      gmv_gate: { cap_multiplier: est.gate_cap }
+    }
+  };
+}
+
+// Live-period fallback when no one has run Compute yet — every TL + their
+// KAMs, pace-estimated. Never used for a period that already has real rows.
+function nrrBuildEstimateFullTableRows(periodMonth) {
+  var rows = [];
+  nrrListTeams().forEach(function (team) {
+    var tlRow = _nrrEstimateTlSnapshotRow(team, periodMonth);
+    if (tlRow) rows.push(tlRow);
+    nrrListKamsForTeam(team.email).forEach(function (kam) {
+      var kamRow = _nrrEstimateKamSnapshotRow(kam, team.email, periodMonth);
+      if (kamRow) rows.push(kamRow);
+    });
+  });
+  return rows;
+}
+
 function nrrRenderCommissionFullTable(periodMonth) {
   var el = document.getElementById('nrr-comm-fulltable-body');
   if (!el) return;
@@ -2694,7 +2945,14 @@ function nrrRenderCommissionFullTable(periodMonth) {
       target.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div></div>';
       return;
     }
-    target.innerHTML = nrrCommissionFullTableHtml(res.rows);
+    // No real Compute has run for this period yet — for the live in-progress
+    // month only, fall back to pace-based estimates instead of an empty
+    // state (mirrors the "สรุป" tab's own snapshot-then-estimate fallback).
+    var rows = res.rows;
+    if (!rows.length && periodMonth === nrrState.period) {
+      rows = nrrBuildEstimateFullTableRows(periodMonth);
+    }
+    target.innerHTML = nrrCommissionFullTableHtml(rows);
   });
 }
 window.nrrRenderCommissionFullTable = nrrRenderCommissionFullTable;
@@ -2709,10 +2967,18 @@ function nrrCommissionFullTableHtml(rows) {
   // Exception-based stamping: everyone final → ONE stamp up top and no
   // per-row noise; otherwise per-row stamps appear only on non-final rows
   // (drafts should stand out — 15 identical FINAL chips would say nothing).
+  // A period is structurally either 100% real (synthesis never mixes with
+  // real snapshot rows, see nrrRenderCommissionFullTable) or 100% synthetic
+  // pace-estimates for the live month — allEstimate gets its own header so
+  // 15 identical per-row ESTIMATE chips don't shout the same thing twice.
   var allFinal = rows.every(function (r) { return r.snapshot_status === 'final'; });
+  var allEstimate = rows.every(function (r) { return r.snapshot_status === 'estimate'; });
   var headStamp = allFinal
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('final') +
       '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')</span></div>'
+    : allEstimate
+    ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('estimate') +
+      '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้</span></div>'
     : '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('draft') +
       '<span class="micro">บางรายการยังไม่ล็อก — แถวที่ไม่ใช่ final มีตรากำกับ</span></div>';
 
@@ -2727,10 +2993,23 @@ function nrrCommissionFullTableHtml(rows) {
     teamUpsellGmv[r.team_lead_email] = (teamUpsellGmv[r.team_lead_email] || 0) + gmv;
   });
 
-  return headStamp + nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) + nrrCommFullKamTableHtml(kamRows, allFinal);
+  return headStamp + nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal, allEstimate) + nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate);
 }
 
-function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
+// upsell_mult can be a bare number/string (Excel backfill, e.g. "1.50x") or
+// an object {multiplier, team_upsell_pct} (the live engine's own
+// _commBuildSnapshotRows() shape, also used by our live-estimate synthetic
+// rows) — generalizes the same 3-way parsing nrrCommSnapshotReceiptSteps
+// already does for this field (nrr_commission.js) so both places agree.
+function _nrrCommMultParts(bd) {
+  var raw = bd.upsell_mult;
+  if (raw && typeof raw === 'object') {
+    return { mult: Number(raw.multiplier), upsellPct: raw.team_upsell_pct != null ? Number(raw.team_upsell_pct) : null };
+  }
+  return { mult: parseFloat(raw), upsellPct: null };
+}
+
+function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal, allEstimate) {
   if (!tlRows.length) return '';
   var t = { nrrPayout: 0, upsellGmv: 0, finalPayout: 0 };
   var rowsHtml = tlRows.map(function (r) {
@@ -2744,9 +3023,11 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
     t.nrrPayout += Number(bd.nrr_payout || 0);
     t.upsellGmv += upsellGmv;
     t.finalPayout += finalPayout;
-    // upsell_mult varies by data source: numeric (live engine) or a string
-    // like "1x"/"2x" (Excel backfill) — parseFloat handles both.
-    var mult = parseFloat(bd.upsell_mult);
+    // upsell_mult varies by data source: numeric/string ("1x"/"2x", Excel
+    // backfill) or an object {multiplier, team_upsell_pct} (live engine +
+    // our own pace-estimate rows) — _nrrCommMultParts normalizes both.
+    var parts = _nrrCommMultParts(bd);
+    var mult = parts.mult;
     // Audit check: the multiplier the money actually reflects is
     // final ÷ nrr_payout. Real June data stores "2x" where the paid math is
     // 12,000 × 1.5 = 18,000 — the Excel's column was a tier label, not the
@@ -2758,7 +3039,13 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
       var effective = finalPayout / nrrPay;
       multHtml += ' <span class="nrr-comm-note-dot" title="ค่าที่จ่ายจริงสะท้อนตัวคูณ ' + effective.toFixed(2) + '× (' + nrrFmtGMVExact(nrrPay) + ' × ' + effective.toFixed(2) + ' = ' + nrrFmtGMVExact(finalPayout) + ') — ตัวเลข ' + mult.toFixed(0) + ' ที่บันทึกไว้น่าจะเป็นเลข tier จากไฟล์ Excel ที่ backfill ไม่ใช่ตัวคูณ">ⓘ</span>';
     }
-    var rowStamp = (!allFinal && r.snapshot_status !== 'final')
+    // The %GMV growth behind the multiplier — only present when upsell_mult
+    // is the object shape (live engine / pace-estimate); historical
+    // Excel-backfill rows simply omit this line, which is fine.
+    if (parts.upsellPct != null) {
+      multHtml += '<div class="nrr-comm-cell-meta">+' + parts.upsellPct.toFixed(1) + '% GMV</div>';
+    }
+    var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr><td>' + nrrEsc(bd.team_lead_name || r.beneficiary_email) + rowStamp + '</td>' +
       '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
@@ -2790,7 +3077,7 @@ function _nrrCommMoneyCell(comm, metaText) {
   return '<td>' + commHtml + metaHtml + '</td>';
 }
 
-function nrrCommFullKamTableHtml(kamRows, allFinal) {
+function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
   if (!kamRows.length) return '';
   var t = { nrrPayout: 0, hoPayout: 0, expPayout: 0, p1Comm: 0, p3Comm: 0, upsell: 0, finalPayout: 0 };
   var rowsHtml = kamRows.map(function (r) {
@@ -2813,7 +3100,7 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
     var noteHtml = note
       ? ' <span class="nrr-comm-note-dot" title="' + nrrEsc(note) + '">ⓘ</span>'
       : '';
-    var rowStamp = (!allFinal && r.snapshot_status !== 'final')
+    var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr>' +
       '<td><b>' + nrrEsc(bd.kam_name || r.beneficiary_email) + '</b>' + noteHtml + rowStamp +

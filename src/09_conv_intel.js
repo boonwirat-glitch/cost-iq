@@ -803,11 +803,23 @@ body:not(.echo-active) { background:unset; }
       r.onerror   = () => rej(r.error);
     });
   }
+  // v_echofix (2026-07-21): IDB write failures used to be swallowed silently
+  // (.catch(()=>{})) — in Safari private mode / full storage, recording
+  // proceeded with ZERO warning that crash-recovery wouldn't work. Warn the
+  // rep ONCE per session (not per 1s chunk) — recording itself continues,
+  // only the safety net is degraded.
+  let _idbWarned = false;
+  function _warnIdbOnce(e) {
+    if (_idbWarned) return;
+    _idbWarned = true;
+    _toast('เก็บไฟล์กันเสียงหายไม่ได้ (พื้นที่เต็ม/โหมดส่วนตัว?) — ถ้าแอปถูกปิดกลางทาง เสียงจะกู้คืนไม่ได้');
+    try { window.SenseSentinel?.report('ci_idb_write_fail', String(e?.message || e || 'unknown')); } catch(_) {}
+  }
   function _idbPutChunk(blob) {
-    _idbOpen().then(db => { db.transaction('chunks','readwrite').objectStore('chunks').add(blob); }).catch(()=>{});
+    _idbOpen().then(db => { db.transaction('chunks','readwrite').objectStore('chunks').add(blob); }).catch(_warnIdbOnce);
   }
   function _idbSetMeta(meta) {
-    _idbOpen().then(db => { db.transaction('meta','readwrite').objectStore('meta').put(meta,'current'); }).catch(()=>{});
+    _idbOpen().then(db => { db.transaction('meta','readwrite').objectStore('meta').put(meta,'current'); }).catch(_warnIdbOnce);
   }
   function _idbGetMeta() {
     return _idbOpen().then(db => new Promise(res => {
@@ -1064,7 +1076,7 @@ body:not(.echo-active) { background:unset; }
       // Analysis layers are disposable — transcript is permanent
       let segments = _resumeFromSegments || null;
       if (!segments) {
-        _setStep('กำลัง transcript...', 'Groq Whisper · ฟัง audio ทั้งหมด', 10);
+        _setStep('กำลัง transcript...', 'Whisper + Gemini · ถอดเสียง + แยกคนพูด', 10); // v3 hybrid pipeline (worker /transcript)
         // Dynamic timeout: at least 6 min, scale with recording length
         const transcriptTimeout = Math.max(360000, _secs * 1000 * 1.5);
         const transcriptResult = await _callTranscript(blob, transcriptTimeout);
@@ -1186,7 +1198,7 @@ body:not(.echo-active) { background:unset; }
     let res, lastErr;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (attempt > 1) {
-        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Groq Whisper · ระบบคิวเต็ม', 10 + attempt * 5);
+        _setStep(`ลองใหม่ครั้งที่ ${attempt-1}/2...`, 'Whisper + Gemini · ระบบคิวเต็ม', 10 + attempt * 5);
         await new Promise(r => setTimeout(r, attempt === 2 ? 3000 : 7000));
       }
       const ctrl = new AbortController();
@@ -1342,7 +1354,7 @@ body:not(.echo-active) { background:unset; }
     try {
       const { data, error } = await supa
         .from('skill_definitions')
-        .select('skill_code,skill_name_en,principle_th,pass_test_th,echo_observable,echo_enabled')
+        .select('skill_code,skill_name_en,skill_name_th,principle_th,pass_test_th,echo_observable,echo_enabled') // v_echofix: +skill_name_th for the worker's richer rubric text
         .eq('echo_enabled', true)
         .order('skill_code');
       if (error) throw error;
@@ -1354,52 +1366,11 @@ body:not(.echo-active) { background:unset; }
     }
   }
 
-  // ── Build Gemini prompt จาก rubric + account context ──────────────────────
-  function _buildGeminiPrompt() {
-    // v590: ลด prompt — ตัด account context, กฎเหล็กซ้ำซาก, ตัวอย่าง JSON เต็ม,
-    // key_moments instruction ที่บีบให้โมเดลแต่งเรื่องเพื่อให้ครบ
-    // เหลือเฉพาะ rubric จาก DB + schema โครงเปล่า + no_speech guard สั้น
-
-    // Skill rubric จาก DB — เฉพาะ code + name + เกณฑ์ผ่าน
-    const rubricText = (_rubricCache || []).map(s =>
-      `[${s.skill_code}] ${s.skill_name_en}: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}`
-    ).join('\n');
-
-    return `ฟัง audio การสนทนาระหว่าง Sales rep กับเจ้าของร้านอาหาร แล้วตอบ JSON ตาม schema ด้านล่าง
-
-ถ้าไม่มีเสียงคนพูดใน audio เลย ตอบ {"no_speech": true} เท่านั้น
-
-ทุกอย่างในคำตอบต้องมาจากเสียงที่ได้ยินจริงเท่านั้น — ถ้าไม่มีหลักฐานในเสียง ให้ปล่อยว่างหรือ not_observed ห้ามเดาหรือเติมเอง ตอบเป็นภาษาไทย ยกเว้น quote คงคำพูดตรงตามที่ได้ยิน
-
-SKILL RUBRIC:
-${rubricText}
-
-OCPB (customer intel จากเสียงเท่านั้น):
-- O: Operation — การสั่งของ วัน/เวลา ปริมาณ ปัญหา ops
-- C: ซัพเดิม ราคา สินค้าที่ใช้
-- P: Payment — วิธีจ่าย credit term
-- B: Business Plan — แผนขยาย เปิดสาขา เปลี่ยน concept
-
-ตอบ JSON เท่านั้น ไม่มี markdown:
-{
-  "transcript_summary": "",
-  "tone_signals": {
-    "rep_confidence": "high|medium|low",
-    "rep_confidence_note": "",
-    "customer_engagement": "increasing|stable|decreasing",
-    "customer_engagement_note": "",
-    "key_moments": [{"ts": "mm:ss", "quote": "", "note": ""}]
-  },
-  "skills": [{"code": "", "score": "pass|developing|not_observed|not_applicable", "evidence": "", "gap": "", "coaching_note": ""}],
-  "pipc_stage": "Prepare|Identify|Probe|Close",
-  "pipc_reached": "",
-  "overall": "strong|developing|needs_work",
-  "session_summary": "",
-  "ocpb_status": {"O": "answered|asked_no_answer|not_asked", "C": "answered|asked_no_answer|not_asked", "P": "answered|asked_no_answer|not_asked", "B": "answered|asked_no_answer|not_asked"},
-  "ocpb_facts": [{"dim": "O|C|P|B", "summary": "", "quote": "", "ts": "mm:ss", "tag": "pain_high|pain_medium|opportunity|null"}],
-  "next_actions": [{"action": "", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "reason": ""}]
-}`;
-  }
+  // v_echofix (2026-07-21): deleted the dead audio-native Gemini path
+  // (_buildGeminiPrompt + _analyzeWithGemini, ~150 lines) — fully built but
+  // never invoked anywhere since the Echo v2 3-stage pipeline replaced it.
+  // Recover from git history if an audio-native A/B test is ever wanted;
+  // the worker-side /analyze-audio endpoint it called is still deployed.
 
   // ── v571b: JSON repair — กู้ JSON ที่ถูก truncate กลางทาง ──────────────────
   // Gemini ตอบยาวเกิน max tokens → JSON ขาดท้าย → ตัด incomplete trailing แล้วปิด braces
@@ -1428,113 +1399,6 @@ OCPB (customer intel จากเสียงเท่านั้น):
     return null;
   }
 
-  // ── Gemini audio analyze — single call ────────────────────────────────────
-  async function _analyzeWithGemini(audioBlob) {
-    // Convert blob to base64
-    const arrayBuf = await audioBlob.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuf);
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8.length; i += chunkSize) {
-      binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
-    }
-    const b64audio = btoa(binary);
-    const mimeType = audioBlob.type || 'audio/webm';
-
-    _setStep('กำลังวิเคราะห์...', 'Gemini · ฟัง audio + skill rubric', 35);
-
-    // Retry up to 3 times on 503/429 (Gemini overload) with exponential backoff
-    // v571: per-attempt timeout — ไม่ปล่อยให้ "กำลังวิเคราะห์..." ค้างไม่มีวันจบ
-    // ถ้าหมดเวลา → throw ชัดเจน → buffer ยังอยู่ → recovery banner ให้ลองใหม่ได้
-    const FETCH_TIMEOUT_MS = 240000; // 4 นาที ต่อ attempt (audio ยาว + Gemini ใช้เวลาคิด)
-    let res, lastErr;
-    const _payload = JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, prompt: _buildGeminiPrompt() });
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      if (attempt > 1) {
-        const delay = attempt === 2 ? 3000 : 7000; // 3s then 7s
-        // v598: ชัดเจนว่า retry ครั้งไหน + progress bar เดินต่อ
-        _setStep(`ลองใหม่ครั้งที่ ${attempt - 1}/2...`, 'Gemini · ระบบ AI คิวเต็ม — กำลังรอสักครู่', 35 + (attempt - 1) * 10);
-        await new Promise(r => setTimeout(r, delay));
-        _setStep(`กำลังวิเคราะห์... (attempt ${attempt}/3)`, 'Gemini · ฟัง audio + skill rubric', 35 + (attempt - 1) * 10);
-      }
-      const _ctrl = new AbortController();
-      const _tmo  = setTimeout(() => _ctrl.abort(), FETCH_TIMEOUT_MS);
-      try {
-        res = await fetch(`${WORKER_URL}/analyze-audio`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: _payload,
-          signal: _ctrl.signal,
-        });
-        if (res.ok) {
-          // v598: reset step text on success — ไม่ให้ "attempt 3/3" ค้างขณะ parse
-          _setStep('กำลังประมวลผลผล...', 'Gemini · แปลงผล', 75);
-          break;
-        }
-        const errText = await res.text().catch(() => String(res.status));
-        lastErr = new Error(`Gemini ${res.status}: ${errText}`);
-        if (res.status !== 503 && res.status !== 429) throw lastErr; // don't retry on other errors
-        res = null; // mark as failed, will retry
-      } catch(e) {
-        if (e.name === 'AbortError') throw new Error('หมดเวลารอผลวิเคราะห์ (4 นาที)');
-        if (e.message && !e.message.startsWith('Gemini 503') && !e.message.startsWith('Gemini 429')) throw e;
-        lastErr = e;
-      } finally {
-        clearTimeout(_tmo);
-      }
-    }
-    if (!res || !res.ok) throw lastErr || new Error('Gemini unavailable after 3 attempts');
-    const data = await res.json();
-    const raw = data?.text || data?.content?.[0]?.text || '';
-    // v571b: log ทั้งหัวและท้าย — เห็นว่า response จบสมบูรณ์หรือถูก truncate
-    console.log('[CI Gemini raw head]', raw.substring(0, 300));
-    console.log('[CI Gemini raw tail]', raw.length > 300 ? raw.substring(raw.length - 300) : '(same as head)', '| total len:', raw.length);
-
-    const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
-    if (s === -1 || e === -1) {
-      try { window.SenseSentinel?.report('ci_gemini_nojson', 'len=' + raw.length + ' head=' + raw.substring(0, 200)); } catch(_) {}
-      throw new Error('Gemini no JSON: ' + raw.substring(0, 120));
-    }
-    // v571b: robust parse — Gemini ตอบ JSON ยาว (audio นาน → 12 skills + intel ครบ)
-    // อาจถูก truncate ที่ max output tokens → JSON ขาดท้าย → ซ่อมก่อน parse
-    let parsed;
-    const _jsonStr = raw.slice(s, e + 1);
-    try {
-      parsed = JSON.parse(_jsonStr);
-    } catch (parseErr) {
-      console.warn('[CI] JSON.parse failed, attempting repair:', parseErr.message);
-      try { window.SenseSentinel?.report('ci_gemini_badjson',
-        'len=' + raw.length + ' err=' + parseErr.message.slice(0, 100) +
-        ' tail=' + raw.substring(Math.max(0, raw.length - 200))); } catch(_) {}
-      parsed = _ciRepairJson(_jsonStr);
-      if (!parsed) throw new Error('Gemini ตอบไม่สมบูรณ์ (JSON ขาด ' + raw.length + ' ตัวอักษร) — อาจเพราะบทสนทนายาวมาก');
-      console.log('[CI] JSON repaired successfully');
-    }
-
-    // Split combined response into skillData + intelData + new fields
-    const skillData = {
-      no_speech:       parsed.no_speech || false,   // ← Gemini บอกว่าไม่มีเสียง
-      skills:          parsed.skills || [],
-      pipc_stage:      parsed.pipc_stage || null,
-      pipc_reached:    parsed.pipc_reached || null,
-      overall:         parsed.overall || null,
-      session_summary: parsed.session_summary || null,
-    };
-    const intelData = {
-      // v582: OCPB fact capture — แทน buyer_type/wallet/ocpb_covered/pain_points/upsell_signals
-      // (ตัด Wallet/BANK ออกเพราะไม่มี rubric ที่เชื่อถือได้ — user decision 12 มิ.ย. 69)
-      ocpb_status:  parsed.ocpb_status || null,
-      ocpb_facts:   Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
-      next_actions: parsed.next_actions || [],
-    };
-
-    return {
-      skillData,
-      intelData,
-      transcriptSummary: parsed.transcript_summary || null,
-      toneSignals:       parsed.tone_signals || null,
-    };
-  }
 
 
   // ── Supabase save ──────────────────────────────────────────────────────────
@@ -1651,7 +1515,15 @@ OCPB (customer intel จากเสียงเท่านั้น):
 // ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
   async function _saveTranscriptOnly(segments, source) {
     const email = currentUserProfile?.email;
-    if (!email) return;
+    if (!email) {
+      // v_echofix (2026-07-21): used to silently return — a profile-load race
+      // at save time meant the transcript was NEVER persisted and the rep had
+      // no idea. Now: tell the rep, keep the IDB buffer alive (caller's
+      // success path only clears IDB after analysis save), and report it.
+      _toast('บันทึกไม่สำเร็จ (โปรไฟล์ยังไม่พร้อม) — เสียงถูกเก็บไว้ เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
+      try { window.SenseSentinel?.report('ci_save_no_profile', 'stage=transcript'); } catch(_) {}
+      return;
+    }
     const nowIso = new Date().toISOString();
     try {
       const { data: sessionRow, error } = await supa.from('ci_sessions').insert({
@@ -1689,7 +1561,12 @@ OCPB (customer intel จากเสียงเท่านั้น):
     const transcriptSummary = summaryData?.transcript_summary || null;
     const toneSignals = summaryData?.tone || null;
     const email = currentUserProfile?.email;
-    if (!email) return;
+    if (!email) {
+      // v_echofix: same silent-loss guard as _saveTranscriptOnly above.
+      _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ (โปรไฟล์ยังไม่พร้อม) — เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
+      try { window.SenseSentinel?.report('ci_save_no_profile', 'stage=analysis'); } catch(_) {}
+      return;
+    }
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
 

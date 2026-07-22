@@ -397,14 +397,19 @@ html, body {
   border: 1px solid var(--line); border-radius: var(--r-sm);
   padding: 12px 14px; margin-bottom: 10px;
 }
-.nrr-waiver-card.approved { border-left: 3px solid var(--attention); }
+/* v_waivergreen (2026-07-21): approved used --attention (an amber/rust —
+   correct for "needs a look" states elsewhere, but backwards here: an
+   approved waiver needs NO further attention, it's done) — background
+   wash added (not just the 3px border) specifically so a scrolling glance
+   reads "this one's settled" without stopping to read the badge text. */
+.nrr-waiver-card.approved { border-left: 3px solid var(--green-deep); background: var(--green-soft); }
 .nrr-waiver-card.rejected { border-left: 3px solid var(--ink3); opacity: .7; }
 .nrr-waiver-card.submitted { border-left: 3px solid var(--sun); }
 .nrr-waiver-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .nrr-waiver-acct { font-size: 14.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
 .nrr-waiver-acct:hover { text-decoration: underline; }
 .nrr-waiver-status { font-size: 11.5px; font-weight: 700; border-radius: var(--r-pill); padding: 3px 10px; flex-shrink: 0; }
-.nrr-waiver-status.approved { background: var(--attention-soft); color: var(--attention); }
+.nrr-waiver-status.approved { background: rgba(255,255,255,.6); color: var(--green-deep); }
 .nrr-waiver-status.submitted { background: var(--sun-soft); color: var(--sun-deep); }
 .nrr-waiver-status.rejected { background: rgba(0,0,0,.06); color: var(--ink3); }
 .nrr-waiver-actions { display: flex; gap: 8px; margin-top: 10px; }
@@ -544,6 +549,52 @@ html, body {
 .nrr-risk-strip.has-selection .nrr-risk-tile:not(.selected) { opacity: 0.4; }
 .nrr-risk-tile-label { font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
 .nrr-risk-tile-value { font-size: 19px; font-weight: 700; margin-top: 4px; }
+
+/* ══ PM Portfolio Mode (v_pmmode, 2026-07-21) ═══════════════════════════════
+   Shown only for portfolios >= NRR_PM_MODE_MIN_ACCOUNTS accounts (see
+   nrr_portfolio.js). Deliberately the analyst hairline/tint language of the
+   risk tiles above — NOT the Pulse signage look. */
+/* Layer 1a — KPI strip: same tile bones as .nrr-risk-tile, non-clickable. */
+.nrr-pm-kpi-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.nrr-pm-kpi-tile { flex: 1; min-width: 150px; border-radius: var(--r-md); padding: 10px 14px; background: var(--fill); }
+.nrr-pm-kpi-label { font-size: 12px; font-weight: 700; color: var(--ink2); }
+.nrr-pm-kpi-value { font-size: 19px; font-weight: 700; margin: 4px 0 2px; }
+/* Layer 1b — flow ladder: label | proportional mini-bar | signed ฿. The
+   bar column is the visual anchor; widths are % of max(base, curr) set
+   inline by nrrPortfolioWaterfallHtml. */
+.nrr-pm-flow { display: flex; flex-direction: column; gap: 2px; }
+.nrr-pm-flow-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.nrr-pm-flow-row:last-child { border-bottom: none; }
+.nrr-pm-flow-row.anchor { background: var(--fill); border-radius: var(--r-xs, 6px); padding-left: 10px; padding-right: 10px; border-bottom: none; }
+.nrr-pm-flow-label { flex: none; width: 250px; font-size: 13.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pm-flow-row.anchor .nrr-pm-flow-label { font-weight: 700; }
+.nrr-pm-flow-bar { flex: 1; height: 12px; border-radius: 999px; background: var(--fill); overflow: hidden; }
+.nrr-pm-flow-row.anchor .nrr-pm-flow-bar { background: rgba(0, 0, 0, 0.05); }
+.nrr-pm-flow-fill { height: 100%; border-radius: 999px; }
+.nrr-pm-flow-val { flex: none; width: 110px; text-align: right; font-size: 14.5px; font-weight: 700; }
+/* Layer 2 — risk queue rows: rank | name | reason | −฿. Anchor rows (link
+   to the Account page), hover matches .nrr-acct-row's affordance. */
+.nrr-pm-queue { display: flex; flex-direction: column; }
+.nrr-pm-queue-row { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); border-radius: var(--r-xs, 6px); }
+.nrr-pm-queue-row:last-child { border-bottom: none; }
+.nrr-pm-queue-row:hover { background: var(--fill); }
+.nrr-pm-queue-rank { flex: none; width: 26px; text-align: right; font-size: 13px; font-weight: 700; color: var(--ink3); }
+.nrr-pm-queue-name { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pm-queue-reason { flex: none; }
+.nrr-pm-queue-amt { flex: none; width: 100px; text-align: right; font-size: 14.5px; font-weight: 700; color: var(--coral); }
+/* Layer 3 — tier cards: click-to-filter, same selected/dim contract as
+   .nrr-risk-tile above (one selected ring, siblings stay full opacity since
+   tier selection is single-choice, not multi-select). */
+.nrr-pm-tier-strip { display: flex; gap: 10px; flex-wrap: wrap; margin: 22px 0 4px; }
+.nrr-pm-tier-card {
+  flex: 1; min-width: 170px; border-radius: var(--r-md); padding: 12px 14px; background: var(--fill);
+  cursor: pointer; border: 2px solid transparent; transition: opacity 140ms ease, border-color 140ms ease;
+}
+.nrr-pm-tier-card:hover { opacity: 0.85; }
+.nrr-pm-tier-card.selected { border-color: var(--ink); }
+.nrr-pm-tier-label { font-size: 12px; font-weight: 700; color: var(--ink2); }
+.nrr-pm-tier-nums { font-size: 16px; font-weight: 700; margin: 4px 0 2px; }
+.nrr-pm-tier-ret { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
 
 /* ── Per-account sparkline (round 2) — ported technique from Sense's
    _buildSparkline (06_portview_teamview.js:987-1017): 5 closed months
@@ -1393,29 +1444,65 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    glance); now 4 rotating FULL-SCREEN SCENES (one idea per glance), built
    once per data refresh and cross-faded via .nrr-pulse-scene.active, never
    re-rendering innerHTML per rotation tick (see nrr_pulse.js's own header
-   comment + the plan doc for the design-thinking rationale). */
-.nrr-pulse-page { max-width: 1800px; margin: 0 auto; padding: 0 40px 60px; }
+   comment + the plan doc for the design-thinking rationale).
+   v_market1 (2026-07-21): "Market Crate" repaint — Bush picked this
+   direction from 4 mockups (deep basil green + terracotta + mango, grounded
+   in Freshket's own produce identity, instead of the app's usual light
+   hairline look). Every color below is scoped as a --pc-* custom property on
+   .nrr-pulse-page so it never touches the shared dashboard-wide tokens
+   (--ink/--fill/--line/etc. all have 40+ other use-sites outside this page).
+   Deliberately did NOT add the mockup's card-rotation/dashed-stamp transform
+   — nice on a static mockup, but stacking a CSS transform on top of the
+   already-fragile clamp()-based fullscreen tier (see v_signage7/8 below) and
+   the TV-browser quirks already fought this session was not worth the risk
+   for a decorative flourish. Every DIMENSIONAL value (padding/height/font-
+   size) below this point is UNCHANGED from the pre-repaint tuning — only
+   colors moved, plus the owner-chip restructure and new scene-toggle control
+   documented at their own rules. */
+.nrr-pulse-page {
+  --pc-bg: #12362A; --pc-bg2: #1B4636; --pc-ink: #F6EFE1; --pc-ink-dim: #B9D6C6;
+  --pc-terracotta: #E2622B; --pc-mango: #F2B705; --pc-line: rgba(246,239,225,.12);
+  max-width: 1800px; margin: 0 auto; padding: 0 40px 60px;
+}
+/* v_market2 (2026-07-21): full-bleed dark — the scene card alone being dark
+   left the app's light body showing all around it on a real TV ("dark theme
+   ไม่ได้คลุมทั้งจอ ดีไซน์แหว่งๆ") and made the cream dateline text unreadable.
+   Class set on <body> by nrrRenderPulseView / removed on route-away
+   (nrr_pulse.js) — literal hex (not var(--pc-bg)) because the --pc-* scope
+   is .nrr-pulse-page, below <body>. One step darker than the card's #12362A
+   so scenes still read as raised cards. Masthead is unaffected (it carries
+   its own opaque var(--bg) background). */
+body.nrr-pulse-on { background: #0E2A21; }
 .nrr-pulseboard { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 24px; height: calc(100vh - 220px); min-height: 520px; }
-.nrr-pulse-loading { padding: 60px 0; text-align: center; color: var(--ink3); font-size: 16px; }
+.nrr-pulse-loading { padding: 60px 0; text-align: center; color: var(--pc-ink-dim); font-size: 16px; }
 
 .nrr-pulse-dateline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex: none; }
-.nrr-pulse-dateline-main { font-size: 30px; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; }
+.nrr-pulse-dateline-main { font-size: 30px; font-weight: 800; color: var(--pc-ink); letter-spacing: -0.01em; }
 /* v56: fs button now shares its corner with the new rotation-speed control —
    wrapped in one flex group so .nrr-pulse-dateline's own space-between still
-   only ever sees 2 top-level children. */
+   only ever sees 2 top-level children. v_market1: the scene-visibility
+   toggle control joins the same group. */
 .nrr-pulse-dateline-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.nrr-pulse-rot-ctrl { display: flex; align-items: center; gap: 8px; }
-.nrr-pulse-rot-lbl { font-size: 12.5px; font-weight: 700; color: var(--ink3); white-space: nowrap; }
+.nrr-pulse-rot-ctrl, .nrr-pulse-scene-toggle-ctrl { display: flex; align-items: center; gap: 8px; }
+.nrr-pulse-rot-lbl { font-size: 12.5px; font-weight: 700; color: var(--pc-ink-dim); white-space: nowrap; }
+/* v_market1: reuses the app's existing generic .seg segmented-control (see
+   nrr_base.css) for the new scene-visibility toggles instead of inventing a
+   parallel pill component — same click/`.on` behavior either way, this just
+   themes it for the dark board (the base .seg is tuned for a light page). */
+.nrr-pulse-page .seg { border-color: var(--pc-line); }
+.nrr-pulse-page .seg button { color: var(--pc-ink-dim); }
+.nrr-pulse-page .seg button.on { background: var(--pc-mango); color: var(--pc-bg); }
+.nrr-pulse-page .seg button:not(.on):hover { color: var(--pc-ink); }
 /* Hidden once genuinely fullscreen — a real TV screen shouldn't show
    interactive chrome, only the fs-exit button (kept, mirrors the pre-v56
    behavior) needs to stay reachable there. */
-.nrr-pulse-fs-active .nrr-pulse-rot-ctrl { display: none; }
+.nrr-pulse-fs-active .nrr-pulse-rot-ctrl, .nrr-pulse-fs-active .nrr-pulse-scene-toggle-ctrl { display: none; }
 .nrr-pulse-fs-btn {
-  padding: 9px 16px; border-radius: var(--r-pill); border: 1px solid var(--line);
-  background: transparent; color: var(--ink2); font-size: 13px; font-weight: 700;
+  padding: 9px 16px; border-radius: var(--r-pill); border: 1px solid var(--pc-line);
+  background: transparent; color: var(--pc-ink-dim); font-size: 13px; font-weight: 700;
   cursor: pointer; white-space: nowrap; transition: border-color 140ms ease, background 140ms ease;
 }
-.nrr-pulse-fs-btn:hover { border-color: var(--ink3); background: var(--fill); }
+.nrr-pulse-fs-btn:hover { border-color: var(--pc-ink-dim); background: var(--pc-bg2); }
 /* v47: TV fullscreen mode — hides the app's own masthead/nav (shared across
    every view) so the board is pure signage with no browser/app chrome
    competing for space; only active while genuinely in the Fullscreen API
@@ -1424,7 +1511,7 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-pulse-fs-active .nrr-masthead { display: none !important; }
 .nrr-pulse-fs-active .nrr-pulse-page { max-width: 100vw; padding: 28px 48px; }
 .nrr-pulse-fs-active .nrr-pulseboard { height: calc(100vh - 56px); }
-.nrr-pulse-dateline-sub { font-size: 14px; color: var(--ink3); font-weight: 600; }
+.nrr-pulse-dateline-sub { font-size: 14px; color: var(--pc-ink-dim); font-weight: 600; }
 
 /* ── Scene area: every active scene's node is built up front and absolutely
    stacked here; only the .active one is visible, cross-fading via opacity
@@ -1434,6 +1521,7 @@ select.nrr-search { appearance: auto; cursor: pointer; }
   position: absolute; inset: 0; display: flex; flex-direction: column;
   justify-content: center; border-radius: var(--r-lg); padding: 40px 56px;
   opacity: 0; pointer-events: none; transition: opacity 550ms ease;
+  background: var(--pc-bg); color: var(--pc-ink);
 }
 .nrr-pulse-scene.active { opacity: 1; pointer-events: auto; }
 .nrr-pulse-scene-lbl { font-size: 22px; font-weight: 700; opacity: 0.92; }
@@ -1441,8 +1529,8 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-pulse-scene-sub { font-size: 20px; font-weight: 600; opacity: 0.92; }
 .nrr-pulse-scene-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 
-/* Scene 2 — Today's wins: white canvas, cumulative stat up top + a
-   name-forward spotlight list below (the emotional core of the redesign).
+/* Scene 2 — Today's wins: cumulative stat up top + a name-forward spotlight
+   list below (the emotional core of the redesign).
    v65 bugfix: the cumulative number originally reused the Vibe scene's full
    148px .nrr-pulse-scene-num — fine for Vibe (one number, nothing else to
    fit), but here it left too little vertical room for up to 3 spotlight
@@ -1453,9 +1541,9 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    scene only, sized so cumulative block + title + 3 rows genuinely fit
    within the scene's real available height (measured ~355px inner content
    area in the embedded, non-fullscreen admin view — the tightest case). */
-.nrr-pulse-scene-wins { background: var(--fill); color: var(--ink); justify-content: flex-start; padding-top: 3px; }
+.nrr-pulse-scene-wins { justify-content: flex-start; padding-top: 3px; }
 .nrr-pulse-scene-cumul { text-align: center; margin-bottom: 1px; flex: none; }
-.nrr-pulse-scene-wins .nrr-pulse-scene-lbl { color: var(--ink2); font-size: 14px; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-lbl { color: var(--pc-ink-dim); font-size: 14px; }
 /* v_signage2/3 shrunk this hero block twice (60px->44px->38px) to make room
    for more spotlight rows. v_signage4/5 shrunk it further (38px->34px->30px)
    to buy back room for making the row text below match the app's normal
@@ -1470,9 +1558,9 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    padding/margin/list-gap) to cover it. Scene's real available height stays
    ~419px in the embedded/non-fullscreen admin view (the tightest real case)
    -- re-verified by DOM measurement after this change, not assumed. */
-.nrr-pulse-scene-wins .nrr-pulse-scene-num { color: var(--green-deep); font-size: 24px; margin: 1px 0; }
-.nrr-pulse-scene-wins .nrr-pulse-scene-sub { color: var(--ink3); font-size: 11px; }
-.nrr-pulse-spotlight-title { font-size: 12px; font-weight: 700; color: var(--ink3); text-align: center; margin-bottom: 3px; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-num { color: var(--pc-mango); font-size: 24px; margin: 1px 0; }
+.nrr-pulse-scene-wins .nrr-pulse-scene-sub { color: var(--pc-ink-dim); font-size: 11px; }
+.nrr-pulse-spotlight-title { font-size: 12px; font-weight: 700; color: var(--pc-ink-dim); text-align: center; margin-bottom: 3px; }
 .nrr-pulse-spotlight-list { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
 /* v_signage7 (2026-07-15): FIXED height, same bug class + same fix as the
    v46 comment on .nrr-pulse-arr-row below -- this row used to be
@@ -1481,15 +1569,15 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    without, and the tag/chip/amount -- centered via align-items:center
    against EACH row's own height -- landed on a different vertical position
    row to row (user: "แต่ละ pill เรียงในแนวตั้ง...เบี้ยวไปเบี้ยวมา"). Fixed height,
-   sized for the worst case (name + sub, two lines), makes every row
-   identical regardless of content, so the pill/chip/amount always center
+   sized for the worst case (name + meta line, two lines), makes every row
+   identical regardless of content, so the tag/amount always center
    against the same number and land on one shared line. Matches
    .nrr-pulse-arr-row/.nrr-pulse-risk-row's own height per tier (52px
    embedded, see .nrr-pulse-fs-active override below for the 96px
    fullscreen tier) -- all three row types share one height per tier now. */
 .nrr-pulse-spotlight-row {
-  display: flex; flex: none; align-items: center; gap: 10px; background: #fff; border-radius: var(--r-md);
-  height: 52px; padding: 0 16px; box-shadow: 0 1px 0 var(--line);
+  display: flex; flex: none; align-items: center; gap: 10px; background: var(--pc-bg2); border-radius: var(--r-md);
+  height: 52px; padding: 0 16px; box-shadow: 0 1px 0 var(--pc-line);
 }
 .nrr-pulse-spotlight-main { flex: 1; min-width: 0; }
 /* v_signage4: name 15px/800 -> 15px/600, matching the app's standard
@@ -1498,37 +1586,41 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    (user feedback), so this scene keeps the 600 weight (still reads cleaner
    than the old 700/800) but grows the SIZE back up past the plain in-app
    standard, on purpose, for this signage-specific context. */
-.nrr-pulse-spotlight-name { font-size: 18px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-spotlight-name { font-size: 18px; font-weight: 600; color: var(--pc-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v_signage5: weight 800 -> 700. v_signage6: size 13px -> 16px (same
    "bigger for signage" pass as the name above). */
-.nrr-pulse-spotlight-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--ink); flex: none; }
+.nrr-pulse-spotlight-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--pc-mango); flex: none; }
 /* Sales/Expansion source badge — v_signage4 matched this to the app's
    standard `.tag` size (12px/700). v_signage6: bumped to 14px/700, padding
    5px 12px, to grow in step with the rest of this row's now-bigger text. */
 .nrr-pulse-source-tag {
   flex: none; display: inline-block; padding: 5px 12px; border-radius: var(--r-pill);
-  font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap;
+  font-size: 14px; font-weight: 700; white-space: nowrap;
 }
-.nrr-pulse-source-tag.sales      { background: var(--mv-teal); }
-.nrr-pulse-source-tag.expansion  { background: var(--mv-green-lt); }
+.nrr-pulse-source-tag.sales      { background: var(--pc-terracotta); color: #fff; }
+.nrr-pulse-source-tag.expansion  { background: var(--pc-mango); color: var(--pc-bg); }
 
 /* Scenes 3/4 — full-screen block panels (SKU / risk), reusing the same
    saturated left-accent look as the pre-v65 blocks, just larger rows now
-   that each scene owns the whole screen instead of sharing it with 6 others. */
-.nrr-pulse-scene-skus, .nrr-pulse-scene-risk { background: var(--fill); border-left: 10px solid var(--ink3); color: var(--ink); }
-.nrr-pulse-scene-skus { border-left-color: var(--sun); background: var(--sun-soft); }
-.nrr-pulse-scene-risk { border-left-color: var(--coral); background: var(--coral-soft); }
-.nrr-pulse-scene-skus .nrr-pulse-scene-num { color: var(--sun-deep); }
-.nrr-pulse-block-title { font-size: 24px; font-weight: 800; color: var(--ink); }
-.nrr-pulse-block-tally { font-size: 20px; font-weight: 700; color: var(--ink2); font-family: var(--font-num); }
+   that each scene owns the whole screen instead of sharing it with 6 others.
+   v_market1: both now share the same dark --pc-bg base as wins/month (one
+   board identity), differentiated only by their accent border color — skus
+   stays in the "good news" mango family, risk keeps a distinct terracotta
+   accent without reverting to an alarm-red. */
+.nrr-pulse-scene-skus, .nrr-pulse-scene-risk { border-left: 10px solid var(--pc-line); }
+.nrr-pulse-scene-skus { border-left-color: var(--pc-mango); }
+.nrr-pulse-scene-risk { border-left-color: var(--pc-terracotta); }
+.nrr-pulse-scene-skus .nrr-pulse-scene-num { color: var(--pc-mango); }
+.nrr-pulse-block-title { font-size: 24px; font-weight: 800; color: var(--pc-ink); }
+.nrr-pulse-block-tally { font-size: 20px; font-weight: 700; color: var(--pc-ink-dim); font-family: var(--font-num); }
 /* v_signage7 (2026-07-15): margin-bottom 14px -> 10px. Giving
    .nrr-pulse-arr-row/.nrr-pulse-risk-row `flex:none` (see those rules)
    exposed a real ~3.6px overflow that flex-shrink had been silently
    absorbing -- trimmed here rather than the row height itself, since the
    rows are already sized to match .nrr-pulse-spotlight-row's own height. */
-.nrr-pulse-block-caption { font-size: 14px; font-weight: 600; color: var(--ink3); margin: -2px 0 10px; line-height: 1.4; }
+.nrr-pulse-block-caption { font-size: 14px; font-weight: 600; color: var(--pc-ink-dim); margin: -2px 0 10px; line-height: 1.4; }
 .nrr-pulse-list { display: flex; flex-direction: column; overflow: hidden; }
-.nrr-pulse-empty { color: var(--ink3); font-size: 18px; padding: 10px 0; }
+.nrr-pulse-empty { color: var(--pc-ink-dim); font-size: 18px; padding: 10px 0; }
 
 /* v46: fixed row height (was auto — a row whose meta line happened to wrap
    to 2 lines made THAT rotation window taller than others, so the whole
@@ -1544,11 +1636,11 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    row equally whenever 6 rows don't quite fit the scene, which is exactly
    the same bug .nrr-pulse-spotlight-row just got caught doing (self-audited
    this row + risk-row for the same mistake once that turned up). */
-.nrr-pulse-arr-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--line); }
+.nrr-pulse-arr-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--pc-line); }
 .nrr-pulse-arr-row:last-child { border-bottom: none; }
-.nrr-pulse-arr-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--ink3); opacity: 0.4; flex: none; }
-.nrr-pulse-today-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--green-deep); flex: none; box-shadow: 0 0 0 0 rgba(0,128,101,0.6); animation: nrrPulseBeat 1.8s infinite; }
-@keyframes nrrPulseBeat { 0% { box-shadow: 0 0 0 0 rgba(0,128,101,0.55); } 70% { box-shadow: 0 0 0 10px rgba(0,128,101,0); } 100% { box-shadow: 0 0 0 0 rgba(0,128,101,0); } }
+.nrr-pulse-arr-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--pc-ink-dim); opacity: 0.4; flex: none; }
+.nrr-pulse-today-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--pc-mango); flex: none; box-shadow: 0 0 0 0 rgba(242,183,5,0.6); animation: nrrPulseBeat 1.8s infinite; }
+@keyframes nrrPulseBeat { 0% { box-shadow: 0 0 0 0 rgba(242,183,5,0.55); } 70% { box-shadow: 0 0 0 10px rgba(242,183,5,0); } 100% { box-shadow: 0 0 0 0 rgba(242,183,5,0); } }
 .nrr-pulse-arr-main { flex: 1; min-width: 0; }
 /* v_signage5 (2026-07-15): 20px/700 -> 15px/600, matched to app-standard row
    typography. v_signage6 (same day): 15px -> 18px -- across-the-board too
@@ -1556,46 +1648,39 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    cleaner than the pre-v_signage5 700/800) but grew the size, same as
    .nrr-pulse-spotlight-name (Wins/Month use a separate class but the SAME
    target size -- keep both in sync if either changes again). */
-.nrr-pulse-arr-name { font-size: 18px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-arr-name { font-size: 18px; font-weight: 600; color: var(--pc-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v_signage3: 14px -> 12px. v_signage5: 12px/600 -> 13px/500, matching the
    app's standard secondary-caption typography. v_signage6: 13px -> 15px,
    same "bigger for signage" pass as the name above. */
-.nrr-pulse-arr-sub { font-size: 15px; font-weight: 500; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-arr-sub { font-size: 15px; font-weight: 500; color: var(--pc-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* v50: was plain gray caption text — repurposed into a solid color-coded
    chip (color hashed per person in JS, _nrrPulseOwnerColor) so a KAM can
    learn "I'm this color" and spot their own rows across the whole board at
    a glance, instead of having to read every name. Shared by every list
    (Sales/Expansion/at-risk) — same person, same color, everywhere.
-   v51 tried a fixed-width CHIP to stop column drift — wrong fix (made every
-   chip the same size regardless of name, which read oddly stretched/padded
-   for short names). v53: chip goes back to hugging its own text; instead a
-   fixed-width, right-aligned SLOT wraps it, so the chip's right edge (the
-   edge nearest the ฿ figure, the one the eye actually tracks) lands in the
-   same column every row while its left edge is free to vary with the name. */
-/* v54: width now set inline per-list (measured from real text, see
-   _nrrPulseOwnerSlotWidth in nrr_pulse.js) — not a guessed constant here.
-   v65: font-size bumped 12px -> 16px, MUST stay in sync with the default
-   font string in _nrrPulseTextWidth (nrr_pulse.js) or measured slot widths
-   go silently wrong — see that file's own comment on this exact bug class.
-   v_signage5 (2026-07-15): 16px/800, padding 5px 13px -> 12px/700, padding
-   4px 10px -- matched to the app's standard `.tag` typography (nrr_base.css)
-   so this chip stops looking oversized next to the now-same-scale
-   Sales/Expansion tag it sits beside in Wins/Month rows.
-   v_signage6 (same day): 12px -> 14px, padding 4px 10px -> 5px 12px -- grew
-   back up in step with the rest of the row (too small per user feedback).
-   PAIRED EDIT REQUIRED: _nrrPulseTextWidth's default font string
-   (nrr_pulse.js) MUST also change to '700 14px ...' or measured slot widths
-   go silently wrong. */
+   v51-v65: several rounds landed on a measured right-aligned SLOT
+   (_nrrPulseOwnerSlotWidth) so the chip's right edge lines up in a column
+   next to the ฿ figure — measured from the list's real names, never a
+   guessed constant (see nrr_pulse.js).
+   v_market1 (2026-07-21) briefly moved the chip onto its own line under the
+   store name to make the closer more prominent; v_market2 (same day)
+   REVERTED that on real-device feedback — it read as the chip floating
+   detached from the row ("ทำไมไปอยู่ตรงนั้น? ควรจะอยู่ทางขวาดีกว่ามั้ย"). Back on
+   the measured right-hand slot; the prominence ask is carried by SIZE
+   instead: 17px/800 (was 14px/700 pre-redesign), plus its own larger
+   clamp() in the fullscreen tier below. PAIRED EDIT unchanged: the probe
+   pattern in nrr_pulse.js reads this class's real computed font, so no
+   hardcoded string to sync. */
 .nrr-pulse-owner-slot { flex: none; display: flex; justify-content: flex-end; }
 .nrr-pulse-owner-chip {
-  display: inline-block; padding: 5px 12px; border-radius: var(--r-pill);
-  font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 0.01em;
+  display: inline-block; padding: 6px 14px; border-radius: var(--r-pill);
+  font-size: 17px; font-weight: 800; color: #fff; letter-spacing: 0.01em;
   white-space: nowrap;
 }
 /* v_signage5: 20px/800 -> 13px/700, matching .nrr-pulse-spotlight-amt and
    the app's standard trailing-number weight. v_signage6: 13px -> 16px, same
    "bigger for signage" pass, kept in sync with .nrr-pulse-spotlight-amt. */
-.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--ink); flex: none; }
+.nrr-pulse-arr-gmv { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--pc-mango); flex: none; }
 
 /* v50: rebuilt to match .nrr-pulse-arr-row exactly (res_name primary /
    account_name secondary via .nrr-pulse-arr-main, owner chip) — only the
@@ -1607,37 +1692,30 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    v_signage7: added `flex:none`, same fix + same reason as .nrr-pulse-arr-row
    above -- a bare `height` inside a flex column is only a sizing hint and
    silently flex-shrinks without this. */
-.nrr-pulse-risk-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--line); }
+.nrr-pulse-risk-row { display: flex; flex: none; align-items: center; gap: 14px; height: 52px; border-bottom: 1px solid var(--pc-line); }
 .nrr-pulse-risk-row:last-child { border-bottom: none; }
 /* v52: the chip fix (v51) wasn't the real cause — .nrr-pulse-risk-amt-wrap
    itself had NO fixed width (only `max-width` on the label inside it, which
    caps but doesn't force), so "เงียบ" (short) vs "ต่ำกว่าฐาน 45%" (long)
    rendered the whole wrap block at different widths row to row. Since
    .nrr-pulse-arr-main is flex:1 (fills whatever's left), a wider/narrower
-   amt-wrap shifted how much space main actually got, which moved the owner
-   chip's position between them — the chip was never the moving part, the
-   block to its right was. Fixed width on the wrap stops the whole row's
-   layout from depending on the reason text's length at all.
-   v55: 132px was a GUESSED constant — same bug class as the owner slot
-   (v53). For any row shorter than the guess, right-aligned text left dead
-   space right next to the chip, reading as "chip far from the number".
-   Width now set inline per-list from real measured text
-   (_nrrPulseRiskAmtWidth in nrr_pulse.js) — no width here.
+   amt-wrap shifted how much space main actually got. Fixed width on the
+   wrap stops the whole row's layout from depending on the reason text's
+   length at all. v55: 132px was a GUESSED constant. Width now set inline
+   per-list from real measured text (_nrrPulseRiskAmtWidth in nrr_pulse.js).
    v65: 16px/10.5px -> 22px/13px, MUST stay in sync with the font strings
-   inside _nrrPulseRiskAmtWidth (nrr_pulse.js) — same measure-don't-guess
-   discipline as the owner slot above.
-   v_signage5 (2026-07-15): 22px/800 -> 13px/700 (color stays coral — user
-   confirmed dropping the deliberate "alarm" emphasis in favor of matching
-   every other number on the page). Reason label 13px/700 -> 13px/500,
-   matching the app's standard secondary-caption weight.
-   v_signage6 (same day): 13px -> 16px (amount) / 13px -> 15px (label), same
-   "bigger for signage" pass as every other row-level class. PAIRED EDIT
-   REQUIRED: _nrrPulseRiskAmtWidth's two hardcoded font strings (nrr_pulse.js)
-   MUST also update to match, or the amt-wrap column width goes silently
-   wrong. */
+   inside _nrrPulseRiskAmtWidth (nrr_pulse.js) — measure-don't-guess.
+   v_signage5 (2026-07-15): 22px/800 -> 13px/700 (color stays terracotta —
+   user confirmed dropping the deliberate "alarm" emphasis in favor of
+   matching every other number on the page, v_market1 just retints it).
+   Reason label 13px/700 -> 13px/500. v_signage6 (same day): 13px -> 16px
+   (amount) / 13px -> 15px (label), same "bigger for signage" pass as every
+   other row-level class. PAIRED EDIT REQUIRED: _nrrPulseRiskAmtWidth's two
+   hardcoded font strings (nrr_pulse.js) MUST also update to match, or the
+   amt-wrap column width goes silently wrong. */
 .nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
-.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--coral); }
-.nrr-pulse-risk-amt-lbl { font-size: 15px; font-weight: 500; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--pc-terracotta); }
+.nrr-pulse-risk-amt-lbl { font-size: 15px; font-weight: 500; color: var(--pc-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Fullscreen tier (v_signage7, 2026-07-15) ─────────────────────────────
    Every rule above this point is the EMBEDDED tier — sized for the Pulse
@@ -1655,10 +1733,10 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    numbers all get bigger together, same invariant as every prior round
    (all 4 scenes share one scale per tier, never touched independently).
    PAIRED EDIT: entering/exiting fullscreen changes which font this CSS
-   renders for the owner-chip/risk-amount — _nrrPulseTextWidth,
-   _nrrPulseOwnerSlotWidth and _nrrPulseRiskAmtWidth (nrr_pulse.js) all check
-   document.fullscreenElement and pick the matching font string/padding, or
-   the measured column widths go wrong the instant fullscreen toggles. */
+   renders for the risk-amount column — _nrrPulseTextWidth and
+   _nrrPulseRiskAmtWidth (nrr_pulse.js) check document.fullscreenElement and
+   pick the matching font string/padding, or the measured column widths go
+   wrong the instant fullscreen toggles. */
 /* v_signage8 (2026-07-16): a real device (not this test harness's simulated
    1920x1080) showed the last row clipped -- the prior round's fit left only
    ~3px of spare at exactly 1920x1080, which is not a safety margin, it's an
@@ -1671,11 +1749,11 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    Nvh, max)` -- tied to the REAL viewport height (vh), so it naturally
    scales down on a shorter screen and up on a taller one, rather than
    assuming one fixed canvas. This only works because _nrrPulseTextWidth/
-   _nrrPulseOwnerSlotWidth/_nrrPulseRiskAmtWidth (nrr_pulse.js) no longer
-   hardcode a font string to match -- they read the REAL computed font off
-   a hidden probe element carrying these same classes, so whatever size the
-   browser actually resolves the clamp() to is what gets measured, on any
-   screen, permanently (no more per-round sync edits). */
+   _nrrPulseRiskAmtWidth (nrr_pulse.js) no longer hardcode a font string to
+   match -- they read the REAL computed font off a hidden probe element
+   carrying these same classes, so whatever size the browser actually
+   resolves the clamp() to is what gets measured, on any screen,
+   permanently (no more per-round sync edits). */
 .nrr-pulse-fs-active .nrr-pulse-scene { padding: clamp(24px, 4vh, 40px) clamp(32px, 5vw, 56px); }
 .nrr-pulse-fs-active .nrr-pulse-scene-wins .nrr-pulse-scene-lbl { font-size: clamp(16px, 2.2vh, 24px); }
 .nrr-pulse-fs-active .nrr-pulse-scene-wins .nrr-pulse-scene-num { font-size: clamp(56px, 9vh, 100px); margin: 2px 0; }
@@ -1690,8 +1768,11 @@ select.nrr-search { appearance: auto; cursor: pointer; }
 .nrr-pulse-fs-active .nrr-pulse-spotlight-amt,
 .nrr-pulse-fs-active .nrr-pulse-arr-gmv,
 .nrr-pulse-fs-active .nrr-pulse-risk-amt { font-size: clamp(17px, 2.4vh, 29px); }
-.nrr-pulse-fs-active .nrr-pulse-source-tag,
-.nrr-pulse-fs-active .nrr-pulse-owner-chip { font-size: clamp(12.5px, 1.5vh, 18px); padding: clamp(4px, 0.7vh, 7px) clamp(10px, 1.4vw, 18px); }
+.nrr-pulse-fs-active .nrr-pulse-source-tag { font-size: clamp(12.5px, 1.5vh, 18px); padding: clamp(4px, 0.7vh, 7px) clamp(10px, 1.4vw, 18px); }
+/* v_market1: owner chip gets its OWN (bigger) clamp range in fullscreen too
+   — no longer shares a rule with .nrr-pulse-source-tag, since it's now the
+   more prominent of the two (see the embedded-tier rule above for why). */
+.nrr-pulse-fs-active .nrr-pulse-owner-chip { font-size: clamp(16px, 2.2vh, 26px); padding: clamp(5px, 0.9vh, 9px) clamp(12px, 1.6vw, 20px); }
 .nrr-pulse-fs-active .nrr-pulse-arr-row,
 .nrr-pulse-fs-active .nrr-pulse-risk-row { height: clamp(52px, 7vh, 84px); gap: clamp(12px, 1.6vw, 18px); }
 .nrr-pulse-fs-active .nrr-pulse-block-title { font-size: clamp(22px, 3vh, 36px); }
@@ -5674,6 +5755,132 @@ function nrrPortfolioRiskSummary(kamEmail) {
 }
 window.nrrPortfolioRiskSummary = nrrPortfolioRiskSummary;
 
+// ══ PM Portfolio Mode (v_pmmode, 2026-07-21) ═══════════════════════════════
+// A PM holds 400+ accounts — the flat per-account card list that works for a
+// 20-account KAM is unusable at that scale, and per-account metrics don't
+// match the inputs a PM actually controls (one-to-many campaigns, not
+// per-account calls). Three layers, all computed from data ALREADY loaded
+// client-side (nrrKamResult / bulkPortviewData) — no new SQL:
+//   1. nrrPortfolioWaterfall — NRR flow decomposition (base → churn/
+//      contraction/comeback/new → current), a pure re-presentation of
+//      _qnrrCompute's own segments so it can never disagree with the %NRR
+//      shown elsewhere on the page.
+//   2. nrrRiskQueue — the ฿-ranked "ต้องดูแล" triage list, extracted from
+//      nrr_pulse.js's proven inline logic (Pulse now calls this too).
+//   3. nrrPortfolioTiers — Pareto A/B/C by account size, so the top ~40
+//      accounts (60% of GMV) can be worked KAM-style and the tail managed
+//      as a cohort.
+// Activation is by PORTFOLIO SIZE, not role (>= NRR_PM_MODE_MIN_ACCOUNTS),
+// so an admin opening a PM's portfolio gets the same treatment with zero
+// new role plumbing, and small KAM portfolios keep the existing view.
+var NRR_PM_MODE_MIN_ACCOUNTS = 100;
+
+// Flow decomposition for one owner+period, derived 1:1 from
+// nrrKamResult(email).by_month[period] (nrr_aggregate.js/_qnrrCompute):
+//   base − churn + contraction + comeback + newStores + inflow === curr
+// holds EXACTLY (contraction = segments.core_nrr − core_nrr_base by
+// definition, so the sum telescopes back to total_gmv). All ฿ values are
+// the same day-normalized (÷days×30) figures _qnrrCompute produces.
+function nrrPortfolioWaterfall(email, period) {
+  var result = (typeof nrrKamResult === 'function') ? nrrKamResult(email) : null;
+  var bm = result && period ? result.by_month[period] : null;
+  if (!bm) return null;
+  var seg = bm.segments || {}, out = bm.outlets || {};
+  var churn = seg.core_nrr_churn || 0;
+  var activeN = out.core_nrr || 0, churnedN = out.core_nrr_churn || 0;
+  return {
+    base: (bm.core_nrr_base || 0) + churn,
+    churn: churn,
+    contraction: bm.contraction || 0,   // core cohort's own delta vs base — can be + (growth) or − (shrink)
+    comeback: seg.comeback || 0,
+    newStores: (seg.expansion || 0) + (seg.new_sales || 0),
+    inflow: (seg.handover || 0) + (seg.transfer_in || 0),
+    curr: bm.total_gmv || 0,
+    counts: {
+      active: activeN, churned: churnedN,
+      comeback: out.comeback || 0,
+      newStores: (out.expansion || 0) + (out.new_sales || 0),
+      inflow: (out.handover || 0) + (out.transfer_in || 0)
+    },
+    activeRatio: (activeN + churnedN) > 0 ? activeN / (activeN + churnedN) * 100 : null,
+    nrr_pct: bm.nrr_pct
+  };
+}
+window.nrrPortfolioWaterfall = nrrPortfolioWaterfall;
+
+// ฿-ranked at-risk queue. Extracted VERBATIM from nrr_pulse.js's inline
+// "ต้องดูแล" computation (v49 threshold: run-rate >20% below the quarter's
+// fixed base month, i.e. pace.pct < 80 — deliberately stricter than
+// nrrPaceSignal's own 'danger' band so the list stays actionable, see the
+// original v49 note now living here). Pulse calls this with
+// opts.bigOutletByAcct (its account→biggest-outlet name map) to keep its
+// display names identical; the Portfolio queue passes no opts and shows
+// plain account names (rows deep-link to the Account page anyway).
+function nrrRiskQueue(rows, opts) {
+  var out = [];
+  (rows || []).forEach(function (row) {
+    var pace = (typeof nrrPaceSignal === 'function') ? nrrPaceSignal(row) : { pct: null, cls: 'unknown', baseline_gmv: 0 };
+    if (pace.pct == null) return; // no baseline (brand-new account) — nothing to compare
+    if (pace.cls === 'great' || pace.cls === 'safe') return;
+    if (pace.pct >= 80) return;
+    var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
+    var shortfall = Math.max(0, baseline - runrate);
+    var dropPct = Math.max(0, Math.round(100 - pace.pct));
+    var quiet = pace.pct < 50 || (row.churned_gmv || 0) > runrate;
+    var acctName = row.account_name || row.account_id;
+    var big = (opts && opts.bigOutletByAcct) ? opts.bigOutletByAcct[row.account_id] : null;
+    out.push({
+      account_id: row.account_id,
+      name: (big && big.name) || acctName,
+      sub: (big && big.name && big.name !== acctName) ? acctName : '',
+      kam: row.kam_name || row.kam_email || '',
+      risk: shortfall,
+      reason: quiet ? 'เงียบ' : 'ต่ำกว่าฐาน ' + dropPct + '%'
+    });
+  });
+  out.sort(function (a, b) { return b.risk - a.risk; });
+  return out;
+}
+window.nrrRiskQueue = nrrRiskQueue;
+
+// Pareto tiers: sort by account size (fixed-base-month GMV; run-rate as the
+// fallback for baseline-less new accounts so a big new account isn't buried
+// in C), then cumulative share — A = accounts covering the first 60% of
+// portfolio GMV, B = to 90%, C = the tail. The account that CROSSES a
+// boundary stays in the earlier tier (cum measured before adding it).
+var NRR_TIER_BOUNDS = { A: 0.60, B: 0.90 };
+function nrrPortfolioTiers(email) {
+  function mk() { return { count: 0, gmv: 0, baseline: 0, runrate: 0, byId: {} }; }
+  var tiers = { A: mk(), B: mk(), C: mk() };
+  var sized = nrrPortfolioRowsFor(email).map(function (it) {
+    return { it: it, size: (it.pace.baseline_gmv || 0) > 0 ? it.pace.baseline_gmv : (it.row.runrate_gmv || 0) };
+  }).sort(function (a, b) { return b.size - a.size; });
+  var total = sized.reduce(function (s, x) { return s + x.size; }, 0);
+  var cum = 0;
+  sized.forEach(function (x) {
+    var key = total <= 0 ? 'C'
+      : cum < total * NRR_TIER_BOUNDS.A ? 'A'
+      : cum < total * NRR_TIER_BOUNDS.B ? 'B' : 'C';
+    cum += x.size;
+    var t = tiers[key];
+    t.count++;
+    t.gmv += x.size;
+    t.baseline += x.it.pace.baseline_gmv || 0;
+    t.runrate += x.it.row.runrate_gmv || 0;
+    t.byId[x.it.row.account_id] = true;
+  });
+  ['A', 'B', 'C'].forEach(function (k) {
+    var t = tiers[k];
+    t.share = total > 0 ? t.gmv / total * 100 : 0;
+    // "retention" here = tier's pooled run-rate vs its pooled fixed base —
+    // the same ratio nrrPaceSignal computes per account, pooled per tier.
+    t.retention = t.baseline > 0 ? t.runrate / t.baseline * 100 : null;
+  });
+  tiers.total = total;
+  return tiers;
+}
+window.nrrPortfolioTiers = nrrPortfolioTiers;
+
 // Mini 6-month bar chart per account (Sense's _buildSparkline pattern,
 // 06_portview_teamview.js:987-1017, ghost/solid two-tone last bar) — the
 // 5 closed months come straight from bulk_history.csv; the current
@@ -7380,7 +7587,12 @@ window.nrrHandleSalesClick = nrrHandleSalesClick;
 // simultaneous list content, which the pre-v65 "3 heroes + 4 lists on one
 // page" layout required).
 var NRR_PULSE_ROT_MS = 8000;                // default: advance to the next scene every 8s
-var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [] };
+// v_market1 (2026-07-21): sceneToggles lets an admin hide a scene from
+// rotation entirely (e.g. skus off by default per explicit request) — same
+// session-only convention as rotMs above (no localStorage anywhere in /nrr).
+var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [], tvMode: false,
+  sceneToggles: { wins: true, month: true, skus: false, risk: true } };
+var NRR_PULSE_SCENE_LABELS = [['wins', 'ชนะวันนี้'], ['month', 'เดือนนี้'], ['skus', 'SKU ใหม่'], ['risk', 'ต้องดูแล']];
 var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
 var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
@@ -7528,6 +7740,12 @@ function _nrrPulseRiskAmtWidth(items) {
   // string in the list clips itself by ~1px and silently ellipsizes.
   return maxW > 0 ? Math.ceil(maxW) + 3 : 0;
 }
+// v_market2 (2026-07-21): back on the right-aligned measured slot — v_market1
+// briefly moved the chip to its own line under the store name, but on a real
+// TV that read as the chip floating detached from everything else (user:
+// "ชื่อ owner ทำไมไปอยู่ตรงนั้น? ควรจะอยู่ทางขวาดีกว่ามั้ย"). The prominence ask is
+// kept via SIZE instead (17px/800 embedded, own bigger clamp() in fullscreen
+// — see .nrr-pulse-owner-chip in nrr_components.css), not via position.
 function _nrrPulseOwnerChip(fullName, slotWidth) {
   var nick = _nrrPulseNick(fullName);
   var chip = nick ? '<span class="nrr-pulse-owner-chip" style="background:' + _nrrPulseOwnerColor(nick) + '">' + nrrEsc(nick) + '</span>' : '';
@@ -7671,46 +7889,24 @@ function nrrPulseModel() {
   // todayGmv specifically).
   var monthItems = salesItems.concat(expItems).sort(function (a, b) { return b.gmv - a.gmv; });
 
-  // ── At-risk accounts, from portview + history (nrrPaceSignal) ──
+  // ── At-risk accounts, from portview + history ──
+  // v_pmmode (2026-07-21): the inline v49 computation that used to live here
+  // (pace.pct < 80 threshold, เงียบ split, shortfall sort) moved VERBATIM to
+  // the shared nrrRiskQueue helper (nrr_portfolio.js) so the new PM
+  // Portfolio mode shows the exact same queue — behavior here is unchanged
+  // (verified by fixture comparison against the old inline version).
   var pv = window.bulkPortviewData;
-  var dangerCount = 0, newSkuAdded = 0;
+  var newSkuAdded = 0;
   var riskItems = [];
   if (pv && pv.loaded && pv.allRows) {
     pv.allRows.forEach(function (row) {
       // new-SKU count (v1: count only, no names — no portfolio-wide SKU source)
       var added = (row.cur_sku_count || 0) - (row.last_month_sku_count || 0);
       if (added > 0) newSkuAdded += added;
-
-      var pace = (typeof nrrPaceSignal === 'function') ? nrrPaceSignal(row) : { pct: null, cls: 'unknown', baseline_gmv: 0 };
-      if (pace.pct == null) return; // no baseline (brand-new account) — nothing to compare
-      var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
-      if (pace.cls !== 'great' && pace.cls !== 'safe') {
-        // v49: "ต้องดูแล" now requires a drop of MORE than 20% below baseline
-        // (pct < 80) — was nrrPaceSignal's own 'danger' band (pct < 90, i.e.
-        // >10% drop), which the user found too inclusive/noisy for a "act on
-        // this today" TV list. This is a Pulse-page-only threshold — does
-        // NOT change nrrPaceSignal itself or anything else in the app that
-        // reads pace.cls (e.g. the Account page's own pace coloring).
-        if (pace.pct < 80) {
-          dangerCount++;
-          var shortfall = Math.max(0, baseline - runrate);
-          var dropPct = Math.max(0, Math.round(100 - pace.pct));
-          var quiet = pace.pct < 50 || (row.churned_gmv || 0) > runrate;
-          var acctName = row.account_name || row.account_id;
-          var bigOutlet = acctBigOutlet[row.account_id];
-          var primaryName = (bigOutlet && bigOutlet.name) || acctName;
-          riskItems.push({
-            name: primaryName,
-            sub: (bigOutlet && bigOutlet.name && bigOutlet.name !== acctName) ? acctName : '',
-            kam: row.kam_name || row.kam_email || '',
-            risk: shortfall,
-            reason: quiet ? 'เงียบ' : 'ต่ำกว่าฐาน ' + dropPct + '%'
-          });
-        }
-      }
     });
+    riskItems = nrrRiskQueue(pv.allRows, { bigOutletByAcct: acctBigOutlet });
   }
-  riskItems.sort(function (a, b) { return b.risk - a.risk; });
+  var dangerCount = riskItems.length;
   // v48: sum across ALL 156 danger-band accounts (riskItems already holds
   // every one, not just the rotating top-N shown) — user asked for the real
   // total ฿ at risk, not just individual row amounts.
@@ -7765,46 +7961,87 @@ function _nrrPulseRotControlHtml() {
     '</div>';
 }
 
+// v_market1 (2026-07-21): multi-toggle, not the single-select .seg pattern
+// _nrrCoSegHtml renders — several scenes can be on at once, so this builds
+// its own row of independently-toggleable buttons sharing the same .seg/
+// button.on classes (see nrr_components.css for why reusing .seg is safe
+// here: the visual is identical whether one or several buttons carry .on).
+function _nrrPulseSceneToggleHtml() {
+  var t = nrrPulseState.sceneToggles;
+  return '<div class="nrr-pulse-scene-toggle-ctrl"><span class="nrr-pulse-rot-lbl">แสดงฉาก</span>' +
+    '<div class="seg" id="nrr-pulse-scene-toggle-seg">' +
+    NRR_PULSE_SCENE_LABELS.map(function (kv) {
+      return '<button type="button"' + (t[kv[0]] ? ' class="on"' : '') + ' data-scenekey="' + kv[0] + '">' + kv[1] + '</button>';
+    }).join('') +
+    '</div></div>';
+}
+
 function _nrrPulseDatelineHtml(m) {
   var d = m.asOf;
   var dow = _NRR_PULSE_TH_DOW[d.getDay()];
   var dateTh = nrrThMonthLabel ? (d.getDate() + ' ' + nrrThMonthLabel(d)) : (d.getDate() + '/' + (d.getMonth() + 1));
   var upd = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  var isFs = !!document.fullscreenElement;
   return '<div class="nrr-pulse-dateline">' +
     '<div><div class="nrr-pulse-dateline-main">เช้าวัน' + dow + ' · ' + nrrEsc(dateTh) + '</div>' +
     '<div class="nrr-pulse-dateline-sub">ภาพรวม portfolio · ข้อมูลถึงเมื่อวาน · อัปเดต ' + upd + '</div></div>' +
     '<div class="nrr-pulse-dateline-controls">' +
+    _nrrPulseSceneToggleHtml() +
     _nrrPulseRotControlHtml() +
     '<button type="button" class="nrr-pulse-fs-btn" id="nrr-pulse-fs-btn">' +
-    (isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
+    (nrrPulseState.tvMode ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
     '</div>' +
     '</div>';
 }
 
 // ── Fullscreen / TV mode ─────────────────────────────────────────────────
-// Uses the standard Fullscreen API (a user gesture is required to invoke
-// it, hence the button — can't auto-trigger on page load). Hides the app's
-// masthead/nav while active so the board is pure signage on the TV, no
-// browser chrome or app nav competing for space. Tied to the SAME cleanup
-// hook that already clears the rotation/refresh timers on route-away, so
-// leaving #/pulse always exits fullscreen too.
-function _nrrPulseToggleFullscreen() {
-  if (!document.fullscreenElement) {
-    (document.documentElement.requestFullscreen() || Promise.resolve()).catch(function () {});
-  } else {
-    (document.exitFullscreen() || Promise.resolve()).catch(function () {});
-  }
-}
-document.addEventListener('fullscreenchange', function () {
-  var isFs = !!document.fullscreenElement;
-  document.body.classList.toggle('nrr-pulse-fs-active', isFs);
+// v_signage8 (2026-07-21): TV mode is driven by OUR OWN button-click state
+// (nrrPulseState.tvMode / .nrr-pulse-fs-active), NOT by document.fullscreen-
+// Element / the fullscreenchange event. Root-caused a real report: several
+// Smart TV "internet browser" apps don't support (or silently reject) the
+// standard Fullscreen API at all — requestFullscreen()'s promise never
+// resolves/rejects usefully there, fullscreenchange never fires, so the old
+// design (gating .nrr-pulse-fs-active on that event) left the board stuck
+// in its small "desktop preview" layout forever on those TVs, with its
+// vh/vw-based sizing computed against whatever narrow width that TV's
+// browser reports — that's what produced the "content only fills the left
+// half of the screen, fonts/boxes distorted" bug (same in both the button's
+// 'fullscreen' and 'normal' state, because fs-active never actually
+// engaged either way). Now the full-bleed CSS applies the instant the
+// button is clicked, independent of whether real browser fullscreen ever
+// engages. Real Fullscreen API support (where it exists, e.g. an actual
+// desktop Chrome) is still requested as a bonus — it hides the browser's
+// own chrome — but its success/failure no longer gates the board's layout.
+function _nrrPulseSetTvMode(on) {
+  nrrPulseState.tvMode = on;
+  document.body.classList.toggle('nrr-pulse-fs-active', on);
   var btn = document.getElementById('nrr-pulse-fs-btn');
-  if (btn) btn.textContent = isFs ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
-  // v56/v65: row cap (_nrrPulseEffMax) depends on document.fullscreenElement —
-  // re-show the current scene immediately so the row count changes the
-  // instant fullscreen toggles, not just on the next rotation tick.
+  if (btn) btn.textContent = on ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
+  // v56/v65: re-show the current scene immediately so any layout-dependent
+  // sizing updates the instant TV mode toggles, not just on the next
+  // rotation tick.
   if (nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
+}
+function _nrrPulseToggleFullscreen() {
+  var goingOn = !nrrPulseState.tvMode;
+  _nrrPulseSetTvMode(goingOn);
+  // Best-effort only — guarded so a TV browser with no Fullscreen API at
+  // all (requestFullscreen undefined) can't throw synchronously and abort
+  // the state change above.
+  try {
+    if (goingOn && document.documentElement.requestFullscreen) {
+      (document.documentElement.requestFullscreen() || Promise.resolve()).catch(function () {});
+    } else if (!goingOn && document.fullscreenElement && document.exitFullscreen) {
+      (document.exitFullscreen() || Promise.resolve()).catch(function () {});
+    }
+  } catch (e) {}
+}
+// One-way top-up: if a REAL Fullscreen API exit happens by some other means
+// (e.g. user presses Esc on a desktop browser that does support it), turn
+// our own layout off too. Never the sole trigger for turning tvMode ON —
+// TVs that never fire this event at all simply don't hit this listener,
+// which is fine, since the button click above is already authoritative.
+document.addEventListener('fullscreenchange', function () {
+  if (!document.fullscreenElement && nrrPulseState.tvMode) _nrrPulseSetTvMode(false);
 });
 
 // ── Scenes ───────────────────────────────────────────────────────────────
@@ -7967,10 +8204,12 @@ function _nrrPulseFillLists(sceneKey) {
 // let its own empty-state message ("— ยังไม่มีร้านใหม่วันนี้ —") communicate
 // "system's working, just nothing yet" instead of the scene vanishing.
 function _nrrPulseActiveScenes(m) {
-  var scenes = ['wins'];
-  if (m.monthItems.length > 0) scenes.push('month');
-  if (m.newSkuItems.length > 0 || m.newSkuAdded > 0) scenes.push('skus');
-  if (m.risk.length > 0) scenes.push('risk');
+  var t = nrrPulseState.sceneToggles;
+  var scenes = [];
+  if (t.wins) scenes.push('wins');
+  if (t.month && m.monthItems.length > 0) scenes.push('month');
+  if (t.skus && (m.newSkuItems.length > 0 || m.newSkuAdded > 0)) scenes.push('skus');
+  if (t.risk && m.risk.length > 0) scenes.push('risk');
   return scenes;
 }
 
@@ -8061,6 +8300,14 @@ function _nrrPulseArmSceneSubRotation(key) {
 function nrrRenderPulseView() {
   var page = document.getElementById('nrr-pulse-page');
   if (!page) return;
+  // v_market2 (2026-07-21): paint the WHOLE page dark while Pulse is on
+  // screen — the scene card alone being dark left the body's light
+  // background showing around it ("dark theme ไม่ได้คลุมทั้งจอ ดีไซน์แหว่งๆ"),
+  // and the cream dateline text was near-invisible on that light gap.
+  // Removed by the hashchange listener below the instant the route leaves
+  // #/pulse (NOT in _nrrPulseClearTimers — that also runs on every timer
+  // re-arm while still on this page, which would flash the light bg back).
+  document.body.classList.add('nrr-pulse-on');
   // Ensure the portfolio-level data this page needs is loaded (dashboard init
   // only fetches movement/company data; portview + history come from the
   // portfolio/account flows). Idempotent + cached — safe to await every entry.
@@ -8129,6 +8376,20 @@ function _nrrPulseRender() {
     // not worth splitting into two separate arm functions for this scope.
     _nrrPulseArmTimers();
   });
+  // v_market1 (2026-07-21): scene-visibility toggle — unlike rotSeg (timing
+  // only), toggling a scene changes which DOM nodes exist at all, so the
+  // simplest correct response is a full re-render, same as a data refresh.
+  var toggleSeg = document.getElementById('nrr-pulse-scene-toggle-seg');
+  if (toggleSeg) toggleSeg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-scenekey]');
+    if (!btn) return;
+    var key = btn.dataset.scenekey;
+    var t = nrrPulseState.sceneToggles;
+    var onCount = Object.keys(t).filter(function (k) { return t[k]; }).length;
+    if (t[key] && onCount <= 1) return; // keep at least one scene on — never let the board go fully blank
+    t[key] = !t[key];
+    _nrrPulseRender();
+  });
 }
 
 // ── Timers (auto-refresh + spotlight rotation) ──────────────────────────────
@@ -8165,9 +8426,20 @@ function _nrrPulseClearTimers() {
   if (_nrrPulseRotTimer) { clearInterval(_nrrPulseRotTimer); _nrrPulseRotTimer = null; }
   if (_nrrPulseRefreshTimer) { clearInterval(_nrrPulseRefreshTimer); _nrrPulseRefreshTimer = null; }
   if (_nrrPulseSceneSubTimer) { clearInterval(_nrrPulseSceneSubTimer); _nrrPulseSceneSubTimer = null; }
-  // Leaving #/pulse always exits TV fullscreen too — same cleanup hook.
-  if (document.fullscreenElement) (document.exitFullscreen() || Promise.resolve()).catch(function () {});
+  // Leaving #/pulse always exits TV mode too — same cleanup hook. Reset our
+  // own state directly (don't rely on the fullscreenchange event, which may
+  // never fire on TV browsers without real Fullscreen API support).
+  if (nrrPulseState.tvMode) { nrrPulseState.tvMode = false; document.body.classList.remove('nrr-pulse-fs-active'); }
+  try { if (document.fullscreenElement && document.exitFullscreen) (document.exitFullscreen() || Promise.resolve()).catch(function () {}); } catch (e) {}
 }
+
+// v_market2: drop the dark page background the moment the route leaves
+// #/pulse. Registered AFTER nrr_router.js's own hashchange listener (that
+// file is injected before this module), so nrrCurrentRoute is already
+// updated by the time this runs.
+window.addEventListener('hashchange', function () {
+  if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') document.body.classList.remove('nrr-pulse-on');
+});
 
 // ── Route registration (nrr_router.js is injected before this module) ────────
 nrrRouterRegister('pulse', nrrRenderPulseView);
@@ -9071,7 +9343,11 @@ async function nrrInitApp() {
 // KAM, switcher grouped by team. All three render the SAME two blocks —
 // self-summary (commission receipt, reused verbatim from the drawer) +
 // account card list (portview.csv) — "ภาษาเดียวกัน" across every role.
-var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn: false, danger: false }, skuFilter: false };
+var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn: false, danger: false }, skuFilter: false,
+  // v_pmmode (2026-07-21): PM Portfolio mode — tier chip filter ('A'|'B'|'C'
+  // or '' = off) + risk-queue expand toggle. Both reset on portfolio switch
+  // (nrrRenderPortfolioLayerView) since tier membership is per-portfolio.
+  tierFilter: '', queueExpanded: false };
 
 // { email, name } list this profile is allowed to switch between — also
 // what nrr_router.js's TL guard checks against, so "what the switcher
@@ -9223,7 +9499,13 @@ function _nrrAccountOutletNameMatches(accountId, query) {
 function nrrPortfolioAcctGridHtml(email) {
   var pf = nrrPortfolioState.paceFilter;
   var anyPaceSelected = pf.ok || pf.warn || pf.danger;
+  // v_pmmode: tier chip filter — tiers only recomputed when one is active
+  // (the tier cards themselves only render in PM mode, and the filter is
+  // reset on portfolio switch, so this never leaks into small portfolios).
+  var tierSel = nrrPortfolioState.tierFilter;
+  var tierMap = tierSel ? nrrPortfolioTiers(email) : null;
   var filtered = nrrPortfolioRowsFor(email).filter(function (item) {
+    if (tierSel && tierMap && !tierMap[tierSel].byId[item.row.account_id]) return false;
     if (anyPaceSelected) {
       var bucket = (item.pace.cls === 'great' || item.pace.cls === 'safe') ? 'ok' : (item.pace.cls === 'warn' ? 'warn' : (item.pace.cls === 'danger' ? 'danger' : null));
       if (!bucket || !pf[bucket]) return false;
@@ -9271,6 +9553,115 @@ function nrrPortfolioPulseHtml(email, period) {
     '<div class="num nrr-port-pulse-pct" style="color:' + (pct != null ? nrrThresholdColorVar(pct) : 'var(--ink3)') + '">' + nrrFmtPct(pct) + '</div>' +
     nrrTripleHtml('lg', triple) +
     '</div>';
+}
+
+// ══ PM Portfolio Mode render layer (v_pmmode, 2026-07-21) ══════════════════
+// Shown only when the portfolio has >= NRR_PM_MODE_MIN_ACCOUNTS accounts
+// (see nrr_portfolio.js header for the full rationale). Three layers:
+// waterfall+KPIs, ฿-ranked risk queue, Pareto tier cards. All hairline
+// analyst-view styling — NOT the Pulse signage look.
+
+// Layer 1 — flow "ladder": base at the top, each signed flow as its own
+// labeled row with a proportional mini-bar, current at the bottom. Chosen
+// over a classic floating-bar waterfall chart: same information, readable
+// at a glance, zero chart-library/positioning risk.
+function nrrPortfolioWaterfallHtml(email, period) {
+  var w = nrrPortfolioWaterfall(email, period);
+  if (!w) return '';
+  var maxRef = Math.max(w.base, w.curr, 1);
+  function row(label, val, kind, count) {
+    var isFlow = kind === 'flow';
+    var color = !isFlow ? 'var(--ink)' : (val >= 0 ? 'var(--green-deep)' : 'var(--coral)');
+    var wPct = Math.max(0.5, Math.abs(val) / maxRef * 100);
+    var sign = isFlow ? (val >= 0 ? '+' : '−') : '';
+    return '<div class="nrr-pm-flow-row' + (isFlow ? '' : ' anchor') + '">' +
+      '<div class="nrr-pm-flow-label">' + nrrEsc(label) +
+      (count != null ? ' <span class="micro">' + count + ' สาขา</span>' : '') + '</div>' +
+      '<div class="nrr-pm-flow-bar"><div class="nrr-pm-flow-fill" style="width:' + wPct.toFixed(1) + '%;background:' + color + '"></div></div>' +
+      '<div class="num nrr-pm-flow-val" style="color:' + color + '">' + sign + nrrFmtGMV(Math.abs(val)) + '</div>' +
+      '</div>';
+  }
+  function kpi(label, big, sub, color) {
+    return '<div class="nrr-pm-kpi-tile">' +
+      '<div class="nrr-pm-kpi-label">' + nrrEsc(label) + '</div>' +
+      '<div class="num nrr-pm-kpi-value"' + (color ? ' style="color:' + color + '"' : '') + '>' + big + '</div>' +
+      '<div class="micro">' + nrrEsc(sub) + '</div>' +
+      '</div>';
+  }
+  var totalCohort = w.counts.active + w.counts.churned;
+  var kpisHtml =
+    kpi('สาขาที่ยังสั่งอยู่', w.activeRatio != null ? Math.round(w.activeRatio) + '%' : '—',
+      w.counts.active + ' / ' + totalCohort + ' สาขาฐาน',
+      w.activeRatio != null ? nrrThresholdColorVar(w.activeRatio) : null) +
+    kpi('ยอดหาย (หยุดสั่ง)', '−' + nrrFmtGMV(w.churn), w.counts.churned + ' สาขา', 'var(--coral)') +
+    kpi('ร้านกลับมา', '+' + nrrFmtGMV(w.comeback), w.counts.comeback + ' สาขา', 'var(--green-deep)') +
+    kpi('ร้านใหม่', '+' + nrrFmtGMV(w.newStores), w.counts.newStores + ' สาขา', 'var(--green-deep)');
+  // Row order mirrors the exact identity: base − churn + contraction +
+  // comeback + new + inflow = curr (nrrPortfolioWaterfall's contract).
+  return '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ยอดพอร์ตไหลจากไหนไปไหน</div></div>' +
+    '<div class="nrr-pm-kpi-strip">' + kpisHtml + '</div>' +
+    '<div class="nrr-pm-flow">' +
+    row('ฐานเดือน ' + nrrBaseMonthThLabel(), w.base, 'anchor', totalCohort) +
+    row('หยุดสั่ง (churn)', -w.churn, 'flow', w.counts.churned) +
+    row(w.contraction >= 0 ? 'ร้านเดิมซื้อเพิ่ม' : 'ร้านเดิมซื้อลด', w.contraction, 'flow', w.counts.active) +
+    row('ร้านกลับมา', w.comeback, 'flow', w.counts.comeback) +
+    row('ร้านใหม่ (Sales + Expansion)', w.newStores, 'flow', w.counts.newStores) +
+    row('รับโอนเข้า (handover/transfer)', w.inflow, 'flow', w.counts.inflow) +
+    row('ยอดปัจจุบัน (normalized/30วัน)', w.curr, 'anchor', null) +
+    '</div>';
+}
+
+// Layer 2 — the ฿-ranked "ต้องดูแล" queue (same nrrRiskQueue the Pulse TV
+// board uses), capped at 20 with an expander. Rows deep-link to the
+// Account page.
+var NRR_PM_QUEUE_CAP = 20;
+function nrrPortfolioRiskQueueHtml(email) {
+  var pv = window.bulkPortviewData;
+  var rows = (pv && pv.loaded && pv.byKamEmail[email]) || [];
+  var q = nrrRiskQueue(rows);
+  if (!q.length) return '<div id="nrr-port-risk-queue"></div>';
+  var total = q.reduce(function (s, x) { return s + x.risk; }, 0);
+  var shown = nrrPortfolioState.queueExpanded ? q : q.slice(0, NRR_PM_QUEUE_CAP);
+  var rowsHtml = shown.map(function (x, i) {
+    return '<a class="nrr-pm-queue-row" href="#/account/' + encodeURIComponent(x.account_id) + '">' +
+      '<span class="num nrr-pm-queue-rank">' + (i + 1) + '</span>' +
+      '<span class="nrr-pm-queue-name">' + nrrEsc(x.name) + '</span>' +
+      '<span class="micro nrr-pm-queue-reason">' + nrrEsc(x.reason) + '</span>' +
+      '<span class="num nrr-pm-queue-amt">−' + nrrFmtGMV(x.risk) + '</span>' +
+      '</a>';
+  }).join('');
+  var moreHtml = q.length > NRR_PM_QUEUE_CAP
+    ? '<button type="button" class="nrr-chip" id="nrr-port-queue-expand">' +
+      (nrrPortfolioState.queueExpanded ? 'ย่อเหลือ ' + NRR_PM_QUEUE_CAP + ' อันดับแรก' : 'แสดงทั้งหมด ' + q.length + ' ร้าน') + '</button>'
+    : '';
+  return '<div id="nrr-port-risk-queue">' +
+    '<div class="nrr-panel-head" style="margin-top:22px"><div><div class="h2" style="font-size:18px">ต้องดูแลก่อน (' + q.length + ' ร้าน · −' + nrrFmtGMV(total) + ')</div>' +
+    '<div class="micro">ยอดวิ่งต่ำกว่าฐานเกิน 20% เรียงตามเงินที่หายมากสุด — จัดการจากบนลงล่าง</div></div></div>' +
+    '<div class="nrr-pm-queue">' + rowsHtml + '</div>' + moreHtml +
+    '</div>';
+}
+
+// Layer 3 — Pareto tier cards, click-to-filter the account list below
+// (same interaction contract as the pace tiles / SKU chip above them).
+var NRR_PM_TIER_META = {
+  A: { label: 'Tier A — หัวพอร์ต', desc: '60% แรกของยอด ดูแลรายร้าน' },
+  B: { label: 'Tier B — กลาง', desc: 'ถัดมาถึง 90% ของยอด' },
+  C: { label: 'Tier C — หาง', desc: 'ที่เหลือ ดูแลแบบกลุ่ม/แคมเปญ' }
+};
+function nrrPortfolioTierStripHtml(email) {
+  var t = nrrPortfolioTiers(email);
+  var cards = ['A', 'B', 'C'].map(function (k) {
+    var tier = t[k], meta = NRR_PM_TIER_META[k];
+    var sel = nrrPortfolioState.tierFilter === k;
+    var retColor = tier.retention != null ? nrrThresholdColorVar(tier.retention) : 'var(--ink3)';
+    return '<div class="nrr-pm-tier-card' + (sel ? ' selected' : '') + '" data-tier-filter="' + k + '">' +
+      '<div class="nrr-pm-tier-label">' + nrrEsc(meta.label) + '</div>' +
+      '<div class="nrr-pm-tier-nums"><span class="num">' + tier.count + '</span> ร้าน · <span class="num">' + Math.round(tier.share) + '%</span> ของยอด</div>' +
+      '<div class="nrr-pm-tier-ret">เทียบฐาน <span class="num" style="color:' + retColor + '">' + (tier.retention != null ? Math.round(tier.retention) + '%' : '—') + '</span></div>' +
+      '<div class="micro">' + nrrEsc(meta.desc) + '</div>' +
+      '</div>';
+  }).join('');
+  return '<div class="nrr-pm-tier-strip" id="nrr-port-tier-strip">' + cards + '</div>';
 }
 
 // ── Company-wide account search (v31) ────────────────────────────────────
@@ -9343,6 +9734,18 @@ function nrrRenderPortfolioBody() {
     summaryHtml = '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูล %NRR ของเดือนนี้</div></div>';
   }
 
+  // v_pmmode (2026-07-21): portfolios at PM scale (>= NRR_PM_MODE_MIN_ACCOUNTS)
+  // get the 3-layer triage view (flow waterfall + risk queue + Pareto tiers)
+  // between the NRR hero and the commission section. Smaller (KAM-scale)
+  // portfolios are completely untouched. Gated on SIZE, not role — an admin
+  // opening a PM's portfolio gets the same treatment.
+  var pmMode = nrrPortfolioRowsFor(email).length >= NRR_PM_MODE_MIN_ACCOUNTS;
+  var pmHtml = pmMode
+    ? nrrPortfolioWaterfallHtml(email, period) +
+      nrrPortfolioRiskQueueHtml(email) +
+      nrrPortfolioTierStripHtml(email)
+    : '';
+
   body.innerHTML =
     nrrPortfolioGlobalSearchHtml() +
     '<div class="nrr-panel-head">' +
@@ -9350,6 +9753,7 @@ function nrrRenderPortfolioBody() {
     switcherHtml +
     '</div>' +
     pulseHtml +
+    pmHtml +
     '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ค่าคอมมิชชั่น</div></div>' +
     summaryHtml +
     nrrPortfolioAcctListHtml(email);
@@ -9382,6 +9786,10 @@ function nrrRenderPortfolioLayerView(route) {
     // "no email selected" branch (below) shows the company-wide search box
     // + a KAM switcher with no default choice, so the user picks explicitly.
     var email = route.param || (nrrProfile.role === 'rep' ? nrrProfile.email : null);
+    // v_pmmode: tier membership + queue expansion are per-portfolio — a
+    // stale Tier-A filter from one PM would silently hide accounts on the
+    // next portfolio viewed.
+    if (nrrPortfolioState.email !== email) { nrrPortfolioState.tierFilter = ''; nrrPortfolioState.queueExpanded = false; }
     nrrPortfolioState.email = email;
     nrrRenderPortfolioBody();
   });
@@ -9411,6 +9819,25 @@ function nrrRenderPortfolioLayerView(route) {
 // persistent #nrr-portfolio-body container (the router re-renders its
 // innerHTML on every route change, so listeners must live on the parent).
 function nrrHandlePortfolioClick(e) {
+  // v_pmmode: tier card toggle (click the selected one again to clear) —
+  // same repaint contract as the pace tiles below (strip + grid only).
+  var tierCard = e.target.closest('[data-tier-filter]');
+  if (tierCard) {
+    var tk = tierCard.dataset.tierFilter;
+    nrrPortfolioState.tierFilter = nrrPortfolioState.tierFilter === tk ? '' : tk;
+    var stripT = document.getElementById('nrr-port-tier-strip');
+    if (stripT) stripT.outerHTML = nrrPortfolioTierStripHtml(nrrPortfolioState.email);
+    var gridT = document.getElementById('nrr-port-acct-grid');
+    if (gridT) gridT.innerHTML = nrrPortfolioAcctGridHtml(nrrPortfolioState.email);
+    return;
+  }
+  // v_pmmode: risk-queue expander.
+  if (e.target.closest('#nrr-port-queue-expand')) {
+    nrrPortfolioState.queueExpanded = !nrrPortfolioState.queueExpanded;
+    var qEl = document.getElementById('nrr-port-risk-queue');
+    if (qEl) qEl.outerHTML = nrrPortfolioRiskQueueHtml(nrrPortfolioState.email);
+    return;
+  }
   var riskTile = e.target.closest('[data-risk-filter]');
   if (riskTile) {
     var key = riskTile.dataset.riskFilter;
@@ -11253,14 +11680,24 @@ function nrrRenderCommissionSection() {
     nrrFetchAvailablePeriods().then(function (periods) {
       var sel = document.getElementById('nrr-comm-period-select');
       if (!sel) return;
-      if (!periods.length) {
+      // Prepend the live in-progress month (nrrState.period) as a selectable
+      // "(ประมาณการ)" option when it has no real snapshot yet — the dropdown
+      // otherwise only ever lists periods someone has already run Compute
+      // for, so the current month can never appear on its own.
+      var livePeriod = nrrState.period;
+      var liveHasSnapshot = livePeriod && periods.indexOf(livePeriod) !== -1;
+      var displayPeriods = periods.slice();
+      if (livePeriod && !liveHasSnapshot) displayPeriods.unshift(livePeriod);
+      if (!displayPeriods.length) {
         sel.innerHTML = '<option>ไม่มีข้อมูล</option>';
         document.getElementById('nrr-comm-fulltable-body').innerHTML = '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี snapshot ในระบบเลย</div></div>';
         return;
       }
-      if (!nrrCommSelectedPeriod || periods.indexOf(nrrCommSelectedPeriod) === -1) nrrCommSelectedPeriod = periods[0];
-      sel.innerHTML = periods.map(function (p) {
-        return '<option value="' + p + '"' + (p === nrrCommSelectedPeriod ? ' selected' : '') + '>' + nrrEsc(QNRR_CFG.months_th[p] || p) + '</option>';
+      if (!nrrCommSelectedPeriod || displayPeriods.indexOf(nrrCommSelectedPeriod) === -1) nrrCommSelectedPeriod = displayPeriods[0];
+      sel.innerHTML = displayPeriods.map(function (p) {
+        var isLiveEstimate = p === livePeriod && !liveHasSnapshot;
+        var label = (QNRR_CFG.months_th[p] || p) + (isLiveEstimate ? ' (ประมาณการ)' : '');
+        return '<option value="' + p + '"' + (p === nrrCommSelectedPeriod ? ' selected' : '') + '>' + nrrEsc(label) + '</option>';
       }).join('');
       nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
     });
@@ -11645,6 +12082,92 @@ function nrrCommGateClass(mult) {
   return 'nrr-comm-gate-full';
 }
 
+// Recover the raw P1/P3/outlet GMV behind a KAM's live-estimate commission
+// figures — nrrEstimateKamCommission() computes commission FROM these but
+// doesn't return them, and the full table displays "จาก ฿X" GMV under each
+// money cell (_nrrCommMoneyCell). Mirrors that function's own group-grain-
+// vs-flat-CSV branch exactly so the GMV shown always matches the base that
+// actually produced the adjacent commission number.
+function _nrrEstimateKamGmvSources(kamEmail) {
+  var email = (kamEmail || '').toLowerCase();
+  var flat = nrrUpsellTeamCache.byEmail[email] || { p1_gmv: 0, p3_incremental: 0, outlet_gmv: 0 };
+  var grpRows = nrrUpsellTeamGroupsCache.byEmail[email];
+  if (grpRows && grpRows.length) {
+    var p1 = 0, p3 = 0;
+    grpRows.forEach(function (gr) { p1 += gr.p1_gmv || 0; p3 += gr.p3_incremental || 0; });
+    return { p1_gmv: p1, p3_incremental: p3, outlet_gmv: flat.outlet_gmv };
+  }
+  return { p1_gmv: flat.p1_gmv, p3_incremental: flat.p3_incremental, outlet_gmv: flat.outlet_gmv };
+}
+
+// Build a synthetic "snapshot row" for a TL from the live pace-based
+// estimate engine — shaped exactly like a real commission_payout_snapshots
+// row so nrrCommissionFullTableHtml/nrrCommFullTlTableHtml need no
+// real-vs-synthetic branch at all. upsell_mult is built as the object shape
+// {multiplier, team_upsell_pct} — the same shape the live engine's own
+// _commBuildSnapshotRows() already writes for real computed snapshots — so
+// one display code path (nrrCommFullTlTableHtml) handles both sources.
+function _nrrEstimateTlSnapshotRow(team, periodMonth) {
+  var result = nrrTeamResult(team.email);
+  var bm = result && result.by_month ? result.by_month[periodMonth] : null;
+  if (!bm || bm.nrr_pct == null) return null;
+  var est = nrrEstimateTlCommission(team.email, periodMonth, bm.nrr_pct);
+  if (!est) return null;
+  return {
+    beneficiary_role: 'tl', beneficiary_email: team.email, team_lead_email: team.email,
+    raw_nrr_pct: bm.nrr_pct, governed_nrr_pct: bm.nrr_pct,
+    payout_amount: est.est, snapshot_status: 'estimate',
+    breakdown: {
+      nrr_pct: bm.nrr_pct, nrr_payout: est.nrr_payout, team_lead_name: team.name,
+      team_upsell_gmv: null, // renderer falls back to summing the KAM rows under this TL, same as today
+      upsell_mult: { multiplier: est.multiplier, team_upsell_pct: est.upsell_pct }
+    }
+  };
+}
+
+// Same idea for a KAM row — every field nrrCommFullKamTableHtml reads
+// (bd.handover, bd.upsell_outlet, bd.upsell_sku.p1/p3, bd.gmv_gate) mapped
+// straight from nrrEstimateKamCommission()'s already-computed output.
+function _nrrEstimateKamSnapshotRow(kam, tlEmail, periodMonth) {
+  var result = nrrKamResult(kam.email);
+  var bm = result && result.by_month ? result.by_month[periodMonth] : null;
+  if (!bm || bm.nrr_pct == null) return null;
+  var est = nrrEstimateKamCommission(kam.email, periodMonth, bm.nrr_pct);
+  if (!est) return null;
+  var gmv = _nrrEstimateKamGmvSources(kam.email);
+  return {
+    beneficiary_role: 'kam', beneficiary_email: kam.email, team_lead_email: tlEmail,
+    raw_nrr_pct: bm.nrr_pct, governed_nrr_pct: bm.nrr_pct,
+    payout_amount: est.est, snapshot_status: 'estimate',
+    breakdown: {
+      nrr_pct: bm.nrr_pct, nrr_payout: est.nrr_payout, kam_name: kam.name,
+      handover: est.handover, // nrrComputeHandoverForKam's shape already matches bd.handover verbatim
+      upsell_outlet: { commission: est.outlet_comm, outlet_gmv: gmv.outlet_gmv },
+      upsell_sku: {
+        p1: { comm: est.p1_comm, gmv: gmv.p1_gmv },
+        p3: { comm: est.p3_comm, gmv_incremental: gmv.p3_incremental },
+        total_commission: est.upsell_comm
+      },
+      gmv_gate: { cap_multiplier: est.gate_cap }
+    }
+  };
+}
+
+// Live-period fallback when no one has run Compute yet — every TL + their
+// KAMs, pace-estimated. Never used for a period that already has real rows.
+function nrrBuildEstimateFullTableRows(periodMonth) {
+  var rows = [];
+  nrrListTeams().forEach(function (team) {
+    var tlRow = _nrrEstimateTlSnapshotRow(team, periodMonth);
+    if (tlRow) rows.push(tlRow);
+    nrrListKamsForTeam(team.email).forEach(function (kam) {
+      var kamRow = _nrrEstimateKamSnapshotRow(kam, team.email, periodMonth);
+      if (kamRow) rows.push(kamRow);
+    });
+  });
+  return rows;
+}
+
 function nrrRenderCommissionFullTable(periodMonth) {
   var el = document.getElementById('nrr-comm-fulltable-body');
   if (!el) return;
@@ -11656,7 +12179,14 @@ function nrrRenderCommissionFullTable(periodMonth) {
       target.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดไม่สำเร็จ</div></div>';
       return;
     }
-    target.innerHTML = nrrCommissionFullTableHtml(res.rows);
+    // No real Compute has run for this period yet — for the live in-progress
+    // month only, fall back to pace-based estimates instead of an empty
+    // state (mirrors the "สรุป" tab's own snapshot-then-estimate fallback).
+    var rows = res.rows;
+    if (!rows.length && periodMonth === nrrState.period) {
+      rows = nrrBuildEstimateFullTableRows(periodMonth);
+    }
+    target.innerHTML = nrrCommissionFullTableHtml(rows);
   });
 }
 window.nrrRenderCommissionFullTable = nrrRenderCommissionFullTable;
@@ -11671,10 +12201,18 @@ function nrrCommissionFullTableHtml(rows) {
   // Exception-based stamping: everyone final → ONE stamp up top and no
   // per-row noise; otherwise per-row stamps appear only on non-final rows
   // (drafts should stand out — 15 identical FINAL chips would say nothing).
+  // A period is structurally either 100% real (synthesis never mixes with
+  // real snapshot rows, see nrrRenderCommissionFullTable) or 100% synthetic
+  // pace-estimates for the live month — allEstimate gets its own header so
+  // 15 identical per-row ESTIMATE chips don't shout the same thing twice.
   var allFinal = rows.every(function (r) { return r.snapshot_status === 'final'; });
+  var allEstimate = rows.every(function (r) { return r.snapshot_status === 'estimate'; });
   var headStamp = allFinal
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('final') +
       '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')</span></div>'
+    : allEstimate
+    ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('estimate') +
+      '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้</span></div>'
     : '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('draft') +
       '<span class="micro">บางรายการยังไม่ล็อก — แถวที่ไม่ใช่ final มีตรากำกับ</span></div>';
 
@@ -11689,10 +12227,23 @@ function nrrCommissionFullTableHtml(rows) {
     teamUpsellGmv[r.team_lead_email] = (teamUpsellGmv[r.team_lead_email] || 0) + gmv;
   });
 
-  return headStamp + nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) + nrrCommFullKamTableHtml(kamRows, allFinal);
+  return headStamp + nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal, allEstimate) + nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate);
 }
 
-function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
+// upsell_mult can be a bare number/string (Excel backfill, e.g. "1.50x") or
+// an object {multiplier, team_upsell_pct} (the live engine's own
+// _commBuildSnapshotRows() shape, also used by our live-estimate synthetic
+// rows) — generalizes the same 3-way parsing nrrCommSnapshotReceiptSteps
+// already does for this field (nrr_commission.js) so both places agree.
+function _nrrCommMultParts(bd) {
+  var raw = bd.upsell_mult;
+  if (raw && typeof raw === 'object') {
+    return { mult: Number(raw.multiplier), upsellPct: raw.team_upsell_pct != null ? Number(raw.team_upsell_pct) : null };
+  }
+  return { mult: parseFloat(raw), upsellPct: null };
+}
+
+function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal, allEstimate) {
   if (!tlRows.length) return '';
   var t = { nrrPayout: 0, upsellGmv: 0, finalPayout: 0 };
   var rowsHtml = tlRows.map(function (r) {
@@ -11706,9 +12257,11 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
     t.nrrPayout += Number(bd.nrr_payout || 0);
     t.upsellGmv += upsellGmv;
     t.finalPayout += finalPayout;
-    // upsell_mult varies by data source: numeric (live engine) or a string
-    // like "1x"/"2x" (Excel backfill) — parseFloat handles both.
-    var mult = parseFloat(bd.upsell_mult);
+    // upsell_mult varies by data source: numeric/string ("1x"/"2x", Excel
+    // backfill) or an object {multiplier, team_upsell_pct} (live engine +
+    // our own pace-estimate rows) — _nrrCommMultParts normalizes both.
+    var parts = _nrrCommMultParts(bd);
+    var mult = parts.mult;
     // Audit check: the multiplier the money actually reflects is
     // final ÷ nrr_payout. Real June data stores "2x" where the paid math is
     // 12,000 × 1.5 = 18,000 — the Excel's column was a tier label, not the
@@ -11720,7 +12273,13 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal) {
       var effective = finalPayout / nrrPay;
       multHtml += ' <span class="nrr-comm-note-dot" title="ค่าที่จ่ายจริงสะท้อนตัวคูณ ' + effective.toFixed(2) + '× (' + nrrFmtGMVExact(nrrPay) + ' × ' + effective.toFixed(2) + ' = ' + nrrFmtGMVExact(finalPayout) + ') — ตัวเลข ' + mult.toFixed(0) + ' ที่บันทึกไว้น่าจะเป็นเลข tier จากไฟล์ Excel ที่ backfill ไม่ใช่ตัวคูณ">ⓘ</span>';
     }
-    var rowStamp = (!allFinal && r.snapshot_status !== 'final')
+    // The %GMV growth behind the multiplier — only present when upsell_mult
+    // is the object shape (live engine / pace-estimate); historical
+    // Excel-backfill rows simply omit this line, which is fine.
+    if (parts.upsellPct != null) {
+      multHtml += '<div class="nrr-comm-cell-meta">+' + parts.upsellPct.toFixed(1) + '% GMV</div>';
+    }
+    var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr><td>' + nrrEsc(bd.team_lead_name || r.beneficiary_email) + rowStamp + '</td>' +
       '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
@@ -11752,7 +12311,7 @@ function _nrrCommMoneyCell(comm, metaText) {
   return '<td>' + commHtml + metaHtml + '</td>';
 }
 
-function nrrCommFullKamTableHtml(kamRows, allFinal) {
+function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
   if (!kamRows.length) return '';
   var t = { nrrPayout: 0, hoPayout: 0, expPayout: 0, p1Comm: 0, p3Comm: 0, upsell: 0, finalPayout: 0 };
   var rowsHtml = kamRows.map(function (r) {
@@ -11775,7 +12334,7 @@ function nrrCommFullKamTableHtml(kamRows, allFinal) {
     var noteHtml = note
       ? ' <span class="nrr-comm-note-dot" title="' + nrrEsc(note) + '">ⓘ</span>'
       : '';
-    var rowStamp = (!allFinal && r.snapshot_status !== 'final')
+    var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr>' +
       '<td><b>' + nrrEsc(bd.kam_name || r.beneficiary_email) + '</b>' + noteHtml + rowStamp +

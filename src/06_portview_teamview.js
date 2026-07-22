@@ -989,7 +989,14 @@ function __legacyRenderPortviewListFallback(){
     return;
   }
   const _pvVisitMap=getVisitMap((currentUserProfile&&currentUserProfile.email)||'local');
-  const _pvEchoMap=getEchoMap((currentUserProfile&&currentUserProfile.email)||'local');
+  // v_echofix (2026-07-21): echo dots follow the VIEWED portfolio's owner —
+  // portviewRepEmail is set when a TL/Admin drills into a rep's portfolio
+  // (01_core.js), null when viewing your own. getEchoMap is now
+  // server-backed (kam_visits) so the TL case actually returns that rep's
+  // data instead of the TL's own localStorage. getVisitMap (line above)
+  // deliberately NOT changed here — different feature, own localStorage
+  // semantics, out of this fix's scope.
+  const _pvEchoMap=getEchoMap(portviewRepEmail||(currentUserProfile&&currentUserProfile.email)||'local');
 
   // Value guard: skip full list rebuild if data + context unchanged
   const _pvSnap=portviewBulkData.length>0
@@ -2801,10 +2808,33 @@ async function getTeamVisitMapFromSupabase(kamEmails){
   }catch(e){return{};}
 }
 
-function getEchoMap(kamEmail){
-  const KEY='ciq_echo_visits';
+// v_echofix (2026-07-21): server-backed. Used to read ONLY
+// localStorage['ciq_echo_visits'] — per-browser, so a TL viewing a rep's
+// portfolio saw their OWN echo dots (or none), never the rep's. The server
+// table for exactly this already existed all along: kam_visits carries
+// ci_session_id/ci_created_at per (kam_email, account_id), upserted by CI
+// on every Echo save (09_conv_intel.js). Same sync-call contract as before
+// (render sites call this synchronously): returns the cached server map
+// when ready; on a cache miss, kicks off ONE background fetch and returns
+// the localStorage map as an immediate fallback (self-view keeps working
+// exactly as before while the fetch lands), then repaints the list.
+let _echoMapCache = { email: null, map: null };
+let _echoMapFetching = null;
+async function _fetchEchoMapFromSupabase(kamEmail){
+  const cutoffIso = new Date(Date.now() - 30*24*60*60*1000).toISOString();
+  const { data, error } = await supa.from('kam_visits')
+    .select('account_id,ci_created_at')
+    .eq('kam_email', kamEmail)
+    .not('ci_session_id', 'is', null)
+    .gte('ci_created_at', cutoffIso);
+  if (error || !data) return {};
+  const map = {};
+  data.forEach(r => { map[r.account_id] = { ts: new Date(r.ci_created_at).getTime() }; });
+  return map;
+}
+function _getEchoMapLocal(kamEmail){
   try{
-    const store=JSON.parse(localStorage.getItem(KEY)||'{}');
+    const store=JSON.parse(localStorage.getItem('ciq_echo_visits')||'{}');
     const prefix=(kamEmail||'local')+'::';
     const now=Date.now();
     const cutoff=30*24*60*60*1000;
@@ -2816,6 +2846,29 @@ function getEchoMap(kamEmail){
     });
     return result;
   }catch(e){return{};}
+}
+function getEchoMap(kamEmail){
+  const email = kamEmail || 'local';
+  // Cache hit: still overlay fresh localStorage so a session recorded a
+  // moment ago dots immediately (kam_visits upsert may not have round-
+  // tripped into the cached fetch).
+  if (_echoMapCache.email === email && _echoMapCache.map) {
+    return { ..._echoMapCache.map, ..._getEchoMapLocal(email) };
+  }
+  if (email !== 'local' && typeof currentUser !== 'undefined' && currentUser && !_echoMapFetching) {
+    _echoMapFetching = _fetchEchoMapFromSupabase(email).then(map => {
+      // Merge local over server for self-view: a just-recorded session may
+      // land in localStorage before the kam_visits upsert round-trips.
+      const merged = { ...map, ..._getEchoMapLocal(email) };
+      _echoMapCache = { email, map: merged };
+      _echoMapFetching = null;
+      // Repaint the portview list so dots appear once server data lands —
+      // via the debounced scheduler (same convention as the async data
+      // arrivals at :782).
+      try { if (typeof schedulePortviewListRender === 'function') schedulePortviewListRender(); else renderPortviewList(); } catch(e) {}
+    }).catch(() => { _echoMapFetching = null; });
+  }
+  return _getEchoMapLocal(email);
 }
 
 function getVisitDot(visitMap,accountId,echoMap){

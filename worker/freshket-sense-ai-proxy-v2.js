@@ -53,11 +53,175 @@ async function withRetry(fn, maxAttempts = 3, delays = [0, 2000, 5000]) {
 }
 
 
-// ── /transcript (v2) ─────────────────────────────────────────────────────────
-// Gemini 3.5 Flash single call — ฟัง audio โดยตรง, transcript + diarization ในครั้งเดียว
-// เปลี่ยนจาก Groq Whisper + Gemini Lite 2-step → single multimodal call
-// Output format: segments[] เดิมทุกอย่าง — ไม่แตะ downstream code
+// ── /transcript (v3 hybrid, 2026-07-21) ──────────────────────────────────────
+// Groq Whisper (ถอดเสียง — หลักวินาที ถอดตรงตัว) + Gemini (ฟังเสียงจริงแต่ตอบ
+// เฉพาะ "ประโยคไหนใครพูด" — output จิ๋ว = เร็ว)
+//
+// ทำไมเปลี่ยนจาก v2 (Gemini พิมพ์ transcript ทั้งบทเอง): พิสูจน์จาก app_errors
+// จริง — visit ยาว 18-48 นาทีชน Cloudflare error 524 (~100s ceiling) ทุกครั้ง
+// เพราะ Gemini ต้อง generate transcript ทั้งบทเป็น output tokens (หลายนาที
+// สำหรับเสียงยาว) ส่วน Whisper เป็น ASR เฉพาะทาง ถอด 30 นาทีในหลัก 10-30 วิ
+// และ Gemini ขั้นแยกคนพูด: อ่าน audio เป็น INPUT (เร็ว) + ตอบแค่ mapping
+// (id→speaker) ไม่กี่ร้อย tokens — ทั้งสอง call อยู่ใต้เพดาน 524 สบายๆ
+//
+// Output format: segments[] หน้าตาเดิมทุก field — client ไม่ต้องแก้อะไรเลย
+// source: 'groq_whisper_gemini_diarize' (ค่าที่ client รู้จักอยู่แล้ว) หรือ
+// 'whisper_fallback' ถ้าขั้นแยกคนพูดพัง (ได้ transcript แต่ speaker='ไม่ทราบ')
+// เส้น v2 เดิมยังอยู่ครบที่ /transcript-gemini สำหรับ A/B (tools/echo_ab_test.js)
+function _b64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function _fmtTs(sec) {
+  const m = Math.floor((sec || 0) / 60), s = Math.floor((sec || 0) % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
 async function handleTranscript(request, env) {
+  if (!env.GROQ_API_KEY)   return json({ error: 'GROQ_API_KEY not set' }, 503, env);
+  if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY not set' }, 503, env);
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ error: 'Invalid JSON' }, 400, env); }
+
+  const { audio_b64, mime_type, duration_secs } = body;
+  if (!audio_b64) return json({ error: 'audio_b64 required' }, 400, env);
+
+  // ── Step 1: Groq Whisper — verbatim transcription with real timestamps ──
+  const audioBytes = _b64ToBytes(audio_b64);
+  const groqForm = new FormData();
+  groqForm.append('file', new Blob([audioBytes], { type: mime_type || 'audio/webm' }), 'recording.webm');
+  groqForm.append('model', 'whisper-large-v3');
+  groqForm.append('language', 'th');
+  groqForm.append('prompt', 'บทสนทนาภาษาไทยระหว่างพนักงานขาย Freshket (วัตถุดิบอาหาร) กับเจ้าของร้านอาหาร อาจมีคำว่า Freshket, SKU, delivery, order, กิโล, ลัง');
+  groqForm.append('response_format', 'verbose_json');
+  groqForm.append('timestamp_granularities[]', 'segment');
+
+  let groqData;
+  try {
+    const groqRes = await withRetry(async () => {
+      const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
+        body: groqForm
+      });
+      if (r.ok) return r;
+      if (r.status === 503 || r.status === 429) return null;
+      throw new Error(`Groq ${r.status}: ${await r.text().catch(() => '')}`);
+    }, 3, [0, 2000, 5000]);
+    groqData = await groqRes.json();
+  } catch (e) {
+    return json({ error: 'Groq transcribe failed: ' + (e?.message || 'unknown') }, 502, env);
+  }
+
+  // Whisper hallucination guard: drop segments Whisper itself flags as
+  // probably-not-speech AND low-confidence (its classic invent-text-on-
+  // silence failure mode — restaurant background noise triggers it).
+  const rawSegs = (groqData.segments || []).filter(s =>
+    (s.text || '').trim() && !((s.no_speech_prob || 0) > 0.9 && (s.avg_logprob || 0) < -1)
+  );
+  if (!rawSegs.length) {
+    return json({ text: JSON.stringify({
+      no_speech: true, segments: [], speakers_detected: [],
+      duration_mins: 0, source: 'groq_whisper_v3', avg_speaker_confidence: 0, avg_transcript_confidence: 0
+    })}, 200, env);
+  }
+
+  const segments = rawSegs.map((s, i) => ({
+    segment_id: i,
+    ts: _fmtTs(s.start),
+    start_sec: s.start || 0,
+    end_sec: s.end || 0,
+    speaker: 'ไม่ทราบ',
+    text: (s.text || '').trim(),
+    speaker_confidence: 0,
+    // avg_logprob → rough 0..1 confidence (exp of mean token logprob)
+    transcript_confidence: Math.max(0, Math.min(1, Math.exp(s.avg_logprob || -0.3)))
+  }));
+
+  // ── Step 2: Gemini — hears the REAL audio, assigns speakers only ────────
+  // Output is a tiny id→speaker mapping (hundreds of tokens), so this call
+  // stays fast regardless of visit length.
+  const segLines = segments.map(s => `[${s.segment_id}] [${s.ts}] ${s.text}`).join('\n');
+  const diarizePrompt = `ฟัง audio แล้วระบุว่าแต่ละ segment ของ transcript นี้ใครเป็นคนพูด
+
+บริบท: สนทนาระหว่าง Sales rep ของ Freshket (จำหน่ายวัตถุดิบอาหาร) กับเจ้าของร้านอาหาร
+speaker ที่ใช้ได้: "Sales" = คนขาย Freshket, "ลูกค้า" = ฝั่งร้าน (ถ้าได้ยินชื่อจริง เช่น "คุณมาลี" ใช้ชื่อนั้นแทน "ลูกค้า" ได้)
+
+TRANSCRIPT (ถอดจาก audio เดียวกันนี้ — ห้ามแก้ text ห้ามเพิ่ม/ลบ segment):
+${segLines}
+
+ตอบ JSON เท่านั้น ไม่มี markdown:
+{
+  "assignments": [ { "id": 0, "speaker": "Sales", "confidence": 0.9 } ],
+  "speakers_detected": ["Sales", "ลูกค้า"]
+}`;
+
+  let diarized = false, speakersDetected = [];
+  try {
+    const gemRes = await withRetry(async () => {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_35}:generateContent?key=${env.GEMINI_API_KEY}`,
+        {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { inline_data: { mime_type: mime_type || 'audio/webm', data: audio_b64 } },
+              { text: diarizePrompt }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' }
+          })
+        }
+      );
+      if (r.ok) return r;
+      if (r.status === 503 || r.status === 429) return null;
+      throw new Error(`Gemini diarize ${r.status}`);
+    }, 3, [0, 2000, 5000]);
+    const gemData = await gemRes.json();
+    const rawText = gemData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let parsed;
+    try { parsed = JSON.parse(rawText); }
+    catch (_) {
+      const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
+      if (s !== -1 && e !== -1) { try { parsed = JSON.parse(rawText.slice(s, e + 1)); } catch (_) {} }
+    }
+    if (parsed && Array.isArray(parsed.assignments)) {
+      const byId = {};
+      parsed.assignments.forEach(a => { if (a && a.id != null) byId[a.id] = a; });
+      segments.forEach(s => {
+        const a = byId[s.segment_id];
+        if (a && a.speaker) {
+          s.speaker = a.speaker;
+          s.speaker_confidence = Math.max(0, Math.min(1, Number(a.confidence) || 0.5));
+        }
+      });
+      speakersDetected = Array.isArray(parsed.speakers_detected) ? parsed.speakers_detected : [];
+      diarized = segments.some(s => s.speaker !== 'ไม่ทราบ');
+    }
+  } catch (e) {
+    // Diarize failure is non-fatal — the verbatim transcript is the ground
+    // truth; ship it with unknown speakers (client already handles
+    // 'whisper_fallback').
+  }
+
+  const n = segments.length;
+  return json({ text: JSON.stringify({
+    no_speech: false,
+    segments,
+    speakers_detected: speakersDetected.length ? speakersDetected : [...new Set(segments.map(s => s.speaker))],
+    duration_mins: Math.round((duration_secs || segments[n - 1].end_sec || 0) / 60),
+    source: diarized ? 'groq_whisper_gemini_diarize' : 'whisper_fallback',
+    avg_speaker_confidence: n ? segments.reduce((a, s) => a + s.speaker_confidence, 0) / n : 0,
+    avg_transcript_confidence: n ? segments.reduce((a, s) => a + s.transcript_confidence, 0) / n : 0
+  })}, 200, env);
+}
+
+// ── /transcript-gemini (v2 path, kept for A/B comparison) ────────────────────
+// Gemini 3.5 Flash single call — ฟัง audio โดยตรง, transcript + diarization ในครั้งเดียว
+// ⚠️ known limit: visit ยาว >~15 นาที เสี่ยงชน Cloudflare 524 (ดู v3 note ด้านบน)
+async function handleTranscriptGeminiFull(request, env) {
   if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY not set' }, 503, env);
 
   let body;
@@ -271,8 +435,15 @@ async function handleAnalyze(request, env) {
     `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
   ).join('\n');
 
+  // v_echofix (2026-07-21): rubric text used to carry ONLY code+EN name+pass
+  // test — it dropped `echo_observable`, the admin-editable field designed
+  // specifically to tell the model WHAT TO LISTEN FOR per skill (a likely
+  // driver of the 62% not_observed rate on real data). Now includes the
+  // Thai name + the listen-for hint. The client already sends these fields
+  // (rubric rows come from skill_definitions verbatim) — no client change.
   const rubricText = (rubric || []).map(s =>
-    `[${s.skill_code}] ${s.skill_name_en}: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}`
+    `[${s.skill_code}] ${s.skill_name_en}${s.skill_name_th ? ' (' + s.skill_name_th + ')' : ''}: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}` +
+    (s.echo_observable ? `\n  ฟังหา: ${s.echo_observable}` : '')
   ).join('\n');
 
   const summaryText = summary ? JSON.stringify(summary) : '';
@@ -571,7 +742,8 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(env) });
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
     const url = new URL(request.url);
-    if (url.pathname === '/transcript')    return handleTranscript(request, env);
+    if (url.pathname === '/transcript')        return handleTranscript(request, env);
+    if (url.pathname === '/transcript-gemini') return handleTranscriptGeminiFull(request, env); // v2 path, kept for A/B
     if (url.pathname === '/summarize')     return handleSummarize(request, env);
     if (url.pathname === '/analyze')       return handleAnalyze(request, env);
     if (url.pathname === '/eval')          return handleEval(request, env);
