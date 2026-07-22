@@ -532,8 +532,15 @@ function _commRoleSetupStatus(role) {
   return { planCode, state };
 }
 function _commRolePeopleCount(role) {
-  if (role === 'kam') return (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []).length : 0;
-  if (role === 'tl') return (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []).length : 0;
+  const other = _commOtherRoleEmailSet();
+  if (role === 'kam') {
+    const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
+    return groups.filter(g => g.kamEmail && !other.has(g.kamEmail.toLowerCase())).length;
+  }
+  if (role === 'tl') {
+    const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
+    return tls.filter(t => t.email && !other.has(t.email.toLowerCase())).length;
+  }
   return (_commOtherRoleRoster || []).filter(p => p.role === role).length;
 }
 const _COMM_ROLE_LABEL = { kam:'KAM', tl:'Team Lead', pm:'PM', admin:'Admin', sales:'Sales', sales_tl:'Sales TL', ad:'AD', ad_tl:'AD TL' };
@@ -639,18 +646,32 @@ function _renderSchemeSwitcher(role, activeCode, defaultCode) {
   </div>`;
 }
 
+// portviewBulkData's kamEmail/tlEmail fields track who currently OWNS a
+// portfolio, independent of profiles.role — someone whose real role is
+// pm/admin/sales/sales_tl/ad/ad_tl can still show up there if they hold
+// accounts (confirmed live: Ornpreya "Ice" Sukthai, role='ad', still owns
+// a portfolio and appeared in the KAM people list/count/preview). Exclude
+// them everywhere Setup enumerates "real KAM/TL people" — mirrors the
+// identical skip already applied in the payout builder
+// (_commBuildSnapshotRows, commit 23f3517) so the UI's roster always
+// matches who the engine will actually pay as a KAM/TL.
+function _commOtherRoleEmailSet() {
+  return new Set((_commOtherRoleRoster || []).map(p => (p.email || '').toLowerCase()));
+}
+
 // Pick one real person currently in this role to preview against — first
 // match is enough (the goal is "does this look right", not a full roster
 // audit). Returns null if nobody is in the role yet (e.g. AD/AD TL today).
 function _commRolePreviewPerson(role) {
+  const other = _commOtherRoleEmailSet();
   if (role === 'kam') {
     const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-    const g = groups.find(x => x.kamEmail);
+    const g = groups.find(x => x.kamEmail && !other.has(x.kamEmail.toLowerCase()));
     return g ? { email: g.kamEmail, name: g.kamName || g.kamEmail } : null;
   }
   if (role === 'tl') {
     const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
-    const t = tls.find(x => x.email);
+    const t = tls.find(x => x.email && !other.has(x.email.toLowerCase()));
     return t ? { email: t.email, name: t.name || t.email } : null;
   }
   const p = (_commOtherRoleRoster || []).find(x => x.email);
@@ -739,18 +760,21 @@ function _renderRolePeopleSection(role, defaultCode) {
     </div>`;
   };
 
+  const other = _commOtherRoleEmailSet();
   let inner = '';
   let count = 0;
   if (role === 'tl') {
-    const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
+    const tls = ((typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [])
+      .filter(t => t.email && !other.has(t.email.toLowerCase()));
     count = tls.length;
     inner = tls.map(t => rowHtml(t.email, t.name, t.email)).join('') || '<div class="comm-empty">ไม่พบ TL</div>';
   } else {
     const tls = (typeof _commGetTlListFromPortview === 'function') ? (_commGetTlListFromPortview() || []) : [];
-    const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-    count = groups.filter(g => g.kamEmail).length;
+    const groups = ((typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [])
+      .filter(g => g.kamEmail && !other.has(g.kamEmail.toLowerCase()));
+    count = groups.length;
     inner = tls.map(t => {
-      const kams = groups.filter(g => g.kamEmail && (g.accounts || []).some(a => a.tlEmail === t.email));
+      const kams = groups.filter(g => (g.accounts || []).some(a => a.tlEmail === t.email));
       if (!kams.length) return '';
       return `<div class="comm-rule-group-title">${_commEscapeHtml(t.name || t.email)}</div>` +
         kams.map(g => rowHtml(g.kamEmail, g.kamName, g.kamEmail)).join('');
