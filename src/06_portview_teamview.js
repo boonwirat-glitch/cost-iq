@@ -2030,8 +2030,15 @@ function _buildKamGroups(){
     }
     return a;
   });
+  // v_adsplit: portfolio holders whose real profiles.role is not KAM
+  // (ad/pm/... — window.nrrRoleRoster.nonKamSet) are not team KAMs; their
+  // card must not appear in the Teamview KAM list while the team %NRR
+  // (07c _rowInScope) excludes them. Operational account visibility is NOT
+  // affected — getPortviewAccounts stays unfiltered.
+  const _nonKamSet=(window.nrrRoleRoster&&window.nrrRoleRoster.nonKamSet)||new Set();
   const groups={};
   enrichedAccounts.forEach(a=>{
+    if(a.kamEmail&&_nonKamSet.has(a.kamEmail.toLowerCase()))return;
     const key=a.kamEmail||a.kamName||'ไม่มี KAM';
     if(!groups[key])groups[key]={kamEmail:a.kamEmail||'',kamName:a.kamName||key,accounts:[]};
     groups[key].accounts.push(a);

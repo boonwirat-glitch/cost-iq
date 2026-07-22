@@ -146,6 +146,40 @@ async function nrrFetchQnrrCsv(force) {
 }
 window.nrrFetchQnrrCsv = nrrFetchQnrrCsv;
 
+// ── Role roster (v_adsplit) ──────────────────────────────────────────────
+// kam_rep_view.csv's latest_kam_email tracks who OWNS a portfolio,
+// independent of profiles.role — a person whose real role is pm/admin/
+// sales/ad can still hold outlets there (confirmed live: Ornpreya "Ice"
+// Sukthai, role='ad', holds 75 outlets tagged under team Ploy). This
+// roster is what lets the compute layer (_rowInScope in nrr_logic.js)
+// classify those rows OUT of KAM/TL-scoped %NRR and INTO the 'ad' bucket.
+// Shape is shared with the Sense bundle (07c_qnrr_view.js populates the
+// same window.nrrRoleRoster) so the twin engines stay in lockstep.
+// Empty sets = exactly today's behavior — a failed fetch degrades to the
+// old numbers, never throws.
+window.nrrRoleRoster = { loaded: false, nonKamSet: new Set(), adSet: new Set() };
+async function nrrFetchRoleRoster() {
+  if (window.nrrRoleRoster.loaded) return window.nrrRoleRoster;
+  if (!supa) return window.nrrRoleRoster;
+  try {
+    var resp = await supa.from('profiles').select('email,role')
+      .in('role', ['pm', 'admin', 'sales', 'sales_tl', 'ad', 'ad_tl']);
+    if (resp.error) throw new Error(resp.error.message);
+    var nonKam = new Set(), ad = new Set();
+    (resp.data || []).forEach(function (p) {
+      if (!p || !p.email) return;
+      var em = p.email.toLowerCase();
+      nonKam.add(em);
+      if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+    });
+    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+  } catch (e) {
+    console.warn('[nrr] role roster fetch failed — KAM scoping falls back to email-only', e);
+  }
+  return window.nrrRoleRoster;
+}
+window.nrrFetchRoleRoster = nrrFetchRoleRoster;
+
 // List of distinct TLs present in the data (email + display name), sorted
 // by display name — drives the cross-team comparison table (admin only).
 function nrrListTeams() {
@@ -171,9 +205,14 @@ function nrrListKamsForTeam(tlEmail) {
   if (!qd || !qd.loaded) return [];
   var seen = {};
   var out = [];
+  var nonKam = (window.nrrRoleRoster && window.nrrRoleRoster.nonKamSet) || new Set();
   (qd.byTlEmail[tlEmail] || []).forEach(function (r) {
     var email = r.latest_kam_email;
     if (!email || seen[email]) return;
+    // v_adsplit: portfolio holders whose real role isn't KAM (pm/ad/...)
+    // are not team KAMs — keeps them out of the Leaderboard, dropdowns and
+    // every commission-estimate loop that iterates this list.
+    if (nonKam.has(email.toLowerCase())) return;
     seen[email] = true;
     out.push({ email: email, name: r.latest_staff_owner || email });
   });

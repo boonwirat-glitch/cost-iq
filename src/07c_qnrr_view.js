@@ -13,6 +13,35 @@ var QNRR_CFG = {
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Role roster (v_adsplit, twin of src/nrr/nrr_data.js's copy) ──────────────
+// latest_kam_email in kam_rep_view.csv tracks portfolio OWNERSHIP, not
+// employment role — an AD/PM person can still hold outlets there. This roster
+// (profiles.role driven) lets _rowInScope below reclassify those rows OUT of
+// KAM/TL-scoped %NRR. Both bundles populate the same window.nrrRoleRoster
+// shape; empty sets = old behavior, so a failed fetch degrades gracefully.
+// NOTE: this %NRR feeds real commission payouts via _qnrrComputeForCommission.
+window.nrrRoleRoster = window.nrrRoleRoster || { loaded: false, nonKamSet: new Set(), adSet: new Set() };
+async function _qnrrFetchRoleRoster() {
+  if (window.nrrRoleRoster.loaded) return window.nrrRoleRoster;
+  try {
+    const { data, error } = await supa.from('profiles').select('email,role')
+      .in('role', ['pm', 'admin', 'sales', 'sales_tl', 'ad', 'ad_tl']);
+    if (error) throw new Error(error.message);
+    const nonKam = new Set(), ad = new Set();
+    (data || []).forEach(p => {
+      if (!p || !p.email) return;
+      const em = p.email.toLowerCase();
+      nonKam.add(em);
+      if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+    });
+    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+  } catch (e) {
+    console.warn('[Sense qnrr] role roster fetch failed — KAM scoping falls back to email-only', e);
+  }
+  return window.nrrRoleRoster;
+}
+window._qnrrFetchRoleRoster = _qnrrFetchRoleRoster;
+
 // ══════════════════════════════════════════════════════════════════════════════
 // _qnrrCompute — Quarter NRR Health compute (v776 — adjusted base for core transfer_out)
 //
@@ -60,17 +89,31 @@ function _qnrrCompute(kamEmail, scope) {
   } else if (scope === 'tl' && !myTlEmail) {
     // Admin ดู tl scope แต่ไม่มี myTlEmail → ใช้ allRows (portfolio ทั้งองค์กร)
     allRows = qd.allRows || [];
-  } else if (scope === 'admin') {
+  } else if (scope === 'admin' || scope === 'ad') {
     allRows = qd.allRows || [];
   } else {
     allRows = kamRows;
   }
   if (!allRows || !allRows.length) return null;
 
+  // v_adsplit (2026-07-22, mirrored in src/nrr/nrr_logic.js in the same
+  // commit): 'tl'/'admin' scopes exclude rows owned by someone whose real
+  // profiles.role is not KAM (window.nrrRoleRoster.nonKamSet); new 'ad'
+  // scope selects exactly the ad/ad_tl people's rows. scope 'kam' untouched
+  // (self-view). Empty roster = old behavior. This CHANGES the TL %NRR that
+  // feeds commission for teams carrying a non-KAM portfolio holder —
+  // intended (an AD's book must not inflate a KAM team's number).
+  var _roster = window.nrrRoleRoster || { nonKamSet: new Set(), adSet: new Set() };
+  var _nonKam = _roster.nonKamSet || new Set();
+  var _adSet = _roster.adSet || new Set();
+  function _isNonKamOwner(r) {
+    return _nonKam.has((r.latest_kam_email || '').toLowerCase());
+  }
   function _rowInScope(r) {
     if (scope === 'kam')   return r.latest_kam_email === kamEmail; // v827-fix
-    if (scope === 'tl')    return myTlEmail ? r.latest_tl_email === myTlEmail : true;
-    if (scope === 'admin') return true;
+    if (scope === 'tl')    return (myTlEmail ? r.latest_tl_email === myTlEmail : true) && !_isNonKamOwner(r);
+    if (scope === 'admin') return !_isNonKamOwner(r);
+    if (scope === 'ad')    return _adSet.has((r.latest_kam_email || '').toLowerCase());
     return r.latest_kam_email === kamEmail;
   }
 
@@ -91,7 +134,7 @@ function _qnrrCompute(kamEmail, scope) {
     // myTlEmail==='' (see allRows selection above), which resolves to the exact same
     // all-rows, no-boundary view as scope==='admin'. Missing this second path was
     // why the reported bug reproduced from the "ทีม" toggle specifically.
-    var isOrgWideView = (scope === 'admin') || (scope === 'tl' && !myTlEmail);
+    var isOrgWideView = (scope === 'admin') || (scope === 'ad') || (scope === 'tl' && !myTlEmail); // v_adsplit: 'ad' is boundary-less too
     if (isOrgWideView) {
       // At this scope there is no portfolio boundary between individual KAMs -- if
       // an outlet just moves from one KAM to another (both sides still 'KAM'

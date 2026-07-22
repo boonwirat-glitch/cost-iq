@@ -1246,6 +1246,17 @@ function handleFileUpload(type,input){
           }
         });
         window.bulkQnrrData={byKamEmail,byTlEmail,allRows,loaded:true,loadedAt:Date.now()};
+        // v_adsplit: role roster rides alongside the QNRR bundle — _rowInScope
+        // (07c_qnrr_view.js) needs it to keep non-KAM portfolio holders (AD/PM
+        // people) out of KAM/TL-scoped %NRR. If compute ran before it resolved,
+        // re-signal 'qnrr' once so consumers re-render with the corrected sets.
+        try{
+          if(typeof _qnrrFetchRoleRoster==='function' && !(window.nrrRoleRoster&&window.nrrRoleRoster.loaded)){
+            _qnrrFetchRoleRoster().then(function(r){
+              if(r && r.loaded && window.RenderBus) window.RenderBus.signal('qnrr');
+            });
+          }
+        }catch(e){}
         // v6-fix: trigger commission strip re-render now that QNRR data is available.
         // Root cause: _commBuildKamSelfState() calls _qnrrComputeForCommission() which
         // returns null while bulkQnrrData isn't loaded yet -> tier lookup fails to match

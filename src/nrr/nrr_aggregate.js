@@ -679,8 +679,20 @@ function nrrHandoverCohorts(result) {
 }
 window.nrrHandoverCohorts = nrrHandoverCohorts;
 
-// VP "Total Portfolio" — 3 separate %NRR (KAM/PM/Admin), never blended into
-// one number (per user's explicit answer), plus one combined GMV figure.
+// v_adsplit: AD people's portfolios (rows in bulkQnrrData whose
+// latest_kam_email has profiles.role='ad'/'ad_tl') — the same rows the
+// 'admin'/'tl' scopes now EXCLUDE, re-bucketed here so the org total is
+// unchanged. Returns null when the roster has no ad people (chip hidden).
+function nrrAdResult() {
+  var adSet = (window.nrrRoleRoster && window.nrrRoleRoster.adSet) || new Set();
+  if (!adSet.size) return null;
+  return _nrrActualizeResult(_qnrrCompute(null, 'ad'));
+}
+window.nrrAdResult = nrrAdResult;
+
+// VP "Total Portfolio" — separate %NRR per portfolio type (KAM/PM/Admin
+// + AD when ad-role people hold portfolios), never blended into one number
+// (per user's explicit answer), plus one combined GMV figure.
 function nrrTotalPortfolio() {
   var kam = nrrOrgResult();
   var kamPeriod = nrrCurrentPeriod(kam);
@@ -696,11 +708,21 @@ function nrrTotalPortfolio() {
   var adminPct = _nrrBlendedBucketPct(admin);
   var adminGmv = _nrrBlendedBucketGmv(admin);
 
+  // v_adsplit: same shape as the kam bucket (both come from _qnrrCompute
+  // over bulkQnrrData — these rows were part of the kam bucket before the
+  // role split, so kamGmv+adGmv reconciles to the pre-split kam figure).
+  var ad = nrrAdResult();
+  var adPeriod = nrrCurrentPeriod(ad);
+  var adBm = ad && adPeriod ? ad.by_month[adPeriod] : null;
+  var adPct = adBm ? adBm.nrr_pct : null;
+  var adGmv = ad ? Math.round((adBm && adBm.effective_base_norm != null ? adBm.effective_base_norm : ad.base_norm) * nrrBaseDays()) : 0;
+
   return {
     kam: { pct: kamPct, gmv: kamGmv },
     pm: { pct: pmPct, gmv: pmGmv },
     admin: { pct: adminPct, gmv: adminGmv },
-    total_gmv: kamGmv + pmGmv + adminGmv
+    ad: { pct: adPct, gmv: adGmv },
+    total_gmv: kamGmv + pmGmv + adminGmv + adGmv
   };
 }
 window.nrrTotalPortfolio = nrrTotalPortfolio;

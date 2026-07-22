@@ -796,9 +796,15 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
 function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, planCode, previewResolver) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
+    // v_adsplit: portview lists portfolio HOLDERS — someone whose real
+    // profiles.role is ad/pm/etc. can appear under this TL without being a
+    // team KAM. Their upsell must not count toward the TL's team upsell %
+    // (numerator NOR baseline), matching the same exclusion in
+    // _rowInScope (07c) and _commBuildSnapshotRows.
+    const _nonKamSet = (window.nrrRoleRoster && window.nrrRoleRoster.nonKamSet) || new Set();
     const kamEmails = Array.from(new Set(
       (portviewBulkData || [])
-        .filter(r => r.tlEmail === tlEmail && r.kamEmail)
+        .filter(r => r.tlEmail === tlEmail && r.kamEmail && !_nonKamSet.has((r.kamEmail || '').toLowerCase()))
         .map(r => r.kamEmail)
     ));
     if (!kamEmails.length) return EMPTY;
@@ -1183,6 +1189,19 @@ async function loadTargets(quarter) {
     _commOtherRoleRoster = (otherRoleRows || [])
       .filter(p => p && p.email)
       .map(p => ({ email: p.email, role: _commEngineRole(p.role), name: p.full_name || p.email }));
+    // v_adsplit: keep the shared window.nrrRoleRoster (consumed by
+    // 07c_qnrr_view.js's _rowInScope) warm from this fetch too — same
+    // source table, so whichever of the two loaders runs first wins.
+    try {
+      const nonKam = new Set(), ad = new Set();
+      (otherRoleRows || []).forEach(p => {
+        if (!p || !p.email) return;
+        const em = p.email.toLowerCase();
+        nonKam.add(em);
+        if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+      });
+      window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+    } catch (e) {}
   } catch (e) {
     console.warn('[Commission other-role roster] load failed:', e.message);
     _commOtherRoleRoster = [];

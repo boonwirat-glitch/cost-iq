@@ -1784,7 +1784,10 @@ async function nrrRefresh(force) {
     await Promise.all([nrrFetchPmCsv(force), nrrFetchAdminCsv(force), nrrFetchVpCsv(force), nrrFetchCompanyCsv(force), nrrFetchSalesPipelineCsv(force)]);
     await Promise.all([nrrFetchCommissionSnapshots(), nrrFetchCommissionRates(),
                        nrrFetchCommissionPlans(), nrrFetchUpsellTeamCsv(),
-                       nrrFetchUpsellTeamGroupsCsv(), nrrFetchHandoverCsv()]); // v_catbonus: group-grain for per-category estimate
+                       nrrFetchUpsellTeamGroupsCsv(), nrrFetchHandoverCsv(),
+                       // v_adsplit: role roster must resolve before render —
+                       // nrr_logic.js's _rowInScope reads it synchronously.
+                       nrrFetchRoleRoster()]); // v_catbonus: group-grain for per-category estimate
     // Must resolve before nrrRenderAll() below -- nrr_logic.js's compute
     // functions call nrrAccountWaivedForPeriod synchronously off this cache.
     await nrrFetchExclusions();
@@ -1956,9 +1959,12 @@ function nrrRenderPulse(result) {
   var heroResult = result;
   var eyebrowLabel = isAdmin ? 'องค์กร · KAM PORTFOLIO' : 'ทีมของคุณ';
   var fallbackNote = '';
+  // v_adsplit: mention AD in the headline only when ad-role people
+  // actually hold portfolios (same condition that shows the AD chip).
+  var _hasAd = !!(window.nrrRoleRoster && window.nrrRoleRoster.adSet && window.nrrRoleRoster.adSet.size);
   if (vpMode) {
     heroResult = nrrVpResult();
-    eyebrowLabel = 'องค์กร · ทุก PORTFOLIO (KAM+PM+ADMIN)';
+    eyebrowLabel = 'องค์กร · ทุก PORTFOLIO (KAM+PM+ADMIN' + (_hasAd ? '+AD' : '') + ')';
   } else if (isAdmin) {
     fallbackNote = '<div class="micro" style="margin-top:8px">ภาพรวมรวมทุก portfolio ยังไม่พร้อม (vp_view.csv) — ตัวเลขใหญ่คือ KAM portfolio</div>';
   }
@@ -1988,9 +1994,15 @@ function nrrRenderPulse(result) {
       var kamPct = kamBm ? kamBm.nrr_pct : null;
       kamSat = '<span>' + satDot + 'KAM <b class="num" style="color:' + nrrThresholdColorVar(kamPct) + '">' + nrrFmtPct(kamPct) + '</b></span>';
     }
+    // v_adsplit: AD chip appears only when ad-role people hold portfolios
+    // (t.ad.pct null otherwise — nrrAdResult returns null on empty adSet).
+    var adSat = (t.ad && t.ad.pct != null)
+      ? '<span>' + satDot + 'AD <b class="num" style="color:' + nrrThresholdColorVar(t.ad.pct) + '">' + nrrFmtPct(t.ad.pct) + '</b></span>'
+      : '';
     satellitesHtml = '<div class="nrr-pulse-satellites">' + kamSat +
       '<span>' + satDot + 'PM <b class="num" style="color:' + nrrThresholdColorVar(t.pm.pct) + '">' + nrrFmtPct(t.pm.pct) + '</b></span>' +
       '<span>' + satDot + 'Admin <b class="num" style="color:' + nrrThresholdColorVar(t.admin.pct) + '">' + nrrFmtPct(t.admin.pct) + '</b></span>' +
+      adSat +
       '</div>' + fallbackNote;
   } else {
     var org = nrrOrgResult();

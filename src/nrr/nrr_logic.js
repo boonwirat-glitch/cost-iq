@@ -45,15 +45,29 @@ var QNRR_CFG = {
 };
 window.QNRR_CFG = QNRR_CFG;
 
-// scope: 'kam' | 'tl' | 'admin'
-// For 'tl'/'admin' scope, kamEmail may be the TL's own email (direct
+// scope: 'kam' | 'tl' | 'admin' | 'ad'
+// For 'tl'/'admin'/'ad' scope, kamEmail may be the TL's own email (direct
 // byTlEmail lookup, v817) or null/empty (pure org-wide, v850-fix — kamEmail
 // is genuinely optional once scope !== 'kam').
+//
+// v_adsplit (2026-07-22, mirrored in src/07c_qnrr_view.js in the same
+// commit): 'tl' and 'admin' scopes now EXCLUDE rows whose latest_kam_email
+// belongs to someone whose real profiles.role is not KAM (pm/admin/sales/
+// ad/... — window.nrrRoleRoster.nonKamSet), and a new 'ad' scope selects
+// exactly the ad/ad_tl people's rows for the org AD bucket. Rationale: the
+// CSV's latest_kam_email tracks portfolio OWNERSHIP, not employment role —
+// an AD (Ornpreya "Ice") holding 75 outlets under team Ploy was inflating
+// the KAM team's %NRR (and the TL's commission NRR). scope 'kam' is
+// deliberately untouched so her own self-view keeps working. Empty roster
+// (fetch failed / not yet loaded) = exactly the old behavior.
 function _qnrrCompute(kamEmail, scope) {
   scope = scope || 'kam';
   if (scope === 'kam' && !kamEmail) return null;
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded) return null;
+  var _roster = window.nrrRoleRoster || { nonKamSet: new Set(), adSet: new Set() };
+  var _nonKam = _roster.nonKamSet || new Set();
+  var _adSet = _roster.adSet || new Set();
 
   var myTlEmail = '';
   var kamRows = (qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
@@ -71,17 +85,21 @@ function _qnrrCompute(kamEmail, scope) {
   } else if (scope === 'tl' && !myTlEmail) {
     // Admin viewing "team" scope with no personal TL — org-wide fallback.
     allRows = qd.allRows || [];
-  } else if (scope === 'admin') {
+  } else if (scope === 'admin' || scope === 'ad') {
     allRows = qd.allRows || [];
   } else {
     allRows = kamRows;
   }
   if (!allRows || !allRows.length) return null;
 
+  function _isNonKamOwner(r) {
+    return _nonKam.has((r.latest_kam_email || '').toLowerCase());
+  }
   function _rowInScope(r) {
     if (scope === 'kam')   return r.latest_kam_email === kamEmail;
-    if (scope === 'tl')    return myTlEmail ? r.latest_tl_email === myTlEmail : true;
-    if (scope === 'admin') return true;
+    if (scope === 'tl')    return (myTlEmail ? r.latest_tl_email === myTlEmail : true) && !_isNonKamOwner(r);
+    if (scope === 'admin') return !_isNonKamOwner(r);
+    if (scope === 'ad')    return _adSet.has((r.latest_kam_email || '').toLowerCase());
     return r.latest_kam_email === kamEmail;
   }
 
@@ -96,7 +114,8 @@ function _qnrrCompute(kamEmail, scope) {
     // "org-wide, no portfolio boundary" applies both to scope==='admin' AND
     // to scope==='tl' with myTlEmail==='' (Admin viewing the "ทีม" toggle
     // without personally being a TL of any squad) — same resolved view.
-    var isOrgWideView = (scope === 'admin') || (scope === 'tl' && !myTlEmail);
+    // v_adsplit: scope 'ad' is also boundary-less (org-level AD bucket).
+    var isOrgWideView = (scope === 'admin') || (scope === 'ad') || (scope === 'tl' && !myTlEmail);
     if (isOrgWideView) {
       // No boundary between individual KAMs at this scope: a pure KAM<->KAM
       // reassignment never cost/gained the org anything, so it reads as
