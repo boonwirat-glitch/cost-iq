@@ -1,4 +1,4 @@
-<!-- Freshket Sense v905: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v906: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v905',
+      version: 'v906',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -39680,7 +39680,12 @@ function _commRolePreviewPerson(role) {
     const t = tls.find(x => x.email && !other.has(x.email.toLowerCase()));
     return t ? { email: t.email, name: t.name || t.email } : null;
   }
-  const p = (_commOtherRoleRoster || []).find(x => x.email);
+  // Pre-existing bug (predates today's kam/tl fix, just now surfaced by
+  // real testing): this never filtered by role at all — it grabbed the
+  // FIRST person in the whole cross-role roster (pm/admin/sales/ad/...)
+  // regardless of which role's detail page was open. Opening AD showed
+  // whichever person happened to load first (e.g. a PM), never Ice.
+  const p = (_commOtherRoleRoster || []).find(x => x.email && x.role === role);
   return p ? { email: p.email, name: p.name || p.email } : null;
 }
 // Draft-aware preview card — reuses _commBuildKamPayoutPreview/

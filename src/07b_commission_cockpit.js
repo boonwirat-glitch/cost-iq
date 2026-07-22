@@ -674,7 +674,12 @@ function _commRolePreviewPerson(role) {
     const t = tls.find(x => x.email && !other.has(x.email.toLowerCase()));
     return t ? { email: t.email, name: t.name || t.email } : null;
   }
-  const p = (_commOtherRoleRoster || []).find(x => x.email);
+  // Pre-existing bug (predates today's kam/tl fix, just now surfaced by
+  // real testing): this never filtered by role at all — it grabbed the
+  // FIRST person in the whole cross-role roster (pm/admin/sales/ad/...)
+  // regardless of which role's detail page was open. Opening AD showed
+  // whichever person happened to load first (e.g. a PM), never Ice.
+  const p = (_commOtherRoleRoster || []).find(x => x.email && x.role === role);
   return p ? { email: p.email, name: p.name || p.email } : null;
 }
 // Draft-aware preview card — reuses _commBuildKamPayoutPreview/
