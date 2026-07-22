@@ -171,6 +171,14 @@
   function buildSources(st){
     var nrr=Number(st&&st.payout||0);
     var base={loading:false,nrr:nrr,uplift:0,handover:0,gate_cap:1.0,gate_active:false,final:nrr};
+    // v_qtrux-fix (money-trust): _commBuildKamSelfState returns {loading:true}
+    // while quarterly QNRR hasn't loaded — its payout field is UNDEFINED, not
+    // a real ฿0. Rendering that as "NRR ฿0" was the intermittent
+    // wrong-commission bug (tiers + upsell bundle warm-start from cache →
+    // everything looked "ready" except the 2.6MB QNRR CSV). Propagate loading.
+    if(st&&st.loading){
+      return Object.assign({},base,{loading:true});
+    }
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
       return Object.assign({},base,{loading:true});
     }
@@ -210,7 +218,11 @@
     // _commGatedRender's 'กำลังโหลด' peek + _tgtInitCheck both retry once tiers arrive.
     // v754e: require DB fetch (not just localStorage cache) to prevent stale hardcoded tier flash
     var _tiersReady=!!(window._tgtLoadedFromDB);
-    var _stripLoading=!!src.loading||!_tiersReady;
+    // v_qtrux-fix: st.loading = QNRR not ready (quarterly) — the NRR number
+    // doesn't exist yet, so the whole strip must show the skeleton, never a
+    // confident "NRR ฿0". Repaint comes from the existing QNRR-arrival hook
+    // (02_data_pipeline) + _tgtInitCheck retries.
+    var _stripLoading=!!src.loading||!_tiersReady||!!(st&&st.loading);
     var finalAmt=_stripLoading?null:src.final;
     var paid=!_stripLoading&&finalAmt>0;
     var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
@@ -234,9 +246,12 @@
       +'<span class="pv-comm-hist-lbl">\u0e1b\u0e23\u0e30\u0e27\u0e31\u0e15\u0e34</span>'
       +'</button>'
       +'<div class="pv-comm-sources">'
-      +'<span style="color:'+(src.nrr>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+money(src.nrr)+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(src.loading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
-      +'<span style="color:'+(!src.loading&&(src.handover||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(src.loading?'\u2014':money(src.handover||0))+'</span>'
+      // v_qtrux-fix: while ANYTHING is still loading (_stripLoading covers
+      // QNRR/tiers/bundle) every source shows '\u2014' \u2014 "NRR \u0e3f0" for money that
+      // hasn't loaded yet was the reported wrong-commission bug.
+      +'<span style="color:'+(!_stripLoading&&src.nrr>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>NRR</b> '+(_stripLoading?'\u2014':money(src.nrr))+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!_stripLoading&&(src.uplift||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Uplift</b> '+(_stripLoading?'\u2014':money(src.uplift||0))+'</span><span class="pv-comm-sep">\u00b7</span>'
+      +'<span style="color:'+(!_stripLoading&&(src.handover||0)>0?'#ffe08a':'rgba(255,255,255,.35)')+'"><b>Handover</b> '+(_stripLoading?'\u2014':money(src.handover||0))+'</span>'
       +'</div>'
       +'</div>';
   }
@@ -1310,6 +1325,9 @@
 
     var nrr=Number(st.payout||0);
     var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
+    // v_qtrux-fix: QNRR not loaded yet (st.loading) → the sheet must open in
+    // loading state ('…' + "กำลังโหลด" note), never confident partial money.
+    if(st.loading){ src.loading=true; }
     if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&typeof _commBuildKamPayout==='function'){
       try{
         var p=_commBuildKamPayout(st.email);
@@ -1323,6 +1341,7 @@
           src.upsell_sku_detail=p.upsell_sku;
           src.upsell_outlet_detail=p.upsell_outlet;
           src.handover_detail=p.handover;
+          src.base_month_used=p.base_month_used||null; // v_qtrux: quarter anchor for the timeline UI
           src.final=Math.round((nrr+src.upsell_sku+src.upsell_outlet+src.handover)*src.gate_cap);
         }
       }catch(e){ console.warn('[cds] buildSrc error',e); }
@@ -1450,6 +1469,40 @@ window._cdsBackToSummary = function() {
   if(body){void body.offsetWidth; body.classList.add('cds-body-enter'); body.scrollTop=0;}
 };
 
+// ── v_qtrux: shared quarter-timeline line for the CDS P1/P3 tabs ──────────
+// "ก.ค. ✓฿450 · ส.ค. ฿180 (MTD) · ก.ย. ~฿420" + status chip, from
+// _upsellQuarterTimeline (07a). Reads _cdsKamSt/_cdsSrc set by _cdsOpen.
+// Returns '' when data is missing (monthly mode / bundle absent) — tabs
+// render exactly as before.
+window._cdsQtrTimelineHtml = function(g, kind) {
+  try {
+    var st = window._cdsKamSt, src = window._cdsSrc;
+    if (!st || !src || !src.base_month_used || typeof _upsellQuarterTimeline !== 'function') return '';
+    var t = _upsellQuarterTimeline(st.email, g, kind, src.base_month_used);
+    if (!t) return '';
+    function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (n >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
+    var cells = t.months.map(function(m){
+      var mo = m.label.split(' ')[0];
+      if (m.state === 'paid') return '<span style="color:var(--tk-ok-bright)">' + mo + ' ✓' + mon(m.comm) + '</span>';
+      if (m.state === 'none') return '<span style="color:rgba(var(--ink-blue-hi),.35)">' + mo + ' —</span>';
+      if (m.state === 'mtd')  return '<span style="color:rgba(var(--ink-blue-hi),.85);font-weight:800">' + mo + ' ' + mon(m.comm) + ' (MTD)</span>';
+      return '<span style="color:rgba(255,224,138,.75)">' + mo + ' ' + (m.comm != null ? '~' + mon(m.comm) : '~') + '</span>';
+    }).join('<span style="color:rgba(var(--ink-blue),.35)"> · </span>');
+    var chip;
+    if (t.isLastMonth) chip = '<span style="color:#bcd7ff">เดือนสุดท้าย — รวมไตรมาส ' + mon(Math.round(t.quarterTotal)) + '</span>';
+    else if (t.status === 'growing') chip = '<span style="color:var(--tk-ok-bright)">ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม</span>';
+    else if (t.status === 'kept') chip = '<span style="color:var(--tk-ok-bright)">ร้านยังซื้ออยู่ · จ่ายต่อ</span>';
+    else chip = '<span style="color:rgba(var(--ink-blue-hi),.55)">เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ</span>';
+    return '<div style="padding:3px 16px 7px 34px;font-size:var(--text-2xs);font-family:\'IBM Plex Mono\',\'Noto Sans Thai\',monospace;line-height:1.7;border-bottom:1px solid rgba(var(--ink-blue),.06)">' + cells + '<br>' + chip + '</div>';
+  } catch(e) { return ''; }
+};
+
+// v_qtrux: the conditionality education line — always visible at the top of
+// the P1/P3 tab body, never a dismissible tooltip.
+window._cdsQtrEducationHtml = function() {
+  return '<div style="padding:7px 16px;font-size:var(--text-sm);color:rgba(255,224,138,.82);background:rgba(255,224,138,.05);border-bottom:1px solid rgba(var(--ink-blue),.10);line-height:1.4">ค่าคอมฯ จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนี้อยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>';
+};
+
 // ── Level 1 summary — EXACT original "วิธีคิดค่าคอมฯ" design ───────────────
 window._cdsRenderL1 = function(src, st) {
   var body = document.getElementById('cds-body');
@@ -1479,6 +1532,27 @@ window._cdsRenderL1 = function(src, st) {
   var p3cnt    = src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.groups?src.upsell_sku_detail.p3.groups.length:0;
   var upSub    = (p1cnt?'สินค้าใหม่ '+p1cnt+' รายการ':'')+(p1cnt&&p3cnt?' · ':'')+(p3cnt?'ยอดเติบโต '+p3cnt+' รายการ':'');
   if(!upSub) upSub='สินค้าใหม่ + ยอดเติบโต';
+  // v_qtrux: quarter-projection sub-line — the emotional counterweight to
+  // "3%→1.5%": this month's ACTUAL stays the row's number, the sub shows
+  // the same effort keeps paying every remaining quarter month.
+  // Conditionality ("ถ้าร้านยังซื้อ") baked into the line, not a footnote.
+  try{
+    if(src.base_month_used&&typeof _upsellQuarterTimeline==='function'&&(p1cnt||p3cnt)){
+      var _qg1=(src.upsell_sku_detail&&src.upsell_sku_detail.p1&&src.upsell_sku_detail.p1.groups)||[];
+      var _qg3=(src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.groups)||[];
+      var _qSum=0,_qAny=false,_qLast=false,_qReady=true;
+      _qg1.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p1',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
+      _qg3.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p3',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
+      if(_qAny){
+        var _qLine=_qLast
+          ?'เดือนสุดท้ายของไตรมาส — รวม upsell ทั้งไตรมาส ≈ '+fmtFull(Math.round(_qSum))
+          :(_qReady
+            ?'ยอดนี้จ่ายต่อทุกเดือนที่เหลือ → รวม ~'+fmtFull(Math.round(_qSum))+' ทั้งไตรมาส (ถ้าร้านยังซื้อ)'
+            :'ยอดนี้จ่ายต่อทุกเดือนที่เหลือของไตรมาส (ถ้าร้านยังซื้อ)');
+        upSub+='<br><span style="color:rgba(255,224,138,.85);font-weight:var(--fw-bold)">'+_qLine+'</span>';
+      }
+    }
+  }catch(e){}
   var ed       = src.upsell_outlet_detail;
   // v560: live config (was hardcoded 1.5% / ฿2,500 tiers)
   var _cfgQ    = function(k,p,d){ try{ return typeof _commGetConfig==='function'?_commGetConfig(k,p,d):d; }catch(e){ return d; } };
@@ -1491,13 +1565,16 @@ window._cdsRenderL1 = function(src, st) {
   var hoSub    = hd.accounts?hd.accounts+' account · retention '+_commFmtPct(hd.retention_pct||0):'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
 
   function srcRow(tabKey, dotColor, name, sub, amt) {
-    var earned = amt > 0;
+    var earned = !src.loading && amt > 0;
+    // v_qtrux-fix: while loading, amounts show '—' — a confident-looking ฿0
+    // for money that simply hasn't loaded yet is a trust violation.
+    var amtText = src.loading ? '—' : fmtFull(amt);
     return '<div class="cds-src-row" data-tab="'+tabKey+'">'
       +'<div class="cds-src-dot" style="background:'+dotColor+';'+(earned?'box-shadow:0 0 7px '+dotColor.replace(')',', .45)'):'')+'" ></div>'
       +'<div class="cds-src-body"><div class="cds-src-name">'+esc(name)+'</div>'
       +'<div class="cds-src-sub">'+sub+'</div></div>'
       +'<div class="cds-src-right">'
-      +'<span class="cds-src-amt'+(earned?' earned':'')+'" style="color:'+(earned?'#ffe08a':'rgba(var(--ink-blue-hi),.28)')+'">'+fmtFull(amt)+'</span>'
+      +'<span class="cds-src-amt'+(earned?' earned':'')+'" style="color:'+(earned?'#ffe08a':'rgba(var(--ink-blue-hi),.28)')+'">'+amtText+'</span>'
       +'<span class="cds-src-chevron">&#8250;</span>'
       +'</div></div>';
   }
@@ -1516,7 +1593,10 @@ window._cdsRenderL1 = function(src, st) {
   // ── Gate card ─────────────────────────────────────────────────────────────
   var gateGmv  = src.gate&&src.gate.ach_pct!=null ? src.gate.ach_pct : (st.pct||null);
   var gT1 = 95; try{gT1=_commGetConfig('gmv_gate','threshold_1',95);}catch(e){}
-  var gateSub  = gateGmv!==null ? 'NRR '+gateGmv+'% ≥'+gT1+'% — '+(gateOk?'ผ่าน':'ถูก cap') : 'NRR —';
+  // v_qtrux-fix: ach_pct arrives UNROUNDED from the engine (deliberately —
+  // tier threshold comparisons need full precision); display must format it
+  // (was rendering "NRR 104.43019273127221%"). _commFmtPct includes the %.
+  var gateSub  = gateGmv!==null ? 'NRR '+_commFmtPct(gateGmv)+' ≥'+gT1+'% — '+(gateOk?'ผ่าน':'ถูก cap') : 'NRR —';
   var gateHtml = '<div class="cds-l1-gate '+(gateOk?'ok':'warn')+'">'
     +'<div class="cds-l1-gate-info">'
     +'<div class="cds-l1-gate-title">NRR Gate</div>'
@@ -1645,6 +1725,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
         { text: fmt(g.total_gmv),  cls: 'cds-val v-muted' },
         { text: fmt(g.commission), cls: 'cds-val v-amber' }
       ], 'p1');
+      html += window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(g, 'p1') : ''; // v_qtrux
       html += h.proof(proofId, [
         { label: 'GMV เดือนนี้',     result: fmt(g.total_gmv) },
         { label: 'เกณฑ์ขั้นต่ำ',   result: '≥ ฿' + p1MinGmv.toLocaleString('en-US'), pass: g.total_gmv >= p1MinGmv },
@@ -1655,7 +1736,27 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     html += h.chipRowClose();
   });
 
-  body.innerHTML = html;
+  // v_qtrux: stopped-buying groups — earned earlier this quarter, ฿0 this
+  // month. Real data as the conditionality lesson; grayed at the bottom.
+  try {
+    var _stSt = window._cdsKamSt, _stSrc = window._cdsSrc;
+    if (_stSt && _stSrc && _stSrc.base_month_used && typeof _upsellStoppedGroups === 'function') {
+      var _stopped = _upsellStoppedGroups(_stSt.email, groups, _stSrc.base_month_used) || [];
+      if (_stopped.length) {
+        html += '<div style="padding:10px 16px 6px;font-size:var(--text-2xs);font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,107,61,.75);font-family:\'IBM Plex Mono\',monospace;border-top:1px solid rgba(var(--ink-blue),.10);margin-top:6px">หยุดซื้อเดือนนี้ — ค่าคอมฯ หยุด (' + _stopped.length + ')</div>'
+          + _stopped.map(function(sg){
+              var oN = typeof _pvOutletName === 'function' ? _pvOutletName(sg.outletId, sg.accountId) : sg.outletId;
+              return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 16px;opacity:.55;border-bottom:1px solid rgba(var(--ink-blue),.06)">'
+                + '<div><div style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.60)">' + h.esc(sg.groupKey) + '</div>'
+                + '<div style="font-size:var(--text-2xs);color:rgba(var(--ink-blue-hi),.45)">' + h.esc(oN) + ' · เคยได้ ~' + fmt(sg.lastComm) + ' (' + h.esc(sg.lastLabel.split(' ')[0]) + ')</div></div>'
+                + '<span style="font-size:var(--text-sm);font-family:\'IBM Plex Mono\',monospace;font-weight:900;color:rgba(255,107,61,.85)">฿0</span>'
+                + '</div>';
+            }).join('');
+      }
+    }
+  } catch(e) {}
+
+  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + html; // v_qtrux: education line always on top
 
   body.querySelectorAll('.cds-sub-row.p1-cols').forEach(function(row) {
     row.style.cursor = 'pointer';
@@ -1756,6 +1857,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
         { text: fmt(g.incremental),   cls: 'cds-val v-green' },
         { text: fmt(g.commission),    cls: 'cds-val v-amber' }
       ], 'p3');
+      html += window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(g, 'p3') : ''; // v_qtrux
       html += h.proof(proofId, [
         { label: 'Baseline (' + esc(g.max_baseline_month || '') + ')', result: fmt(g.max_baseline) },
         { label: 'GMV เดือนนี้', result: fmt(g.existing_curr) + ' (' + growthPct + '%)' },
@@ -1767,7 +1869,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
     html += h.chipRowClose();
   });
 
-  body.innerHTML = html;
+  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + html; // v_qtrux
 
   body.querySelectorAll('.cds-sub-row.p3-cols').forEach(function(row) {
     row.style.cursor = 'pointer';
