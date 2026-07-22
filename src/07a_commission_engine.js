@@ -2573,8 +2573,16 @@ function _commBuildSnapshotRows(periodOverride) {
   });
 
   const groups = role === 'admin' ? allGroups : allGroups.filter(g => (g.accounts || []).some(a => a.tlEmail === visibleTlEmail));
+  // PM/AD/sales/... people who hold a portfolio appear in portview grouped
+  // as "a KAM under a team" (data side), but their REAL beneficiary role
+  // comes from profiles (loaded into _commOtherRoleRoster). Without this
+  // skip they'd get TWO snapshot rows per Compute — one paid at KAM rates
+  // via this loop + one at their own role's rates via the otherRoster loop
+  // below. Skip them here; their single correct row is built below.
+  const _otherRoleEmails = new Set((_commOtherRoleRoster || []).map(p => (p.email || '').toLowerCase()));
   groups.forEach(g => {
     if (!g.kamEmail) return;
+    if (_otherRoleEmails.has(g.kamEmail.toLowerCase())) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
     const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
     // v878 (phase 7): resolve+freeze which scheme actually produced this

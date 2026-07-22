@@ -1,4 +1,4 @@
-<!-- Freshket Sense v902: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v903: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v902',
+      version: 'v903',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -38020,8 +38020,16 @@ function _commBuildSnapshotRows(periodOverride) {
   });
 
   const groups = role === 'admin' ? allGroups : allGroups.filter(g => (g.accounts || []).some(a => a.tlEmail === visibleTlEmail));
+  // PM/AD/sales/... people who hold a portfolio appear in portview grouped
+  // as "a KAM under a team" (data side), but their REAL beneficiary role
+  // comes from profiles (loaded into _commOtherRoleRoster). Without this
+  // skip they'd get TWO snapshot rows per Compute — one paid at KAM rates
+  // via this loop + one at their own role's rates via the otherRoster loop
+  // below. Skip them here; their single correct row is built below.
+  const _otherRoleEmails = new Set((_commOtherRoleRoster || []).map(p => (p.email || '').toLowerCase()));
   groups.forEach(g => {
     if (!g.kamEmail) return;
+    if (_otherRoleEmails.has(g.kamEmail.toLowerCase())) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
     const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
     // v878 (phase 7): resolve+freeze which scheme actually produced this
