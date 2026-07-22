@@ -2307,7 +2307,15 @@ function _commValidateDrafts() {
     const e = { tiers:{} };
     if (!String(d.plan_name || '').trim()) e.name = 'กรุณาใส่ชื่อ rule เพื่อให้ audit ได้ว่าใช้ criteria ชุดไหน';
     const tiers = Array.isArray(d.tiers) ? d.tiers : [];
-    if (!tiers.length) e.general = 'ต้องมีอย่างน้อย 1 tier';
+    // An EMPTY tier ladder is legitimate, not an error: it means "this role
+    // gets ฿0 from the NRR component" while other components (Upsell P1/P3,
+    // Handover, ...) still pay — the exact shape a role like AD needs. The
+    // old hard block ('ต้องมีอย่างน้อย 1 tier') made the whole Setup save
+    // abort for any never-configured role the moment its toggle was turned
+    // on (the toggle stages an NRR draft whose default tiers are [] since
+    // v754f), so AD/PM/... could never be saved at all. The sibling ladder
+    // editors (Gate, TL-mult) already treat empty as a valid no-op; the NRR
+    // editor now shows an inline note instead of blocking.
     tiers.forEach((t, i) => {
       const te = {};
       const minEmpty = t.min_value === null || t.min_value === '' || t.min_value === undefined;

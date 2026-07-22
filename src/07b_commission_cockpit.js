@@ -1719,6 +1719,10 @@ function _renderCommRuleEditorByCode(planCode, role) {
   }).join('');
 
   const generalErr = err.general ? `<div style="font-size:var(--text-sm);color:rgba(255,100,60,.90);padding:8px 10px;background:rgba(255,80,60,.10);border-radius:var(--r-8);margin-bottom:10px">${_commEscapeHtml(err.general)}</div>` : '';
+  // Empty ladder = valid no-op (role gets ฿0 NRR, other components still
+  // pay) — same convention as the Gate/TL-mult editors' emptyNote. Shown as
+  // an informational note, NOT a validation error (see _commValidateDrafts).
+  const emptyNote = !tiers.length ? `<div style="font-size:var(--text-sm);color:rgba(var(--ink-blue),.60);padding:8px 10px;background:rgba(255,255,255,.04);border:1px dashed rgba(var(--ink-blue),.20);border-radius:var(--r-8);margin-bottom:10px">ยังไม่มี NRR tier — role นี้ได้ NRR ฿0 (component อื่น เช่น Upsell ยังจ่ายตามที่ตั้งไว้) · กด "+ เพิ่ม tier" ถ้าต้องการให้ role นี้ได้ค่าคอมฯ จาก NRR ด้วย</div>` : '';
 
   return `<div style="border-radius:var(--r-lg);border:1px solid rgba(var(--ink-blue),.12);background:rgba(255,255,255,.03);padding:14px;margin-bottom:8px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px">
@@ -1733,6 +1737,7 @@ function _renderCommRuleEditorByCode(planCode, role) {
         style="font-size:var(--text-xs);color:${isStandard?'rgba(var(--ink-blue),.25)':'rgba(255,100,60,.70)'};background:none;border:1px solid ${isStandard?'rgba(var(--ink-blue),.10)':'rgba(255,100,60,.28)'};border-radius:var(--r-7);padding:5px 10px;cursor:${isStandard?'default':'pointer'};white-space:nowrap">Archive</button>
     </div>
     ${generalErr}
+    ${emptyNote}
     ${tierCards}
     <button class="comm-add" onclick="addRuleTier('${planCode}')"
       style="width:100%;padding:10px;border-radius:var(--r-md);background:rgba(var(--ink-blue),.06);border:1px dashed rgba(var(--ink-blue),.22);color:rgba(var(--ink-blue),.70);font-size:var(--text-md);font-weight:var(--fw-bold);cursor:pointer;margin-top:2px;font-family:var(--tk-font-body),system-ui,sans-serif">+ เพิ่ม tier</button>
@@ -1921,12 +1926,19 @@ const _COMM_METRIC_DEFAULTS = {
 async function saveCommissionComponentRulesByScheme() {
   const keys = Object.keys(_commComponentRulePending || {});
   if (!keys.length) return;
+  const skipped = [];
   for (const key of keys) {
     const parts = key.split('|');
     const planCode = parts[0], metricCode = parts[1], metricVariant = parts[2] || null;
     const plan = (_commRuleConfig.plans || {})[planCode];
     if (!plan || !plan.id) {
+      // Should be unreachable in the normal save order (saveCommissionRules
+      // persists every _commRulePending plan first) — but if it ever fires,
+      // the user MUST know their component edit didn't land. The old code
+      // console.warn'd and then wiped the draft below, silently losing the
+      // staged rates while the save toast still said สำเร็จ.
       console.warn('[Commission Setup] skipped component save — plan not persisted yet', key);
+      skipped.push(key);
       continue;
     }
     const draft = _commComponentRulePending[key];
@@ -1986,8 +1998,13 @@ async function saveCommissionComponentRulesByScheme() {
       id: ruleId, plan_id: plan.id, metric_code: metricCode, metric_variant: metricVariant,
       active: rulePayload.active, params: rulePayload.params, tier_config: rulePayload.tier_config
     };
+    delete _commComponentRulePending[key];
   }
-  _commComponentRulePending = {};
+  // Only successfully-saved keys were deleted above — skipped drafts stay
+  // staged (Save button stays lit) instead of being silently discarded.
+  if (skipped.length && typeof showToast === 'function') {
+    showToast(`บาง component ยังไม่ถูกบันทึก (${skipped.length}) — กด Save อีกครั้ง ถ้ายังไม่หายให้แจ้ง dev`, '!');
+  }
 }
 window.saveCommissionComponentRulesByScheme = saveCommissionComponentRulesByScheme;
 
@@ -2094,8 +2111,16 @@ async function saveCommissionCockpit() {
   const validation = _commValidateDrafts();
   const firstInvalid = _commFirstValidationPlan(validation);
   if (firstInvalid) {
-    _commSelectedRuleCode = firstInvalid;
-    _commCockpitStep = 'rules';
+    // Keep the user in the Setup role-detail page when that's where they
+    // are editing — the NRR editor there renders the same inline validation
+    // errors. Bouncing to the Advanced 'rules' step mid-Setup (the old
+    // behavior) read as "save silently failed and dumped me somewhere else"
+    // — that exact confusion was reported for the AD-role setup flow.
+    const stayInSetup = _commCockpitStep === 'setup' && _commSetupDetailRole;
+    if (!stayInSetup) {
+      _commSelectedRuleCode = firstInvalid;
+      _commCockpitStep = 'rules';
+    }
     renderCommissionCockpit();
     if (typeof showToast === 'function') showToast('กรุณาแก้ rule ที่ยังไม่ครบก่อน save', '!');
     setTimeout(()=>{
