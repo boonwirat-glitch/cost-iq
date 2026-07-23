@@ -193,6 +193,44 @@ function nrrKamRowsForTeam(tlEmail, period) {
 }
 window.nrrKamRowsForTeam = nrrKamRowsForTeam;
 
+// v_adperson: Team -> AD drill-down rows — mirrors nrrKamRowsForTeam exactly
+// (same nrrKamResult() call, same 'tl'-scope outlet classification so the
+// outlet count/badges reconcile with the team's movement lens), just sourced
+// from nrrListAdsForTeam instead. AD rows share the SAME return shape as KAM
+// rows (kam_email/kam_name keys kept, not renamed) so both feed the same
+// row-rendering + slide-over code with zero branching.
+function nrrAdRowsForTeam(tlEmail, period) {
+  var ads = nrrListAdsForTeam(tlEmail);
+  return ads.map(function (k) {
+    var kamResult = nrrKamResult(k.email);
+    var kamPeriod = period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult);
+    var bm = kamResult && kamPeriod ? kamResult.by_month[kamPeriod] : null;
+
+    var qd = window.bulkQnrrData;
+    var rawRows = ((qd && qd.byKamEmail[k.email]) || []).filter(function (r) {
+      return r.period_month === kamPeriod;
+    });
+    var outlets = rawRows.map(function (r) {
+      return { row: r, movement: nrrClassifyRow(r, 'tl', tlEmail) };
+    }).filter(function (o) { return o.movement; });
+
+    return {
+      kam_email: k.email,
+      kam_name: k.name,
+      nrr_pct: bm ? bm.nrr_pct : null,
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : kamResult.base_norm) * nrrBaseDays()) : 0,
+      outlet_count: outlets.length,
+      period: kamPeriod,
+      outlets: outlets
+    };
+  }).sort(function (a, b) {
+    if (a.nrr_pct == null) return 1;
+    if (b.nrr_pct == null) return -1;
+    return b.nrr_pct - a.nrr_pct;
+  });
+}
+window.nrrAdRowsForTeam = nrrAdRowsForTeam;
+
 // KAM -> Outlet drill-down rows (section 7) — that KAM's own scope='kam' lens.
 function nrrOutletsForKam(kamEmail, period) {
   var qd = window.bulkQnrrData;
@@ -602,6 +640,59 @@ function nrrPmResult() {
   };
 }
 window.nrrPmResult = nrrPmResult;
+
+// v_adperson: PM per-person breakdown — PM (unlike KAM/AD) has no team
+// concept and no email column in pm_view.csv, only a plain staff-name
+// string (current_staff_owner), so this groups by trimmed name instead of
+// email — same precedent as nrrPipelineByRep's staff_owner grouping above.
+// nrrComputeRowsPool is already generic over any row subset + label, so
+// each name's group gets the exact same %NRR formula as the Chain/SA-MC
+// buckets, just re-targeted to "this one person's rows" instead of "this
+// one account_type's rows". Admin gets no equivalent (admin_view.csv's
+// current_staff_owner is ~99% blank per _nrrParsePortfolioCsv's header
+// comment — not enough usable data for a real per-person list).
+function nrrPmRowsByPerson() {
+  var pd = window.bulkPmData;
+  if (!pd || !pd.loaded || !pd.allRows.length) return [];
+  var byName = {};
+  pd.allRows.forEach(function (r) {
+    var name = (r.current_staff_owner || '').trim() || 'ไม่ระบุ PM';
+    if (!byName[name]) byName[name] = [];
+    byName[name].push(r);
+  });
+  return Object.keys(byName).map(function (name) {
+    var result = _nrrActualizeResult(nrrComputeRowsPool(byName[name], name));
+    var period = nrrCurrentPeriod(result);
+    var bm = result && period ? result.by_month[period] : null;
+    var outletCount = 0;
+    if (bm) {
+      ['core_nrr', 'core_nrr_churn', 'comeback', 'transfer_in'].forEach(function (m) {
+        outletCount += bm.outlets[m] || 0;
+      });
+    }
+    return {
+      name: name,
+      nrr_pct: bm ? bm.nrr_pct : null,
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm) * nrrBaseDays()) : 0,
+      outlet_count: outletCount,
+      period: period,
+      result: result
+    };
+  }).filter(function (p) {
+    // pm_view.csv's current_staff_owner carries some stray zero-signal names
+    // (rows whose movement_type never lands in the counted set for the
+    // current period — verified against real data: several groups render
+    // 0%/฿0/0 outlets across the board). Nothing to show for those; drop
+    // them rather than list noise. A group with base_gmv but 0 current
+    // (a real churn-to-zero) still has outlet_count > 0 and stays.
+    return p.outlet_count > 0;
+  }).sort(function (a, b) {
+    if (a.nrr_pct == null) return 1;
+    if (b.nrr_pct == null) return -1;
+    return b.nrr_pct - a.nrr_pct;
+  });
+}
+window.nrrPmRowsByPerson = nrrPmRowsByPerson;
 
 function nrrAdminResult() {
   var ad = window.bulkAdminData;

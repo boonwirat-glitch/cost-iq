@@ -2703,6 +2703,28 @@ function nrrListKamsForTeam(tlEmail) {
 }
 window.nrrListKamsForTeam = nrrListKamsForTeam;
 
+// v_adperson: List of distinct AD people within a team (by latest_tl_email),
+// for the new AD leaderboard — mirrors nrrListKamsForTeam exactly except the
+// membership test is flipped: only INCLUDE adSet members (KAM/other roles
+// stay off this list, same way AD stays off nrrListKamsForTeam).
+function nrrListAdsForTeam(tlEmail) {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return [];
+  var seen = {};
+  var out = [];
+  var adSet = (window.nrrRoleRoster && window.nrrRoleRoster.adSet) || new Set();
+  (qd.byTlEmail[tlEmail] || []).forEach(function (r) {
+    var email = r.latest_kam_email;
+    if (!email || seen[email]) return;
+    if (!adSet.has(email.toLowerCase())) return;
+    seen[email] = true;
+    out.push({ email: email, name: r.latest_staff_owner || email });
+  });
+  out.sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+  return out;
+}
+window.nrrListAdsForTeam = nrrListAdsForTeam;
+
 // ── PM / Admin portfolio views ───────────────────────────────────────────
 // pm_view.csv / admin_view.csv come from DIFFERENT SQL sources
 // (sql/q3_2026_movement_pm_view.sql, .../admin_view.sql) with a SMALLER
@@ -4069,6 +4091,44 @@ function nrrKamRowsForTeam(tlEmail, period) {
 }
 window.nrrKamRowsForTeam = nrrKamRowsForTeam;
 
+// v_adperson: Team -> AD drill-down rows — mirrors nrrKamRowsForTeam exactly
+// (same nrrKamResult() call, same 'tl'-scope outlet classification so the
+// outlet count/badges reconcile with the team's movement lens), just sourced
+// from nrrListAdsForTeam instead. AD rows share the SAME return shape as KAM
+// rows (kam_email/kam_name keys kept, not renamed) so both feed the same
+// row-rendering + slide-over code with zero branching.
+function nrrAdRowsForTeam(tlEmail, period) {
+  var ads = nrrListAdsForTeam(tlEmail);
+  return ads.map(function (k) {
+    var kamResult = nrrKamResult(k.email);
+    var kamPeriod = period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult);
+    var bm = kamResult && kamPeriod ? kamResult.by_month[kamPeriod] : null;
+
+    var qd = window.bulkQnrrData;
+    var rawRows = ((qd && qd.byKamEmail[k.email]) || []).filter(function (r) {
+      return r.period_month === kamPeriod;
+    });
+    var outlets = rawRows.map(function (r) {
+      return { row: r, movement: nrrClassifyRow(r, 'tl', tlEmail) };
+    }).filter(function (o) { return o.movement; });
+
+    return {
+      kam_email: k.email,
+      kam_name: k.name,
+      nrr_pct: bm ? bm.nrr_pct : null,
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : kamResult.base_norm) * nrrBaseDays()) : 0,
+      outlet_count: outlets.length,
+      period: kamPeriod,
+      outlets: outlets
+    };
+  }).sort(function (a, b) {
+    if (a.nrr_pct == null) return 1;
+    if (b.nrr_pct == null) return -1;
+    return b.nrr_pct - a.nrr_pct;
+  });
+}
+window.nrrAdRowsForTeam = nrrAdRowsForTeam;
+
 // KAM -> Outlet drill-down rows (section 7) — that KAM's own scope='kam' lens.
 function nrrOutletsForKam(kamEmail, period) {
   var qd = window.bulkQnrrData;
@@ -4478,6 +4538,59 @@ function nrrPmResult() {
   };
 }
 window.nrrPmResult = nrrPmResult;
+
+// v_adperson: PM per-person breakdown — PM (unlike KAM/AD) has no team
+// concept and no email column in pm_view.csv, only a plain staff-name
+// string (current_staff_owner), so this groups by trimmed name instead of
+// email — same precedent as nrrPipelineByRep's staff_owner grouping above.
+// nrrComputeRowsPool is already generic over any row subset + label, so
+// each name's group gets the exact same %NRR formula as the Chain/SA-MC
+// buckets, just re-targeted to "this one person's rows" instead of "this
+// one account_type's rows". Admin gets no equivalent (admin_view.csv's
+// current_staff_owner is ~99% blank per _nrrParsePortfolioCsv's header
+// comment — not enough usable data for a real per-person list).
+function nrrPmRowsByPerson() {
+  var pd = window.bulkPmData;
+  if (!pd || !pd.loaded || !pd.allRows.length) return [];
+  var byName = {};
+  pd.allRows.forEach(function (r) {
+    var name = (r.current_staff_owner || '').trim() || 'ไม่ระบุ PM';
+    if (!byName[name]) byName[name] = [];
+    byName[name].push(r);
+  });
+  return Object.keys(byName).map(function (name) {
+    var result = _nrrActualizeResult(nrrComputeRowsPool(byName[name], name));
+    var period = nrrCurrentPeriod(result);
+    var bm = result && period ? result.by_month[period] : null;
+    var outletCount = 0;
+    if (bm) {
+      ['core_nrr', 'core_nrr_churn', 'comeback', 'transfer_in'].forEach(function (m) {
+        outletCount += bm.outlets[m] || 0;
+      });
+    }
+    return {
+      name: name,
+      nrr_pct: bm ? bm.nrr_pct : null,
+      base_gmv: bm ? Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm) * nrrBaseDays()) : 0,
+      outlet_count: outletCount,
+      period: period,
+      result: result
+    };
+  }).filter(function (p) {
+    // pm_view.csv's current_staff_owner carries some stray zero-signal names
+    // (rows whose movement_type never lands in the counted set for the
+    // current period — verified against real data: several groups render
+    // 0%/฿0/0 outlets across the board). Nothing to show for those; drop
+    // them rather than list noise. A group with base_gmv but 0 current
+    // (a real churn-to-zero) still has outlet_count > 0 and stays.
+    return p.outlet_count > 0;
+  }).sort(function (a, b) {
+    if (a.nrr_pct == null) return 1;
+    if (b.nrr_pct == null) return -1;
+    return b.nrr_pct - a.nrr_pct;
+  });
+}
+window.nrrPmRowsByPerson = nrrPmRowsByPerson;
 
 function nrrAdminResult() {
   var ad = window.bulkAdminData;
@@ -11276,6 +11389,15 @@ function nrrShellHtml() {
     '    </div></div>' +
     '    <table class="nrr-table"><thead><tr><th>KAM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-kams-tbody"></tbody></table>' +
     '  </div></div>' +
+    // v_adperson: AD leaderboard — same team-nested shape as the KAM table
+    // right above it, but a clearly separate section (own header + muted
+    // "ไม่รวมใน %NRR ทีม" tag) so it never reads as part of the KAM roll-up.
+    // Hidden entirely via inline style when the selected team has 0 AD.
+    '  <div class="nrr-section" id="nrr-sec-ads" style="animation-delay:.16s;display:none"><div class="nrr-panel-body">' +
+    '    <div class="nrr-panel-head"><div class="h2" id="nrr-ads-title">AD</div>' +
+    '    <span class="tag muted">ไม่รวมใน %NRR ทีม</span></div>' +
+    '    <table class="nrr-table"><thead><tr><th>AD</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-ads-tbody"></tbody></table>' +
+    '  </div></div>' +
     '  <div class="nrr-section" id="nrr-sec-pm" style="animation-delay:.18s"><div class="nrr-panel-body" id="nrr-pm-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-admin" style="animation-delay:.22s"><div class="nrr-panel-body" id="nrr-admin-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-commission" style="animation-delay:.26s"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
@@ -11344,6 +11466,7 @@ function nrrRenderAll() {
   nrrRenderTeamCards();
   nrrRenderMovementSection();
   nrrRenderKamLeaderboard();
+  nrrRenderAdLeaderboard();
   nrrRenderPortfolioSection('pm');
   nrrRenderPortfolioSection('admin');
   nrrRenderCommissionSection();
@@ -11503,6 +11626,7 @@ function nrrRenderTeamCards() {
       e.preventDefault();
       nrrState.selectedTeam = card.dataset.email;
       nrrRenderKamLeaderboard();
+      nrrRenderAdLeaderboard();
       document.getElementById('nrr-sec-kams').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     card.querySelector('[data-act="browse"]').addEventListener('click', function (e) {
@@ -11663,6 +11787,7 @@ function nrrRenderKamLeaderboard() {
       b.addEventListener('click', function () {
         nrrState.selectedTeam = b.dataset.team;
         nrrRenderKamLeaderboard();
+        nrrRenderAdLeaderboard();
       });
     });
   } else { chipWrap.innerHTML = ''; }
@@ -11693,6 +11818,41 @@ function nrrRenderKamLeaderboard() {
   var totalOutlets = kams.reduce(function (s, k) { return s + k.outlet_count; }, 0);
   browseBtn.textContent = 'ดูร้านค้าทั้งทีม (' + totalOutlets + ')';
   browseBtn.onclick = function () { nrrOpenSlideoverTeam(tlEmail); };
+}
+
+// v_adperson: AD leaderboard for the currently selected team — same tlEmail
+// resolution and row shape as nrrRenderKamLeaderboard (kams/ads share the
+// {kam_email, kam_name, nrr_pct, base_gmv, outlet_count, period} shape), so
+// the row markup and slide-over wiring are copied verbatim. The whole
+// section hides itself when the team has 0 AD people, so unaffected teams
+// look exactly like before this feature existed.
+function nrrRenderAdLeaderboard() {
+  var isAdmin = nrrProfile.role === 'admin';
+  var tlEmail = isAdmin ? nrrState.selectedTeam : nrrProfile.email;
+  var section = document.getElementById('nrr-sec-ads');
+  if (!tlEmail || !section) return;
+
+  var ads = nrrAdRowsForTeam(tlEmail, nrrState.period);
+  if (!ads.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  var teamName = (nrrListTeams().find(function (t) { return t.email === tlEmail; }) || {}).name || tlEmail;
+  document.getElementById('nrr-ads-title').textContent = 'AD — ทีม ' + teamName;
+
+  var tbody = document.getElementById('nrr-ads-tbody');
+  tbody.innerHTML = ads.map(function (k, i) {
+    var kamResult = nrrKamResult(k.kam_email);
+    var triple = nrrMonthTriple(kamResult, k.period);
+    return '<tr data-email="' + nrrEsc(k.kam_email) + '" data-period="' + nrrEsc(k.period) + '" data-name="' + nrrEsc(k.kam_name.toLowerCase()) + '" style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row">' +
+      '<td>' + nrrEsc(k.kam_name) + '</td>' +
+      '<td class="num-cell" style="color:' + nrrThresholdColorVar(k.nrr_pct) + '">' + nrrFmtPct(k.nrr_pct) + '</td>' +
+      '<td>' + nrrTripleHtml('md', triple) + '</td>' +
+      '<td class="num-cell">' + k.outlet_count + '</td>' +
+      '</tr>';
+  }).join('');
+  tbody.querySelectorAll('tr').forEach(function (tr) {
+    tr.addEventListener('click', function () { nrrOpenSlideoverKam(tr.dataset.email, tr.dataset.period); });
+  });
 }
 
 function nrrBindLeaderboardControls() {
@@ -11815,10 +11975,34 @@ function nrrRenderPortfolioSection(kind) {
       '</div>';
   }).join('');
 
+  // v_adperson: PM per-person flat list (admin only — PM has no team/TL
+  // concept, so a TL's bucket-scoped view has nothing meaningful to list
+  // per-person; Admin branch for 'admin' kind stays untouched, no per-person
+  // equivalent — admin_view.csv's staff attribution is ~99% blank).
+  var personRowsHtml = '';
+  if (kind === 'pm' && isAdmin) {
+    var people = nrrPmRowsByPerson();
+    if (people.length) {
+      personRowsHtml = '<div class="nrr-panel-head" style="margin-top:18px"><div class="h2">PM — รายบุคคล</div></div>' +
+        '<table class="nrr-table"><thead><tr><th>PM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody>' +
+        people.map(function (p, i) {
+          var triple = p.result && p.period ? nrrMonthTriple(p.result, p.period) : null;
+          return '<tr style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row">' +
+            '<td>' + nrrEsc(p.name) + '</td>' +
+            '<td class="num-cell" style="color:' + nrrThresholdColorVar(p.nrr_pct) + '">' + nrrFmtPct(p.nrr_pct) + '</td>' +
+            '<td>' + nrrTripleHtml('md', triple) + '</td>' +
+            '<td class="num-cell">' + p.outlet_count + '</td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    }
+  }
+
   body.innerHTML =
     '<div class="nrr-panel-head"><div class="h2">' + label + ' Portfolio — แยกตาม Account Type</div></div>' +
     staleBanner +
-    '<div class="nrr-kpi-grid" style="grid-template-columns:repeat(' + buckets.length + ',1fr)">' + tilesHtml + '</div>';
+    '<div class="nrr-kpi-grid" style="grid-template-columns:repeat(' + buckets.length + ',1fr)">' + tilesHtml + '</div>' +
+    personRowsHtml;
 
   body.querySelectorAll('[data-mv-jump]').forEach(function (btn) {
     btn.addEventListener('click', function () {

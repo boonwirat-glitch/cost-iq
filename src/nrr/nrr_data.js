@@ -221,6 +221,28 @@ function nrrListKamsForTeam(tlEmail) {
 }
 window.nrrListKamsForTeam = nrrListKamsForTeam;
 
+// v_adperson: List of distinct AD people within a team (by latest_tl_email),
+// for the new AD leaderboard — mirrors nrrListKamsForTeam exactly except the
+// membership test is flipped: only INCLUDE adSet members (KAM/other roles
+// stay off this list, same way AD stays off nrrListKamsForTeam).
+function nrrListAdsForTeam(tlEmail) {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return [];
+  var seen = {};
+  var out = [];
+  var adSet = (window.nrrRoleRoster && window.nrrRoleRoster.adSet) || new Set();
+  (qd.byTlEmail[tlEmail] || []).forEach(function (r) {
+    var email = r.latest_kam_email;
+    if (!email || seen[email]) return;
+    if (!adSet.has(email.toLowerCase())) return;
+    seen[email] = true;
+    out.push({ email: email, name: r.latest_staff_owner || email });
+  });
+  out.sort(function (a, b) { return a.name.localeCompare(b.name, 'th'); });
+  return out;
+}
+window.nrrListAdsForTeam = nrrListAdsForTeam;
+
 // ── PM / Admin portfolio views ───────────────────────────────────────────
 // pm_view.csv / admin_view.csv come from DIFFERENT SQL sources
 // (sql/q3_2026_movement_pm_view.sql, .../admin_view.sql) with a SMALLER
