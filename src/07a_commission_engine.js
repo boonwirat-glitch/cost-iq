@@ -56,6 +56,10 @@ let _tgtActiveQuarter = null; // "2026-Q3"
 let _tgtPendingEdits = {};    // { "2026-06|kam|ning@f.co": 3200000 }
 let _tgtMode = null;          // "admin" | "tl"
 let _nrrGovPolicies = {};     // { "2026-07|all|all": {...} }
+// v_polrace-fix: true = policies fetch succeeded (mode is knowable),
+// 'failed' = fetch broke (proceed with fallback), undefined = still pending
+// (consumers must treat commission mode as UNKNOWN, not rolling-MoM).
+let _nrrGovLoadFailed = false; // window._nrrGovPoliciesLoaded is the shared readiness signal
 let _nrrGovPending = {};      // { "2026-07|all|all": {...draft...} }
 let _commRuleConfig = {};     // { plans:{}, rules:{}, tiers:{} }
 // v878 (phase 8/9): roster of people in the 6 roles beyond tl/kam
@@ -1243,7 +1247,13 @@ async function loadTargets(quarter) {
   const months = _tgtQuarterMonths(quarter);
 
   const hit = _tgtQuarterCache[quarter];
-  if (hit && (Date.now() - hit.ts) < _TGT_CACHE_TTL) {
+  // v_polrace-fix: a cached quarter whose policy map is EMPTY is almost
+  // certainly a poisoned entry written before this fix (empty-policy fetch
+  // used to be cached + persisted to localStorage) — refetch instead of
+  // serving it, or users carry the frozen rolling-MoM mode across sessions
+  // until TTL expiry. A genuinely policy-less quarter just refetches (cheap).
+  const _hitHasPolicies = !!(hit && hit.nrrPolicies && Object.keys(hit.nrrPolicies).length);
+  if (hit && _hitHasPolicies && (Date.now() - hit.ts) < _TGT_CACHE_TTL) {
     _tgtCache = { ...hit.cache };
     _tgtSettings = { ...hit.settings };
     _nrrGovPolicies = { ...(hit.nrrPolicies || {}) };
@@ -1253,6 +1263,10 @@ async function loadTargets(quarter) {
     _tgtLoaded = true;
     _tgtSettingsLoadFailed = false; // v835-fix: cache only ever holds successful settings loads now (see bottom of function)
     window._tgtSettingsLoadFailed = false;
+    // v_polrace-fix: the quarter cache is only ever written when the
+    // policies fetch succeeded (see the cache-write guard below), so a
+    // cache hit is a real policy answer.
+    window._nrrGovPoliciesLoaded = true;
     return;
   }
 
@@ -1308,8 +1322,20 @@ async function loadTargets(quarter) {
     (policies || []).forEach(p => {
       _nrrGovPolicies[_nrrGovKey(p.period_month, p.scope_type, p.scope_key)] = { ...p };
     });
+    // v_polrace-fix: the commission mode (quarterly vs rolling MoM) is only
+    // knowable once this fetch succeeds. Before this flag existed, every
+    // consumer that resolved the mode while the map was still empty silently
+    // fell back to rolling MoM — the root of the intermittent "NRR ฿0"
+    // strip (a KAM at 104.4% quarterly can easily be <100% MoM). 'true' =
+    // real answer (even a genuinely-empty table is a real "no policy"
+    // answer); 'failed' = fetch broke, proceed with old fallback behavior
+    // rather than blanking the UI forever.
+    window._nrrGovPoliciesLoaded = true;
+    _nrrGovLoadFailed = false;
   } catch (e) {
     console.warn('[NRR governance] load failed (table may not exist yet):', e.message);
+    window._nrrGovPoliciesLoaded = 'failed';
+    _nrrGovLoadFailed = true;
   }
 
   try {
@@ -1462,7 +1488,10 @@ async function loadTargets(quarter) {
   // v835-fix: never cache a quarter's state if target_settings failed to load —
   // caching it would serve stale/wrong defaults to every call within _TGT_CACHE_TTL
   // even after Supabase recovers. A failed load always re-fetches next call instead.
-  if (!_tgtSettingsLoadFailed) {
+  // v_polrace-fix: same rule for a failed nrr_policies fetch — caching an
+  // EMPTY policy map would freeze every consumer in rolling-MoM mode for the
+  // whole TTL (and, via localStorage below, poison the next session too).
+  if (!_tgtSettingsLoadFailed && !_nrrGovLoadFailed) {
     _tgtQuarterCache[quarter] = {
       cache: { ..._tgtCache },
       settings: { ..._tgtSettings },
@@ -1476,10 +1505,20 @@ async function loadTargets(quarter) {
   _tgtLoaded = true;
   window._tgtSettingsLoadFailed = _tgtSettingsLoadFailed; // v835-fix: UI can check this to warn "commission config may be stale"
   window._tgtLoadedFromDB = !_tgtSettingsLoadFailed; // v835-fix: was unconditionally true even when settings load failed — now reflects reality
+  // v_polrace-fix: loadTargets completion is the moment the commission MODE
+  // becomes knowable (nrr_policies arrived) — repaint the strip DIRECTLY
+  // (bypasses RenderBus version-dedup and _dataKey, neither of which track
+  // policy state). Without this, a strip rendered pre-policies froze on
+  // rolling-MoM numbers ("NRR ฿0" while the header showed 104.4%) with no
+  // trigger left to correct it.
+  try { const s = document.getElementById('pv-commission-strip'); if (s) s._lastCommHtml = ''; } catch (e) {}
+  try { if (typeof window._commResetKey === 'function') window._commResetKey(); } catch (e) {}
+  try { if (typeof _commRenderKamSelfStrip === 'function') _commRenderKamSelfStrip(); } catch (e) {}
   // v224e: persist to localStorage — next session reads this instantly (no Supabase cold-start flash)
   // v835-fix: skip persisting if settings load failed — a bad localStorage cache would poison
   // the NEXT session's cold-start too, extending the blast radius beyond just this session
-  if (!_tgtSettingsLoadFailed) {
+  // v_polrace-fix: same for a failed policies fetch (empty map = frozen MoM mode next session)
+  if (!_tgtSettingsLoadFailed && !_nrrGovLoadFailed) {
     try{
       localStorage.setItem('sense_tgt_ls_'+quarter,JSON.stringify({ts:Date.now(),data:{
         cache:{..._tgtCache},settings:{..._tgtSettings},nrrPolicies:{..._nrrGovPolicies},
@@ -2999,6 +3038,16 @@ function _commBuildKamSelfState() {
   // state. Mirrors the existing bulkQnrrData.loaded guard already used in
   // 07c_qnrr_view.js:606. Force-releases after 15s (see _fetchQnrrBundle) so this can
   // never shimmer forever if QNRR genuinely fails to load.
+  // v_polrace-fix: until nrr_policies has actually loaded, the commission
+  // MODE is unknown — resolving it against an empty map silently returns the
+  // rolling-MoM default, and a KAM at 104.4% quarterly can be <100% MoM →
+  // tier miss → a confident-looking "NRR ฿0". That was the second layer of
+  // the intermittent wrong-commission bug (the first was QNRR-not-ready,
+  // guarded below since v910). undefined = pending → loading; 'failed' =
+  // fetch broke → proceed with the old fallback rather than blanking forever.
+  if (window._nrrGovPoliciesLoaded === undefined) {
+    return { role, email, loading: true };
+  }
   const _qPolicy = typeof _nrrGovResolveForVisibleScope === 'function' ? _nrrGovResolveForVisibleScope() : null;
   const _isQuarterly = _qPolicy && _qPolicy.commission_mode === 'quarterly';
   const _qnrrReady = typeof window.bulkQnrrData !== 'undefined' && window.bulkQnrrData && window.bulkQnrrData.loaded;

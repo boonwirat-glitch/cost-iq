@@ -207,8 +207,15 @@
     if(!st) return '';
     var src=buildSources(st);
     if(!src) return '';
-    // Self-healing: if upsell not loaded yet, trigger fetch now
-    if(src.loading && st.email && typeof _fetchUpsellBundle==='function'){
+    // Self-healing: fetch this KAM's detailed upsell bundle whenever the
+    // strip renders. v_polrace-fix: was gated on src.loading — but the
+    // team-summary FAST PATH makes src.loading false while the strip is
+    // showing the coarser team-CSV uplift (observed: ฿3,078 vs the detailed
+    // ฿4,491); the bundle then never loaded and the strip never corrected.
+    // _fetchUpsellBundle dedups internally (_upsellBundleLoaded/inFlight),
+    // and its completion hook repaints the strip — so this is one cheap,
+    // idempotent call that guarantees convergence to the detailed number.
+    if(st.email && typeof _fetchUpsellBundle==='function'){
       _fetchUpsellBundle(st.email).catch(function(){});
     }
     // v565 TIERS-READY GATE: NRR payout comes from commission_rule_tiers loaded by

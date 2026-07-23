@@ -1476,7 +1476,11 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       // key changes from '0' → '1' → triggers re-render → commission strip shows real value
       // without this, key was frozen once R2 loaded → commission stuck on 'กำลังโหลด'
       var db = window._tgtLoadedFromDB ? '1' : '0';
-      return r + ':' + ph + ':' + hh + ':' + db;
+      // v_polrace-fix: include policy readiness — when nrr_policies arrive the
+      // commission MODE can flip rolling-MoM → quarterly; without this the key
+      // stayed frozen and gated renders skipped the correction repaint.
+      var pol = window._nrrGovPoliciesLoaded === true ? 'p1' : (window._nrrGovPoliciesLoaded === 'failed' ? 'pf' : 'p0');
+      return r + ':' + ph + ':' + hh + ':' + db + ':' + pol;
     }catch(e){ return ''; }
   }
 
