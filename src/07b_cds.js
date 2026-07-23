@@ -1563,25 +1563,38 @@ window._cdsQtrDotsHtml = function(t) {
 // Collapsed-by-default calendar block (class cds-qtr-cal, same max-height
 // open/close mechanism as .cds-proof) — toggled together with the existing
 // formula-proof box by the shared click handler wired in _cdsRender_p1/_p3.
+// v_qsum readability pass (Bush, live-tested): the first cut used raw
+// hard-coded px sizes (9-12.5px) and sub-floor opacities (.35-.45) — both
+// against this app's own established rules (styles_tokens.css's --text-*
+// scale, which the user text-size SETTING scales; and the "ink floor" a
+// prior readability pass set at .52 minimum for any real text). This build
+// uses the token scale throughout and never drops text below that floor —
+// same convention as .cds-nrr-ctx-eyebrow/-payout-val elsewhere in this
+// file. Month captions use the English abbreviation (m.labelEn) — Thai
+// month glyphs' diacritic stacking gets illegible at this caption size,
+// Latin letters don't have that problem.
 window._cdsQtrTimelineHtml = function(t) {
   try {
     if (!t) return '';
     function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (Math.abs(n) >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
-    var cellBase = 'flex:1;text-align:center;border-radius:8px;padding:6px 3px 7px;min-width:0';
+    var cellBase = 'flex:1;text-align:center;border-radius:8px;padding:7px 3px 8px;min-width:0';
+    var capStyle = 'font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.05em;font-family:\'IBM Plex Mono\',monospace';
+    var valStyle = 'font-weight:800;font-size:var(--text-lg);margin-top:3px;font-family:\'IBM Plex Mono\',monospace';
+    var gmvStyle = 'font-size:var(--text-2xs);margin-top:4px;padding-top:4px;border-top:1px solid';
     var cells = t.months.map(function(m){
-      var mo = m.label.split(' ')[0];
+      var mo = m.labelEn || (m.label ? m.label.split(' ')[0] : '');
       if (m.state === 'paid') {
-        return '<div style="'+cellBase+';border:1px solid rgba(77,220,151,.35);background:rgba(77,220,151,.07)">'
-          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.45);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
-          + '<div style="font-weight:800;font-size:12.5px;margin-top:2px;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+mon(m.comm)+'</div>'
-          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(77,220,151,.2);color:rgba(77,220,151,.65);font-family:\'IBM Plex Mono\',monospace">GMV '+mon(m.gmv)+'</div>'
+        return '<div style="'+cellBase+';border:1px solid rgba(77,220,151,.4);background:rgba(77,220,151,.08)">'
+          + '<div style="'+capStyle+';color:rgba(var(--ink-blue-hi),.65)">'+mo+'</div>'
+          + '<div style="'+valStyle+';color:var(--tk-ok-bright)">'+mon(m.comm)+'</div>'
+          + '<div style="'+gmvStyle+' rgba(77,220,151,.25);color:rgba(77,220,151,.85)">GMV '+mon(m.gmv)+'</div>'
           + '</div>';
       }
       if (m.state === 'mtd') {
-        return '<div style="'+cellBase+';border:1px solid rgba(255,224,138,.4);background:rgba(255,224,138,.07)">'
-          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.45);font-family:\'IBM Plex Mono\',monospace">'+mo+' · MTD</div>'
-          + '<div style="font-weight:800;font-size:12.5px;margin-top:2px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(m.comm)+'</div>'
-          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(255,224,138,.2);color:rgba(255,224,138,.7);font-family:\'IBM Plex Mono\',monospace">GMV '+mon(m.gmv)+'</div>'
+        return '<div style="'+cellBase+';border:1px solid rgba(255,224,138,.45);background:rgba(255,224,138,.08)">'
+          + '<div style="'+capStyle+';color:rgba(var(--ink-blue-hi),.65)">'+mo+' · MTD</div>'
+          + '<div style="'+valStyle+';color:#ffe08a">'+mon(m.comm)+'</div>'
+          + '<div style="'+gmvStyle+' rgba(255,224,138,.25);color:rgba(255,224,138,.85)">GMV '+mon(m.gmv)+'</div>'
           + '</div>';
       }
       if (m.state === 'none') {
@@ -1590,17 +1603,17 @@ window._cdsQtrTimelineHtml = function(t) {
         // group to this outlet yet) — same neutral card either way, caption
         // differs so a rep never reads "not started" as "you missed it".
         var caption = m.hasGmv ? 'ไม่ถึงเกณฑ์ (GMV ' + mon(m.gmv) + ')' : 'ยังไม่ขาย';
-        return '<div style="'+cellBase+';border:1px dotted rgba(var(--ink-blue-hi),.22);opacity:.65">'
-          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
-          + '<div style="font-weight:700;font-size:12.5px;margin-top:2px;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">—</div>'
-          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(var(--ink-blue-hi),.15);color:rgba(var(--ink-blue-hi),.4)">'+caption+'</div>'
+        return '<div style="'+cellBase+';border:1px dotted rgba(var(--ink-blue-hi),.28);opacity:.8">'
+          + '<div style="'+capStyle+';color:rgba(var(--ink-blue-hi),.6)">'+mo+'</div>'
+          + '<div style="'+valStyle+';color:rgba(var(--ink-blue-hi),.55)">—</div>'
+          + '<div style="'+gmvStyle+' rgba(var(--ink-blue-hi),.18);color:rgba(var(--ink-blue-hi),.6)">'+caption+'</div>'
           + '</div>';
       }
       // future
-      return '<div style="'+cellBase+';border:1px dashed rgba(var(--ink-blue-hi),.2)">'
-        + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
-        + '<div style="font-weight:700;font-size:12.5px;margin-top:2px;color:rgba(var(--ink-blue-hi),.75);font-family:\'IBM Plex Mono\',monospace">'+(m.comm != null ? '~' + mon(m.comm) : '~')+'</div>'
-        + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(var(--ink-blue-hi),.12);color:rgba(var(--ink-blue-hi),.4)">'+(m.gmv != null ? '~GMV ' + mon(m.gmv) : '—')+'</div>'
+      return '<div style="'+cellBase+';border:1px dashed rgba(var(--ink-blue-hi),.25)">'
+        + '<div style="'+capStyle+';color:rgba(var(--ink-blue-hi),.6)">'+mo+'</div>'
+        + '<div style="'+valStyle+';color:rgba(var(--ink-blue-hi),.8)">'+(m.comm != null ? '~' + mon(m.comm) : '~')+'</div>'
+        + '<div style="'+gmvStyle+' rgba(var(--ink-blue-hi),.16);color:rgba(var(--ink-blue-hi),.6)">'+(m.gmv != null ? '~GMV ' + mon(m.gmv) : '—')+'</div>'
         + '</div>';
     }).join('');
     var note;
@@ -1610,16 +1623,10 @@ window._cdsQtrTimelineHtml = function(t) {
     else if (t.status === 'kept') note = 'ร้านยังซื้ออยู่ · จ่ายต่อทุกเดือน · รวมทั้งไตรมาส ~' + qtot;
     else note = 'เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ · รวมทั้งไตรมาส ~' + qtot;
     return '<div class="cds-qtr-cal">'
-      + '<div style="display:flex;gap:6px;padding:9px 16px 0 24px">' + cells + '</div>'
-      + '<div style="padding:7px 16px 9px 24px;font-size:10.5px;line-height:1.5;color:rgba(var(--ink-blue-hi),.55)"><b style="color:rgba(var(--ink-blue-hi),.8)">สูตร:</b> GMV × rate = ค่าคอมฯ · ' + note + '</div>'
+      + '<div style="display:flex;gap:7px;padding:10px 16px 0 24px">' + cells + '</div>'
+      + '<div style="padding:8px 16px 10px 24px;font-size:var(--text-xs);line-height:1.5;color:rgba(var(--ink-blue-hi),.6)"><b style="color:rgba(var(--ink-blue-hi),.82)">สูตร:</b> GMV × rate = ค่าคอมฯ · ' + note + '</div>'
       + '</div>';
   } catch(e) { return ''; }
-};
-
-// v_qtrux: the conditionality education line — always visible at the top of
-// the P1/P3 tab body, never a dismissible tooltip.
-window._cdsQtrEducationHtml = function() {
-  return '<div style="padding:7px 16px;font-size:var(--text-sm);color:rgba(255,224,138,.82);background:rgba(255,224,138,.05);border-bottom:1px solid rgba(var(--ink-blue),.10);line-height:1.4">ค่าคอมฯ จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนี้อยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>';
 };
 
 // v_qsum: always-visible (no click) quarter summary — Option C's philosophy
@@ -1630,14 +1637,23 @@ window._cdsQtrEducationHtml = function() {
 // — their historical earnings aren't in a full month-by-month shape here,
 // only a single lastComm figure, so folding them in would need a second
 // timeline computation per stopped group. Disclosed, not silently dropped.
+// v_qsum: reuses the SAME .cds-nrr-ctx card classes as the NRR tab's summary
+// card (07b_cds.js's _cdsRender_nrr) — same eyebrow/value/payout layout,
+// same type tokens (--text-2xs/-2xl/-3xl) — just a gold-tinted variant
+// (.gold-tint, defined in styles_commission.css) instead of the NRR tab's
+// green, so the two summary cards read as one consistent design language.
 window._cdsQtrSummaryHtml = function(totalGmv, totalComm) {
-  function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (Math.abs(n) >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
-  var cell = 'background:rgba(255,255,255,.03);padding:11px 14px;min-width:0';
-  var lbl = 'font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:rgba(var(--ink-blue-hi),.42);font-family:\'IBM Plex Mono\',monospace';
-  var val = 'font-size:17px;font-weight:900;margin-top:3px;font-family:\'IBM Plex Mono\',monospace';
-  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.08);border-radius:var(--r-md);overflow:hidden;margin:10px 16px 2px">'
-    + '<div style="'+cell+'"><div style="'+lbl+'">GMV Upsell ทั้งไตรมาส</div><div style="'+val+';color:rgba(var(--ink-blue-hi),.92)">~'+mon(totalGmv)+'</div></div>'
-    + '<div style="'+cell+'"><div style="'+lbl+'">ค่าคอมฯ ทั้งไตรมาส</div><div style="'+val+';color:#ffe08a">~'+mon(totalComm)+'</div></div>'
+  var h = window._cdsHtml;
+  var fmtFull = (h && h.fmtFull) ? h.fmtFull : function(n){ n=Number(n||0); return n?'฿'+Math.round(n).toLocaleString('en-US'):'฿0'; };
+  return '<div class="cds-nrr-ctx gold-tint" style="margin:10px 16px 2px">'
+    + '<div class="cds-nrr-ctx-top">'
+    + '<div><div class="cds-nrr-ctx-eyebrow">GMV Upsell ทั้งไตรมาส</div>'
+    + '<div class="cds-nrr-ctx-pct">~' + fmtFull(totalGmv) + '</div>'
+    + '</div>'
+    + '<div class="cds-nrr-ctx-payout">'
+    + '<div class="cds-nrr-ctx-payout-lbl">ค่าคอมฯ ทั้งไตรมาส</div>'
+    + '<div class="cds-nrr-ctx-payout-val">~' + fmtFull(totalComm) + '</div>'
+    + '</div></div>'
     + '</div>';
 };
 
@@ -1668,6 +1684,17 @@ window._cdsRenderL1 = function(src, st) {
   var nrrSub   = esc((pctText!=='—'?'NRR '+pctText+' · ':'')+esc(st.tierLabel||st.ruleName||'—'));
   var p1cnt    = src.upsell_sku_detail&&src.upsell_sku_detail.p1&&src.upsell_sku_detail.p1.groups?src.upsell_sku_detail.p1.groups.length:0;
   var p3cnt    = src.upsell_sku_detail&&src.upsell_sku_detail.p3&&src.upsell_sku_detail.p3.groups?src.upsell_sku_detail.p3.groups.length:0;
+  // v_qsum: shared 3-branch "pays every remaining month" line — used by both
+  // upSub (P1/P3) and expSub (Expansion) below, reworded per Bush's request
+  // ("จ่ายทุกเดือนที่เหลือ รวม ~X ทั้งไตรมาส" — dropped the old "ยอดนี้...ต่อ →"
+  // phrasing) with no per-source label, since the row title above it already
+  // gives the context.
+  function _qtrPayLineText(sum, isLastMonth, projectionReady) {
+    if (isLastMonth) return 'เดือนสุดท้ายของไตรมาส — รวมทั้งไตรมาส ≈ ' + fmtFull(Math.round(sum));
+    if (projectionReady) return 'จ่ายทุกเดือนที่เหลือ รวม ~' + fmtFull(Math.round(sum)) + ' ทั้งไตรมาส (ถ้าร้านยังซื้อ)';
+    return 'จ่ายทุกเดือนที่เหลือของไตรมาส (ถ้าร้านยังซื้อ)';
+  }
+
   var upSub    = (p1cnt?'สินค้าใหม่ '+p1cnt+' รายการ':'')+(p1cnt&&p3cnt?' · ':'')+(p3cnt?'ยอดเติบโต '+p3cnt+' รายการ':'');
   if(!upSub) upSub='สินค้าใหม่ + ยอดเติบโต';
   // v_qtrux: quarter-projection sub-line — the emotional counterweight to
@@ -1682,12 +1709,7 @@ window._cdsRenderL1 = function(src, st) {
       _qg1.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p1',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
       _qg3.forEach(function(g){var t=_upsellQuarterTimeline(st.email,g,'p3',src.base_month_used);if(t){_qSum+=t.quarterTotal;_qAny=true;_qLast=t.isLastMonth;_qReady=t.projectionReady;}});
       if(_qAny){
-        var _qLine=_qLast
-          ?'เดือนสุดท้ายของไตรมาส — รวม upsell ทั้งไตรมาส ≈ '+fmtFull(Math.round(_qSum))
-          :(_qReady
-            ?'ยอดนี้จ่ายต่อทุกเดือนที่เหลือ → รวม ~'+fmtFull(Math.round(_qSum))+' ทั้งไตรมาส (ถ้าร้านยังซื้อ)'
-            :'ยอดนี้จ่ายต่อทุกเดือนที่เหลือของไตรมาส (ถ้าร้านยังซื้อ)');
-        upSub+='<br><span style="color:rgba(255,224,138,.85);font-weight:var(--fw-bold)">'+_qLine+'</span>';
+        upSub+='<br><span style="color:rgba(255,224,138,.85);font-weight:var(--fw-bold)">'+_qtrPayLineText(_qSum,_qLast,_qReady)+'</span>';
       }
     }
   }catch(e){}
@@ -1699,6 +1721,18 @@ window._cdsRenderL1 = function(src, st) {
   var _ht2Pay  = Number(_cfgQ('handover','tier2_payout',2500)).toLocaleString('en-US');
   var _ht3Bon  = Number(_cfgQ('handover','tier3_bonus',2500)).toLocaleString('en-US');
   var expSub   = ed&&ed.outlet_gmv>0?'สาขาใหม่ × '+_orPct+'% · GMV '+fmt(ed.outlet_gmv):' สาขาใหม่/comeback × '+_orPct+'%';
+  // v_qsum: Bush — "text set นี้ต้องมีให้กับ expansion เหมือนกัน เพราะจ่ายทุก
+  // เดือนเหมือนกัน" — same sub-line, sourced from the lighter outlet-level
+  // _commExpansionQuarterEstimate (Expansion has no item-family groups to
+  // sum like P1/P3 does).
+  try{
+    if(src.base_month_used&&typeof _commExpansionQuarterEstimate==='function'&&ed&&ed.outlet_gmv>0){
+      var _expQ=_commExpansionQuarterEstimate(st.email,src.base_month_used);
+      if(_expQ){
+        expSub+='<br><span style="color:rgba(255,224,138,.85);font-weight:var(--fw-bold)">'+_qtrPayLineText(_expQ.quarterTotal,_expQ.isLastMonth,_expQ.projectionReady)+'</span>';
+      }
+    }
+  }catch(e){}
   var hd       = src.handover_detail||{};
   var hoSub    = hd.accounts?hd.accounts+' account · retention '+_commFmtPct(hd.retention_pct||0):'≥'+_ht2+'% = ฿'+_ht2Pay+' · ≥'+_ht3+'% = +฿'+_ht3Bon;
 
@@ -1904,7 +1938,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   } catch(e) {}
 
   var _qtrSummary = window._cdsQtrSummaryHtml ? window._cdsQtrSummaryHtml(_qtrGmvSum, _qtrCommSum) : '';
-  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + _qtrSummary + html; // v_qtrux/v_qsum: education + quarter summary always on top
+  body.innerHTML = _qtrSummary + html; // v_qsum: quarter summary always on top (education banner removed per Bush — redundant with the per-row sub-line + per-cell states)
 
   // v_qsum: click toggles EVERY expandable block between this sub-row and
   // the next one (the new .cds-qtr-cal calendar AND the existing .cds-proof
@@ -2032,7 +2066,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   });
 
   var _qtrSummary = window._cdsQtrSummaryHtml ? window._cdsQtrSummaryHtml(_qtrGmvSum, _qtrCommSum) : '';
-  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + _qtrSummary + html; // v_qtrux/v_qsum
+  body.innerHTML = _qtrSummary + html; // v_qsum (education banner removed per Bush)
 
   // v_qsum: same order-independent multi-sibling toggle as p1 (see comment
   // there) — one click opens both the quarter calendar and the formula box.

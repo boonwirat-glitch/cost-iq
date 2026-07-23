@@ -201,6 +201,12 @@ window._commUpsellRateFor = _commUpsellRateFor;
 // ── Thai month helpers ──────────────────────────────────────────
 const _TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
                     'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+// v_qsum: English 3-letter month abbreviations — Bush: compact UI (the
+// quarter calendar's month captions) reads better in Latin script at small
+// sizes than Thai, whose diacritic stacking gets illegible at a caption
+// size. Used only where the display is this tight; every other date label
+// in the app stays Thai.
+const _EN_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ── lag anchor: วันที่ 1 มิ.ย. → lag = 31 พ.ค. → label = "พ.ค." ตรงกับ upsell CSV ──
 function _commLagDate() {
@@ -502,6 +508,12 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
       const d = new Date(baseYr, baseMo - 1 + i, 1);
       return _TH_MONTHS[d.getMonth()] + ' ' + (d.getFullYear() + 543);
     });
+    // v_qsum: EN month abbreviation per quarter slot, same index as qLabels —
+    // display-only companion for compact UI (see _EN_MONTHS_SHORT above).
+    const qLabelsEn = [1, 2, 3].map(i => {
+      const d = new Date(baseYr, baseMo - 1 + i, 1);
+      return _EN_MONTHS_SHORT[d.getMonth()];
+    });
     const currLabel = _commCurrentMonthLabel();
     const currIdx = qLabels.indexOf(currLabel);
     if (currIdx === -1) return null; // current month not in this quarter — stale config
@@ -553,13 +565,14 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
     const projectedGmvFull = daysElapsed > 0 ? mtdGmv / daysElapsed * daysInCurr : mtdGmv;
 
     const months = qLabels.map((lbl, i) => {
+      const labelEn = qLabelsEn[i];
       if (i < currIdx) {
         const m = monthComm(lbl);
         // 'none' = ยังไม่เกิด (group ยังไม่ qualify เดือนนั้น) → แสดง "—"
-        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
+        return { label: lbl, labelEn, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
       }
-      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
-      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
+      if (i === currIdx) return { label: lbl, labelEn, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
+      return { label: lbl, labelEn, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
     });
 
     const paidSum = months.filter(m => m.state === 'paid').reduce((s, m) => s + m.comm, 0);
@@ -588,6 +601,65 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
   }
 }
 window._upsellQuarterTimeline = _upsellQuarterTimeline;
+
+// v_qsum: lightweight Expansion quarter-total estimate — same "จ่ายทุกเดือน"
+// message as P1/P3 (Bush: "text set นี้จริงๆ ต้องมีให้กับ expansion เหมือนกัน
+// เพราะจ่ายทุกเดือนเหมือนกัน"), but at outlet-aggregate level — Expansion has
+// no item-family granularity, so this returns only the minimal shape the L1
+// sub-line needs ({quarterTotal, isLastMonth, projectionReady}), not a full
+// per-month breakdown with dots/calendar. Scans bulkQnrrData rows directly
+// (movement_type==='expansion') rather than reusing bulkUpsellData, since
+// Expansion's commission source is the QNRR bundle, not the upsell bundle.
+function _commExpansionQuarterEstimate(kamEmail, baseMonthOverride) {
+  try {
+    if (!baseMonthOverride || !bulkQnrrData || !bulkQnrrData.loaded) return null;
+    const rate = _commGetConfig('upsell_outlet', 'rate', 0.005);
+    const parts = baseMonthOverride.split('-');
+    const baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
+    const qIso = [1, 2, 3].map(i => {
+      const d = new Date(baseYr, baseMo - 1 + i, 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    });
+    // Same lag-1 anchor as the rest of the engine (_commLagDate) — not a bare
+    // `new Date()` — so "current month" agrees with every other commission
+    // figure on this same sheet at a month boundary.
+    const lag = _commLagDate();
+    const currIso = lag.getFullYear() + '-' + String(lag.getMonth() + 1).padStart(2, '0');
+    const currIdx = qIso.indexOf(currIso);
+    if (currIdx === -1) return null;
+
+    const rows = (bulkQnrrData.byKamEmail && bulkQnrrData.byKamEmail[kamEmail]) || [];
+    function gmvForMonth(iso) {
+      let g = 0;
+      rows.forEach(r => { if (r.period_month === iso && r.movement_type === 'expansion') g += parseFloat(r.curr_gmv) || 0; });
+      return g;
+    }
+
+    let daysElapsed = new Date().getDate();
+    try {
+      const sample = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
+      if (sample && sample.daysElapsed > 0) daysElapsed = sample.daysElapsed;
+    } catch (e) {}
+    const daysInCurr = _commDaysInLabel(_commCurrentMonthLabel());
+    const mtdGmv = gmvForMonth(currIso);
+    const mtdComm = mtdGmv * rate;
+    const projectionReady = daysElapsed >= 5;
+    const projectedComm = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+
+    let paidSum = 0;
+    for (let i = 0; i < currIdx; i++) paidSum += gmvForMonth(qIso[i]) * rate;
+    const isLastMonth = currIdx === qIso.length - 1;
+    const remainingMonths = qIso.length - 1 - currIdx;
+    const perFutureMonth = projectionReady ? projectedComm : mtdComm;
+    const quarterTotal = paidSum + mtdComm + (isLastMonth ? 0 : perFutureMonth * remainingMonths);
+
+    return { quarterTotal, isLastMonth, projectionReady };
+  } catch (e) {
+    console.warn('[CommEngine] _commExpansionQuarterEstimate error', e);
+    return null;
+  }
+}
+window._commExpansionQuarterEstimate = _commExpansionQuarterEstimate;
 
 // v_qtrux: groups that EARNED in an earlier elapsed month of the quarter but
 // no longer qualify this month — they're absent from _commComputeUpsellSku's

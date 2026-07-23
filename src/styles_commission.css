@@ -1828,6 +1828,16 @@ flex-wrap:wrap;}
 .cds-nrr-ctx-payout-lbl{font-size:var(--text-2xs);color:rgba(var(--ink-blue),.52);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.06em;}
 .cds-nrr-ctx-payout-val{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-3xl);font-weight:900;color:#ffe08a;text-shadow:0 0 18px rgba(255,224,138,.18);line-height:1;margin-top:2px;}
 .cds-nrr-ctx-next{font-size:var(--text-xs);font-weight:var(--fw-semi);color:rgba(255,224,138,.65);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.07);}
+/* v_qsum: gold-tinted variant of the same card — reused by the upsell
+   quarter summary bar (07b_cds.js: _cdsQtrSummaryHtml) so it reads as one
+   design language with the NRR tab's own summary card, just re-hued.
+   Border/bg alphas mirror --tk-ok-border/--tk-ok-dim's own .22/.10 ratio,
+   applied to gold instead of green (no --tk-gold-* token set exists yet —
+   #ffe08a is this app's de facto gold, used as a literal everywhere in
+   this file, same convention followed here). */
+.cds-nrr-ctx.gold-tint{border-color:rgba(255,224,138,.22);background:rgba(255,224,138,.08);}
+.cds-nrr-ctx.gold-tint .cds-nrr-ctx-eyebrow{color:rgba(255,224,138,.8);}
+.cds-nrr-ctx.gold-tint .cds-nrr-ctx-pct{color:rgba(var(--ink-blue-hi),.92);}
 
 /* ── Typography fixes ────────────────────────────────────────────────────── */
 /* chip-row amounts: always full brightness per component, not dim */

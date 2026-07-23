@@ -5575,9 +5575,17 @@ function nrrUpsellQuarterTimeline(bundle, group, kind, baseMonthIso) {
     var parts = baseMonthIso.split('-');
     var baseYr = parseInt(parts[0], 10), baseMo = parseInt(parts[1], 10);
     var TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    // v_qsum: EN month abbreviation twin of 07a_commission_engine.js's
+    // _EN_MONTHS_SHORT — display-only companion for compact UI, not used by
+    // any /nrr surface yet, kept in lockstep in case one adopts it later.
+    var EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var qLabels = [1, 2, 3].map(function (i) {
       var d = new Date(baseYr, baseMo - 1 + i, 1);
       return TH[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+    });
+    var qLabelsEn = [1, 2, 3].map(function (i) {
+      var d = new Date(baseYr, baseMo - 1 + i, 1);
+      return EN[d.getMonth()];
     });
     var currLabel = nrrCommCurrentMonthLabel();
     var currIdx = qLabels.indexOf(currLabel);
@@ -5616,12 +5624,13 @@ function nrrUpsellQuarterTimeline(bundle, group, kind, baseMonthIso) {
     var projectedGmvFull = daysElapsed > 0 ? mtdGmv / daysElapsed * daysInCurr : mtdGmv;
 
     var months = qLabels.map(function (lbl, i) {
+      var labelEn = qLabelsEn[i];
       if (i < currIdx) {
         var m = monthComm(lbl);
-        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
+        return { label: lbl, labelEn: labelEn, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
       }
-      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
-      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
+      if (i === currIdx) return { label: lbl, labelEn: labelEn, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
+      return { label: lbl, labelEn: labelEn, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
     });
 
     var paidSum = 0, futureSum = 0, paidGmvSum = 0, futureGmvSum = 0, anyPriorPaid = false, lastPaid = null;
