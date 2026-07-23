@@ -1842,6 +1842,20 @@ async function _fetchKamBundle(kamEmail){
 // Fetch per-KAM upsell bundle on demand (like SKU bundles)
 const _upsellBundleLoaded=new Set();
 const _upsellBundleInFlight={};
+// v_oneflash: fetch attempts that finished WITHOUT data (404/network) — the
+// strip's readiness barrier treats failed as "ready" so it renders once with
+// the coarse team-CSV numbers instead of holding the skeleton forever.
+const _upsellBundleFailed=new Set();
+// Readiness barrier for the commission strip: the detailed per-KAM bundle
+// either loaded or definitively failed — until then, show NO numbers at all
+// (the coarse team-CSV uplift painting first, then "correcting" itself, was
+// the flashing-values money-trust bug).
+window._upsellBundleReady=function(kamEmail){
+  try{
+    const k=_kamSafeKey(kamEmail);
+    return _upsellBundleLoaded.has(k)||_upsellBundleFailed.has(k);
+  }catch(e){ return true; } // never let the barrier itself brick the strip
+};
 
 async function _fetchUpsellBundle(kamEmail){
   if(!kamEmail)return false;
@@ -1849,30 +1863,34 @@ async function _fetchUpsellBundle(kamEmail){
   if(_upsellBundleLoaded.has(safeKey))return true;
   if(_upsellBundleInFlight[safeKey])return _upsellBundleInFlight[safeKey];
   const p=(async()=>{
+    let ok=false;
     try{
       const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
       window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
-      const ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+      ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       window._upsellIngestEmail = '';
-      if(ok){
-        _upsellBundleLoaded.add(safeKey);
-        // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
-        // Root cause: _dataKey() uses portviewBulkData.length (unchanged after upsell loads),
-        // so key === _lastCommKey → _commGatedRender early-returns even after _lastCommHtml cleared.
-        // Fix: force key mismatch via _commResetKey, then call gated render.
-        setTimeout(()=>{
-          try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
-          try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-          try{ if(typeof _commGatedRender==='function') _commGatedRender(); }catch(e){}
-          try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-        }, 100);
-      }
+      if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
+      else { _upsellBundleFailed.add(safeKey); }
       return ok;
     }catch(e){
       console.warn('[upsell bundle] error',kamEmail,e&&e.message);
+      _upsellBundleFailed.add(safeKey);
       return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
+      // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
+      // Root cause: _dataKey() uses portviewBulkData.length (unchanged after upsell loads),
+      // so key === _lastCommKey → _commGatedRender early-returns even after _lastCommHtml cleared.
+      // Fix: force key mismatch via _commResetKey, then call gated render.
+      // v_oneflash: moved into finally — the FAILED path must also repaint,
+      // otherwise the barrier's skeleton would sit on screen until some
+      // unrelated data arrival happened to trigger a render.
+      setTimeout(()=>{
+        try{ const s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+        try{ if(typeof _commGatedRender==='function') _commGatedRender(); }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+      }, 100);
     }
   })();
   _upsellBundleInFlight[safeKey]=p;

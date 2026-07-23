@@ -182,6 +182,18 @@
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
       return Object.assign({},base,{loading:true});
     }
+    // v_oneflash: full readiness barrier — the detailed per-KAM bundle must
+    // have loaded (or definitively failed) before ANY number is shown.
+    // Without this, the coarse team-CSV uplift painted first (฿3,078), then
+    // the bundle arrival repainted (฿4,491), then policies/NRR repainted
+    // (฿14,xxx) — a flashing sequence of different money values. Commission
+    // is a governance metric: it must appear ONCE, final, stable. All
+    // pre-ready renders produce the identical skeleton HTML, which the
+    // slot's value-guard dedups → zero visible flicker.
+    if(st&&st.email&&typeof window._upsellBundleReady==='function'
+       &&!window._upsellBundleReady(st.email)){
+      return Object.assign({},base,{loading:true});
+    }
     try{
       var email=st&&st.email;
       var p=email&&typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
@@ -232,7 +244,10 @@
     var _stripLoading=!!src.loading||!_tiersReady||!!(st&&st.loading);
     var finalAmt=_stripLoading?null:src.final;
     var paid=!_stripLoading&&finalAmt>0;
-    var cls='v210k '+(paid?'paid':'unpaid')+' '+esc(st.cls||'');
+    // v_oneflash: while loading, the class must NOT depend on st.cls
+    // (miss/paid tint) — every pre-ready repaint must produce byte-identical
+    // HTML so the slot's value-guard dedups them into zero visible flicker.
+    var cls='v210k '+(_stripLoading?'unpaid loading':((paid?'paid':'unpaid')+' '+esc(st.cls||'')));
     var status=_stripLoading?'กำลังโหลด...':(st.status||(paid?'\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11\u0e41\u0e25\u0e49\u0e27':'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e16\u0e36\u0e07\u0e40\u0e01\u0e13\u0e11'));
     var gateNote=(!_stripLoading&&src.gate_active)?(' <span class="pv-comm-gate-warn">\u26a0 gate '+Math.round(src.gate_cap*100)+'%</span>'):'';
     var mainHtml=_stripLoading
@@ -1324,18 +1339,21 @@
     if(total)total.innerHTML=_cdsTotalHtml('รวม '+t.label,'—',t.valCls);
   }
 
-  // ── Main open: renders Level 1 summary ────────────────────────────────
-  function _cdsOpen(){
-    if(typeof _commBuildKamSelfState!=='function')return;
-    var st=_commBuildKamSelfState();
-    if(!st)return;
-
+  // ── v_oneflash: single src builder with the FULL readiness barrier ─────
+  // Same rule as the strip: no partial money, ever. While any input is still
+  // loading (QNRR/policies via st.loading, team CSV, detailed per-KAM bundle)
+  // the sheet shows '…' — then renders ONCE with final numbers.
+  function _cdsBuildSrc(st){
     var nrr=Number(st.payout||0);
     var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
-    // v_qtrux-fix: QNRR not loaded yet (st.loading) → the sheet must open in
-    // loading state ('…' + "กำลังโหลด" note), never confident partial money.
     if(st.loading){ src.loading=true; }
-    if(typeof bulkUpsellData!=='undefined'&&bulkUpsellData&&bulkUpsellData.loaded&&typeof _commBuildKamPayout==='function'){
+    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
+    if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
+    if(src.loading){
+      if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
+      return src;
+    }
+    if(typeof _commBuildKamPayout==='function'){
       try{
         var p=_commBuildKamPayout(st.email);
         if(p){
@@ -1352,10 +1370,39 @@
           src.final=Math.round((nrr+src.upsell_sku+src.upsell_outlet+src.handover)*src.gate_cap);
         }
       }catch(e){ console.warn('[cds] buildSrc error',e); }
-    }else if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
-      src.loading=true;
-      if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
     }
+    return src;
+  }
+
+  // v_oneflash: if the sheet was opened while loading, poll readiness and
+  // repaint EXACTLY ONCE when everything is final (no intermediate values).
+  function _cdsScheduleRefresh(){
+    if(window._cdsRefreshTimer) return;
+    var tries=0;
+    window._cdsRefreshTimer=setInterval(function(){
+      tries++;
+      var overlay=document.getElementById('cds-overlay');
+      var stop=function(){ clearInterval(window._cdsRefreshTimer); window._cdsRefreshTimer=null; };
+      if(!overlay||tries>60){ stop(); return; } // sheet closed / ~42s safety cap
+      if(!window._cdsSrc||!window._cdsSrc.loading){ stop(); return; }
+      var st=typeof _commBuildKamSelfState==='function'?_commBuildKamSelfState():null;
+      if(!st) return;
+      var src=_cdsBuildSrc(st);
+      if(src.loading) return; // still waiting — keep the '…' state untouched
+      window._cdsSrc=src; window._cdsKamSt=st;
+      if(window._cdsLevel===1){ try{ window._cdsRenderL1(src,st); }catch(e){} }
+      stop();
+    },700);
+  }
+
+  // ── Main open: renders Level 1 summary ────────────────────────────────
+  function _cdsOpen(){
+    if(typeof _commBuildKamSelfState!=='function')return;
+    var st=_commBuildKamSelfState();
+    if(!st)return;
+
+    var src=_cdsBuildSrc(st);
+    if(src.loading) _cdsScheduleRefresh();
 
     window._cdsSrc=src;
     window._cdsKamSt=st;
@@ -1641,7 +1688,7 @@ window._cdsRenderL1 = function(src, st) {
     +srcRow('ho',   '#bcd7ff', 'Handover', hoSub, hoAmt)
     +'<div style="height:1px;background:rgba(var(--ink-blue),.08);margin:2px 18px 0"></div>'
     +'<div class="cds-l1-subtotal"><span class="cds-l1-subtotal-lbl">Subtotal</span>'
-    +'<span class="cds-l1-subtotal-val">'+fmtFull(subtotal)+'</span></div>'
+    +'<span class="cds-l1-subtotal-val">'+(src.loading?'—':fmtFull(subtotal))+'</span></div>'
     +gateHtml
     +'<div style="height:1px;background:rgba(var(--ink-blue),.08);margin:0 18px 0"></div>'
     +heroHtml
@@ -1917,6 +1964,15 @@ window._cdsRender_exp = function(src, body, meta, totalEl) {
   var fmt = h.fmt;
   var esc = h.esc;
 
+  // v_oneflash: match p1/p3/ho/nrr's guard — never render a confident
+  // Expansion number while src is still assembling.
+  if (src.loading) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">กำลังโหลด upsell...</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม Expansion', '—', 'v-amber');
+    return;
+  }
+
   // ── Collect expansion data via _tgtComputeKamNRR ─────────────────────
   var st  = window._cdsKamSt || {};
   var nrr = null;
@@ -2028,6 +2084,15 @@ window._cdsRender_ho = function(src, body, meta, totalEl) {
   }
   var fmt = h.fmt;
   var esc = h.esc;
+
+  // v_oneflash: match p1/p3's guard — never render a confident number (or
+  // ฿0) while src is still assembling.
+  if (src.loading) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">กำลังโหลด upsell...</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม Handover', '—', 'v-amber');
+    return;
+  }
 
   var hd = src.handover_detail || {};
   var detail = hd.detail || [];
@@ -2201,6 +2266,15 @@ window._cdsRender_nrr = function(src, body, meta, totalEl) {
   if (!h) return;
   var fmt = h.fmt;
   var esc = h.esc;
+
+  // v_oneflash: match p1/p3/ho's guard — never render a confident NRR
+  // number while src is still assembling.
+  if (src.loading) {
+    if (meta) meta.innerHTML = '';
+    body.innerHTML = '<div class="cds-empty">กำลังโหลด...</div>';
+    if (totalEl) totalEl.innerHTML = h.total('รวม NRR', '—', 'v-amber');
+    return;
+  }
 
   // ── Get NRR compute result ────────────────────────────────────────────
   var nr = null;
