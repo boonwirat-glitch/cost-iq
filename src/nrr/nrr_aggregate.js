@@ -251,6 +251,25 @@ function nrrOutletsForKam(kamEmail, period) {
 }
 window.nrrOutletsForKam = nrrOutletsForKam;
 
+// v_adperson: outlet drill-down for ONE PM person's row in the per-person
+// list — sourced from the SAME pm_view.csv rows nrrPmRowsByPerson already
+// pooled for that name's %NRR (result.by_month[period].rows), so the outlet
+// list always reconciles with the number on the row by construction. Bucket-
+// scope churn reclassification only (no _rowInScope/nrrClassifyRow — pm_view
+// rows have no kam/tl boundary to classify against), same convention as
+// nrrOutletsForMovement's scopeCtx.scope==='bucket' branch.
+function nrrOutletsForPmPerson(name, period) {
+  var people = nrrPmRowsByPerson();
+  var p = people.find(function (x) { return x.name === name; });
+  if (!p || !p.result || !p.period || !p.result.by_month[p.period]) return [];
+  var rows = p.result.by_month[p.period].rows || [];
+  return rows.map(function (r) {
+    var mv = (r.movement_type === 'core_nrr' && (parseFloat(r.curr_gmv) || 0) === 0) ? 'core_nrr_churn' : r.movement_type;
+    return { row: r, movement: mv };
+  }).sort(function (a, b) { return (b.row.curr_gmv || 0) - (a.row.curr_gmv || 0); });
+}
+window.nrrOutletsForPmPerson = nrrOutletsForPmPerson;
+
 // ── v4: number-triple accessor ───────────────────────────────────────────
 // {base, mtd, run_rate, curr_days, days_in_month, is_partial} for one month
 // of a compute result (works for both _qnrrCompute and nrrComputeBucket

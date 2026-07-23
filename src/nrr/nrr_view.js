@@ -2458,14 +2458,16 @@ function nrrRenderPortfolioSection(kind) {
     var people = nrrPmRowsByPerson();
     if (people.length) {
       personRowsHtml = '<div class="nrr-panel-head" style="margin-top:18px"><div class="h2">PM — รายบุคคล</div></div>' +
-        '<table class="nrr-table"><thead><tr><th>PM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody>' +
+        '<table class="nrr-table"><thead><tr><th>PM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-pm-person-tbody">' +
         people.map(function (p, i) {
           var triple = p.result && p.period ? nrrMonthTriple(p.result, p.period) : null;
           // "อื่นๆ" = every name in pm_view.csv that isn't a real PM roster
           // member (and isn't AD, which gets its own section) pooled into
-          // one row — muted styling + a title tooltip explaining why.
+          // one row — muted styling + a title tooltip explaining why. Not
+          // clickable (it's a mixed pool, not one person's outlets).
           var isOthers = p.name === 'อื่นๆ';
-          return '<tr style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row' + (isOthers ? ' muted' : '') + '">' +
+          return '<tr' + (isOthers ? '' : ' data-name="' + nrrEsc(p.name) + '" data-period="' + nrrEsc(p.period) + '"') +
+            ' style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row' + (isOthers ? ' muted' : '') + '">' +
             '<td' + (isOthers ? ' title="รายชื่ออื่นที่ไม่ตรงกับ PM ในระบบ — รวมไว้ที่นี่แทนการแยกแถว"' : '') + '>' + nrrEsc(p.name) + '</td>' +
             '<td class="num-cell" style="color:' + (isOthers ? 'inherit' : nrrThresholdColorVar(p.nrr_pct)) + '">' + nrrFmtPct(p.nrr_pct) + '</td>' +
             '<td>' + nrrTripleHtml('md', triple) + '</td>' +
@@ -2491,6 +2493,13 @@ function nrrRenderPortfolioSection(kind) {
       document.getElementById('nrr-sec-movement').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+
+  var personTbody = document.getElementById('nrr-pm-person-tbody');
+  if (personTbody) {
+    personTbody.querySelectorAll('tr[data-name]').forEach(function (tr) {
+      tr.addEventListener('click', function () { nrrOpenSlideoverPmPerson(tr.dataset.name, tr.dataset.period); });
+    });
+  }
 }
 
 // ── §7 Commission section — hero + 3-bar trend + per-team/per-KAM
@@ -3470,6 +3479,22 @@ function nrrOpenSlideoverKam(kamEmail, period) {
   var name = outlets[0] && outlets[0].row ? outlets[0].row.latest_staff_owner : kamEmail;
   _nrrOpenSlideover({
     mode: 'kam', title: name || kamEmail,
+    sub: (QNRR_CFG.months_th[period] || period) + ' · ' + outlets.length + ' ร้าน',
+    outlets: outlets, period: period, showKam: false, showKamChips: false, showMvChips: true
+  });
+  nrrLoadNotesFor(outlets, period);
+}
+
+// v_adperson: PM per-person row -> outlet slide-over. name/period identify
+// the exact same group nrrPmRowsByPerson computed the row's %NRR from, so
+// the outlets shown always match the number that was clicked — mirrors
+// nrrOpenSlideoverKam's shape (mode 'kam' reuses the same row renderer;
+// showKam/showKamChips false since pm_view.csv rows carry no KAM/TL to
+// show alongside a PM's own outlets).
+function nrrOpenSlideoverPmPerson(name, period) {
+  var outlets = nrrOutletsForPmPerson(name, period);
+  _nrrOpenSlideover({
+    mode: 'kam', title: name,
     sub: (QNRR_CFG.months_th[period] || period) + ' · ' + outlets.length + ' ร้าน',
     outlets: outlets, period: period, showKam: false, showKamChips: false, showMvChips: true
   });

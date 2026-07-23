@@ -443,8 +443,12 @@
 }
 .nrr-table td { padding: 12px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
 .nrr-table tbody tr { transition: background 120ms ease; }
-#nrr-kams-tbody tr { cursor: pointer; transition: background 140ms ease; }
-#nrr-kams-tbody tr:hover { background: var(--green-soft); }
+#nrr-kams-tbody tr,
+#nrr-ads-tbody tr,
+#nrr-pm-person-tbody tr[data-name] { cursor: pointer; transition: background 140ms ease; }
+#nrr-kams-tbody tr:hover,
+#nrr-ads-tbody tr:hover,
+#nrr-pm-person-tbody tr[data-name]:hover { background: var(--green-soft); }
 .nrr-table .num-cell { font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* v_adperson: "อื่นๆ" pooled row (unrecognized names collapsed together) —
    same muted convention as .nrr-waiver-card.rejected (color:ink3, opacity). */
