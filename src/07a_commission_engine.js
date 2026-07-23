@@ -1376,14 +1376,19 @@ async function loadTargets(quarter) {
     // 07c_qnrr_view.js's _rowInScope) warm from this fetch too — same
     // source table, so whichever of the two loaders runs first wins.
     try {
-      const nonKam = new Set(), ad = new Set();
+      const nonKam = new Set(), ad = new Set(), pm = new Set();
       (otherRoleRows || []).forEach(p => {
         if (!p || !p.email) return;
         const em = p.email.toLowerCase();
         nonKam.add(em);
         if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+        // v_adperson: kept in lockstep with nrr_data.js/07c_qnrr_view.js's
+        // copies — this loader runs independently and "whichever wins" per
+        // the comment above, so all three must carry the same shape or
+        // whichever writes last silently drops the field for the others.
+        if (p.role === 'pm') pm.add(em);
       });
-      window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+      window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad, pmSet: pm };
     } catch (e) {}
   } catch (e) {
     console.warn('[Commission other-role roster] load failed:', e.message);

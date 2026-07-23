@@ -446,6 +446,10 @@
 #nrr-kams-tbody tr { cursor: pointer; transition: background 140ms ease; }
 #nrr-kams-tbody tr:hover { background: var(--green-soft); }
 .nrr-table .num-cell { font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* v_adperson: "อื่นๆ" pooled row (unrecognized names collapsed together) —
+   same muted convention as .nrr-waiver-card.rejected (color:ink3, opacity). */
+.nrr-table tbody tr.muted { color: var(--ink3); opacity: .75; font-style: italic; }
+.nrr-table tbody tr.muted .num-cell { font-weight: 600; }
 .nrr-table-subrow td:first-child { padding-left: 26px; color: var(--ink2); font-size: 13.5px; }
 .nrr-table-total td { border-top: 1.5px solid var(--ink); border-bottom: none; font-weight: 700; }
 

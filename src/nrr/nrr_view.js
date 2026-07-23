@@ -2461,9 +2461,13 @@ function nrrRenderPortfolioSection(kind) {
         '<table class="nrr-table"><thead><tr><th>PM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody>' +
         people.map(function (p, i) {
           var triple = p.result && p.period ? nrrMonthTriple(p.result, p.period) : null;
-          return '<tr style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row">' +
-            '<td>' + nrrEsc(p.name) + '</td>' +
-            '<td class="num-cell" style="color:' + nrrThresholdColorVar(p.nrr_pct) + '">' + nrrFmtPct(p.nrr_pct) + '</td>' +
+          // "อื่นๆ" = every name in pm_view.csv that isn't a real PM roster
+          // member (and isn't AD, which gets its own section) pooled into
+          // one row — muted styling + a title tooltip explaining why.
+          var isOthers = p.name === 'อื่นๆ';
+          return '<tr style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row' + (isOthers ? ' muted' : '') + '">' +
+            '<td' + (isOthers ? ' title="รายชื่ออื่นที่ไม่ตรงกับ PM ในระบบ — รวมไว้ที่นี่แทนการแยกแถว"' : '') + '>' + nrrEsc(p.name) + '</td>' +
+            '<td class="num-cell" style="color:' + (isOthers ? 'inherit' : nrrThresholdColorVar(p.nrr_pct)) + '">' + nrrFmtPct(p.nrr_pct) + '</td>' +
             '<td>' + nrrTripleHtml('md', triple) + '</td>' +
             '<td class="num-cell">' + p.outlet_count + '</td>' +
             '</tr>';

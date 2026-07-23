@@ -1,4 +1,4 @@
-<!-- Freshket Sense v912: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v913: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v912',
+      version: 'v913',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -36883,14 +36883,19 @@ async function loadTargets(quarter) {
     // 07c_qnrr_view.js's _rowInScope) warm from this fetch too — same
     // source table, so whichever of the two loaders runs first wins.
     try {
-      const nonKam = new Set(), ad = new Set();
+      const nonKam = new Set(), ad = new Set(), pm = new Set();
       (otherRoleRows || []).forEach(p => {
         if (!p || !p.email) return;
         const em = p.email.toLowerCase();
         nonKam.add(em);
         if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+        // v_adperson: kept in lockstep with nrr_data.js/07c_qnrr_view.js's
+        // copies — this loader runs independently and "whichever wins" per
+        // the comment above, so all three must carry the same shape or
+        // whichever writes last silently drops the field for the others.
+        if (p.role === 'pm') pm.add(em);
       });
-      window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+      window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad, pmSet: pm };
     } catch (e) {}
   } catch (e) {
     console.warn('[Commission other-role roster] load failed:', e.message);
@@ -55473,21 +55478,24 @@ var QNRR_CFG = {
 // KAM/TL-scoped %NRR. Both bundles populate the same window.nrrRoleRoster
 // shape; empty sets = old behavior, so a failed fetch degrades gracefully.
 // NOTE: this %NRR feeds real commission payouts via _qnrrComputeForCommission.
-window.nrrRoleRoster = window.nrrRoleRoster || { loaded: false, nonKamSet: new Set(), adSet: new Set() };
+window.nrrRoleRoster = window.nrrRoleRoster || { loaded: false, nonKamSet: new Set(), adSet: new Set(), pmSet: new Set() };
 async function _qnrrFetchRoleRoster() {
   if (window.nrrRoleRoster.loaded) return window.nrrRoleRoster;
   try {
     const { data, error } = await supa.from('profiles').select('email,role')
       .in('role', ['pm', 'admin', 'sales', 'sales_tl', 'ad', 'ad_tl']);
     if (error) throw new Error(error.message);
-    const nonKam = new Set(), ad = new Set();
+    const nonKam = new Set(), ad = new Set(), pm = new Set();
     (data || []).forEach(p => {
       if (!p || !p.email) return;
       const em = p.email.toLowerCase();
       nonKam.add(em);
       if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+      // v_adperson: kept in lockstep with the /nrr twin's shape even though
+      // Sense doesn't consume pmSet today — see nrr_data.js's copy.
+      if (p.role === 'pm') pm.add(em);
     });
-    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad, pmSet: pm };
   } catch (e) {
     console.warn('[Sense qnrr] role roster fetch failed — KAM scoping falls back to email-only', e);
   }

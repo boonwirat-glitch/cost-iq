@@ -157,7 +157,7 @@ window.nrrFetchQnrrCsv = nrrFetchQnrrCsv;
 // same window.nrrRoleRoster) so the twin engines stay in lockstep.
 // Empty sets = exactly today's behavior — a failed fetch degrades to the
 // old numbers, never throws.
-window.nrrRoleRoster = { loaded: false, nonKamSet: new Set(), adSet: new Set() };
+window.nrrRoleRoster = { loaded: false, nonKamSet: new Set(), adSet: new Set(), pmSet: new Set() };
 async function nrrFetchRoleRoster() {
   if (window.nrrRoleRoster.loaded) return window.nrrRoleRoster;
   if (!supa) return window.nrrRoleRoster;
@@ -165,14 +165,18 @@ async function nrrFetchRoleRoster() {
     var resp = await supa.from('profiles').select('email,role')
       .in('role', ['pm', 'admin', 'sales', 'sales_tl', 'ad', 'ad_tl']);
     if (resp.error) throw new Error(resp.error.message);
-    var nonKam = new Set(), ad = new Set();
+    var nonKam = new Set(), ad = new Set(), pm = new Set();
     (resp.data || []).forEach(function (p) {
       if (!p || !p.email) return;
       var em = p.email.toLowerCase();
       nonKam.add(em);
       if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+      // v_adperson: distinct from nonKamSet (which also pools admin/sales) —
+      // needed to positively identify "this name IS a real PM roster member"
+      // for the PM per-person list, vs. a stray/unknown name in pm_view.csv.
+      if (p.role === 'pm') pm.add(em);
     });
-    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad, pmSet: pm };
   } catch (e) {
     console.warn('[nrr] role roster fetch failed — KAM scoping falls back to email-only', e);
   }

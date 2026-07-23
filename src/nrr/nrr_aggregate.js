@@ -641,27 +641,68 @@ function nrrPmResult() {
 }
 window.nrrPmResult = nrrPmResult;
 
+// v_adperson: name -> role classifier for pm_view.csv's current_staff_owner
+// strings. pm_view.csv has no email column, only plain name text, so real
+// roster membership (window.nrrRoleRoster.pmSet/adSet, email-keyed) can't be
+// tested directly — but the SAME people also hold portfolio rows in
+// kam_rep_view.csv (bulkQnrrData), keyed by latest_kam_email with a
+// latest_staff_owner display name in the exact same format pm_view.csv uses
+// (verified: Ice's name string is byte-identical across both exports). That
+// row is the bridge: email -> name, for every roster email that shows up
+// there. Returns {pmNames:Set<string>, adNames:Set<string>} — names, not
+// emails, ready to match directly against pm_view.csv rows.
+function nrrRosterNamesFromPortfolioRows() {
+  var pmNames = new Set(), adNames = new Set();
+  var roster = window.nrrRoleRoster;
+  var qd = window.bulkQnrrData;
+  if (!roster || !roster.loaded || !qd || !qd.loaded) return { pmNames: pmNames, adNames: adNames };
+  var pmSet = roster.pmSet || new Set();
+  var adSet = roster.adSet || new Set();
+  (qd.allRows || []).forEach(function (r) {
+    var email = (r.latest_kam_email || '').toLowerCase();
+    if (!email || !r.latest_staff_owner) return;
+    if (pmSet.has(email)) pmNames.add(r.latest_staff_owner);
+    if (adSet.has(email)) adNames.add(r.latest_staff_owner);
+  });
+  return { pmNames: pmNames, adNames: adNames };
+}
+window.nrrRosterNamesFromPortfolioRows = nrrRosterNamesFromPortfolioRows;
+
 // v_adperson: PM per-person breakdown — PM (unlike KAM/AD) has no team
 // concept and no email column in pm_view.csv, only a plain staff-name
-// string (current_staff_owner), so this groups by trimmed name instead of
-// email — same precedent as nrrPipelineByRep's staff_owner grouping above.
-// nrrComputeRowsPool is already generic over any row subset + label, so
-// each name's group gets the exact same %NRR formula as the Chain/SA-MC
-// buckets, just re-targeted to "this one person's rows" instead of "this
-// one account_type's rows". Admin gets no equivalent (admin_view.csv's
+// string (current_staff_owner). nrrComputeRowsPool is already generic over
+// any row subset + label, so each name's group gets the exact same %NRR
+// formula as the Chain/SA-MC buckets, just re-targeted to "this one
+// person's rows" instead of "this one account_type's rows".
+//
+// Bush's ask after seeing the first cut: only list REAL PM roster members by
+// name; an AD person's name (Ice) shouldn't appear here at all — she already
+// has her own dedicated AD leaderboard section elsewhere on the page; every
+// other stray/unrecognized name (data artifacts — verified some are literal
+// KAM names) collapses into one "อื่นๆ" bucket instead of its own row.
+// Admin gets no per-person equivalent at all (admin_view.csv's
 // current_staff_owner is ~99% blank per _nrrParsePortfolioCsv's header
 // comment — not enough usable data for a real per-person list).
 function nrrPmRowsByPerson() {
   var pd = window.bulkPmData;
   if (!pd || !pd.loaded || !pd.allRows.length) return [];
+  var names = nrrRosterNamesFromPortfolioRows();
+
   var byName = {};
+  var othersRows = [];
   pd.allRows.forEach(function (r) {
-    var name = (r.current_staff_owner || '').trim() || 'ไม่ระบุ PM';
-    if (!byName[name]) byName[name] = [];
-    byName[name].push(r);
+    var name = (r.current_staff_owner || '').trim();
+    if (name && names.adNames.has(name)) return; // shown in her own AD section already
+    if (name && names.pmNames.has(name)) {
+      if (!byName[name]) byName[name] = [];
+      byName[name].push(r);
+    } else {
+      othersRows.push(r);
+    }
   });
-  return Object.keys(byName).map(function (name) {
-    var result = _nrrActualizeResult(nrrComputeRowsPool(byName[name], name));
+
+  function buildRow(name, rows) {
+    var result = _nrrActualizeResult(nrrComputeRowsPool(rows, name));
     var period = nrrCurrentPeriod(result);
     var bm = result && period ? result.by_month[period] : null;
     var outletCount = 0;
@@ -678,19 +719,23 @@ function nrrPmRowsByPerson() {
       period: period,
       result: result
     };
-  }).filter(function (p) {
-    // pm_view.csv's current_staff_owner carries some stray zero-signal names
-    // (rows whose movement_type never lands in the counted set for the
-    // current period — verified against real data: several groups render
-    // 0%/฿0/0 outlets across the board). Nothing to show for those; drop
-    // them rather than list noise. A group with base_gmv but 0 current
-    // (a real churn-to-zero) still has outlet_count > 0 and stays.
-    return p.outlet_count > 0;
-  }).sort(function (a, b) {
-    if (a.nrr_pct == null) return 1;
-    if (b.nrr_pct == null) return -1;
-    return b.nrr_pct - a.nrr_pct;
-  });
+  }
+
+  var rows = Object.keys(byName).map(function (name) { return buildRow(name, byName[name]); })
+    // Same zero-signal filter as before — a name with 0 counted outlets this
+    // period has nothing to show; a real churn-to-zero keeps outlet_count > 0.
+    .filter(function (p) { return p.outlet_count > 0; })
+    .sort(function (a, b) {
+      if (a.nrr_pct == null) return 1;
+      if (b.nrr_pct == null) return -1;
+      return b.nrr_pct - a.nrr_pct;
+    });
+
+  if (othersRows.length) {
+    var othersRow = buildRow('อื่นๆ', othersRows);
+    if (othersRow.outlet_count > 0) rows.push(othersRow); // always last, not ranked among named people
+  }
+  return rows;
 }
 window.nrrPmRowsByPerson = nrrPmRowsByPerson;
 

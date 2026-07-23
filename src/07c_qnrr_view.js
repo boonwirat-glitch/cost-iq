@@ -20,21 +20,24 @@ var QNRR_CFG = {
 // KAM/TL-scoped %NRR. Both bundles populate the same window.nrrRoleRoster
 // shape; empty sets = old behavior, so a failed fetch degrades gracefully.
 // NOTE: this %NRR feeds real commission payouts via _qnrrComputeForCommission.
-window.nrrRoleRoster = window.nrrRoleRoster || { loaded: false, nonKamSet: new Set(), adSet: new Set() };
+window.nrrRoleRoster = window.nrrRoleRoster || { loaded: false, nonKamSet: new Set(), adSet: new Set(), pmSet: new Set() };
 async function _qnrrFetchRoleRoster() {
   if (window.nrrRoleRoster.loaded) return window.nrrRoleRoster;
   try {
     const { data, error } = await supa.from('profiles').select('email,role')
       .in('role', ['pm', 'admin', 'sales', 'sales_tl', 'ad', 'ad_tl']);
     if (error) throw new Error(error.message);
-    const nonKam = new Set(), ad = new Set();
+    const nonKam = new Set(), ad = new Set(), pm = new Set();
     (data || []).forEach(p => {
       if (!p || !p.email) return;
       const em = p.email.toLowerCase();
       nonKam.add(em);
       if (p.role === 'ad' || p.role === 'ad_tl') ad.add(em);
+      // v_adperson: kept in lockstep with the /nrr twin's shape even though
+      // Sense doesn't consume pmSet today — see nrr_data.js's copy.
+      if (p.role === 'pm') pm.add(em);
     });
-    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad };
+    window.nrrRoleRoster = { loaded: true, nonKamSet: nonKam, adSet: ad, pmSet: pm };
   } catch (e) {
     console.warn('[Sense qnrr] role roster fetch failed — KAM scoping falls back to email-only', e);
   }
