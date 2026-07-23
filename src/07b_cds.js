@@ -1199,11 +1199,15 @@
   function _cdsChipRowClose(){ return '</div></div>'; }
 
   // ── Zone C: sub-row (grid columns) ────────────────────────────────────
-  // cells = [{text, cls}]
+  // cells = [{text, cls}] — text is escaped, safe default. A cell can pass
+  // {html, cls} instead when it needs trusted inline markup (v_qsum: the
+  // quarter-dots span next to a group name) — the CALLER is responsible for
+  // escaping any untrusted text (e.g. group name) before concatenating.
   function _cdsSubRowHtml(cells, tabKey){
     return '<div class="cds-sub-row '+tabKey+'-cols">'
       +cells.map(function(c){
-        return'<span class="'+(c.cls||'cds-val v-muted')+'">'+esc(c.text||'')+'</span>';
+        var inner = c.html != null ? c.html : esc(c.text||'');
+        return'<span class="'+(c.cls||'cds-val v-muted')+'">'+inner+'</span>';
       }).join('')
       +'</div>';
   }
@@ -1523,31 +1527,92 @@ window._cdsBackToSummary = function() {
   if(body){void body.offsetWidth; body.classList.add('cds-body-enter'); body.scrollTop=0;}
 };
 
-// ── v_qtrux: shared quarter-timeline line for the CDS P1/P3 tabs ──────────
-// "ก.ค. ✓฿450 · ส.ค. ฿180 (MTD) · ก.ย. ~฿420" + status chip, from
-// _upsellQuarterTimeline (07a). Reads _cdsKamSt/_cdsSrc set by _cdsOpen.
-// Returns '' when data is missing (monthly mode / bundle absent) — tabs
-// render exactly as before.
-window._cdsQtrTimelineHtml = function(g, kind) {
+// ── v_qsum: Option A refined — dots next to the group name (always visible,
+// no click needed) + a click-to-expand 3-month calendar showing GMV *and*
+// commission per month (the "cause → effect" pairing Bush asked for), plus
+// a distinct neutral "ยังไม่ขาย"/"ไม่ถึงเกณฑ์" cell for a group whose first
+// qualifying month lands mid-quarter — never a red/zero-looking cell for
+// something that simply hadn't started yet. Approved design:
+// https://claude.ai/code/artifact/b9e3ce85-1171-4435-a8e5-596dbeeb5ee0
+// _cdsQtrCompute() is called ONCE per group by the p1/p3 renderers and its
+// result passed to both _cdsQtrDotsHtml (inline, always shown) and
+// _cdsQtrTimelineHtml (the collapsed calendar block) — avoids computing
+// _upsellQuarterTimeline twice per group.
+window._cdsQtrCompute = function(g, kind) {
   try {
     var st = window._cdsKamSt, src = window._cdsSrc;
-    if (!st || !src || !src.base_month_used || typeof _upsellQuarterTimeline !== 'function') return '';
-    var t = _upsellQuarterTimeline(st.email, g, kind, src.base_month_used);
+    if (!st || !src || !src.base_month_used || typeof _upsellQuarterTimeline !== 'function') return null;
+    return _upsellQuarterTimeline(st.email, g, kind, src.base_month_used);
+  } catch(e) { return null; }
+};
+
+window._cdsQtrDotsHtml = function(t) {
+  if (!t) return '';
+  var dots = t.months.map(function(m){
+    if (m.state === 'paid') return '<span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--tk-ok-bright)"></span>';
+    if (m.state === 'mtd')  return '<span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:#ffe08a"></span>';
+    // 'none' — a flat dash, never a circle (Apple Health precedent: a day
+    // before you tracked something shows a blank tick, not an empty ring —
+    // a ring implies "a target exists here").
+    if (m.state === 'none') return '<span style="width:6px;height:2px;border-radius:1px;display:inline-block;background:rgba(var(--ink-blue-hi),.22);align-self:center"></span>';
+    return '<span style="width:6px;height:6px;border-radius:50%;display:inline-block;border:1.2px solid rgba(var(--ink-blue-hi),.35);box-sizing:border-box"></span>'; // future
+  }).join('');
+  return '<span style="display:inline-flex;gap:3px;margin-left:6px;vertical-align:1px">' + dots + '</span>';
+};
+
+// Collapsed-by-default calendar block (class cds-qtr-cal, same max-height
+// open/close mechanism as .cds-proof) — toggled together with the existing
+// formula-proof box by the shared click handler wired in _cdsRender_p1/_p3.
+window._cdsQtrTimelineHtml = function(t) {
+  try {
     if (!t) return '';
-    function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (n >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
+    function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (Math.abs(n) >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
+    var cellBase = 'flex:1;text-align:center;border-radius:8px;padding:6px 3px 7px;min-width:0';
     var cells = t.months.map(function(m){
       var mo = m.label.split(' ')[0];
-      if (m.state === 'paid') return '<span style="color:var(--tk-ok-bright)">' + mo + ' ✓' + mon(m.comm) + '</span>';
-      if (m.state === 'none') return '<span style="color:rgba(var(--ink-blue-hi),.35)">' + mo + ' —</span>';
-      if (m.state === 'mtd')  return '<span style="color:rgba(var(--ink-blue-hi),.85);font-weight:800">' + mo + ' ' + mon(m.comm) + ' (MTD)</span>';
-      return '<span style="color:rgba(255,224,138,.75)">' + mo + ' ' + (m.comm != null ? '~' + mon(m.comm) : '~') + '</span>';
-    }).join('<span style="color:rgba(var(--ink-blue),.35)"> · </span>');
-    var chip;
-    if (t.isLastMonth) chip = '<span style="color:#bcd7ff">เดือนสุดท้าย — รวมไตรมาส ' + mon(Math.round(t.quarterTotal)) + '</span>';
-    else if (t.status === 'growing') chip = '<span style="color:var(--tk-ok-bright)">ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม</span>';
-    else if (t.status === 'kept') chip = '<span style="color:var(--tk-ok-bright)">ร้านยังซื้ออยู่ · จ่ายต่อ</span>';
-    else chip = '<span style="color:rgba(var(--ink-blue-hi),.55)">เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ</span>';
-    return '<div style="padding:3px 16px 7px 34px;font-size:var(--text-2xs);font-family:\'IBM Plex Mono\',\'Noto Sans Thai\',monospace;line-height:1.7;border-bottom:1px solid rgba(var(--ink-blue),.06)">' + cells + '<br>' + chip + '</div>';
+      if (m.state === 'paid') {
+        return '<div style="'+cellBase+';border:1px solid rgba(77,220,151,.35);background:rgba(77,220,151,.07)">'
+          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.45);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
+          + '<div style="font-weight:800;font-size:12.5px;margin-top:2px;color:var(--tk-ok-bright);font-family:\'IBM Plex Mono\',monospace">'+mon(m.comm)+'</div>'
+          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(77,220,151,.2);color:rgba(77,220,151,.65);font-family:\'IBM Plex Mono\',monospace">GMV '+mon(m.gmv)+'</div>'
+          + '</div>';
+      }
+      if (m.state === 'mtd') {
+        return '<div style="'+cellBase+';border:1px solid rgba(255,224,138,.4);background:rgba(255,224,138,.07)">'
+          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.45);font-family:\'IBM Plex Mono\',monospace">'+mo+' · MTD</div>'
+          + '<div style="font-weight:800;font-size:12.5px;margin-top:2px;color:#ffe08a;font-family:\'IBM Plex Mono\',monospace">'+mon(m.comm)+'</div>'
+          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(255,224,138,.2);color:rgba(255,224,138,.7);font-family:\'IBM Plex Mono\',monospace">GMV '+mon(m.gmv)+'</div>'
+          + '</div>';
+      }
+      if (m.state === 'none') {
+        // hasGmv distinguishes real-but-below-gate (bought some, just not
+        // enough to qualify) from a true zero (hasn't started selling this
+        // group to this outlet yet) — same neutral card either way, caption
+        // differs so a rep never reads "not started" as "you missed it".
+        var caption = m.hasGmv ? 'ไม่ถึงเกณฑ์ (GMV ' + mon(m.gmv) + ')' : 'ยังไม่ขาย';
+        return '<div style="'+cellBase+';border:1px dotted rgba(var(--ink-blue-hi),.22);opacity:.65">'
+          + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
+          + '<div style="font-weight:700;font-size:12.5px;margin-top:2px;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">—</div>'
+          + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(var(--ink-blue-hi),.15);color:rgba(var(--ink-blue-hi),.4)">'+caption+'</div>'
+          + '</div>';
+      }
+      // future
+      return '<div style="'+cellBase+';border:1px dashed rgba(var(--ink-blue-hi),.2)">'
+        + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:rgba(var(--ink-blue-hi),.4);font-family:\'IBM Plex Mono\',monospace">'+mo+'</div>'
+        + '<div style="font-weight:700;font-size:12.5px;margin-top:2px;color:rgba(var(--ink-blue-hi),.75);font-family:\'IBM Plex Mono\',monospace">'+(m.comm != null ? '~' + mon(m.comm) : '~')+'</div>'
+        + '<div style="font-size:9px;margin-top:3px;padding-top:3px;border-top:1px solid rgba(var(--ink-blue-hi),.12);color:rgba(var(--ink-blue-hi),.4)">'+(m.gmv != null ? '~GMV ' + mon(m.gmv) : '—')+'</div>'
+        + '</div>';
+    }).join('');
+    var note;
+    var qtot = mon(Math.round(t.quarterTotal));
+    if (t.isLastMonth) note = 'เดือนสุดท้าย — รวมไตรมาส ' + qtot;
+    else if (t.status === 'growing') note = 'ซื้อเพิ่ม ↑ ค่าคอมฯ โตตาม · รวมทั้งไตรมาส ~' + qtot;
+    else if (t.status === 'kept') note = 'ร้านยังซื้ออยู่ · จ่ายต่อทุกเดือน · รวมทั้งไตรมาส ~' + qtot;
+    else note = 'เริ่มเดือนนี้ · จ่ายต่อทุกเดือนถ้ายังซื้อ · รวมทั้งไตรมาส ~' + qtot;
+    return '<div class="cds-qtr-cal">'
+      + '<div style="display:flex;gap:6px;padding:9px 16px 0 24px">' + cells + '</div>'
+      + '<div style="padding:7px 16px 9px 24px;font-size:10.5px;line-height:1.5;color:rgba(var(--ink-blue-hi),.55)"><b style="color:rgba(var(--ink-blue-hi),.8)">สูตร:</b> GMV × rate = ค่าคอมฯ · ' + note + '</div>'
+      + '</div>';
   } catch(e) { return ''; }
 };
 
@@ -1555,6 +1620,25 @@ window._cdsQtrTimelineHtml = function(g, kind) {
 // the P1/P3 tab body, never a dismissible tooltip.
 window._cdsQtrEducationHtml = function() {
   return '<div style="padding:7px 16px;font-size:var(--text-sm);color:rgba(255,224,138,.82);background:rgba(255,224,138,.05);border-bottom:1px solid rgba(var(--ink-blue),.10);line-height:1.4">ค่าคอมฯ จ่ายทุกเดือนที่ร้านยังซื้อกลุ่มนี้อยู่ — หยุดซื้อ = หยุดจ่าย · ซื้อเพิ่ม = ได้เพิ่ม</div>';
+};
+
+// v_qsum: always-visible (no click) quarter summary — Option C's philosophy
+// folded into Option A: total GMV + total commission for every group in
+// this tab, summed across the whole quarter (paid + MTD + projected
+// remaining months), sitting above the group list. Known limitation: does
+// NOT include groups that stopped buying mid-quarter (_upsellStoppedGroups)
+// — their historical earnings aren't in a full month-by-month shape here,
+// only a single lastComm figure, so folding them in would need a second
+// timeline computation per stopped group. Disclosed, not silently dropped.
+window._cdsQtrSummaryHtml = function(totalGmv, totalComm) {
+  function mon(n){ n = Number(n||0); if (!n) return '฿0'; if (Math.abs(n) >= 1000) return '฿' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'K'; return '฿' + Math.round(n).toLocaleString('en-US'); }
+  var cell = 'background:rgba(255,255,255,.03);padding:11px 14px;min-width:0';
+  var lbl = 'font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:rgba(var(--ink-blue-hi),.42);font-family:\'IBM Plex Mono\',monospace';
+  var val = 'font-size:17px;font-weight:900;margin-top:3px;font-family:\'IBM Plex Mono\',monospace';
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.08);border-radius:var(--r-md);overflow:hidden;margin:10px 16px 2px">'
+    + '<div style="'+cell+'"><div style="'+lbl+'">GMV Upsell ทั้งไตรมาส</div><div style="'+val+';color:rgba(var(--ink-blue-hi),.92)">~'+mon(totalGmv)+'</div></div>'
+    + '<div style="'+cell+'"><div style="'+lbl+'">ค่าคอมฯ ทั้งไตรมาส</div><div style="'+val+';color:#ffe08a">~'+mon(totalComm)+'</div></div>'
+    + '</div>';
 };
 
 // ── Level 1 summary — EXACT original "วิธีคิดค่าคอมฯ" design ───────────────
@@ -1760,6 +1844,7 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
   }
 
   var html = '';
+  var _qtrGmvSum = 0, _qtrCommSum = 0; // v_qsum: quarter summary bar totals
   outlets.forEach(function(o, oi) {
     var rowId   = 'p1r' + oi;
     var oName   = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
@@ -1774,12 +1859,20 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
       + '<div class="cds-sub-rows'+(oi < 3?' open':'') +'" id="'+rowId+'-sub">';
     o.items.forEach(function(g, gi) {
       var proofId = rowId + 'g' + gi;
+      // v_qsum: compute once, feed both the inline dots and the collapsed
+      // calendar; also accumulate this group's quarter totals into the
+      // always-visible summary bar (fallback to this-month-only when the
+      // quarter timeline isn't available, e.g. monthly-mode schemes).
+      var _t = window._cdsQtrCompute ? window._cdsQtrCompute(g, 'p1') : null;
+      _qtrGmvSum  += _t ? _t.quarterTotalGmv : (g.total_gmv || 0);
+      _qtrCommSum += _t ? _t.quarterTotal    : (g.commission || 0);
+      var _dots = _t && window._cdsQtrDotsHtml ? window._cdsQtrDotsHtml(_t) : '';
       html += h.subRow([
-        { text: g.groupKey || g.group_key || '—', cls: 'cds-outlet-name' },
+        { html: h.esc(g.groupKey || g.group_key || '—') + _dots, cls: 'cds-outlet-name' },
         { text: fmt(g.total_gmv),  cls: 'cds-val v-muted' },
         { text: fmt(g.commission), cls: 'cds-val v-amber' }
       ], 'p1');
-      html += window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(g, 'p1') : ''; // v_qtrux
+      html += _t && window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(_t) : ''; // v_qsum
       html += h.proof(proofId, [
         { label: 'GMV เดือนนี้',     result: fmt(g.total_gmv) },
         { label: 'เกณฑ์ขั้นต่ำ',   result: '≥ ฿' + p1MinGmv.toLocaleString('en-US'), pass: g.total_gmv >= p1MinGmv },
@@ -1810,13 +1903,21 @@ window._cdsRender_p1 = function(src, body, meta, totalEl) {
     }
   } catch(e) {}
 
-  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + html; // v_qtrux: education line always on top
+  var _qtrSummary = window._cdsQtrSummaryHtml ? window._cdsQtrSummaryHtml(_qtrGmvSum, _qtrCommSum) : '';
+  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + _qtrSummary + html; // v_qtrux/v_qsum: education + quarter summary always on top
 
+  // v_qsum: click toggles EVERY expandable block between this sub-row and
+  // the next one (the new .cds-qtr-cal calendar AND the existing .cds-proof
+  // formula box) — order-independent, so it doesn't matter which renders
+  // first for a given group.
   body.querySelectorAll('.cds-sub-row.p1-cols').forEach(function(row) {
     row.style.cursor = 'pointer';
     row.addEventListener('click', function() {
-      var proof = row.nextElementSibling;
-      if (proof && proof.classList.contains('cds-proof')) proof.classList.toggle('open');
+      var el = row.nextElementSibling;
+      while (el && !el.classList.contains('cds-sub-row') && !el.classList.contains('cds-chip-row')) {
+        if (el.classList.contains('cds-proof') || el.classList.contains('cds-qtr-cal')) el.classList.toggle('open');
+        el = el.nextElementSibling;
+      }
     });
   });
 
@@ -1888,6 +1989,7 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
   }
 
   var html = '';
+  var _qtrGmvSum = 0, _qtrCommSum = 0; // v_qsum: quarter summary bar totals
   outlets.forEach(function(o, oi) {
     var rowId = 'p3r' + oi;
     var oName = typeof _pvOutletName === 'function' ? _pvOutletName(o.outletId, o.accountId) : (o.outletId || '—');
@@ -1905,13 +2007,19 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
       var growthPct = g.max_baseline > 0 ? Math.round(g.existing_curr / g.max_baseline * 100) : 0;
       var passGrowth = growthPct > (p3ThreshPct + 100);
       var passMinIncr = g.incremental >= p3MinIncr;
+      // v_qsum: same compute-once pattern as p1 — feeds dots + calendar +
+      // the quarter summary bar accumulation.
+      var _t = window._cdsQtrCompute ? window._cdsQtrCompute(g, 'p3') : null;
+      _qtrGmvSum  += _t ? _t.quarterTotalGmv : (g.incremental || 0);
+      _qtrCommSum += _t ? _t.quarterTotal    : (g.commission  || 0);
+      var _dots = _t && window._cdsQtrDotsHtml ? window._cdsQtrDotsHtml(_t) : '';
       html += h.subRow([
-        { text: g.groupKey || g.group_key || '—', cls: 'cds-outlet-name' },
+        { html: h.esc(g.groupKey || g.group_key || '—') + _dots, cls: 'cds-outlet-name' },
         { text: fmt(g.max_baseline),  cls: 'cds-val v-muted' },
         { text: fmt(g.incremental),   cls: 'cds-val v-green' },
         { text: fmt(g.commission),    cls: 'cds-val v-amber' }
       ], 'p3');
-      html += window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(g, 'p3') : ''; // v_qtrux
+      html += _t && window._cdsQtrTimelineHtml ? window._cdsQtrTimelineHtml(_t) : ''; // v_qsum
       html += h.proof(proofId, [
         { label: 'Baseline (' + esc(g.max_baseline_month || '') + ')', result: fmt(g.max_baseline) },
         { label: 'GMV เดือนนี้', result: fmt(g.existing_curr) + ' (' + growthPct + '%)' },
@@ -1923,13 +2031,19 @@ window._cdsRender_p3 = function(src, body, meta, totalEl) {
     html += h.chipRowClose();
   });
 
-  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + html; // v_qtrux
+  var _qtrSummary = window._cdsQtrSummaryHtml ? window._cdsQtrSummaryHtml(_qtrGmvSum, _qtrCommSum) : '';
+  body.innerHTML = (window._cdsQtrEducationHtml ? window._cdsQtrEducationHtml() : '') + _qtrSummary + html; // v_qtrux/v_qsum
 
+  // v_qsum: same order-independent multi-sibling toggle as p1 (see comment
+  // there) — one click opens both the quarter calendar and the formula box.
   body.querySelectorAll('.cds-sub-row.p3-cols').forEach(function(row) {
     row.style.cursor = 'pointer';
     row.addEventListener('click', function() {
-      var proof = row.nextElementSibling;
-      if (proof && proof.classList.contains('cds-proof')) proof.classList.toggle('open');
+      var el = row.nextElementSibling;
+      while (el && !el.classList.contains('cds-sub-row') && !el.classList.contains('cds-chip-row')) {
+        if (el.classList.contains('cds-proof') || el.classList.contains('cds-qtr-cal')) el.classList.toggle('open');
+        el = el.nextElementSibling;
+      }
     });
   });
 

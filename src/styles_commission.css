@@ -1703,6 +1703,12 @@ flex-wrap:wrap;}
 /* proof card — inline expansion on tap */
 .cds-proof{display:none;background:rgba(255,255,255,.03);border-top:1px solid rgba(255,255,255,.06);padding:10px 16px 10px 24px;}
 .cds-proof.open{display:block;}
+/* v_qsum: quarter calendar — same display:none/block backstop as .cds-proof
+   above (the max-height transition pair further down is a progressive
+   enhancement on TOP of this; display is what actually guarantees the
+   content shows/hides regardless of whether the transition engages). */
+.cds-qtr-cal{display:none;}
+.cds-qtr-cal.open{display:block;}
 .cds-proof-row{display:flex;align-items:baseline;justify-content:space-between;padding:3px 0;font-size:var(--text-xs);}
 .cds-proof-label{color:rgba(var(--ink-blue),.55);font-weight:var(--fw-semi);}
 .cds-proof-result{font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.82);}
@@ -1854,6 +1860,10 @@ flex-wrap:wrap;}
 /* proof card: smooth height */
 .cds-proof{max-height:0;overflow:hidden;transition:max-height .20s cubic-bezier(.34,1.1,.64,1);}
 .cds-proof.open{max-height:200px;}
+/* v_qsum: quarter calendar — same smooth max-height pattern as .cds-proof,
+   toggled together with it by the sub-row click handler in _cdsRender_p1/p3 */
+.cds-qtr-cal{max-height:0;overflow:hidden;transition:max-height .22s cubic-bezier(.34,1.1,.64,1);}
+.cds-qtr-cal.open{max-height:160px;}
 
 /* ── CDS Commission Gold Token ──────────────────────────────────────────────
    Sheet identity: gold border + ambient glow — signals "this is your money"

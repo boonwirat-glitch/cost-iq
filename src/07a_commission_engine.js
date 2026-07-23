@@ -516,21 +516,30 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
 
     // Qualified commission for one month's raw row, per the SAME gates the
     // engine applies — 0 when the month doesn't qualify (stopped / below gate).
+    // v_gmv: also returns the GMV that the rate was applied to (raw totalGmv
+    // for P1, incremental-over-baseline for P3) — the "cause" half of the
+    // "GMV × rate = ค่าคอมฯ" formula shown alongside every month cell.
+    // `has` distinguishes true zero (no purchase at all that month — the
+    // group hadn't started yet) from a real-but-below-gate purchase (bought
+    // something, just not enough to qualify) — the render layer uses this to
+    // pick "ยังไม่ขาย" vs "ไม่ถึงเกณฑ์" for the same 'none' state.
     function monthComm(lbl) {
       const row = monthData[lbl];
-      if (!row) return { comm: 0, has: false };
+      if (!row) return { comm: 0, has: false, gmv: 0 };
       if (kind === 'p1') {
         const g = row.totalGmv || 0;
-        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0 };
+        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0, gmv: g };
       }
       const ex = row.existingGmv || 0;
       const base = Number(group.max_baseline) || 0; // frozen all quarter
-      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0 };
-      const incr = ex - base;
-      return { comm: incr >= p3MinIncr ? incr * rate : 0, has: ex > 0 };
+      const incrRaw = ex - base;
+      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0, gmv: Math.max(0, incrRaw) };
+      return { comm: incrRaw >= p3MinIncr ? incrRaw * rate : 0, has: ex > 0, gmv: incrRaw };
     }
 
-    // Current-month full-month projection (run-rate) for the future cells.
+    // Current-month full-month projection (run-rate) for the future cells —
+    // GMV projected the same way as commission (same rate, so they stay
+    // internally consistent: projectedGmvFull * rate ≈ projectedFull).
     let daysElapsed = new Date().getDate();
     try {
       const sample = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
@@ -538,23 +547,32 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
     } catch (e) {}
     const daysInCurr = _commDaysInLabel(currLabel);
     const mtdComm = Number(group.commission) || 0;
+    const mtdGmv = kind === 'p1' ? (Number(group.total_gmv) || 0) : (Number(group.incremental) || 0);
     const projectionReady = daysElapsed >= 5; // run-rate too noisy before day 5
     const projectedFull = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+    const projectedGmvFull = daysElapsed > 0 ? mtdGmv / daysElapsed * daysInCurr : mtdGmv;
 
     const months = qLabels.map((lbl, i) => {
       if (i < currIdx) {
         const m = monthComm(lbl);
         // 'none' = ยังไม่เกิด (group ยังไม่ qualify เดือนนั้น) → แสดง "—"
-        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, estimated: true };
+        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
       }
-      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, estimated: false };
-      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, estimated: true };
+      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
+      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
     });
 
     const paidSum = months.filter(m => m.state === 'paid').reduce((s, m) => s + m.comm, 0);
     const futureSum = months.filter(m => m.state === 'future' && m.comm != null).reduce((s, m) => s + m.comm, 0);
     const isLastMonth = currIdx === qLabels.length - 1;
     const quarterTotal = paidSum + (isLastMonth ? mtdComm : (projectionReady ? projectedFull : mtdComm)) + futureSum;
+
+    // v_qsum: GMV mirror of quarterTotal — same fold, different field — so a
+    // "GMV upsell ทั้งไตรมาส" summary can sit next to "ค่าคอมฯ ทั้งไตรมาส"
+    // without re-deriving the quarter math a second way.
+    const paidGmvSum = months.filter(m => m.state === 'paid').reduce((s, m) => s + (m.gmv || 0), 0);
+    const futureGmvSum = months.filter(m => m.state === 'future' && m.gmv != null).reduce((s, m) => s + m.gmv, 0);
+    const quarterTotalGmv = paidGmvSum + (isLastMonth ? mtdGmv : (projectionReady ? projectedGmvFull : mtdGmv)) + futureGmvSum;
 
     const anyPriorPaid = months.some((m, i) => i < currIdx && m.state === 'paid');
     const lastPaid = [...months].reverse().find((m, ri) => months.length - 1 - ri < currIdx && m.state === 'paid');
@@ -563,7 +581,7 @@ function _upsellQuarterTimeline(kamEmail, group, kind, baseMonthOverride) {
       status = 'kept';
       if (projectionReady && lastPaid && projectedFull > lastPaid.comm * 1.1) status = 'growing';
     }
-    return { months, status, quarterTotal, isLastMonth, projectionReady };
+    return { months, status, quarterTotal, quarterTotalGmv, isLastMonth, projectionReady };
   } catch (e) {
     console.warn('[CommEngine] _upsellQuarterTimeline error', e);
     return null;

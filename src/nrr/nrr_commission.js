@@ -756,49 +756,59 @@ function nrrUpsellQuarterTimeline(bundle, group, kind, baseMonthIso) {
     var p3MinIncr = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
     var rate = Number(group.applied_rate) || 0;
 
+    // v_gmv: also returns the GMV the rate was applied to (twin of the
+    // Sense-side comment in 07a_commission_engine.js's monthComm) — `has`
+    // distinguishes true zero (group hadn't started yet) from a real but
+    // below-gate purchase, so the render layer can pick "ยังไม่ขาย" vs
+    // "ไม่ถึงเกณฑ์" for the same 'none' state.
     function monthComm(lbl) {
       var row = monthData[lbl];
-      if (!row) return { comm: 0, has: false };
+      if (!row) return { comm: 0, has: false, gmv: 0 };
       if (kind === 'p1') {
         var g = row.totalGmv || 0;
-        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0 };
+        return { comm: g >= p1MinGmv ? g * rate : 0, has: g > 0, gmv: g };
       }
       var ex = row.existingGmv || 0;
       var base = Number(group.max_baseline) || 0;
-      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0 };
-      var incr = ex - base;
-      return { comm: incr >= p3MinIncr ? incr * rate : 0, has: ex > 0 };
+      var incrRaw = ex - base;
+      if (ex <= base * p3Thresh) return { comm: 0, has: ex > 0, gmv: Math.max(0, incrRaw) };
+      return { comm: incrRaw >= p3MinIncr ? incrRaw * rate : 0, has: ex > 0, gmv: incrRaw };
     }
 
     var daysElapsed = new Date().getDate();
     var daysInCurr = nrrDaysInLabel(currLabel);
     var mtdComm = Number(group.commission) || 0;
+    var mtdGmv = kind === 'p1' ? (Number(group.total_gmv) || 0) : (Number(group.incremental) || 0);
     var projectionReady = daysElapsed >= 5;
     var projectedFull = daysElapsed > 0 ? mtdComm / daysElapsed * daysInCurr : mtdComm;
+    var projectedGmvFull = daysElapsed > 0 ? mtdGmv / daysElapsed * daysInCurr : mtdGmv;
 
     var months = qLabels.map(function (lbl, i) {
       if (i < currIdx) {
         var m = monthComm(lbl);
-        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, estimated: true };
+        return { label: lbl, state: m.comm > 0 ? 'paid' : 'none', comm: m.comm, gmv: m.gmv, hasGmv: m.has, estimated: true };
       }
-      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, estimated: false };
-      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, estimated: true };
+      if (i === currIdx) return { label: lbl, state: 'mtd', comm: mtdComm, gmv: mtdGmv, estimated: false };
+      return { label: lbl, state: 'future', comm: projectionReady ? projectedFull : null, gmv: projectionReady ? projectedGmvFull : null, estimated: true };
     });
 
-    var paidSum = 0, futureSum = 0, anyPriorPaid = false, lastPaid = null;
+    var paidSum = 0, futureSum = 0, paidGmvSum = 0, futureGmvSum = 0, anyPriorPaid = false, lastPaid = null;
     months.forEach(function (m, i) {
-      if (m.state === 'paid') { paidSum += m.comm; if (i < currIdx) { anyPriorPaid = true; lastPaid = m; } }
+      if (m.state === 'paid') { paidSum += m.comm; paidGmvSum += (m.gmv || 0); if (i < currIdx) { anyPriorPaid = true; lastPaid = m; } }
       if (m.state === 'future' && m.comm != null) futureSum += m.comm;
+      if (m.state === 'future' && m.gmv != null) futureGmvSum += m.gmv;
     });
     var isLastMonth = currIdx === qLabels.length - 1;
     var quarterTotal = paidSum + (isLastMonth ? mtdComm : (projectionReady ? projectedFull : mtdComm)) + futureSum;
+    // v_qsum: GMV mirror of quarterTotal — twin of the Sense-side addition.
+    var quarterTotalGmv = paidGmvSum + (isLastMonth ? mtdGmv : (projectionReady ? projectedGmvFull : mtdGmv)) + futureGmvSum;
 
     var status = 'new';
     if (anyPriorPaid) {
       status = 'kept';
       if (projectionReady && lastPaid && projectedFull > lastPaid.comm * 1.1) status = 'growing';
     }
-    return { months: months, status: status, quarterTotal: quarterTotal, isLastMonth: isLastMonth, projectionReady: projectionReady };
+    return { months: months, status: status, quarterTotal: quarterTotal, quarterTotalGmv: quarterTotalGmv, isLastMonth: isLastMonth, projectionReady: projectionReady };
   } catch (e) {
     console.warn('[nrr] nrrUpsellQuarterTimeline error', e);
     return null;
