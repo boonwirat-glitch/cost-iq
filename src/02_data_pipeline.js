@@ -1502,6 +1502,53 @@ const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
 let _dataPillTimers=[];
 
+// v_oneflash2b: commission-strip gate watchdog — TOP-LEVEL, anchored to script
+// eval, NOT inside loadFromCloudflareR2. The first cut put the safety valves
+// inside that function, but PWA warm starts hydrate data from IndexedDB via a
+// separate path and may never call it — the valves never fired and the strip's
+// new readiness gates (handover / upsell_team_groups) skeletoned FOREVER in
+// production the moment sense_upsell_team_groups.csv 404'd on R2. This watchdog
+// runs unconditionally: every 2s it checks both gated sources; once a source is
+// either genuinely loaded or past its deadline (force-released), it stops
+// blocking. Past-deadline = proceed with today's fallback behavior (handover
+// treated as absent / flat-rate upsell), never a permanent skeleton.
+(function(){
+  var _wdStart=null; // starts counting only once data loading has actually begun
+  function _wdPokeStrip(){
+    try{ var s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
+    try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+    try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+  }
+  var _wdIv=setInterval(function(){
+    try{
+      // Don't start the deadline clock while the user is still on the login
+      // screen — anchor it to the first sign that data loading has begun
+      // (explicit loader flag, any tab already ingested via cloud fetch OR
+      // IDB hydration, or a resolved logged-in profile).
+      if(_wdStart===null){
+        var _began=!!window.sheetsLoadStarted||_cloudLoadedTabs.size>0
+          ||!!(window.currentUserProfile&&window.currentUserProfile.email);
+        if(!_began)return;
+        _wdStart=Date.now();
+      }
+      var elapsed=Date.now()-_wdStart;
+      var allClear=true;
+      // handover: 15s deadline (mirrors the QNRR valve's tradeoff)
+      if(!(typeof bulkHandoverData!=='undefined'&&bulkHandoverData&&bulkHandoverData.loaded)){
+        if(elapsed>15000){ try{ bulkHandoverData.loaded=true; _wdPokeStrip(); }catch(e){} }
+        else allClear=false;
+      }
+      // upsell_team_groups: 12s deadline — past it, proceed on the flat-rate
+      // fallback (today's behavior whenever this file is missing)
+      if(!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease){
+        if(elapsed>12000){ window._upsellTeamGroupsForceRelease=true; _wdPokeStrip(); }
+        else allClear=false;
+      }
+      if(allClear)clearInterval(_wdIv);
+    }catch(e){}
+  },2000);
+})();
+
 function _clearDataPillTimers(){return window.FreshketSenseRuntime.data.clearPillTimers();}
 function _clearCloudInFlight(){Object.keys(_cloudInFlight).forEach(k=>delete _cloudInFlight[k]);}
 function _specFetchTimeout(spec){return spec&&spec.heavy?240000:90000;}
@@ -2184,36 +2231,6 @@ async function loadFromCloudflareR2(){
   // handover-readiness gate (buildSources/_cdsBuildSrc) would show skeleton forever
   // for Sales-mode sessions, since the real fetch handler that sets it never runs.
   if(_isSalesMode){ _cloudLoadedTabs.add('handover'); bulkHandoverData.loaded=true; try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
-  // v_oneflash2: safety valve mirroring _fetchQnrrBundle's 15s force-release —
-  // if the handover R2 file genuinely never loads (network error, file missing),
-  // the new commission-strip handover-readiness gate must not shimmer forever.
-  else{
-    setTimeout(function(){
-      if(!bulkHandoverData.loaded){
-        bulkHandoverData.loaded=true;
-        try{ var _s=document.getElementById('pv-commission-strip'); if(_s)_s._lastCommHtml=''; }catch(e){}
-        try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-      }
-    }, 15000);
-  }
-  // v_oneflash2: safety valve for the team-fast-path gate (buildSources/
-  // _cdsBuildSrc) — live-verified that sense_upsell_team_groups.csv currently
-  // 404s on R2 (feature file not uploaded yet for this environment/rollout
-  // stage). Without a release, requiring it would permanently skeleton the
-  // strip for any KAM who lands on the team-summary fast path (detailed bundle
-  // unavailable). 10s is ample margin past the FOREGROUND loop's own
-  // fetch+1-retry-after-2s sequence — after that, proceed with the existing
-  // flat-rate fallback (today's behavior when this file is missing), same
-  // "give up and render, don't hang forever" tradeoff as the QNRR/handover valves.
-  setTimeout(function(){
-    if(typeof _cloudLoadedTabs!=='undefined' && !_cloudLoadedTabs.has('upsell_team_groups')){
-      window._upsellTeamGroupsForceRelease=true;
-      try{ var _s2=document.getElementById('pv-commission-strip'); if(_s2)_s2._lastCommHtml=''; }catch(e){}
-      try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-    }
-  }, 10000);
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
