@@ -2205,16 +2205,11 @@ async function loadFromCloudflareR2(){
     if(btn){btn.disabled=false;btn.textContent='Refresh data';}
     if(fgOk>0){
       showToast('พร้อมใช้งาน — ข้อมูลหลัก '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
-      // QC-06: if upsell file failed, release commission strip from loading state after 15s
-      setTimeout(function(){
-        try{
-          if(typeof bulkUpsellData!=='undefined' && !bulkUpsellData.loaded){
-            bulkUpsellData.loaded=false; // keep false but allow NRR-only render
-            var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml='';
-            if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip();
-          }
-        }catch(e){}
-      }, 15000);
+      // v_adpm: removed the QC-06 "15s release" timer that lived here — it was a
+      // no-op (it set bulkUpsellData.loaded=false, changing nothing) and its
+      // intent is now genuinely covered by the per-person _upsellBundleReady
+      // barrier + the buildSources/_cdsBuildSrc gates in 07b_cds.js, which
+      // release a bundle-less rep to the NRR-only render after 2 failed fetches.
       // Reset scroll to top if portview is active — prevents scroll-anchoring from
       // triggering collapse observer when header grows during data re-render
       if(document.getElementById('scr-portview')?.classList.contains('on')){

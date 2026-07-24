@@ -179,7 +179,15 @@
     if(st&&st.loading){
       return Object.assign({},base,{loading:true});
     }
-    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
+    // v_adpm: the old gate here blocked on the GLOBAL bulkUpsellData.loaded flag,
+    // whose ONLY true-setter is a successful per-KAM sense_upsell_{key}.csv
+    // ingest — for a rep whose bundle doesn't exist on R2 (AD/PM users, or any
+    // future rep the splitter hasn't produced yet) the strip skeletoned FOREVER.
+    // The per-person _upsellBundleReady barrier below already expresses the real
+    // requirement ("my bundle loaded OR definitively failed") — keep the global
+    // check only as a fallback for the no-email edge where the barrier can't run.
+    if(!(st&&st.email)
+       &&(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded)){
       return Object.assign({},base,{loading:true});
     }
     // v_oneflash: full readiness barrier — the detailed per-KAM bundle must
@@ -1369,7 +1377,10 @@
     var nrr=Number(st.payout||0);
     var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
     if(st.loading){ src.loading=true; }
-    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
+    // v_adpm: global bulkUpsellData.loaded only as a no-email fallback — the
+    // per-person barrier on the next line is the real gate (see buildSources).
+    if(!st.email
+       &&(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded)){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
     // v_onestep: mirror the strip's team-fast-path gate (see buildSources) —
     // _cdsScheduleRefresh already polls this src.loading and repaints exactly

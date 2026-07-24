@@ -6,6 +6,28 @@
 
 ---
 
+## ⚠️ อัปเดตด่วน 2026-07-24 — PM/AD ยังใช้แอปไม่ได้ เพราะข้อมูลบน R2 ยังขาด
+
+ตรวจข้อมูลจริงบน R2 (24 ก.ค.) พบว่า **บางไฟล์ยังเป็นผลรันรอบเก่าก่อนเพิ่ม PM/AD**
+และ SQL upsell 2 ไฟล์ยังไม่มี 4 คนนี้ใน roster เลย (แก้แล้วในแพ็กนี้) ต้องรัน+อัปโหลด
+ใหม่ **3 ไฟล์นี้เป็นอย่างน้อย**:
+
+1. **`Q9B_bulk_history.sql` → `bulk_history.csv`** — สำคัญสุด: ตอนนี้ account ของ
+   PM/AD ทั้ง 4 คนมี 0 แถวในไฟล์บน R2 (ของ KAM มีครบ) ทำให้ PM/AD เปิดหน้า
+   account ไม่ได้ / pace bar ไม่ขึ้น / การ์ดร้านค้างที่ "รอข้อมูล"
+   (ตัว SQL ถูกอยู่แล้ว แค่รันใหม่+อัปโหลดทับ)
+2. **`q3c_upsell_team_summary_v4.sql` → `sense_upsell_team.csv`** — แก้ SQL แล้ว
+   (24 ก.ค.): เพิ่ม PM/AD 4 คน + เปลี่ยน filter `commercial_owner='KAM'` เป็น
+   `= expected_owner` ตามแพทเทิร์น Q8E — รันเวอร์ชันใหม่นี้แล้วอัปโหลดทับ
+3. **`q3c_upsell_bulk_all_kams_v4.sql` → splitter.py → `sense_upsell_{email}.csv`**
+   — แก้ SQL แล้วเหมือนข้อ 2; รอบนี้ splitter จะได้ไฟล์ของ 4 คนใหม่เพิ่ม
+   (panitan_p, sarawoot_k, nichamon_k, ornpreya_s) — อัปโหลดทุกไฟล์
+
+แนะนำรันเพิ่ม (batch splitter เดียวกัน เพื่อให้หน้า account ของ PM/AD มีข้อมูล SKU ครบ):
+`Q12B_bulk_sku_outlet.sql`, `SQL1_sense_skus.sql`, `SQL2_sense_alts.sql` + splitter
+
+---
+
 ## Quick reference — 16 ไฟล์ทั้งหมด แบ่งตาม "วิธีรัน"
 
 รายละเอียดเต็มของแต่ละไฟล์อยู่ในกลุ่ม A-D ด้านล่าง อันนี้คือสรุปเร็วๆ ว่าไฟล์ไหนต้องทำ

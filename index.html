@@ -1,4 +1,4 @@
-<!-- Freshket Sense v923: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v924: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v923',
+      version: 'v924',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -17099,16 +17099,11 @@ async function loadFromCloudflareR2(){
     if(btn){btn.disabled=false;btn.textContent='Refresh data';}
     if(fgOk>0){
       showToast('พร้อมใช้งาน — ข้อมูลหลัก '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
-      // QC-06: if upsell file failed, release commission strip from loading state after 15s
-      setTimeout(function(){
-        try{
-          if(typeof bulkUpsellData!=='undefined' && !bulkUpsellData.loaded){
-            bulkUpsellData.loaded=false; // keep false but allow NRR-only render
-            var _s=document.getElementById('pv-commission-strip'); if(_s) _s._lastCommHtml='';
-            if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip();
-          }
-        }catch(e){}
-      }, 15000);
+      // v_adpm: removed the QC-06 "15s release" timer that lived here — it was a
+      // no-op (it set bulkUpsellData.loaded=false, changing nothing) and its
+      // intent is now genuinely covered by the per-person _upsellBundleReady
+      // barrier + the buildSources/_cdsBuildSrc gates in 07b_cds.js, which
+      // release a bundle-less rep to the NRR-only render after 2 failed fetches.
       // Reset scroll to top if portview is active — prevents scroll-anchoring from
       // triggering collapse observer when header grows during data re-render
       if(document.getElementById('scr-portview')?.classList.contains('on')){
@@ -44093,7 +44088,15 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(st&&st.loading){
       return Object.assign({},base,{loading:true});
     }
-    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){
+    // v_adpm: the old gate here blocked on the GLOBAL bulkUpsellData.loaded flag,
+    // whose ONLY true-setter is a successful per-KAM sense_upsell_{key}.csv
+    // ingest — for a rep whose bundle doesn't exist on R2 (AD/PM users, or any
+    // future rep the splitter hasn't produced yet) the strip skeletoned FOREVER.
+    // The per-person _upsellBundleReady barrier below already expresses the real
+    // requirement ("my bundle loaded OR definitively failed") — keep the global
+    // check only as a fallback for the no-email edge where the barrier can't run.
+    if(!(st&&st.email)
+       &&(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded)){
       return Object.assign({},base,{loading:true});
     }
     // v_oneflash: full readiness barrier — the detailed per-KAM bundle must
@@ -45283,7 +45286,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     var nrr=Number(st.payout||0);
     var src={loading:false,nrr:nrr,upsell_sku:0,upsell_outlet:0,handover:0,gate_cap:1,gate_active:false,final:nrr};
     if(st.loading){ src.loading=true; }
-    if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
+    // v_adpm: global bulkUpsellData.loaded only as a no-email fallback — the
+    // per-person barrier on the next line is the real gate (see buildSources).
+    if(!st.email
+       &&(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded)){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
     // v_onestep: mirror the strip's team-fast-path gate (see buildSources) —
     // _cdsScheduleRefresh already polls this src.loading and repaints exactly
