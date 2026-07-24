@@ -367,10 +367,10 @@
     }),
     data: Object.freeze({
       r2Base: R2_BASE,
-      foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover','upsell_team','current_movements']),  // v261: add current_movements
+      foregroundKeys: Object.freeze(['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements']),  // v261: add current_movements; v_oneflash2c: add upsell_team_groups (was missing → R2_SPECS['upsell_team_groups'] undefined, file could never load — same bug class as v230's upsell_team)
       // v212: critical correctness waits for portview + history + handover so movement/NRR cohorts never render with stale split data.
       criticalKeys: Object.freeze(['portview','history','handover']),
-      enhancementKeys: Object.freeze(['categories','sku_current','outlets','upsell_team','current_movements']),  // v264: add upsell_team+current_movements
+      enhancementKeys: Object.freeze(['categories','sku_current','outlets','upsell_team','upsell_team_groups','current_movements']),  // v264: add upsell_team+current_movements; v_oneflash2c: add upsell_team_groups
       backgroundKeys: Object.freeze([]),  // v207b: no global bulk SKU auto-load; Sense uses per-KAM bundle on demand
       r2Files: Object.freeze({
         portview: 'portview.csv',
@@ -383,6 +383,7 @@
         price: 'bulk_price.csv',
         handover: 'portview_handover.csv',
         upsell_team: 'sense_upsell_team.csv',
+        upsell_team_groups: 'sense_upsell_team_groups.csv',  // v_oneflash2c: was missing → _getR2File fell back to the wrong bare 'upsell_team_groups.csv' filename, which 404'd regardless of the real file's presence on R2
         current_movements: 'portview_current_movements.csv'  // v260: movement classification
       }),
       r2Specs: Object.freeze({
@@ -396,6 +397,7 @@
         price: Object.freeze({type:'bulk-price',tab:'price',cache:false,heavy:false}),
         handover: Object.freeze({type:'bulk-handover',tab:'handover',cache:true}), // v224d: cache:true so IDB fast path works
         upsell_team: Object.freeze({type:'bulk-upsell-team',tab:'upsell_team',cache:true}), // v230: was missing from config → R2_SPECS['upsell_team'] was undefined
+        upsell_team_groups: Object.freeze({type:'bulk-upsell-team-groups',tab:'upsell_team_groups',cache:true}), // v_oneflash2c: same bug as v230 above — was missing from config → R2_SPECS['upsell_team_groups'] undefined → _fetchCloudflareFile no-op'd instantly, so the file could never load no matter how long the commission strip waited
         current_movements: Object.freeze({type:'bulk-current-movements',tab:'current_movements',cache:true}) // v260: transfer_in classification
       })
     }),
