@@ -737,7 +737,11 @@ function setAiProvider(p){
     const criticalLoaded = opts.criticalLoaded || 0;
     const specs = getSpecs();
     const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
-    if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
+    // v_onestep: phase-settled flag — the commission strip's team-fast-path
+    // gate (07b_cds.js buildSources/_cdsBuildSrc) holds skeleton until the
+    // enhancement phase CONCLUDES (loaded or definitively failed). Set at
+    // every exit of this phase — never via timers/watchdogs (v919-921 lesson).
+    if(!keys.length){ window._enhancementSettled = true; startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
     record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
     baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
     let done = 0;
@@ -752,6 +756,7 @@ function setAiProvider(p){
     })).then(function(results){
       try{ if(token !== _cloudLoadToken) return results; }catch(e){}
       const okCount = results.filter(Boolean).length;
+      window._enhancementSettled = true; // v_onestep: individual fetch failures resolve false (never reject), so this line always runs — the gate can never hang on a missing file
       orchStatus.foregroundLoaded = criticalLoaded + okCount;
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
@@ -761,6 +766,7 @@ function setAiProvider(p){
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded + okCount, total:ALL.length });
       return results;
     }).catch(function(err){
+      window._enhancementSettled = true; // v_onestep: phase concluded even on unexpected error
       recordError('startCloudEnhancementLoad',err);
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length });
       return [];

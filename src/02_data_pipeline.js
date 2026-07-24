@@ -1851,6 +1851,15 @@ const _upsellBundleInFlight={};
 // strip's readiness barrier treats failed as "ready" so it renders once with
 // the coarse team-CSV numbers instead of holding the skeleton forever.
 const _upsellBundleFailed=new Set();
+// v_onestep: a SINGLE failed attempt used to mark "failed" immediately — a
+// transient network blip right after login made the barrier report ready, the
+// strip rendered the coarse team number, then a later render's refetch
+// succeeded and the number stepped. Require 2 consecutive failures before
+// marking failed; attempts are naturally spaced by the pre-existing
+// render→finally(100ms poke)→render cycle, so a blip resolves inside the
+// skeleton and a truly-missing file still releases in well under a second.
+// No timers, no retry delays (v919-921 lesson).
+const _upsellBundleFailCount={};
 // Readiness barrier for the commission strip: the detailed per-KAM bundle
 // either loaded or definitively failed — until then, show NO numbers at all
 // (the coarse team-CSV uplift painting first, then "correcting" itself, was
@@ -1874,12 +1883,16 @@ async function _fetchUpsellBundle(kamEmail){
       window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
       ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       window._upsellIngestEmail = '';
-      if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
-      else { _upsellBundleFailed.add(safeKey); }
+      if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); delete _upsellBundleFailCount[safeKey]; }
+      else {
+        _upsellBundleFailCount[safeKey]=(_upsellBundleFailCount[safeKey]||0)+1;
+        if(_upsellBundleFailCount[safeKey]>=2) _upsellBundleFailed.add(safeKey); // v_onestep
+      }
       return ok;
     }catch(e){
       console.warn('[upsell bundle] error',kamEmail,e&&e.message);
-      _upsellBundleFailed.add(safeKey);
+      _upsellBundleFailCount[safeKey]=(_upsellBundleFailCount[safeKey]||0)+1;
+      if(_upsellBundleFailCount[safeKey]>=2) _upsellBundleFailed.add(safeKey); // v_onestep
       return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
@@ -2186,6 +2199,9 @@ async function loadFromCloudflareR2(){
     }));
     if(token!==_cloudLoadToken)return;
     const fgOk=fgResults.filter(Boolean).length;
+    // v_onestep: fallback-loader twin of 04_sku_matcher's enhancement-settled
+    // flag (both team files are FOREGROUND here) — see the gate in 07b_cds.js.
+    window._enhancementSettled = true;
     if(btn){btn.disabled=false;btn.textContent='Refresh data';}
     if(fgOk>0){
       showToast('พร้อมใช้งาน — ข้อมูลหลัก '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');

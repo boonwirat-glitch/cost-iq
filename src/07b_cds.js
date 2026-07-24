@@ -194,6 +194,24 @@
        &&!window._upsellBundleReady(st.email)){
       return Object.assign({},base,{loading:true});
     }
+    // v_onestep: team-summary fast-path inputs (upsell_team / upsell_team_groups)
+    // previously had no readiness gate — when the detailed per-KAM bundle is
+    // unavailable, the fast path rendered a flat-rate number first, then stepped
+    // once to the per-category number when team_groups landed. Hold the (byte-
+    // identical, value-guard-deduped) skeleton until BOTH tabs are loaded OR the
+    // enhancement phase has settled (_enhancementSettled is set at every exit of
+    // startCloudEnhancementLoad in 04_sku_matcher.js and of the 02 fallback
+    // loader — individual fetch failures resolve false, never reject, so this
+    // can never hang; a missing file just falls back to flat-rate, once).
+    // Repaint after release rides the EXISTING RenderBus flow: the enhancement
+    // signal → refreshAll → _commGatedRender's 'กำลังโหลด' skeleton-peek retry.
+    // NO pokes, NO timers (v919-921 lesson).
+    if(!window._enhancementSettled &&
+       !(typeof _cloudLoadedTabs!=='undefined'
+         && _cloudLoadedTabs.has('upsell_team')
+         && _cloudLoadedTabs.has('upsell_team_groups'))){
+      return Object.assign({},base,{loading:true});
+    }
     try{
       var email=st&&st.email;
       var p=email&&typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
@@ -1353,6 +1371,13 @@
     if(st.loading){ src.loading=true; }
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
+    // v_onestep: mirror the strip's team-fast-path gate (see buildSources) —
+    // _cdsScheduleRefresh already polls this src.loading and repaints exactly
+    // once when final, so the sheet extends automatically.
+    if(!window._enhancementSettled &&
+       !(typeof _cloudLoadedTabs!=='undefined'
+         && _cloudLoadedTabs.has('upsell_team')
+         && _cloudLoadedTabs.has('upsell_team_groups'))){ src.loading=true; }
     if(src.loading){
       if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
       return src;

@@ -1,4 +1,4 @@
-<!-- Freshket Sense v922: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v923: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v922',
+      version: 'v923',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -16745,6 +16745,15 @@ const _upsellBundleInFlight={};
 // strip's readiness barrier treats failed as "ready" so it renders once with
 // the coarse team-CSV numbers instead of holding the skeleton forever.
 const _upsellBundleFailed=new Set();
+// v_onestep: a SINGLE failed attempt used to mark "failed" immediately — a
+// transient network blip right after login made the barrier report ready, the
+// strip rendered the coarse team number, then a later render's refetch
+// succeeded and the number stepped. Require 2 consecutive failures before
+// marking failed; attempts are naturally spaced by the pre-existing
+// render→finally(100ms poke)→render cycle, so a blip resolves inside the
+// skeleton and a truly-missing file still releases in well under a second.
+// No timers, no retry delays (v919-921 lesson).
+const _upsellBundleFailCount={};
 // Readiness barrier for the commission strip: the detailed per-KAM bundle
 // either loaded or definitively failed — until then, show NO numbers at all
 // (the coarse team-CSV uplift painting first, then "correcting" itself, was
@@ -16768,12 +16777,16 @@ async function _fetchUpsellBundle(kamEmail){
       window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
       ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
       window._upsellIngestEmail = '';
-      if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
-      else { _upsellBundleFailed.add(safeKey); }
+      if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); delete _upsellBundleFailCount[safeKey]; }
+      else {
+        _upsellBundleFailCount[safeKey]=(_upsellBundleFailCount[safeKey]||0)+1;
+        if(_upsellBundleFailCount[safeKey]>=2) _upsellBundleFailed.add(safeKey); // v_onestep
+      }
       return ok;
     }catch(e){
       console.warn('[upsell bundle] error',kamEmail,e&&e.message);
-      _upsellBundleFailed.add(safeKey);
+      _upsellBundleFailCount[safeKey]=(_upsellBundleFailCount[safeKey]||0)+1;
+      if(_upsellBundleFailCount[safeKey]>=2) _upsellBundleFailed.add(safeKey); // v_onestep
       return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
@@ -17080,6 +17093,9 @@ async function loadFromCloudflareR2(){
     }));
     if(token!==_cloudLoadToken)return;
     const fgOk=fgResults.filter(Boolean).length;
+    // v_onestep: fallback-loader twin of 04_sku_matcher's enhancement-settled
+    // flag (both team files are FOREGROUND here) — see the gate in 07b_cds.js.
+    window._enhancementSettled = true;
     if(btn){btn.disabled=false;btn.textContent='Refresh data';}
     if(fgOk>0){
       showToast('พร้อมใช้งาน — ข้อมูลหลัก '+fgOk+'/'+FOREGROUND.length+' ไฟล์','✓');
@@ -22395,7 +22411,11 @@ function setAiProvider(p){
     const criticalLoaded = opts.criticalLoaded || 0;
     const specs = getSpecs();
     const keys = ENHANCEMENT.filter(function(k){ return specs[k]; });
-    if(!keys.length){ startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
+    // v_onestep: phase-settled flag — the commission strip's team-fast-path
+    // gate (07b_cds.js buildSources/_cdsBuildSrc) holds skeleton until the
+    // enhancement phase CONCLUDES (loaded or definitively failed). Set at
+    // every exit of this phase — never via timers/watchdogs (v919-921 lesson).
+    if(!keys.length){ window._enhancementSettled = true; startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length }); return Promise.resolve([]); }
     record('startCloudEnhancementLoad', 'start', { token, keys:keys.slice(), criticalLoaded });
     baseData.setDataPillText('เติมรายละเอียด','0/' + keys.length);
     let done = 0;
@@ -22410,6 +22430,7 @@ function setAiProvider(p){
     })).then(function(results){
       try{ if(token !== _cloudLoadToken) return results; }catch(e){}
       const okCount = results.filter(Boolean).length;
+      window._enhancementSettled = true; // v_onestep: individual fetch failures resolve false (never reject), so this line always runs — the gate can never hang on a missing file
       orchStatus.foregroundLoaded = criticalLoaded + okCount;
       try{ if(typeof updateDataStatus === 'function') updateDataStatus(); }catch(e){}
       try{ if(typeof updateMatcherPreStatus === 'function') updateMatcherPreStatus(); }catch(e){}
@@ -22419,6 +22440,7 @@ function setAiProvider(p){
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded + okCount, total:ALL.length });
       return results;
     }).catch(function(err){
+      window._enhancementSettled = true; // v_onestep: phase concluded even on unexpected error
       recordError('startCloudEnhancementLoad',err);
       startCloudBackgroundLoad({ token, fgLoaded:criticalLoaded, total:ALL.length });
       return [];
@@ -44086,6 +44108,24 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
        &&!window._upsellBundleReady(st.email)){
       return Object.assign({},base,{loading:true});
     }
+    // v_onestep: team-summary fast-path inputs (upsell_team / upsell_team_groups)
+    // previously had no readiness gate — when the detailed per-KAM bundle is
+    // unavailable, the fast path rendered a flat-rate number first, then stepped
+    // once to the per-category number when team_groups landed. Hold the (byte-
+    // identical, value-guard-deduped) skeleton until BOTH tabs are loaded OR the
+    // enhancement phase has settled (_enhancementSettled is set at every exit of
+    // startCloudEnhancementLoad in 04_sku_matcher.js and of the 02 fallback
+    // loader — individual fetch failures resolve false, never reject, so this
+    // can never hang; a missing file just falls back to flat-rate, once).
+    // Repaint after release rides the EXISTING RenderBus flow: the enhancement
+    // signal → refreshAll → _commGatedRender's 'กำลังโหลด' skeleton-peek retry.
+    // NO pokes, NO timers (v919-921 lesson).
+    if(!window._enhancementSettled &&
+       !(typeof _cloudLoadedTabs!=='undefined'
+         && _cloudLoadedTabs.has('upsell_team')
+         && _cloudLoadedTabs.has('upsell_team_groups'))){
+      return Object.assign({},base,{loading:true});
+    }
     try{
       var email=st&&st.email;
       var p=email&&typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
@@ -45245,6 +45285,13 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(st.loading){ src.loading=true; }
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
+    // v_onestep: mirror the strip's team-fast-path gate (see buildSources) —
+    // _cdsScheduleRefresh already polls this src.loading and repaints exactly
+    // once when final, so the sheet extends automatically.
+    if(!window._enhancementSettled &&
+       !(typeof _cloudLoadedTabs!=='undefined'
+         && _cloudLoadedTabs.has('upsell_team')
+         && _cloudLoadedTabs.has('upsell_team_groups'))){ src.loading=true; }
     if(src.loading){
       if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
       return src;
