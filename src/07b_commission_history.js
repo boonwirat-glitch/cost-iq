@@ -399,7 +399,7 @@ window.closeCommissionHistory = closeCommissionHistory;
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
       if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
     });
-    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byOutletId:byOutletId,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION};
+    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byOutletId:byOutletId,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION,loaded:true};
   }
   function schedulePortviewRefresh(){
     try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
@@ -430,6 +430,15 @@ window.closeCommissionHistory = closeCommissionHistory;
             try{console.log('[Freshket Sense '+VERSION+'] handover contains Ploynitcha transfer-in rows');}catch(e){}
           }
           schedulePortviewRefresh(); done();
+          // v_oneflash2: this override is the REAL live path for 'bulk-handover'
+          // ingestion (window.handleFileUpload is monkey-patched above to intercept
+          // it before the original 02_data_pipeline.js handler ever runs) — the
+          // commission-strip handover-readiness gate needs its own repaint hook
+          // here, same as the other bundle handlers, or it never learns handover
+          // actually arrived.
+          try{ var _hs=document.getElementById('pv-commission-strip'); if(_hs)_hs._lastCommHtml=''; }catch(e){}
+          try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+          try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
         }catch(err){console.warn('[Freshket Sense '+VERSION+'] handover parse failed',err); done();}
       };
       reader.readAsText(file);

@@ -820,7 +820,7 @@ function _commQnrrDrillResult(email, scope) {
         const aid = r.account_id || r.account_name;
         if (!byAcct[aid]) byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [], prevTotal: 0, currTotal: 0 };
         const prev = Math.round(r.base_gmv || 0), curr = Math.round(r.curr_gmv || 0);
-        byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name, prevGmv: prev, currGmv: curr,
+        byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.res_name || r.outlet_id, prevGmv: prev, currGmv: curr,
           delta: prev > 0 ? Math.round((curr - prev) / prev * 100) : null });
         byAcct[aid].prevTotal += prev; byAcct[aid].currTotal += curr;
       });
@@ -2954,7 +2954,7 @@ function _commBuildSnapshotRows(periodOverride) {
             _rows.filter(r => r.movement_type === 'core_nrr').forEach(r => {
               const aid = r.account_id || r.account_name;
               if (!_byAcct[aid]) _byAcct[aid] = { acctId: aid, acctName: r.account_name, outlets: [] };
-              _byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.account_name,
+              _byAcct[aid].outlets.push({ outletId: r.outlet_id, outletName: r.res_name || r.outlet_id,
                 prevGmv: Math.round(r.base_gmv||0), currGmv: Math.round(r.curr_gmv||0) });
             });
             return Object.values(_byAcct);
@@ -2966,7 +2966,7 @@ function _commBuildSnapshotRows(periodOverride) {
             const _qr = window._qnrrComputeForCommission(g.kamEmail, 'kam');
             const _rows = (_qr && _qr.by_month && _qr.by_month[_qr.currentPeriod] && _qr.by_month[_qr.currentPeriod].rows) || [];
             return _rows.filter(r => r.movement_type === 'expansion')
-              .map(r => ({ outletId: r.outlet_id, outletName: r.account_name, gmv: Math.round(r.curr_gmv||0) }));
+              .map(r => ({ outletId: r.outlet_id, outletName: r.res_name || r.outlet_id, gmv: Math.round(r.curr_gmv||0) }));
           }
           const _r=_tgtComputeKamNRR(g.kamEmail,null,periodOverride); const _ex=[]; const _add=d=>{(d&&d.expansionDetail||[]).forEach(a=>{(a.outlets||[]).forEach(o=>{_ex.push({outletId:o.outletId,outletName:o.outletName,gmv:Math.round(o.currGmv||0)});})})}; if(_r){_add(_r);_add(_r.transferIn);_add(_r.newFromSales);} return _ex;
         } catch(e){return []} })(),

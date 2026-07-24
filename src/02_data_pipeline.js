@@ -948,6 +948,12 @@ function handleFileUpload(type,input){
     };reader.readAsText(file);return;
   }
   // ── bulk-handover (Q10: portview_handover.csv) ──
+  // v_oneflash2: dead branch in practice — 07b_commission_history.js monkey-patches
+  // window.handleFileUpload and intercepts type==='bulk-handover' before this ever
+  // runs (it never calls oldHandle for this type). The REAL ingest + loaded flag +
+  // repaint hook live in that file's handleFileUpload override (~line 417). Left
+  // here (harmless, correct if ever reached) rather than deleted, since deleting it
+  // isn't this fix's scope — but don't trust this branch as the live path.
   if(type==='bulk-handover'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -978,11 +984,18 @@ function handleFileUpload(type,input){
           byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
         }
       });
-      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
+      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName,loaded:true};
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
+      // v_oneflash2: handover previously had no readiness flag AND no repaint
+      // hook here — a confident payout:0 could render before this arrived,
+      // and nothing told the strip to re-check once it did. Mirror the other
+      // 4 bundle handlers' completion hook.
+      try{ var _hs=document.getElementById('pv-commission-strip'); if(_hs)_hs._lastCommHtml=''; }catch(e){}
+      try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
       // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
       // Old 3-file check removed — was causing early splash fade before categories/sku_current/outlets loaded.
       try{
@@ -1864,18 +1877,31 @@ async function _fetchUpsellBundle(kamEmail){
   if(_upsellBundleInFlight[safeKey])return _upsellBundleInFlight[safeKey];
   const p=(async()=>{
     let ok=false;
+    // v_oneflash2: retry a transient miss (common right after login racing
+    // the R2 file) a couple times BEFORE marking _upsellBundleFailed. The
+    // readiness barrier below treats "failed" as "ready", so marking failed
+    // on the very first miss let the strip confidently render the coarse
+    // team-CSV number, then flash to the real one once a LATER render's own
+    // retry happened to succeed. Retrying here first resolves that invisibly
+    // inside the barrier instead of on screen.
+    const RETRY_DELAYS=[600,1500];
     try{
-      const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
-      window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
-      ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
-      window._upsellIngestEmail = '';
+      for(let attempt=0;attempt<=RETRY_DELAYS.length;attempt++){
+        try{
+          const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+          window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
+          ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+          window._upsellIngestEmail = '';
+        }catch(e){
+          console.warn('[upsell bundle] error',kamEmail,e&&e.message);
+          ok=false;
+        }
+        if(ok||attempt===RETRY_DELAYS.length)break;
+        await new Promise(r=>setTimeout(r,RETRY_DELAYS[attempt]));
+      }
       if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
       else { _upsellBundleFailed.add(safeKey); }
       return ok;
-    }catch(e){
-      console.warn('[upsell bundle] error',kamEmail,e&&e.message);
-      _upsellBundleFailed.add(safeKey);
-      return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
       // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
@@ -2154,7 +2180,40 @@ async function loadFromCloudflareR2(){
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
-  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
+  // v_oneflash2: also mark bulkHandoverData.loaded, or the new commission-strip
+  // handover-readiness gate (buildSources/_cdsBuildSrc) would show skeleton forever
+  // for Sales-mode sessions, since the real fetch handler that sets it never runs.
+  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); bulkHandoverData.loaded=true; try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
+  // v_oneflash2: safety valve mirroring _fetchQnrrBundle's 15s force-release —
+  // if the handover R2 file genuinely never loads (network error, file missing),
+  // the new commission-strip handover-readiness gate must not shimmer forever.
+  else{
+    setTimeout(function(){
+      if(!bulkHandoverData.loaded){
+        bulkHandoverData.loaded=true;
+        try{ var _s=document.getElementById('pv-commission-strip'); if(_s)_s._lastCommHtml=''; }catch(e){}
+        try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+        try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+      }
+    }, 15000);
+  }
+  // v_oneflash2: safety valve for the team-fast-path gate (buildSources/
+  // _cdsBuildSrc) — live-verified that sense_upsell_team_groups.csv currently
+  // 404s on R2 (feature file not uploaded yet for this environment/rollout
+  // stage). Without a release, requiring it would permanently skeleton the
+  // strip for any KAM who lands on the team-summary fast path (detailed bundle
+  // unavailable). 10s is ample margin past the FOREGROUND loop's own
+  // fetch+1-retry-after-2s sequence — after that, proceed with the existing
+  // flat-rate fallback (today's behavior when this file is missing), same
+  // "give up and render, don't hang forever" tradeoff as the QNRR/handover valves.
+  setTimeout(function(){
+    if(typeof _cloudLoadedTabs!=='undefined' && !_cloudLoadedTabs.has('upsell_team_groups')){
+      window._upsellTeamGroupsForceRelease=true;
+      try{ var _s2=document.getElementById('pv-commission-strip'); if(_s2)_s2._lastCommHtml=''; }catch(e){}
+      try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
+      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
+    }
+  }, 10000);
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
