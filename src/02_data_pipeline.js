@@ -950,10 +950,9 @@ function handleFileUpload(type,input){
   // ── bulk-handover (Q10: portview_handover.csv) ──
   // v_oneflash2: dead branch in practice — 07b_commission_history.js monkey-patches
   // window.handleFileUpload and intercepts type==='bulk-handover' before this ever
-  // runs (it never calls oldHandle for this type). The REAL ingest + loaded flag +
-  // repaint hook live in that file's handleFileUpload override (~line 417). Left
-  // here (harmless, correct if ever reached) rather than deleted, since deleting it
-  // isn't this fix's scope — but don't trust this branch as the live path.
+  // runs (it never calls oldHandle for this type). The REAL ingest lives in that
+  // file's handleFileUpload override (~line 417). Left here (harmless, correct if
+  // ever reached) rather than deleted — but don't trust this branch as the live path.
   if(type==='bulk-handover'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -984,18 +983,11 @@ function handleFileUpload(type,input){
           byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
         }
       });
-      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName,loaded:true};
+      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
-      // v_oneflash2: handover previously had no readiness flag AND no repaint
-      // hook here — a confident payout:0 could render before this arrived,
-      // and nothing told the strip to re-check once it did. Mirror the other
-      // 4 bundle handlers' completion hook.
-      try{ var _hs=document.getElementById('pv-commission-strip'); if(_hs)_hs._lastCommHtml=''; }catch(e){}
-      try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
       // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
       // Old 3-file check removed — was causing early splash fade before categories/sku_current/outlets loaded.
       try{
@@ -1502,53 +1494,6 @@ const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
 let _dataPillTimers=[];
 
-// v_oneflash2b: commission-strip gate watchdog — TOP-LEVEL, anchored to script
-// eval, NOT inside loadFromCloudflareR2. The first cut put the safety valves
-// inside that function, but PWA warm starts hydrate data from IndexedDB via a
-// separate path and may never call it — the valves never fired and the strip's
-// new readiness gates (handover / upsell_team_groups) skeletoned FOREVER in
-// production the moment sense_upsell_team_groups.csv 404'd on R2. This watchdog
-// runs unconditionally: every 2s it checks both gated sources; once a source is
-// either genuinely loaded or past its deadline (force-released), it stops
-// blocking. Past-deadline = proceed with today's fallback behavior (handover
-// treated as absent / flat-rate upsell), never a permanent skeleton.
-(function(){
-  var _wdStart=null; // starts counting only once data loading has actually begun
-  function _wdPokeStrip(){
-    try{ var s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
-    try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-    try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-  }
-  var _wdIv=setInterval(function(){
-    try{
-      // Don't start the deadline clock while the user is still on the login
-      // screen — anchor it to the first sign that data loading has begun
-      // (explicit loader flag, any tab already ingested via cloud fetch OR
-      // IDB hydration, or a resolved logged-in profile).
-      if(_wdStart===null){
-        var _began=!!window.sheetsLoadStarted||_cloudLoadedTabs.size>0
-          ||!!(window.currentUserProfile&&window.currentUserProfile.email);
-        if(!_began)return;
-        _wdStart=Date.now();
-      }
-      var elapsed=Date.now()-_wdStart;
-      var allClear=true;
-      // handover: 15s deadline (mirrors the QNRR valve's tradeoff)
-      if(!(typeof bulkHandoverData!=='undefined'&&bulkHandoverData&&bulkHandoverData.loaded)){
-        if(elapsed>15000){ try{ bulkHandoverData.loaded=true; _wdPokeStrip(); }catch(e){} }
-        else allClear=false;
-      }
-      // upsell_team_groups: 12s deadline — past it, proceed on the flat-rate
-      // fallback (today's behavior whenever this file is missing)
-      if(!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease){
-        if(elapsed>12000){ window._upsellTeamGroupsForceRelease=true; _wdPokeStrip(); }
-        else allClear=false;
-      }
-      if(allClear)clearInterval(_wdIv);
-    }catch(e){}
-  },2000);
-})();
-
 function _clearDataPillTimers(){return window.FreshketSenseRuntime.data.clearPillTimers();}
 function _clearCloudInFlight(){Object.keys(_cloudInFlight).forEach(k=>delete _cloudInFlight[k]);}
 function _specFetchTimeout(spec){return spec&&spec.heavy?240000:90000;}
@@ -1924,31 +1869,18 @@ async function _fetchUpsellBundle(kamEmail){
   if(_upsellBundleInFlight[safeKey])return _upsellBundleInFlight[safeKey];
   const p=(async()=>{
     let ok=false;
-    // v_oneflash2: retry a transient miss (common right after login racing
-    // the R2 file) a couple times BEFORE marking _upsellBundleFailed. The
-    // readiness barrier below treats "failed" as "ready", so marking failed
-    // on the very first miss let the strip confidently render the coarse
-    // team-CSV number, then flash to the real one once a LATER render's own
-    // retry happened to succeed. Retrying here first resolves that invisibly
-    // inside the barrier instead of on screen.
-    const RETRY_DELAYS=[600,1500];
     try{
-      for(let attempt=0;attempt<=RETRY_DELAYS.length;attempt++){
-        try{
-          const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
-          window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
-          ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
-          window._upsellIngestEmail = '';
-        }catch(e){
-          console.warn('[upsell bundle] error',kamEmail,e&&e.message);
-          ok=false;
-        }
-        if(ok||attempt===RETRY_DELAYS.length)break;
-        await new Promise(r=>setTimeout(r,RETRY_DELAYS[attempt]));
-      }
+      const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+      window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
+      ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+      window._upsellIngestEmail = '';
       if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
       else { _upsellBundleFailed.add(safeKey); }
       return ok;
+    }catch(e){
+      console.warn('[upsell bundle] error',kamEmail,e&&e.message);
+      _upsellBundleFailed.add(safeKey);
+      return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
       // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
@@ -2227,10 +2159,7 @@ async function loadFromCloudflareR2(){
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
-  // v_oneflash2: also mark bulkHandoverData.loaded, or the new commission-strip
-  // handover-readiness gate (buildSources/_cdsBuildSrc) would show skeleton forever
-  // for Sales-mode sessions, since the real fetch handler that sets it never runs.
-  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); bulkHandoverData.loaded=true; try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
+  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');

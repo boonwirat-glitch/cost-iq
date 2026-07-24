@@ -52,6 +52,15 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   // _nrrExclusionCurrentPeriod() does, so both stay consistent with the
   // quarterly engine's own period_month convention.
   const periodMonth = asOfPeriod || (typeof _nrrExclusionCurrentPeriod === 'function' ? _nrrExclusionCurrentPeriod() : null);
+  // v922 (hasCM hoist): must be FUNCTION-scoped — the nested _groupNRR closure
+  // below reads hasCM. d9940f6 (frozen-mode work) moved this const into the
+  // live-mode else{} block, out of _groupNRR's lexical scope, making _groupNRR's
+  // account-level fallback branch throw "ReferenceError: hasCM is not defined"
+  // whenever an account lacked a bulkOutletsData entry (e.g. teamview repaints
+  // in the boot window before bulk_outlets loads) — crashing the teamview
+  // summary and freezing whatever partial %NRR the last non-crashing repaint
+  // had computed.
+  const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
   if (_isFrozen) {
     const _parts = asOfPeriod.split('-');
     const asYr = parseInt(_parts[0], 10);
@@ -72,7 +81,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
     // daysElapsed + currentMonthLabel from bulkCurrentMonthData
     currentMonthLabel = '';
     daysElapsed = 0;
-    const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
     if (hasCM) {
       for (const a of allAccounts) {
         const cm = bulkCurrentMonthData[a.id];
@@ -1480,21 +1488,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       // commission MODE can flip rolling-MoM → quarterly; without this the key
       // stayed frozen and gated renders skipped the correction repaint.
       var pol = window._nrrGovPoliciesLoaded === true ? 'p1' : (window._nrrGovPoliciesLoaded === 'failed' ? 'pf' : 'p0');
-      // v_oneflash2: without these, a late-arriving upsell bundle or handover
-      // bundle had to rely solely on the 'กำลังโหลด' string-peek below to force
-      // a repaint — which only catches renders that WERE showing skeleton, not
-      // ones that were already confidently-but-wrongly non-skeleton. Including
-      // both readiness states here guarantees a real key change (and thus a
-      // repaint) the moment either source actually resolves.
-      var email = (window.currentUserProfile && window.currentUserProfile.email) || '';
-      var ub = (email && typeof window._upsellBundleReady==='function' && window._upsellBundleReady(email)) ? 'u1' : 'u0';
-      var hv = (typeof bulkHandoverData!=='undefined' && bulkHandoverData && bulkHandoverData.loaded) ? 'h1' : 'h0';
-      // v_oneflash2: live-verified — bulkUpsellTeamGroups (per-category fast-path
-      // rates) can arrive after the strip already rendered off the coarser
-      // flat-rate fast path, changing the number a second time. See buildSources.
-      var tg = (typeof _cloudLoadedTabs!=='undefined' && _cloudLoadedTabs.has('upsell_team') &&
-                (_cloudLoadedTabs.has('upsell_team_groups')||window._upsellTeamGroupsForceRelease)) ? 't1' : 't0';
-      return r + ':' + ph + ':' + hh + ':' + db + ':' + pol + ':' + ub + ':' + hv + ':' + tg;
+      return r + ':' + ph + ':' + hh + ':' + db + ':' + pol;
     }catch(e){ return ''; }
   }
 

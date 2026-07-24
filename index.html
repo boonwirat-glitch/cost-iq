@@ -1,4 +1,4 @@
-<!-- Freshket Sense v921: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v922: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v921',
+      version: 'v922',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -14422,7 +14422,7 @@ let bulkCatsData={};       // Q2B: aid → {month_label → [{n,s,p,c}]}
 let bulkSkusData={};       // Q3B: aid → {month_label → [sku objects]}
 const _bulkSkusSeen={};   // v202 dedup: aid → mo → Set<itemId> — prevents double-push when bundle+bulk both load
 let bulkPriceData={};      // Q6B: aid → {item_id → [{mo, unit_price, avg_piece_price}]} (6-month price history for sparkline)
-let bulkHandoverData={ byAccountId:{}, byKamName:{}, loaded:false }; // Q10: portview_handover.csv — transfer out per KAM
+let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover.csv — transfer out per KAM
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
 let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_{safekey}.csv — per-KAM demand bundle
 let bulkUpsellTeamData={}; // team summary: {[kamEmail]:{p1_gmv,p3_incr,outlet_gmv,tl_upsell_base}}
@@ -15844,10 +15844,9 @@ function handleFileUpload(type,input){
   // ── bulk-handover (Q10: portview_handover.csv) ──
   // v_oneflash2: dead branch in practice — 07b_commission_history.js monkey-patches
   // window.handleFileUpload and intercepts type==='bulk-handover' before this ever
-  // runs (it never calls oldHandle for this type). The REAL ingest + loaded flag +
-  // repaint hook live in that file's handleFileUpload override (~line 417). Left
-  // here (harmless, correct if ever reached) rather than deleted, since deleting it
-  // isn't this fix's scope — but don't trust this branch as the live path.
+  // runs (it never calls oldHandle for this type). The REAL ingest lives in that
+  // file's handleFileUpload override (~line 417). Left here (harmless, correct if
+  // ever reached) rather than deleted — but don't trust this branch as the live path.
   if(type==='bulk-handover'){
     const reader=new FileReader();
     reader.onload=e=>{
@@ -15878,18 +15877,11 @@ function handleFileUpload(type,input){
           byNewKamName[newKamName].push({accountId,accountName,accountType,lastMonthGmv,curMonthGmv,oldKamName:kamName});
         }
       });
-      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName,loaded:true};
+      bulkHandoverData={byAccountId,byOutletId,byKamName,byNewKamName};
       const cnt=Object.keys(byKamName).length;
       const b=document.getElementById('badge-bulk-handover');
       if(b){b.textContent='✓ '+Object.keys(byAccountId).length+' accts';b.className='dp-slot-badge ok';}
       const sl=document.getElementById('slot-bulk-handover');if(sl)sl.style.borderColor='var(--g500)';
-      // v_oneflash2: handover previously had no readiness flag AND no repaint
-      // hook here — a confident payout:0 could render before this arrived,
-      // and nothing told the strip to re-check once it did. Mirror the other
-      // 4 bundle handlers' completion hook.
-      try{ var _hs=document.getElementById('pv-commission-strip'); if(_hs)_hs._lastCommHtml=''; }catch(e){}
-      try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-      try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
       // v218: splash signal now fires from _fetchCloudflareFile when ALL 6 FOREGROUND files ready.
       // Old 3-file check removed — was causing early splash fade before categories/sku_current/outlets loaded.
       try{
@@ -16396,53 +16388,6 @@ const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
 let _dataPillTimers=[];
 
-// v_oneflash2b: commission-strip gate watchdog — TOP-LEVEL, anchored to script
-// eval, NOT inside loadFromCloudflareR2. The first cut put the safety valves
-// inside that function, but PWA warm starts hydrate data from IndexedDB via a
-// separate path and may never call it — the valves never fired and the strip's
-// new readiness gates (handover / upsell_team_groups) skeletoned FOREVER in
-// production the moment sense_upsell_team_groups.csv 404'd on R2. This watchdog
-// runs unconditionally: every 2s it checks both gated sources; once a source is
-// either genuinely loaded or past its deadline (force-released), it stops
-// blocking. Past-deadline = proceed with today's fallback behavior (handover
-// treated as absent / flat-rate upsell), never a permanent skeleton.
-(function(){
-  var _wdStart=null; // starts counting only once data loading has actually begun
-  function _wdPokeStrip(){
-    try{ var s=document.getElementById('pv-commission-strip'); if(s)s._lastCommHtml=''; }catch(e){}
-    try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-    try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
-  }
-  var _wdIv=setInterval(function(){
-    try{
-      // Don't start the deadline clock while the user is still on the login
-      // screen — anchor it to the first sign that data loading has begun
-      // (explicit loader flag, any tab already ingested via cloud fetch OR
-      // IDB hydration, or a resolved logged-in profile).
-      if(_wdStart===null){
-        var _began=!!window.sheetsLoadStarted||_cloudLoadedTabs.size>0
-          ||!!(window.currentUserProfile&&window.currentUserProfile.email);
-        if(!_began)return;
-        _wdStart=Date.now();
-      }
-      var elapsed=Date.now()-_wdStart;
-      var allClear=true;
-      // handover: 15s deadline (mirrors the QNRR valve's tradeoff)
-      if(!(typeof bulkHandoverData!=='undefined'&&bulkHandoverData&&bulkHandoverData.loaded)){
-        if(elapsed>15000){ try{ bulkHandoverData.loaded=true; _wdPokeStrip(); }catch(e){} }
-        else allClear=false;
-      }
-      // upsell_team_groups: 12s deadline — past it, proceed on the flat-rate
-      // fallback (today's behavior whenever this file is missing)
-      if(!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease){
-        if(elapsed>12000){ window._upsellTeamGroupsForceRelease=true; _wdPokeStrip(); }
-        else allClear=false;
-      }
-      if(allClear)clearInterval(_wdIv);
-    }catch(e){}
-  },2000);
-})();
-
 function _clearDataPillTimers(){return window.FreshketSenseRuntime.data.clearPillTimers();}
 function _clearCloudInFlight(){Object.keys(_cloudInFlight).forEach(k=>delete _cloudInFlight[k]);}
 function _specFetchTimeout(spec){return spec&&spec.heavy?240000:90000;}
@@ -16818,31 +16763,18 @@ async function _fetchUpsellBundle(kamEmail){
   if(_upsellBundleInFlight[safeKey])return _upsellBundleInFlight[safeKey];
   const p=(async()=>{
     let ok=false;
-    // v_oneflash2: retry a transient miss (common right after login racing
-    // the R2 file) a couple times BEFORE marking _upsellBundleFailed. The
-    // readiness barrier below treats "failed" as "ready", so marking failed
-    // on the very first miss let the strip confidently render the coarse
-    // team-CSV number, then flash to the real one once a LATER render's own
-    // retry happened to succeed. Retrying here first resolves that invisibly
-    // inside the barrier instead of on screen.
-    const RETRY_DELAYS=[600,1500];
     try{
-      for(let attempt=0;attempt<=RETRY_DELAYS.length;attempt++){
-        try{
-          const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
-          window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
-          ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
-          window._upsellIngestEmail = '';
-        }catch(e){
-          console.warn('[upsell bundle] error',kamEmail,e&&e.message);
-          ok=false;
-        }
-        if(ok||attempt===RETRY_DELAYS.length)break;
-        await new Promise(r=>setTimeout(r,RETRY_DELAYS[attempt]));
-      }
+      const url=`${R2_BASE}/sense_upsell_${safeKey}.csv`;
+      window._upsellIngestEmail = kamEmail; // v259: parser injects this as byKam key
+      ok=await _fetchKamFile({url,type:'bulk-upsell',tab:`bundle-upsell-${safeKey}`});
+      window._upsellIngestEmail = '';
       if(ok){ _upsellBundleLoaded.add(safeKey); _upsellBundleFailed.delete(safeKey); }
       else { _upsellBundleFailed.add(safeKey); }
       return ok;
+    }catch(e){
+      console.warn('[upsell bundle] error',kamEmail,e&&e.message);
+      _upsellBundleFailed.add(safeKey);
+      return false;
     }finally{
       delete _upsellBundleInFlight[safeKey];
       // v491-C: reset commission key before re-render so _commGatedRender doesn't skip.
@@ -17121,10 +17053,7 @@ async function loadFromCloudflareR2(){
     ((typeof getCurrentRole==='function')&&(getCurrentRole()==='sales'||getCurrentRole()==='sales_tl'));
   const FOREGROUND=['portview','history','categories','sku_current','outlets','handover','upsell_team','upsell_team_groups','current_movements'].filter(k=>!(_isSalesMode&&k==='handover'));
   // Sales skips handover fetch — pre-mark as loaded so gate can open on portview+history
-  // v_oneflash2: also mark bulkHandoverData.loaded, or the new commission-strip
-  // handover-readiness gate (buildSources/_cdsBuildSrc) would show skeleton forever
-  // for Sales-mode sessions, since the real fetch handler that sets it never runs.
-  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); bulkHandoverData.loaded=true; try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
+  if(_isSalesMode){ _cloudLoadedTabs.add('handover'); try{if(window.DataRegistry)window.DataRegistry.markLoaded('handover');}catch(_){} }
   const BACKGROUND=[];  // v207b: disable global bulk SKU background load; use per-KAM bundle on demand
   const ALL=[...FOREGROUND,...BACKGROUND];
   const btn=document.getElementById('sheets-load-btn');
@@ -42458,6 +42387,15 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   // _nrrExclusionCurrentPeriod() does, so both stay consistent with the
   // quarterly engine's own period_month convention.
   const periodMonth = asOfPeriod || (typeof _nrrExclusionCurrentPeriod === 'function' ? _nrrExclusionCurrentPeriod() : null);
+  // v922 (hasCM hoist): must be FUNCTION-scoped — the nested _groupNRR closure
+  // below reads hasCM. d9940f6 (frozen-mode work) moved this const into the
+  // live-mode else{} block, out of _groupNRR's lexical scope, making _groupNRR's
+  // account-level fallback branch throw "ReferenceError: hasCM is not defined"
+  // whenever an account lacked a bulkOutletsData entry (e.g. teamview repaints
+  // in the boot window before bulk_outlets loads) — crashing the teamview
+  // summary and freezing whatever partial %NRR the last non-crashing repaint
+  // had computed.
+  const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
   if (_isFrozen) {
     const _parts = asOfPeriod.split('-');
     const asYr = parseInt(_parts[0], 10);
@@ -42478,7 +42416,6 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
     // daysElapsed + currentMonthLabel from bulkCurrentMonthData
     currentMonthLabel = '';
     daysElapsed = 0;
-    const hasCM = typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData;
     if (hasCM) {
       for (const a of allAccounts) {
         const cm = bulkCurrentMonthData[a.id];
@@ -43886,21 +43823,7 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
       // commission MODE can flip rolling-MoM → quarterly; without this the key
       // stayed frozen and gated renders skipped the correction repaint.
       var pol = window._nrrGovPoliciesLoaded === true ? 'p1' : (window._nrrGovPoliciesLoaded === 'failed' ? 'pf' : 'p0');
-      // v_oneflash2: without these, a late-arriving upsell bundle or handover
-      // bundle had to rely solely on the 'กำลังโหลด' string-peek below to force
-      // a repaint — which only catches renders that WERE showing skeleton, not
-      // ones that were already confidently-but-wrongly non-skeleton. Including
-      // both readiness states here guarantees a real key change (and thus a
-      // repaint) the moment either source actually resolves.
-      var email = (window.currentUserProfile && window.currentUserProfile.email) || '';
-      var ub = (email && typeof window._upsellBundleReady==='function' && window._upsellBundleReady(email)) ? 'u1' : 'u0';
-      var hv = (typeof bulkHandoverData!=='undefined' && bulkHandoverData && bulkHandoverData.loaded) ? 'h1' : 'h0';
-      // v_oneflash2: live-verified — bulkUpsellTeamGroups (per-category fast-path
-      // rates) can arrive after the strip already rendered off the coarser
-      // flat-rate fast path, changing the number a second time. See buildSources.
-      var tg = (typeof _cloudLoadedTabs!=='undefined' && _cloudLoadedTabs.has('upsell_team') &&
-                (_cloudLoadedTabs.has('upsell_team_groups')||window._upsellTeamGroupsForceRelease)) ? 't1' : 't0';
-      return r + ':' + ph + ':' + hh + ':' + db + ':' + pol + ':' + ub + ':' + hv + ':' + tg;
+      return r + ':' + ph + ':' + hh + ':' + db + ':' + pol;
     }catch(e){ return ''; }
   }
 
@@ -44161,34 +44084,6 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     // slot's value-guard dedups → zero visible flicker.
     if(st&&st.email&&typeof window._upsellBundleReady==='function'
        &&!window._upsellBundleReady(st.email)){
-      return Object.assign({},base,{loading:true});
-    }
-    // v_oneflash2: handover had no readiness flag at all — _commComputeHandoverRetention
-    // silently returns payout:0 before bulkHandoverData arrives, a confident zero baked
-    // into `final` that no existing gate could detect. Treat it as loading like the
-    // other 3 bundles until it's actually populated.
-    if(typeof bulkHandoverData==='undefined'||!bulkHandoverData||!bulkHandoverData.loaded){
-      return Object.assign({},base,{loading:true});
-    }
-    // v_oneflash2: live-verified race — when the detailed per-KAM upsell bundle is
-    // unavailable (failed/never uploaded for this KAM), _commBuildKamPayout falls
-    // back to the team-summary "fast path", which itself has TWO inputs of its
-    // own with no readiness flag: bulkUpsellTeamData (upsell_team) and, more
-    // recently, bulkUpsellTeamGroups (upsell_team_groups, the per-category rate
-    // fast path added after the v910-912 fixes shipped). If team_groups is still
-    // mid-fetch when the strip first renders, the fast path silently computes a
-    // coarser flat-rate number, then re-renders with the correct per-category
-    // number once team_groups lands seconds later — a second, real flash this
-    // barrier didn't previously cover. Both files are FOREGROUND fetches
-    // (_cloudLoadedTabs is the shared "this R2 tab's fetch attempt succeeded"
-    // signal, declared in 02_data_pipeline.js — same tab keys as R2_SPECS).
-    // team_groups currently 404s on R2 for some environments/rollout stages
-    // (feature file not uploaded yet) — _upsellTeamGroupsForceRelease (10s
-    // safety valve, 02_data_pipeline.js) prevents that from hanging the strip
-    // forever; without team_groups it just falls back to the flat-rate path,
-    // same as today's behavior when the file is missing.
-    if(typeof _cloudLoadedTabs==='undefined'||!_cloudLoadedTabs.has('upsell_team')||
-       (!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease)){
       return Object.assign({},base,{loading:true});
     }
     try{
@@ -45350,16 +45245,6 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
     if(st.loading){ src.loading=true; }
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
-    // v_oneflash2: mirror the strip's tiers-ready gate (buildCompactStrip) so
-    // the sheet can't render off stale/default tier config while the strip
-    // (correctly gated) is still showing skeleton.
-    if(!window._tgtLoadedFromDB){ src.loading=true; }
-    if(typeof bulkHandoverData==='undefined'||!bulkHandoverData||!bulkHandoverData.loaded){ src.loading=true; }
-    // v_oneflash2: mirror the strip's team-fast-path gate (buildSources) — see
-    // the comment there for the live-verified race this closes, and the
-    // _upsellTeamGroupsForceRelease safety valve for the file-missing case.
-    if(typeof _cloudLoadedTabs==='undefined'||!_cloudLoadedTabs.has('upsell_team')||
-       (!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease)){ src.loading=true; }
     if(src.loading){
       if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
       return src;
@@ -47544,7 +47429,7 @@ window.closeCommissionHistory = closeCommissionHistory;
       (byKamName[kamName]||(byKamName[kamName]=[])).push(row);
       if(newKamName)(byNewKamName[newKamName]||(byNewKamName[newKamName]=[])).push(row);
     });
-    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byOutletId:byOutletId,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION,loaded:true};
+    return {byAccountId:byAccountId,byAccountIdNorm:byAccountIdNorm,byOutletId:byOutletId,byKamName:byKamName,byNewKamName:byNewKamName,rows:rows,loadedAt:Date.now(),version:DATA_VERSION};
   }
   function schedulePortviewRefresh(){
     try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
@@ -47575,15 +47460,6 @@ window.closeCommissionHistory = closeCommissionHistory;
             try{console.log('[Freshket Sense '+VERSION+'] handover contains Ploynitcha transfer-in rows');}catch(e){}
           }
           schedulePortviewRefresh(); done();
-          // v_oneflash2: this override is the REAL live path for 'bulk-handover'
-          // ingestion (window.handleFileUpload is monkey-patched above to intercept
-          // it before the original 02_data_pipeline.js handler ever runs) — the
-          // commission-strip handover-readiness gate needs its own repaint hook
-          // here, same as the other bundle handlers, or it never learns handover
-          // actually arrived.
-          try{ var _hs=document.getElementById('pv-commission-strip'); if(_hs)_hs._lastCommHtml=''; }catch(e){}
-          try{ if(typeof window._commResetKey==='function') window._commResetKey(); }catch(e){}
-          try{ if(typeof _commRenderKamSelfStrip==='function') _commRenderKamSelfStrip(); }catch(e){}
         }catch(err){console.warn('[Freshket Sense '+VERSION+'] handover parse failed',err); done();}
       };
       reader.readAsText(file);

@@ -194,34 +194,6 @@
        &&!window._upsellBundleReady(st.email)){
       return Object.assign({},base,{loading:true});
     }
-    // v_oneflash2: handover had no readiness flag at all — _commComputeHandoverRetention
-    // silently returns payout:0 before bulkHandoverData arrives, a confident zero baked
-    // into `final` that no existing gate could detect. Treat it as loading like the
-    // other 3 bundles until it's actually populated.
-    if(typeof bulkHandoverData==='undefined'||!bulkHandoverData||!bulkHandoverData.loaded){
-      return Object.assign({},base,{loading:true});
-    }
-    // v_oneflash2: live-verified race — when the detailed per-KAM upsell bundle is
-    // unavailable (failed/never uploaded for this KAM), _commBuildKamPayout falls
-    // back to the team-summary "fast path", which itself has TWO inputs of its
-    // own with no readiness flag: bulkUpsellTeamData (upsell_team) and, more
-    // recently, bulkUpsellTeamGroups (upsell_team_groups, the per-category rate
-    // fast path added after the v910-912 fixes shipped). If team_groups is still
-    // mid-fetch when the strip first renders, the fast path silently computes a
-    // coarser flat-rate number, then re-renders with the correct per-category
-    // number once team_groups lands seconds later — a second, real flash this
-    // barrier didn't previously cover. Both files are FOREGROUND fetches
-    // (_cloudLoadedTabs is the shared "this R2 tab's fetch attempt succeeded"
-    // signal, declared in 02_data_pipeline.js — same tab keys as R2_SPECS).
-    // team_groups currently 404s on R2 for some environments/rollout stages
-    // (feature file not uploaded yet) — _upsellTeamGroupsForceRelease (10s
-    // safety valve, 02_data_pipeline.js) prevents that from hanging the strip
-    // forever; without team_groups it just falls back to the flat-rate path,
-    // same as today's behavior when the file is missing.
-    if(typeof _cloudLoadedTabs==='undefined'||!_cloudLoadedTabs.has('upsell_team')||
-       (!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease)){
-      return Object.assign({},base,{loading:true});
-    }
     try{
       var email=st&&st.email;
       var p=email&&typeof _commBuildKamPayout==='function'?_commBuildKamPayout(email):null;
@@ -1381,16 +1353,6 @@
     if(st.loading){ src.loading=true; }
     if(typeof bulkUpsellData==='undefined'||!bulkUpsellData||!bulkUpsellData.loaded){ src.loading=true; }
     if(st.email&&typeof window._upsellBundleReady==='function'&&!window._upsellBundleReady(st.email)){ src.loading=true; }
-    // v_oneflash2: mirror the strip's tiers-ready gate (buildCompactStrip) so
-    // the sheet can't render off stale/default tier config while the strip
-    // (correctly gated) is still showing skeleton.
-    if(!window._tgtLoadedFromDB){ src.loading=true; }
-    if(typeof bulkHandoverData==='undefined'||!bulkHandoverData||!bulkHandoverData.loaded){ src.loading=true; }
-    // v_oneflash2: mirror the strip's team-fast-path gate (buildSources) — see
-    // the comment there for the live-verified race this closes, and the
-    // _upsellTeamGroupsForceRelease safety valve for the file-missing case.
-    if(typeof _cloudLoadedTabs==='undefined'||!_cloudLoadedTabs.has('upsell_team')||
-       (!_cloudLoadedTabs.has('upsell_team_groups')&&!window._upsellTeamGroupsForceRelease)){ src.loading=true; }
     if(src.loading){
       if(st.email&&typeof _fetchUpsellBundle==='function')_fetchUpsellBundle(st.email).catch(function(){});
       return src;
