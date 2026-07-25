@@ -88,6 +88,15 @@ async function nrrInitApp() {
   if (_coPage && typeof nrrHandleCompanyClick === 'function') _coPage.addEventListener('click', nrrHandleCompanyClick);
   var _slPage = document.getElementById('nrr-sales-page');
   if (_slPage && typeof nrrHandleSalesClick === 'function') _slPage.addEventListener('click', nrrHandleSalesClick);
+  // v_simtab: Commission tab's simulator + breakdown table — own body,
+  // own delegation (separate from #nrr-comm-strip above, which is the
+  // relocated-but-unchanged "สรุป"/"ตารางเต็ม" strip).
+  var _commSimBody = document.getElementById('nrr-comm-sim-body');
+  if (_commSimBody) {
+    _commSimBody.addEventListener('click', nrrHandleCommSimClick);
+    _commSimBody.addEventListener('input', nrrHandleCommSimInput);
+    _commSimBody.addEventListener('change', nrrHandleCommSimChange);
+  }
 
   // ── Router wiring — see nrr_router.js ──
   // v_navfloat (2026-07-16): dashboard DOM stays rendered by nrrRenderAll();
@@ -98,6 +107,7 @@ async function nrrInitApp() {
   nrrRouterRegister('dashboard', function () {});
   nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
   nrrRouterRegister('account', nrrRenderAccountView);
+  nrrRouterRegister('commission', nrrRenderCommissionTabView);
 
   await nrrRefresh(false);
   nrrHandleRoute();
@@ -1828,6 +1838,9 @@ function nrrShellHtml() {
     (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
       ? '    <a href="#/waivers" data-view="waivers">Waivers</a>'
       : '') +
+    (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
+      ? '    <a href="#/commission" data-view="commission">Commission</a>'
+      : '') +
     '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
@@ -1874,7 +1887,6 @@ function nrrShellHtml() {
     '  </div></div>' +
     '  <div class="nrr-section" id="nrr-sec-pm" style="animation-delay:.18s"><div class="nrr-panel-body" id="nrr-pm-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-admin" style="animation-delay:.22s"><div class="nrr-panel-body" id="nrr-admin-body"></div></div>' +
-    '  <div class="nrr-section" id="nrr-sec-commission" style="animation-delay:.26s"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-footnote" style="animation-delay:.30s"><div class="nrr-panel-body nrr-footnote">' +
     '    <b>%NRR</b> = GMV เดือนปัจจุบัน หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' ของร้านค้าที่ยัง active หรือกลับมาซื้อ (ปรับด้วย transfer เข้า/ออก) — เฉพาะ %NRR normalize เป็น 30 วันทั้งสองฝั่งเพื่อเทียบข้ามเดือนอย่างยุติธรรม · <b>ตัวเลขเงินทุกจุด</b>แสดงเป็นยอดจริงตามจำนวนวันของเดือนนั้น: เดือนที่จบแล้ว = ยอดจริง, เดือนที่ยังไม่จบ (มี <span class="nrr-rr-proj">~</span>) = คาดการณ์เต็มเดือนจาก MTD ÷ วันที่ผ่านมา × จำนวนวันของเดือน · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time' +
     '  </div></div>' +
@@ -1896,6 +1908,16 @@ function nrrShellHtml() {
     '</div></div>' +
     '<div class="nrr-view" id="nrr-view-waivers" hidden><div class="nrr-page">' +
     '  <div class="nrr-section"><div class="nrr-panel-body" id="nrr-waivers-body"></div></div>' +
+    '</div></div>' +
+    // v_simtab (2026-07-25): Commission moved out of the NRR tab into its
+    // own route — same physical #nrr-comm-strip node just relocated here
+    // (nrrRenderCommissionSection() keeps rendering into it unconditionally
+    // regardless of which tab is active, same as every other always-on
+    // section). #nrr-comm-sim-body is new: the threshold simulator +
+    // item breakdown table, fetched once per tab visit.
+    '<div class="nrr-view" id="nrr-view-commission" hidden><div class="nrr-page">' +
+    '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
+    '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-ds" id="nrr-comm-sim-body"></div></div>' +
     '</div></div>' +
     '<div id="nrr-slideover-backdrop"></div>' +
     '<div class="float" id="nrr-slideover">' +
@@ -2929,6 +2951,294 @@ function nrrCommissionFootnoteHtml() {
     'Gate: ≥' + gate1 + '%=1.0× · ' + gate2 + '-' + gate1 + '%=' + cap1 + '× · <' + gate2 + '%=' + cap2 + '×' +
     '</div>';
 }
+
+// ── Commission tab (v_simtab, 2026-07-25) — P1/P3 threshold simulator +
+// item-level breakdown. Bush's ask: (1) visualize how fair the current
+// P1 ฿5,000 / P3 2.0×+฿8,000 cutoffs are by re-testing them against
+// different numbers, and (2) see mid-month which near-miss items are on
+// pace to cross the line by month-end, instead of only finding out at
+// month-close. Current live month only (Bush's own scoping choice) —
+// visualization only, NEVER writes to target_settings. Bundles fetch once
+// per tab visit (auto-load on open, Bush's other scoping choice), reusing
+// nrrFetchUpsellBundle/nrrComputeUpsellSkuWithParams/nrrEnumerateUpsellGroups
+// (nrr_commission.js) which today are also used by the single-KAM drawer —
+// any future change to those must consider both call sites.
+var nrrCommSimState = {
+  status: 'idle', // idle | loading | loaded
+  roster: [],     // [{email,name,tlEmail,tlName}]
+  bundles: {},    // email -> bundle (nrrFetchUpsellBundle shape)
+  expIds: {},     // email -> Set<outletId> (Expansion outlets, excluded from P1/P3 same as the real engine)
+  overrides: { p1MinGmv: null, p3ThreshPct: null, p3MinIncr: null }, // null = live default
+  // pass: 'relevant' (default) | 'qualify' | 'onpace' | 'offpace' | 'all' —
+  // 'relevant' is load-bearing, not cosmetic: a real KAM's raw enumeration
+  // is 5,000-10,000+ (account,outlet,groupKey) rows this month (confirmed
+  // against live data), the overwhelming majority under ฿100 GMV and never
+  // remotely near a ฿5,000+ threshold — rendering all of them at once was
+  // measured to produce a 29MB HTML string that froze the tab. Defaulting
+  // to qualifies||projectedQualifies cuts that to a few dozen genuinely
+  // meaningful rows; 'all' is still available for someone who explicitly
+  // wants the unfiltered firehose.
+  filters: { kam: '', category: '', kind: '', pass: 'relevant' }
+};
+
+// Same roster the "สรุป" tab's summary rows already enumerate (admin: every
+// team; tl: own team only) — one proven source of truth for "who counts as
+// a KAM here", not a second roster definition that could drift from it.
+function nrrCommRosterEmails() {
+  var isAdmin = nrrProfile.role === 'admin';
+  var teams = isAdmin ? nrrListTeams() : [{ email: nrrProfile.email, name: nrrProfile.name }];
+  var out = [];
+  teams.forEach(function (t) {
+    nrrListKamsForTeam(t.email).forEach(function (k) {
+      out.push({ email: k.email, name: k.name, tlEmail: t.email, tlName: t.name });
+    });
+  });
+  return out;
+}
+
+function nrrRenderCommissionTabView() {
+  var body = document.getElementById('nrr-comm-sim-body');
+  if (!body) return;
+  if (nrrCommSimState.status === 'loaded') { nrrRenderCommSimShell(); return; }
+  if (nrrCommSimState.status === 'loading') return; // in-flight fetch will render on resolve
+  nrrCommSimState.status = 'loading';
+  body.innerHTML = '<div class="ds-section-hd"><span class="ds-eyebrow">Simulator เกณฑ์ P1/P3</span></div>' +
+    '<div class="ds-skel" style="height:220px"></div>';
+  var roster = nrrCommRosterEmails();
+  var period = nrrState.period;
+  nrrCommSimState.roster = roster;
+  // Same landing-page bug class nrr_waivers.js already hit and fixed
+  // (_nrrAccountNameFor/_nrrOutletNameFor need bulkPortviewData/
+  // bulkOutletsData loaded — normally only fetched when Account/Portfolio
+  // renders first): fetch both explicitly here too, since a TL/admin can
+  // land on #/commission directly without visiting either.
+  Promise.all([
+    nrrFetchAllUpsellBundles(roster, QNRR_CFG.base_month),
+    nrrFetchPortviewCsv(), nrrFetchBulkOutletsCsv()
+  ]).then(function (results) {
+    var pairs = results[0];
+    var bundles = {}, expIds = {};
+    pairs.forEach(function (pr) {
+      bundles[pr.person.email] = pr.bundle;
+      var expOutlets = nrrOutletsForKam(pr.person.email, period).filter(function (o) { return o.movement === 'expansion'; });
+      expIds[pr.person.email] = new Set(expOutlets.map(function (o) { return String(o.row.outlet_id); }));
+    });
+    nrrCommSimState.bundles = bundles;
+    nrrCommSimState.expIds = expIds;
+    nrrCommSimState.status = 'loaded';
+    nrrRenderCommSimShell();
+  });
+}
+
+// overrides object with every field null means "no adjustment" — treat it
+// as the null baseline itself so nrrComputeUpsellSkuWithParams's own
+// null-check stays the single source of truth for "live defaults".
+function _nrrCommSimActiveOverrides() {
+  var ov = nrrCommSimState.overrides;
+  if (ov.p1MinGmv == null && ov.p3ThreshPct == null && ov.p3MinIncr == null) return null;
+  return ov;
+}
+
+// Renders the STATIC shell once per tab visit — the 3 param inputs live in
+// their own sub-container that recompute never touches, so typing a new
+// threshold doesn't blow away cursor position/focus on every debounced
+// keystroke. Only #nrr-comm-sim-results gets replaced on recompute.
+function nrrRenderCommSimShell() {
+  var body = document.getElementById('nrr-comm-sim-body');
+  if (!body) return;
+  var p1Default = nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+  var p3ThreshDefault = nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3IncrDefault = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+  var ov = nrrCommSimState.overrides;
+  body.innerHTML =
+    '<div class="ds-section-hd"><span class="ds-eyebrow">Simulator เกณฑ์ P1/P3</span></div>' +
+    '<div class="micro" style="margin-bottom:14px;color:var(--ink2)">ประมาณการเพื่อดูภาพเท่านั้น — ไม่มีผลต่อการตั้งค่าจริงใน Supabase · ใช้ข้อมูลเดือนปัจจุบัน (' +
+    nrrEsc(QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ') เท่านั้น</div>' +
+    '<div class="nrr-comm-sim-params">' +
+    '<label class="nrr-comm-sim-field">P1 · ขั้นต่ำ GMV (฿)<input type="number" class="nrr-search nrr-sim-param" id="nrr-sim-p1min" data-param="p1MinGmv" min="0" step="500" value="' +
+    (ov.p1MinGmv != null ? ov.p1MinGmv : p1Default) + '"></label>' +
+    '<label class="nrr-comm-sim-field">P3 · เกณฑ์เติบโต (เท่า)<input type="number" class="nrr-search nrr-sim-param" id="nrr-sim-p3x" data-param="p3ThreshPct" min="1" step="0.1" value="' +
+    (ov.p3ThreshPct != null ? ov.p3ThreshPct : p3ThreshDefault) + '"></label>' +
+    '<label class="nrr-comm-sim-field">P3 · ขั้นต่ำส่วนเพิ่ม (฿)<input type="number" class="nrr-search nrr-sim-param" id="nrr-sim-p3incr" data-param="p3MinIncr" min="0" step="500" value="' +
+    (ov.p3MinIncr != null ? ov.p3MinIncr : p3IncrDefault) + '"></label>' +
+    '<button type="button" class="btn-secondary" id="nrr-sim-reset">รีเซ็ตเป็นค่าปัจจุบัน</button>' +
+    '</div>' +
+    '<div id="nrr-comm-sim-results"></div>';
+  nrrRenderCommSimResults();
+}
+
+function nrrRenderCommSimResults() {
+  var el = document.getElementById('nrr-comm-sim-results');
+  if (!el) return;
+  var roster = nrrCommSimState.roster;
+  var bundles = nrrCommSimState.bundles;
+  var expIds = nrrCommSimState.expIds;
+  var overrides = _nrrCommSimActiveOverrides();
+  var baseMonth = QNRR_CFG.base_month;
+
+  var orgBase = 0, orgAdj = 0;
+  var kamRows = roster.map(function (person) {
+    var bundle = bundles[person.email];
+    var eIds = expIds[person.email] || new Set();
+    var baseRes = nrrComputeUpsellSkuWithParams(eIds, bundle, baseMonth, null);
+    var adjRes = overrides ? nrrComputeUpsellSkuWithParams(eIds, bundle, baseMonth, overrides) : baseRes;
+    orgBase += baseRes.total_comm;
+    orgAdj += adjRes.total_comm;
+    return { person: person, base: baseRes.total_comm, adj: adjRes.total_comm, delta: adjRes.total_comm - baseRes.total_comm };
+  });
+  kamRows.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta) || b.adj - a.adj; });
+
+  var orgDelta = orgAdj - orgBase;
+  var compareHtml =
+    '<div class="ds-hero" style="margin:10px 0 18px">' +
+    '<div class="ds-hero-eyebrow">Upsell commission รวม (P1+P3) · องค์กร</div>' +
+    '<div style="display:flex;gap:22px;align-items:baseline;flex-wrap:wrap">' +
+    '<div><div class="ds-hero-number" style="font-size:26px">' + nrrFmtGMVExact(orgAdj) + '</div><div class="ds-hero-sub">ปรับใหม่</div></div>' +
+    '<div class="micro">ปัจจุบัน ' + nrrFmtGMVExact(orgBase) + '</div>' +
+    (orgDelta !== 0 ? '<div class="micro" style="color:' + (orgDelta > 0 ? 'var(--green-deep)' : 'var(--coral)') + '">Δ ' + (orgDelta > 0 ? '+' : '') + nrrFmtGMVExact(orgDelta) + '</div>' : '') +
+    '</div></div>';
+
+  var kamTableRows = kamRows.map(function (r) {
+    var deltaHtml = r.delta === 0 ? '<span class="nrr-comm-zero">—</span>'
+      : '<span style="color:' + (r.delta > 0 ? 'var(--green-deep)' : 'var(--coral)') + '">' + (r.delta > 0 ? '+' : '') + nrrFmtGMVExact(r.delta) + '</span>';
+    return '<tr><td><b>' + nrrEsc(r.person.name) + '</b><div class="nrr-comm-cell-meta">' + nrrEsc(r.person.tlName || '') + '</div></td>' +
+      '<td>' + nrrFmtGMVExact(r.base) + '</td><td>' + nrrFmtGMVExact(r.adj) + '</td><td>' + deltaHtml + '</td></tr>';
+  }).join('');
+  var kamTableHtml = kamRows.length
+    ? '<div class="ds-section-hd" style="margin-top:6px"><span class="ds-eyebrow">รายบุคคล (KAM) — ปัจจุบัน vs ปรับใหม่</span></div>' +
+      '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr><th>KAM</th><th>ปัจจุบัน</th><th>ปรับใหม่</th><th>Δ</th></tr></thead><tbody>' + kamTableRows + '</tbody></table></div>'
+    : '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีม</div></div>';
+
+  el.innerHTML = compareHtml + kamTableHtml + nrrCommBreakdownSectionHtml();
+}
+
+function nrrCommPaceBadgeHtml(r) {
+  if (r.qualifies) return '<span class="nrr-pace-badge qualify">เข้าเกณฑ์แล้ว</span>';
+  if (!r.projectionReady) return '<span class="nrr-pace-badge pending">รอข้อมูล</span>';
+  if (r.projectedQualifies) return '<span class="nrr-pace-badge onpace">ตามจังหวะ คาดว่าจะถึง</span>';
+  return '<span class="nrr-pace-badge offpace">ต่ำกว่าจังหวะ</span>';
+}
+
+function nrrCommBreakdownRowHtml(r) {
+  var acctName = _nrrAccountNameFor(r.accountId);
+  var outletName = _nrrOutletNameFor(r.accountId, r.outletId);
+  var kindLabel = r.kind === 'p1' ? 'P1 ใหม่' : 'P3 โต';
+  var thresholdLabel = r.kind === 'p1' ? nrrFmtGMVExact(r.threshold) : ('>' + r.thresholdPct + '× (' + nrrFmtGMVExact(r.threshold) + ')');
+  var projectedLabel = r.projected != null ? nrrFmtGMVExact(r.projected) : '—';
+  return '<tr>' +
+    '<td><b>' + nrrEsc(r.person.name) + '</b></td>' +
+    '<td>' + nrrEsc(acctName) + '</td>' +
+    '<td>' + nrrEsc(outletName) + '</td>' +
+    '<td>' + nrrEsc(r.groupKey) + (r.category ? '<div class="nrr-comm-cell-meta">' + nrrEsc(r.category) + '</div>' : '') + '</td>' +
+    '<td>' + kindLabel + '</td>' +
+    '<td>' + nrrFmtGMVExact(r.current) + '</td>' +
+    '<td>' + thresholdLabel + '</td>' +
+    '<td>' + projectedLabel + '</td>' +
+    '<td>' + nrrCommPaceBadgeHtml(r) + '</td>' +
+    '</tr>';
+}
+
+function nrrCommBreakdownSectionHtml() {
+  var roster = nrrCommSimState.roster;
+  var bundles = nrrCommSimState.bundles;
+  var expIds = nrrCommSimState.expIds;
+  var overrides = _nrrCommSimActiveOverrides();
+  var baseMonth = QNRR_CFG.base_month;
+
+  var allRows = [];
+  roster.forEach(function (person) {
+    var bundle = bundles[person.email];
+    var eIds = expIds[person.email] || new Set();
+    allRows = allRows.concat(nrrEnumerateUpsellGroups(person, bundle, baseMonth, overrides, eIds));
+  });
+
+  var f = nrrCommSimState.filters;
+  var categories = Array.from(new Set(allRows.map(function (r) { return r.category; }).filter(Boolean))).sort();
+
+  var filtered = allRows.filter(function (r) {
+    if (f.kam && r.person.email !== f.kam) return false;
+    if (f.category && r.category !== f.category) return false;
+    if (f.kind && r.kind !== f.kind) return false;
+    if (f.pass === 'relevant' && !(r.qualifies || r.projectedQualifies)) return false;
+    if (f.pass === 'qualify' && !r.qualifies) return false;
+    if (f.pass === 'onpace' && !(!r.qualifies && r.projectedQualifies)) return false;
+    if (f.pass === 'offpace' && (r.qualifies || r.projectedQualifies)) return false;
+    // f.pass === 'all' → no pass/fail filtering at all
+    return true;
+  });
+  filtered.sort(function (a, b) { return (b.current || 0) - (a.current || 0); });
+
+  // Hard render cap — a KAM/category/kind filter narrow enough to still
+  // leave thousands of rows (e.g. explicitly choosing "แสดงทั้งหมด" org-wide)
+  // must never again try to paint 10,000+ rows in one innerHTML (measured:
+  // ~30MB of HTML, froze the tab). Never silent: the count line below always
+  // shows shown/matched/total so a cap is visible, not mistaken for "that's
+  // everything."
+  var RENDER_CAP = 500;
+  var matchedCount = filtered.length;
+  var truncated = matchedCount > RENDER_CAP;
+  if (truncated) filtered = filtered.slice(0, RENDER_CAP);
+
+  var filtersHtml = '<div class="nrr-comm-sim-filters">' +
+    '<select class="nrr-search nrr-sim-filter" id="nrr-sim-f-kam" data-filter="kam"><option value="">ทุก KAM</option>' +
+    roster.map(function (p) { return '<option value="' + nrrEsc(p.email) + '"' + (f.kam === p.email ? ' selected' : '') + '>' + nrrEsc(p.name) + '</option>'; }).join('') + '</select>' +
+    '<select class="nrr-search nrr-sim-filter" id="nrr-sim-f-cat" data-filter="category"><option value="">ทุกหมวด</option>' +
+    categories.map(function (c) { return '<option value="' + nrrEsc(c) + '"' + (f.category === c ? ' selected' : '') + '>' + nrrEsc(c) + '</option>'; }).join('') + '</select>' +
+    '<select class="nrr-search nrr-sim-filter" id="nrr-sim-f-kind" data-filter="kind">' +
+    '<option value=""' + (f.kind === '' ? ' selected' : '') + '>P1+P3</option>' +
+    '<option value="p1"' + (f.kind === 'p1' ? ' selected' : '') + '>P1 เท่านั้น</option>' +
+    '<option value="p3"' + (f.kind === 'p3' ? ' selected' : '') + '>P3 เท่านั้น</option></select>' +
+    '<select class="nrr-search nrr-sim-filter" id="nrr-sim-f-pass" data-filter="pass">' +
+    '<option value="relevant"' + (f.pass === 'relevant' ? ' selected' : '') + '>เข้าเกณฑ์ + ใกล้เข้าเกณฑ์</option>' +
+    '<option value="qualify"' + (f.pass === 'qualify' ? ' selected' : '') + '>เข้าเกณฑ์แล้ว</option>' +
+    '<option value="onpace"' + (f.pass === 'onpace' ? ' selected' : '') + '>ยังไม่ถึงแต่ตามจังหวะ</option>' +
+    '<option value="offpace"' + (f.pass === 'offpace' ? ' selected' : '') + '>ต่ำกว่าจังหวะ/ไม่เข้าเกณฑ์</option>' +
+    '<option value="all"' + (f.pass === 'all' ? ' selected' : '') + '>แสดงทั้งหมด (รวมรายการเล็กน้อย)</option></select>' +
+    '</div>';
+
+  var rowsHtml = filtered.map(nrrCommBreakdownRowHtml).join('');
+  var truncNote = truncated
+    ? '<div class="micro" style="margin:6px 0;color:var(--sun-deep)">แสดง ' + RENDER_CAP + ' จาก ' + matchedCount + ' รายการที่ตรงตัวกรอง — เรียงตามยอดสูงสุด, กรองเพิ่ม (เช่น เลือก KAM) เพื่อดูรายการที่เหลือ</div>'
+    : '';
+  var tableHtml = filtered.length
+    ? truncNote + '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
+      '<th>KAM</th><th>ร้าน</th><th>สาขา</th><th>กลุ่มสินค้า</th><th>ประเภท</th><th>ยอดปัจจุบัน</th><th>เกณฑ์</th><th>คาดสิ้นเดือน</th><th>สถานะ</th>' +
+      '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+    : '<div class="ds-empty"><div class="ds-empty-title">ไม่พบรายการตามตัวกรองนี้</div></div>';
+
+  return '<div class="ds-section-hd" style="margin-top:24px"><span class="ds-eyebrow">Breakdown รายรายการ (เดือน' +
+    nrrEsc(QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ') <span class="ds-section-count">' + matchedCount + '/' + allRows.length + '</span></span></div>' +
+    '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">"กลุ่มสินค้า" คือกลุ่ม/หมวดย่อยของสินค้า ไม่ใช่ SKU รายตัว — ข้อมูล SKU ระดับนั้นยังไม่มีในไปป์ไลน์นี้ · ค่าเริ่มต้นแสดงเฉพาะรายการที่เข้าเกณฑ์แล้วหรือใกล้เข้าเกณฑ์ (' + allRows.length + ' รายการทั้งหมดในเดือนนี้ ส่วนใหญ่เป็นยอดเล็กน้อยที่ไม่มีนัยสำคัญ)</div>' +
+    filtersHtml + tableHtml;
+}
+
+var _nrrCommSimDebounce = null;
+function nrrHandleCommSimInput(e) {
+  if (!e.target.classList.contains('nrr-sim-param')) return;
+  clearTimeout(_nrrCommSimDebounce);
+  _nrrCommSimDebounce = setTimeout(function () {
+    var param = e.target.dataset.param;
+    var v = e.target.value === '' ? NaN : parseFloat(e.target.value);
+    nrrCommSimState.overrides[param] = isNaN(v) ? null : v;
+    nrrRenderCommSimResults();
+  }, 300);
+}
+window.nrrHandleCommSimInput = nrrHandleCommSimInput;
+
+function nrrHandleCommSimChange(e) {
+  if (!e.target.classList.contains('nrr-sim-filter')) return;
+  nrrCommSimState.filters[e.target.dataset.filter] = e.target.value;
+  nrrRenderCommSimResults();
+}
+window.nrrHandleCommSimChange = nrrHandleCommSimChange;
+
+function nrrHandleCommSimClick(e) {
+  if (e.target.id !== 'nrr-sim-reset') return;
+  nrrCommSimState.overrides = { p1MinGmv: null, p3ThreshPct: null, p3MinIncr: null };
+  nrrRenderCommSimShell();
+}
+window.nrrHandleCommSimClick = nrrHandleCommSimClick;
+window.nrrRenderCommissionTabView = nrrRenderCommissionTabView;
 
 // ── Commission "ตารางเต็ม" — wide spreadsheet-style audit table ──────────
 // Any historical period (not just the current quarter), one row per

@@ -636,7 +636,20 @@ window.nrrEstimateKamCommission = nrrEstimateKamCommission;
 // (07a_commission_engine.js). In non-quarterly use (baseMonthIso falsy —
 // /nrr never actually calls it that way today) evalLabels degenerates to
 // exactly [currLabel], i.e. this was always a no-op there.
-function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
+// v_simtab (2026-07-25): parameterized twin — accepts an `overrides` object
+// ({p1MinGmv, p3ThreshPct, p3MinIncr}) so the Commission tab's "what-if"
+// simulator can re-test today's real upsell data against a different set of
+// cutoffs, purely client-side (visualization only, never writes back to
+// target_settings). nrrComputeUpsellSku (below) is now a thin wrapper that
+// calls this with overrides=null — ONE implementation, not two twins that
+// could silently drift apart (the exact failure mode this codebase has been
+// bitten by before — see the GMV-tier-bucketing and P1-baseline-freeze
+// comments elsewhere in this file). Calling with overrides=null MUST
+// reproduce nrrComputeUpsellSku's old standalone behavior exactly by
+// construction, since that's now the only code path.
+// Rates (p1Rate/p3Rate) are deliberately NOT overridable — Bush's ask was
+// specifically about the three threshold cutoffs, not the payout rates.
+function nrrComputeUpsellSkuWithParams(expansionOutletIds, bundle, baseMonthIso, overrides) {
   var EMPTY = { p1: { gmv: 0, comm: 0, groups: [] }, p3: { gmv_incremental: 0, comm: 0, groups: [] },
                 total_comm: 0, total_gmv_eligible: 0 };
   if (!bundle || !bundle.loaded) return EMPTY;
@@ -646,9 +659,9 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
 
   var p1Rate    = nrrCommRateGet('upsell_sku', 'p1_rate', 0.01);
   var p3Rate    = nrrCommRateGet('upsell_sku', 'p3_rate', 0.01);
-  var p3Thresh  = nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
-  var p3MinIncr = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
-  var p1MinGmv  = nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+  var p3Thresh  = (overrides && overrides.p3ThreshPct != null) ? Number(overrides.p3ThreshPct) : nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3MinIncr = (overrides && overrides.p3MinIncr != null) ? Number(overrides.p3MinIncr) : nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+  var p1MinGmv  = (overrides && overrides.p1MinGmv != null) ? Number(overrides.p1MinGmv) : nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
 
   var currLabel = nrrCommCurrentMonthLabel();
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
@@ -727,7 +740,124 @@ function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
     total_gmv_eligible: p1Gmv + p3Incr
   };
 }
+window.nrrComputeUpsellSkuWithParams = nrrComputeUpsellSkuWithParams;
+
+function nrrComputeUpsellSku(expansionOutletIds, bundle, baseMonthIso) {
+  return nrrComputeUpsellSkuWithParams(expansionOutletIds, bundle, baseMonthIso, null);
+}
 window.nrrComputeUpsellSku = nrrComputeUpsellSku;
+
+// ── Commission tab (v_simtab) — org-wide bundle fetch + full enumeration ──
+// nrrFetchUpsellBundle (nrr_data.js) already exists and is proven — today
+// it's only ever called for ONE KAM at a time (the Portfolio drill-down
+// drawer). This loops it across a whole roster for the new Commission tab's
+// simulator + breakdown table. Runs once per tab visit (not on every
+// dashboard refresh) — the caller is expected to cache the result.
+function nrrFetchAllUpsellBundles(roster, baseMonthIso) {
+  return Promise.all((roster || []).map(function (person) {
+    return nrrFetchUpsellBundle(person.email, baseMonthIso).then(function (bundle) {
+      return { person: person, bundle: bundle };
+    });
+  }));
+}
+window.nrrFetchAllUpsellBundles = nrrFetchAllUpsellBundles;
+
+// Enumerates EVERY (account, outlet, groupKey) row for one KAM this month —
+// unlike nrrComputeUpsellSkuWithParams, this does NOT drop rows that fail
+// the current threshold. That function's job is "what would actually get
+// paid" (matches the real engine, which only ever pays qualifying rows);
+// this one's job is Bush's second ask — "which near-miss items are on pace
+// to cross the line by month-end" — so every row with real activity this
+// month is kept, tagged with qualifies/projectedQualifies. Never used to
+// alter a payout number; read-only display data for the breakdown table.
+function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expansionOutletIds) {
+  var out = [];
+  if (!bundle || !bundle.loaded) return out;
+  var expIds = expansionOutletIds instanceof Set ? expansionOutletIds : new Set();
+  var data = bundle.data || {};
+  var baselineGroups = bundle.baselineGroups || {};
+  var groupCategory = bundle.groupCategory || {};
+
+  var p1Rate    = nrrCommRateGet('upsell_sku', 'p1_rate', 0.01);
+  var p3Rate    = nrrCommRateGet('upsell_sku', 'p3_rate', 0.01);
+  var p3Thresh  = (overrides && overrides.p3ThreshPct != null) ? Number(overrides.p3ThreshPct) : nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3MinIncr = (overrides && overrides.p3MinIncr != null) ? Number(overrides.p3MinIncr) : nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+  var p1MinGmv  = (overrides && overrides.p1MinGmv != null) ? Number(overrides.p1MinGmv) : nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+  var _rateMap  = nrrCommCategoryBonus();
+
+  var currLabel = nrrCommCurrentMonthLabel();
+  var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
+  var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
+  var lbl = evalLabels[evalLabels.length - 1];
+
+  // Same linear run-rate convention as nrrUpsellQuarterTimeline (MTD ÷ days
+  // elapsed × days in month) — held back before day 5 for the same reason
+  // (too early to extrapolate off 1-2 days of data).
+  var daysElapsed = new Date().getDate();
+  var daysInCurr = nrrDaysInLabel(currLabel);
+  var projectionReady = daysElapsed >= 5;
+
+  Object.keys(data).forEach(function (accountId) {
+    var outletMap = data[accountId];
+    var baselineByOutlet = baselineGroups[accountId] || {};
+
+    Object.keys(outletMap).forEach(function (outletId) {
+      if (expIds.has(String(outletId))) return; // earns 0.5% via Expansion instead — same exclusion as the commission calc
+      var outletGroups = outletMap[outletId];
+      var outletBaseline = baselineByOutlet[outletId] || {};
+
+      Object.keys(outletGroups).forEach(function (groupKey) {
+        var monthData = outletGroups[groupKey];
+        var row = monthData[lbl];
+        if (!row) return;
+        var isP1 = !outletBaseline[groupKey];
+        var category = groupCategory[groupKey] || null;
+
+        if (isP1) {
+          var rawTotalGmv = row.totalGmv || 0;
+          if (rawTotalGmv <= 0) return; // no activity this month — not worth a row
+          var r1 = nrrCommUpsellRateFor(_rateMap, p1Rate, category, groupKey);
+          var qualifies1 = rawTotalGmv >= p1MinGmv;
+          var projGmv1 = daysElapsed > 0 ? rawTotalGmv / daysElapsed * daysInCurr : rawTotalGmv;
+          out.push({
+            person: person, accountId: accountId, outletId: outletId, groupKey: groupKey, category: category,
+            kind: 'p1', current: rawTotalGmv, threshold: p1MinGmv, qualifies: qualifies1,
+            commission: qualifies1 ? rawTotalGmv * r1 : 0, applied_rate: r1,
+            projected: projectionReady ? projGmv1 : null, projectionReady: projectionReady,
+            projectedQualifies: projectionReady ? (projGmv1 >= p1MinGmv) : null
+          });
+          return;
+        }
+
+        var rawExistingGmv = row.existingGmv || 0;
+        if (rawExistingGmv <= 0) return;
+        var maxBaseline = 0;
+        p3Labels.forEach(function (l) {
+          var lRow = monthData[l];
+          if (!lRow) return;
+          var d = nrrDaysInLabel(l);
+          var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
+          if (norm30 > maxBaseline) maxBaseline = norm30;
+        });
+        var incremental = rawExistingGmv - maxBaseline;
+        var qualifies3 = rawExistingGmv > maxBaseline * p3Thresh && incremental >= p3MinIncr;
+        var r3 = nrrCommUpsellRateFor(_rateMap, p3Rate, category, groupKey);
+        var projExisting = daysElapsed > 0 ? rawExistingGmv / daysElapsed * daysInCurr : rawExistingGmv;
+        var projIncremental = projExisting - maxBaseline;
+        out.push({
+          person: person, accountId: accountId, outletId: outletId, groupKey: groupKey, category: category,
+          kind: 'p3', current: incremental, threshold: p3MinIncr, baseline: maxBaseline, thresholdPct: p3Thresh,
+          qualifies: qualifies3, commission: qualifies3 ? incremental * r3 : 0, applied_rate: r3,
+          projected: projectionReady ? projIncremental : null, projectionReady: projectionReady,
+          projectedQualifies: projectionReady ? (projExisting > maxBaseline * p3Thresh && projIncremental >= p3MinIncr) : null
+        });
+      });
+    });
+  });
+
+  return out;
+}
+window.nrrEnumerateUpsellGroups = nrrEnumerateUpsellGroups;
 
 // ── Upsell quarter timeline (v_qtrux) — twin of _upsellQuarterTimeline
 // (07a_commission_engine.js), same shape/lockstep. Rep-facing display data:

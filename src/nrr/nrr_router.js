@@ -31,6 +31,7 @@ function nrrParseHash() {
   if (parts[0] === 'sales') return { view: 'sales', param: null };
   if (parts[0] === 'pulse') return { view: 'pulse', param: null };
   if (parts[0] === 'waivers') return { view: 'waivers', param: null };
+  if (parts[0] === 'commission') return { view: 'commission', param: null };
   return { view: 'dashboard', param: null };
 }
 
@@ -58,6 +59,12 @@ function nrrRouteGuard(route) {
   // full approve/reject queue — rep has no team/portfolio-wide governance
   // role here.
   if (route.view === 'waivers' && p.role === 'rep') {
+    return { view: 'portfolio', param: null, redirect: true };
+  }
+  // Commission tab (2026-07-25): same TL/admin-only scope as Waivers — a
+  // rep already sees their own commission via Portfolio's self-summary,
+  // this tab is the org/team-wide simulator + breakdown view.
+  if (route.view === 'commission' && p.role === 'rep') {
     return { view: 'portfolio', param: null, redirect: true };
   }
   if (p.role === 'rep') {
@@ -98,7 +105,7 @@ function nrrHandleRoute() {
   // App-level nav active state: the account view belongs to the portfolio
   // family; company/sales (v28) are their own tabs.
   var navFamily = route.view === 'dashboard' ? 'dashboard'
-    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse' || route.view === 'waivers') ? route.view
+    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse' || route.view === 'waivers' || route.view === 'commission') ? route.view
     : 'portfolio';
   document.querySelectorAll('#nrr-appnav a').forEach(function (a) {
     a.classList.toggle('on', a.dataset.view === navFamily);

@@ -885,6 +885,22 @@
 .nrr-comm-ds .nrr-comm-gate-mid  { background: var(--sun-soft);   color: var(--sun-deep); }
 .nrr-comm-ds .nrr-comm-gate-full { background: var(--green-soft); color: var(--green-deep); }
 
+/* ── Commission tab (v_simtab) — threshold simulator + breakdown table ── */
+.nrr-comm-ds .nrr-comm-sim-params { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 6px; }
+.nrr-comm-ds .nrr-comm-sim-field {
+  display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink2);
+}
+.nrr-comm-ds .nrr-comm-sim-field input.nrr-search { width: 150px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.nrr-comm-ds .nrr-comm-sim-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.nrr-comm-ds .nrr-comm-sim-filters select.nrr-search { min-width: 130px; }
+.nrr-comm-ds .nrr-pace-badge {
+  display: inline-block; border-radius: var(--r-pill); padding: 3px 10px; font-weight: 700; font-size: 11.5px; white-space: nowrap;
+}
+.nrr-comm-ds .nrr-pace-badge.qualify { background: var(--green-soft); color: var(--green-deep); }
+.nrr-comm-ds .nrr-pace-badge.onpace  { background: var(--sun-soft);   color: var(--sun-deep); }
+.nrr-comm-ds .nrr-pace-badge.offpace { background: var(--fill-deep);  color: var(--ink3); }
+.nrr-comm-ds .nrr-pace-badge.pending { background: var(--fill-deep);  color: var(--ink3); font-weight: 500; }
+
 /* ── Slide-over (640px, 3 modes) ──────────────────────────────────────── */
 #nrr-slideover-backdrop {
   position: fixed; inset: 0; background: rgba(16, 21, 18, 0.45); z-index: 200;
