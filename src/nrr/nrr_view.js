@@ -1898,7 +1898,10 @@ function nrrShellHtml() {
     // landscape TV board, which should use the full screen).
     '<div class="nrr-view" id="nrr-view-pulse" hidden><div class="nrr-pulse-page" id="nrr-pulse-page"></div></div>' +
     // v28: company + sales views — pages render their own .nrr-section stack
-    '<div class="nrr-view" id="nrr-view-company" hidden><div class="nrr-page" id="nrr-company-page"></div></div>' +
+    // v_simtab: Overview uses the WIDE page container — its Target & Plan
+    // reference table has a column per month and was horizontally scrolling
+    // inside the 1020px .nrr-page cap (Bush flagged it alongside Commission).
+    '<div class="nrr-view" id="nrr-view-company" hidden><div class="nrr-page-wide" id="nrr-company-page"></div></div>' +
     '<div class="nrr-view" id="nrr-view-sales" hidden><div class="nrr-page" id="nrr-sales-page"></div></div>' +
     '<div class="nrr-view" id="nrr-view-portfolio" hidden><div class="nrr-page">' +
     '  <div class="nrr-section"><div class="nrr-panel-body" id="nrr-portfolio-body"></div></div>' +
@@ -1915,7 +1918,7 @@ function nrrShellHtml() {
     // regardless of which tab is active, same as every other always-on
     // section). #nrr-comm-sim-body is new: the threshold simulator +
     // item breakdown table, fetched once per tab visit.
-    '<div class="nrr-view" id="nrr-view-commission" hidden><div class="nrr-page">' +
+    '<div class="nrr-view" id="nrr-view-commission" hidden><div class="nrr-page-wide">' +
     '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
     '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-ds" id="nrr-comm-sim-body"></div></div>' +
     '</div></div>' +
@@ -2968,6 +2971,11 @@ var nrrCommSimState = {
   roster: [],     // [{email,name,tlEmail,tlName}]
   bundles: {},    // email -> bundle (nrrFetchUpsellBundle shape)
   expIds: {},     // email -> Set<outletId> (Expansion outlets, excluded from P1/P3 same as the real engine)
+  // Live-config aggregate, cached: derived purely from bundles + expIds +
+  // target_settings rates, none of which change after the loader below sets
+  // them, so caching adds no staleness the bundle cache didn't already have.
+  // Cleared in the loader alongside bundles.
+  baseline: null,
   overrides: { p1MinGmv: null, p3ThreshPct: null, p3MinIncr: null }, // null = live default
   // pass: 'relevant' (default) | 'qualify' | 'onpace' | 'offpace' | 'all' —
   // 'relevant' is load-bearing, not cosmetic: a real KAM's raw enumeration
@@ -3025,6 +3033,7 @@ function nrrRenderCommissionTabView() {
     });
     nrrCommSimState.bundles = bundles;
     nrrCommSimState.expIds = expIds;
+    nrrCommSimState.baseline = null; // recomputed lazily against the bundles just loaded
     nrrCommSimState.status = 'loaded';
     nrrRenderCommSimShell();
   });
@@ -3067,49 +3076,182 @@ function nrrRenderCommSimShell() {
   nrrRenderCommSimResults();
 }
 
+// ── One-pass aggregation (v_simtab round 2) ───────────────────────────────
+// Enumerates every roster member's groups ONCE per render and derives
+// everything on the tab from that single array: the hero totals, the
+// per-KAM table, and the breakdown rows. Before this, a single keystroke
+// swept the same ~103,000 rows THREE times (compute-baseline +
+// compute-adjusted + enumerate) and the three surfaces were independently
+// derived, so they could in principle disagree; now they cannot, because
+// they read the same array.
+//
+// The equivalence that makes this safe: nrrEnumerateUpsellGroups' per-row
+// `commission` applies the identical qualify predicate and arithmetic as
+// nrrComputeUpsellSkuWithParams (the mirror of the real payout engine), so
+// Σ rows.commission === compute().total_comm for the same params. That is
+// checked at load in _nrrCommSimBaseline below and locked by
+// tools/verify_nrrcomm_simulator.js — not merely asserted in a comment.
+function _nrrCommSimEnumerateAll(overrides) {
+  var out = [];
+  nrrCommSimState.roster.forEach(function (person) {
+    out = out.concat(nrrEnumerateUpsellGroups(person, nrrCommSimState.bundles[person.email],
+      QNRR_CFG.base_month, overrides, nrrCommSimState.expIds[person.email] || new Set()));
+  });
+  return out;
+}
+
+// Rolls one enumeration up into org + per-person totals. The projected
+// figures use each row's own run-rate and count only rows whose PROJECTED
+// value clears the threshold — "if the month holds this pace, here's where
+// it lands", which is the second thing this page exists to answer (know
+// early enough to push the team, instead of a month-end surprise).
+function _nrrCommSimAggregate(rows) {
+  var agg = { rows: rows, byEmail: {}, gmv: 0, comm: 0, qualify: 0, onPace: 0,
+              projGmv: 0, projComm: 0, projQualify: 0,
+              projReady: rows.length ? !!rows[0].projectionReady : false };
+  rows.forEach(function (r) {
+    var p = agg.byEmail[r.person.email] ||
+      (agg.byEmail[r.person.email] = { person: r.person, gmv: 0, comm: 0, qualify: 0, projComm: 0 });
+    if (r.qualifies) {
+      agg.gmv += r.current; agg.comm += r.commission; agg.qualify++;
+      p.gmv += r.current; p.comm += r.commission; p.qualify++;
+    } else if (r.projectedQualifies) {
+      agg.onPace++;
+    }
+    if (r.projectedQualifies && r.projected != null) {
+      var pc = r.projected * (Number(r.applied_rate) || 0);
+      agg.projGmv += r.projected; agg.projComm += pc; agg.projQualify++;
+      p.projComm += pc;
+    }
+  });
+  return agg;
+}
+
+// The live-config baseline never changes for a given month+roster, so it is
+// computed once and cached — that's what lets the per-keystroke recompute do
+// ONE pass instead of three. This is also the only place the real-engine
+// mirror still runs: its total must equal the enumeration-derived total, and
+// a drift gets logged rather than silently trusted.
+function _nrrCommSimBaseline() {
+  if (nrrCommSimState.baseline) return nrrCommSimState.baseline;
+  var agg = _nrrCommSimAggregate(_nrrCommSimEnumerateAll(null));
+  var engineComm = 0;
+  nrrCommSimState.roster.forEach(function (person) {
+    engineComm += nrrComputeUpsellSkuWithParams(nrrCommSimState.expIds[person.email] || new Set(),
+      nrrCommSimState.bundles[person.email], QNRR_CFG.base_month, null).total_comm;
+  });
+  if (Math.abs(engineComm - agg.comm) > 1) {
+    console.warn('[nrr] simulator baseline drift — real-engine mirror ฿' + Math.round(engineComm) +
+      ' vs enumerated ฿' + Math.round(agg.comm) + ': the two P1/P3 code paths have diverged, ' +
+      'the breakdown table and the payout numbers no longer agree');
+  }
+  nrrCommSimState.baseline = agg;
+  return agg;
+}
+
+function _nrrSimDeltaHtml(delta, fmt) {
+  if (!delta) return '<div class="nrr-sim-hero-delta flat">เท่าเดิม</div>';
+  return '<div class="nrr-sim-hero-delta ' + (delta > 0 ? 'up' : 'down') + '">' +
+    (delta > 0 ? '+' : '') + fmt(delta) + ' จากเกณฑ์ปัจจุบัน</div>';
+}
+
+function _nrrSimHeroCardHtml(label, valueHtml, subHtml, deltaHtml, changed) {
+  return '<div class="nrr-sim-hero' + (changed ? ' changed' : '') + '">' +
+    '<div class="nrr-sim-hero-label">' + label + '</div>' +
+    '<div class="nrr-sim-hero-value">' + valueHtml + '</div>' +
+    (deltaHtml || '') +
+    (subHtml ? '<div class="nrr-sim-hero-sub">' + subHtml + '</div>' : '') +
+    '</div>';
+}
+
+// The answer row: the three numbers the whole page is about, each as
+// value-now + projected-month-end + (once a threshold is touched) the delta
+// against the live config. Bush's ask — see the whole-org effect of moving a
+// threshold without having to read a single table row.
+function nrrCommSimHeroesHtml(baseline, adjusted, adjusting) {
+  function projLine(v, isCount) {
+    if (!adjusted.projReady) return 'คาดสิ้นเดือน · <span class="num">รอข้อมูล</span> (ต้นเดือนยังประมาณไม่ได้)';
+    return 'คาดสิ้นเดือนตามจังหวะนี้ <span class="num">~' +
+      (isCount ? v.toLocaleString('en-US') + ' รายการ' : nrrFmtGMVExact(v)) + '</span>';
+  }
+  var dGmv = adjusted.gmv - baseline.gmv;
+  var dComm = adjusted.comm - baseline.comm;
+  var dCount = adjusted.qualify - baseline.qualify;
+  return '<div class="nrr-sim-heroes">' +
+    _nrrSimHeroCardHtml('Upsell GMV ที่เข้าเกณฑ์ (P1+P3)', nrrFmtGMVExact(adjusted.gmv),
+      projLine(adjusted.projGmv), adjusting ? _nrrSimDeltaHtml(dGmv, nrrFmtGMVExact) : '',
+      adjusting && dGmv !== 0) +
+    _nrrSimHeroCardHtml('ค่าคอมฯ Upsell รวม', nrrFmtGMVExact(adjusted.comm),
+      projLine(adjusted.projComm), adjusting ? _nrrSimDeltaHtml(dComm, nrrFmtGMVExact) : '',
+      adjusting && dComm !== 0) +
+    _nrrSimHeroCardHtml('รายการที่เข้าเกณฑ์',
+      adjusted.qualify.toLocaleString('en-US') + '<span style="font-size:15px;font-weight:600"> รายการ</span>',
+      'ใกล้เข้าเกณฑ์อีก <span class="num">' + adjusted.onPace.toLocaleString('en-US') + '</span> รายการ · ' +
+        projLine(adjusted.projQualify, true),
+      adjusting ? _nrrSimDeltaHtml(dCount, function (v) { return v.toLocaleString('en-US') + ' รายการ'; }) : '',
+      adjusting && dCount !== 0) +
+    '</div>';
+}
+
+// Per-KAM roll-up. The ปรับใหม่/Δ columns only exist once a threshold has
+// actually been changed — before that they'd be an exact copy of the
+// ปัจจุบัน column, which is noise in an audit table.
+function nrrCommSimKamTableHtml(baseline, adjusted, adjusting) {
+  var rows = nrrCommSimState.roster.map(function (person) {
+    var b = baseline.byEmail[person.email] || { comm: 0, qualify: 0, projComm: 0 };
+    var a = adjusted.byEmail[person.email] || { comm: 0, qualify: 0, projComm: 0 };
+    return { person: person, base: b.comm, adj: a.comm, qualify: a.qualify,
+             proj: a.projComm, delta: a.comm - b.comm };
+  });
+  if (!rows.length) return '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีม</div></div>';
+  rows.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta) || b.adj - a.adj; });
+
+  var t = { base: 0, adj: 0, qualify: 0, proj: 0 };
+  var body = rows.map(function (r) {
+    t.base += r.base; t.adj += r.adj; t.qualify += r.qualify; t.proj += r.proj;
+    var deltaCell = !adjusting ? '' : (r.delta === 0
+      ? '<td><span class="nrr-comm-zero">—</span></td>'
+      : '<td><span style="color:' + (r.delta > 0 ? 'var(--green-deep)' : 'var(--coral)') + '">' +
+        (r.delta > 0 ? '+' : '') + nrrFmtGMVExact(r.delta) + '</span></td>');
+    return '<tr>' +
+      '<td class="txt"><span class="nrr-trunc nrr-trunc-kam" style="font-weight:600" title="' + nrrEsc(r.person.name) + '">' +
+      nrrEsc(nrrPersonNick(r.person.name)) + '</span>' +
+      '<div class="nrr-comm-cell-meta">' + nrrEsc(r.person.tlName || '') + '</div></td>' +
+      '<td>' + r.qualify.toLocaleString('en-US') + '</td>' +
+      '<td>' + nrrFmtGMVExact(r.base) + '</td>' +
+      (adjusting ? '<td><b>' + nrrFmtGMVExact(r.adj) + '</b></td>' : '') +
+      deltaCell +
+      '<td>' + (adjusted.projReady ? '~' + nrrFmtGMVExact(r.proj) : '—') + '</td>' +
+      '</tr>';
+  }).join('');
+  var totalRow = '<tr class="nrr-comm-total-row"><td class="txt">GRAND TOTAL</td>' +
+    '<td>' + t.qualify.toLocaleString('en-US') + '</td>' +
+    '<td>' + nrrFmtGMVExact(t.base) + '</td>' +
+    (adjusting ? '<td>' + nrrFmtGMVExact(t.adj) + '</td><td>' +
+      (t.adj - t.base >= 0 ? '+' : '') + nrrFmtGMVExact(t.adj - t.base) + '</td>' : '') +
+    '<td>' + (adjusted.projReady ? '~' + nrrFmtGMVExact(t.proj) : '—') + '</td></tr>';
+
+  return '<div class="ds-section-hd" style="margin-top:6px"><span class="ds-eyebrow">รายบุคคล (KAM)' +
+    (adjusting ? ' — ปัจจุบัน vs ปรับใหม่' : '') + '</span></div>' +
+    '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
+    '<th class="txt">KAM</th><th>เข้าเกณฑ์</th><th>ค่าคอมฯ ปัจจุบัน</th>' +
+    (adjusting ? '<th>ปรับใหม่</th><th>Δ</th>' : '') +
+    '<th>คาดสิ้นเดือน</th>' +
+    '</tr></thead><tbody>' + body + totalRow + '</tbody></table></div>';
+}
+
 function nrrRenderCommSimResults() {
   var el = document.getElementById('nrr-comm-sim-results');
   if (!el) return;
-  var roster = nrrCommSimState.roster;
-  var bundles = nrrCommSimState.bundles;
-  var expIds = nrrCommSimState.expIds;
   var overrides = _nrrCommSimActiveOverrides();
-  var baseMonth = QNRR_CFG.base_month;
+  var baseline = _nrrCommSimBaseline();
+  // No override active → the adjusted state IS the baseline; reuse the
+  // cached aggregate instead of sweeping 100K rows to reach the same answer.
+  var adjusted = overrides ? _nrrCommSimAggregate(_nrrCommSimEnumerateAll(overrides)) : baseline;
 
-  var orgBase = 0, orgAdj = 0;
-  var kamRows = roster.map(function (person) {
-    var bundle = bundles[person.email];
-    var eIds = expIds[person.email] || new Set();
-    var baseRes = nrrComputeUpsellSkuWithParams(eIds, bundle, baseMonth, null);
-    var adjRes = overrides ? nrrComputeUpsellSkuWithParams(eIds, bundle, baseMonth, overrides) : baseRes;
-    orgBase += baseRes.total_comm;
-    orgAdj += adjRes.total_comm;
-    return { person: person, base: baseRes.total_comm, adj: adjRes.total_comm, delta: adjRes.total_comm - baseRes.total_comm };
-  });
-  kamRows.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta) || b.adj - a.adj; });
-
-  var orgDelta = orgAdj - orgBase;
-  var compareHtml =
-    '<div class="ds-hero" style="margin:10px 0 18px">' +
-    '<div class="ds-hero-eyebrow">Upsell commission รวม (P1+P3) · องค์กร</div>' +
-    '<div style="display:flex;gap:22px;align-items:baseline;flex-wrap:wrap">' +
-    '<div><div class="ds-hero-number" style="font-size:26px">' + nrrFmtGMVExact(orgAdj) + '</div><div class="ds-hero-sub">ปรับใหม่</div></div>' +
-    '<div class="micro">ปัจจุบัน ' + nrrFmtGMVExact(orgBase) + '</div>' +
-    (orgDelta !== 0 ? '<div class="micro" style="color:' + (orgDelta > 0 ? 'var(--green-deep)' : 'var(--coral)') + '">Δ ' + (orgDelta > 0 ? '+' : '') + nrrFmtGMVExact(orgDelta) + '</div>' : '') +
-    '</div></div>';
-
-  var kamTableRows = kamRows.map(function (r) {
-    var deltaHtml = r.delta === 0 ? '<span class="nrr-comm-zero">—</span>'
-      : '<span style="color:' + (r.delta > 0 ? 'var(--green-deep)' : 'var(--coral)') + '">' + (r.delta > 0 ? '+' : '') + nrrFmtGMVExact(r.delta) + '</span>';
-    return '<tr><td><b>' + nrrEsc(r.person.name) + '</b><div class="nrr-comm-cell-meta">' + nrrEsc(r.person.tlName || '') + '</div></td>' +
-      '<td>' + nrrFmtGMVExact(r.base) + '</td><td>' + nrrFmtGMVExact(r.adj) + '</td><td>' + deltaHtml + '</td></tr>';
-  }).join('');
-  var kamTableHtml = kamRows.length
-    ? '<div class="ds-section-hd" style="margin-top:6px"><span class="ds-eyebrow">รายบุคคล (KAM) — ปัจจุบัน vs ปรับใหม่</span></div>' +
-      '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr><th>KAM</th><th>ปัจจุบัน</th><th>ปรับใหม่</th><th>Δ</th></tr></thead><tbody>' + kamTableRows + '</tbody></table></div>'
-    : '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มี KAM ในทีม</div></div>';
-
-  el.innerHTML = compareHtml + kamTableHtml + nrrCommBreakdownSectionHtml();
+  el.innerHTML = nrrCommSimHeroesHtml(baseline, adjusted, !!overrides) +
+    nrrCommSimKamTableHtml(baseline, adjusted, !!overrides) +
+    nrrCommBreakdownSectionHtml(adjusted.rows);
 }
 
 function nrrCommPaceBadgeHtml(r) {
@@ -3119,39 +3261,42 @@ function nrrCommPaceBadgeHtml(r) {
   return '<span class="nrr-pace-badge offpace">ต่ำกว่าจังหวะ</span>';
 }
 
+// One truncating text cell. The full string always goes on title= so nothing
+// is actually lost — hovering reveals it. See the .nrr-trunc CSS note for why
+// the max-width has to sit on an inner element and not the <td>.
+function _nrrTruncCell(text, widthCls, extraStyle) {
+  var t = text == null ? '' : String(text);
+  return '<td class="txt"><span class="nrr-trunc ' + widthCls + '"' +
+    (extraStyle ? ' style="' + extraStyle + '"' : '') +
+    ' title="' + nrrEsc(t) + '">' + nrrEsc(t) + '</span></td>';
+}
+
 function nrrCommBreakdownRowHtml(r) {
-  var acctName = _nrrAccountNameFor(r.accountId);
-  var outletName = _nrrOutletNameFor(r.accountId, r.outletId);
   var kindLabel = r.kind === 'p1' ? 'P1 ใหม่' : 'P3 โต';
   var thresholdLabel = r.kind === 'p1' ? nrrFmtGMVExact(r.threshold) : ('>' + r.thresholdPct + '× (' + nrrFmtGMVExact(r.threshold) + ')');
   var projectedLabel = r.projected != null ? nrrFmtGMVExact(r.projected) : '—';
+  // KAM shows the NICKNAME only (Bush, 2026-07-25) — the full
+  // "First (Nick) Last" was the widest thing in the row and pushed the
+  // numeric columns off screen. Full name stays available on hover.
   return '<tr>' +
-    '<td><b>' + nrrEsc(r.person.name) + '</b></td>' +
-    '<td>' + nrrEsc(acctName) + '</td>' +
-    '<td>' + nrrEsc(outletName) + '</td>' +
-    '<td>' + nrrEsc(r.groupKey) + (r.category ? '<div class="nrr-comm-cell-meta">' + nrrEsc(r.category) + '</div>' : '') + '</td>' +
-    '<td>' + kindLabel + '</td>' +
+    _nrrTruncCell(nrrPersonNick(r.person.name), 'nrr-trunc-kam', 'font-weight:600') +
+    _nrrTruncCell(_nrrAccountNameFor(r.accountId), 'nrr-trunc-acct') +
+    _nrrTruncCell(_nrrOutletNameFor(r.accountId, r.outletId), 'nrr-trunc-acct') +
+    '<td class="txt"><span class="nrr-trunc nrr-trunc-group" title="' + nrrEsc(r.groupKey) + '">' + nrrEsc(r.groupKey) + '</span>' +
+    (r.category ? '<div class="nrr-comm-cell-meta nrr-trunc nrr-trunc-group" title="' + nrrEsc(r.category) + '">' + nrrEsc(r.category) + '</div>' : '') + '</td>' +
+    '<td class="txt">' + kindLabel + '</td>' +
     '<td>' + nrrFmtGMVExact(r.current) + '</td>' +
     '<td>' + thresholdLabel + '</td>' +
     '<td>' + projectedLabel + '</td>' +
-    '<td>' + nrrCommPaceBadgeHtml(r) + '</td>' +
+    '<td class="txt">' + nrrCommPaceBadgeHtml(r) + '</td>' +
     '</tr>';
 }
 
-function nrrCommBreakdownSectionHtml() {
+// allRows comes from the caller's single enumeration pass (see
+// nrrRenderCommSimResults) — this function must never enumerate again, or the
+// hero totals and these rows could be computed from two different sweeps.
+function nrrCommBreakdownSectionHtml(allRows) {
   var roster = nrrCommSimState.roster;
-  var bundles = nrrCommSimState.bundles;
-  var expIds = nrrCommSimState.expIds;
-  var overrides = _nrrCommSimActiveOverrides();
-  var baseMonth = QNRR_CFG.base_month;
-
-  var allRows = [];
-  roster.forEach(function (person) {
-    var bundle = bundles[person.email];
-    var eIds = expIds[person.email] || new Set();
-    allRows = allRows.concat(nrrEnumerateUpsellGroups(person, bundle, baseMonth, overrides, eIds));
-  });
-
   var f = nrrCommSimState.filters;
   var categories = Array.from(new Set(allRows.map(function (r) { return r.category; }).filter(Boolean))).sort();
 
@@ -3202,7 +3347,8 @@ function nrrCommBreakdownSectionHtml() {
     : '';
   var tableHtml = filtered.length
     ? truncNote + '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
-      '<th>KAM</th><th>ร้าน</th><th>สาขา</th><th>กลุ่มสินค้า</th><th>ประเภท</th><th>ยอดปัจจุบัน</th><th>เกณฑ์</th><th>คาดสิ้นเดือน</th><th>สถานะ</th>' +
+      '<th class="txt">KAM</th><th class="txt">ร้าน</th><th class="txt">สาขา</th><th class="txt">กลุ่มสินค้า</th>' +
+      '<th class="txt">ประเภท</th><th>ยอดปัจจุบัน</th><th>เกณฑ์</th><th>คาดสิ้นเดือน</th><th class="txt">สถานะ</th>' +
       '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่พบรายการตามตัวกรองนี้</div></div>';
 

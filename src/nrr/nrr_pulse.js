@@ -69,10 +69,11 @@ function _nrrPulsePad(n) { return (n < 10 ? '0' : '') + n; }
 // Every owner/KAM name in this codebase follows "FirstName (Nickname)
 // LastName" — the signage board only has room for the nickname. Applied at
 // render time (not baked into the model) so the full name stays available.
-function _nrrPulseNick(fullName) {
-  var m = /\(([^)]+)\)/.exec(fullName || '');
-  return m ? m[1] : (fullName || '');
-}
+// v_simtab (2026-07-25): the implementation moved to nrrPersonNick
+// (nrr_core.js) when the Commission breakdown table needed the identical
+// helper; this stays as the pulse-local alias so its ~10 call sites below
+// don't churn. Same semantics, one implementation.
+function _nrrPulseNick(fullName) { return nrrPersonNick(fullName); }
 
 // v50: owner names were plain gray caption text — too easy to skim past.
 // User wants a KAM glancing at the TV to instantly recognize their OWN name

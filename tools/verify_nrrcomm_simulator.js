@@ -147,5 +147,32 @@ checkBool('projectionReady true at day 20 (>=5)', p1Small.projectionReady, true)
 const expectedProjP1Small = 4000 / 20 * 31;
 check('small P1 projected GMV = MTD/20*31', p1Small.projected, expectedProjP1Small);
 
+console.log('\n=== Part 5: Σ enumerate().commission === compute().total_comm ===');
+// THE load-bearing equivalence. nrr_view.js's Commission tab derives its hero
+// totals, per-KAM table and breakdown rows from ONE enumeration pass instead
+// of separately calling the engine mirror — safe only while the enumeration's
+// per-row commission agrees exactly with nrrComputeUpsellSkuWithParams (which
+// mirrors the real payout engine). If a future edit changes one predicate and
+// not the other, the tab would show numbers that don't match a payout; this
+// asserts it across several threshold settings, not just the defaults.
+// (nrr_view.js also warns at runtime if the two ever drift — belt and braces.)
+[null,
+ { p1MinGmv: 3000, p3ThreshPct: 1.5 },
+ { p1MinGmv: 0 },
+ { p3MinIncr: 0, p3ThreshPct: 1 },
+ { p1MinGmv: 20000, p3ThreshPct: 5 }
+].forEach(function (ov, i) {
+  var computed = nrrComputeUpsellSkuWithParams(expIds, bundle, baseMonth, ov);
+  var enumerated = nrrEnumerateUpsellGroups(person, bundle, baseMonth, ov, expIds);
+  var sumComm = enumerated.reduce(function (s, r) { return s + (r.qualifies ? r.commission : 0); }, 0);
+  var sumGmv = enumerated.reduce(function (s, r) { return s + (r.qualifies ? r.current : 0); }, 0);
+  var label = ov ? JSON.stringify(ov) : 'live defaults';
+  check('[' + i + '] ' + label + ' — commission', sumComm, computed.total_comm);
+  check('[' + i + '] ' + label + ' — eligible GMV', sumGmv, computed.total_gmv_eligible);
+  var qualifyCount = enumerated.filter(function (r) { return r.qualifies; }).length;
+  checkBool('[' + i + '] ' + label + ' — qualifying row count',
+    qualifyCount, computed.p1.groups.length + computed.p3.groups.length);
+});
+
 console.log(`\n${fails === 0 ? 'ALL PASS' : fails + ' FAILURE(S)'}`);
 process.exit(fails === 0 ? 0 : 1);

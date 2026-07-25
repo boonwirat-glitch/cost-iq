@@ -5,6 +5,19 @@
 
 .nrr-page { max-width: 1020px; margin: 0 auto; padding: 0 32px 100px; display: flex; flex-direction: column; }
 
+/* v_simtab (2026-07-25): 1020px above is a READING measure — right for the
+   NRR narrative page (prose takeaways + a few columns), wrong for the
+   data-table pages. Commission (9-column breakdown) and Overview (the
+   Target & Plan reference table, 6+ month columns) both overflowed it and
+   fell back to horizontal scrolling, while the masthead — which has NO
+   max-width — spanned the full window, so the nav sat far right of a
+   pinched centre column. These two views opt into the window width instead.
+   1560px, not 100%: past roughly that, a table row gets wide enough that
+   the eye loses the line between the person and their number, which is the
+   whole job of these tables. Same reasoning that gave the Pulse board its
+   own .nrr-pulse-page — a shared page class shouldn't dictate every view. */
+.nrr-page-wide { max-width: 1560px; margin: 0 auto; padding: 0 32px 100px; display: flex; flex-direction: column; }
+
 /* Masthead — quiet: white, hairline bottom rule, NO shadow (mockup .mast) */
 .nrr-masthead {
   position: sticky; top: 0; z-index: 50;
@@ -204,7 +217,7 @@
   .nrr-masthead-h { font-size: 18px; }
   .nrr-masthead-actions { gap: 8px; }
   .nrr-masthead-actions #nrr-sync-status { display: none; }
-  .nrr-page { padding: 0 16px 80px; }
+  .nrr-page, .nrr-page-wide { padding: 0 16px 80px; }
   .nrr-section { padding: 28px 0; }
 }
 
@@ -870,6 +883,30 @@
   font-family: var(--font-num); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .nrr-comm-ds table.nrr-comm-fulltable td:first-child { text-align: left; padding-left: 0; font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; }
+
+/* v_simtab (2026-07-25): the two rules above assume this table's original
+   shape — ONE leading name column, every other column a number — so they
+   right-align everything and set the tabular-numeral face, overriding only
+   :first-child. The Commission breakdown table has FOUR leading text columns
+   (KAM / account / outlet / item-family), which inherited right-alignment
+   and the numeral font, rendering Thai names ragged against the numbers.
+   An explicit .txt marks a text column: left-aligned, UI face, normal
+   weight. Deliberately additive — the TL/KAM audit tables above still want
+   every non-first cell right-aligned, so the base rules stay as they are. */
+.nrr-comm-ds table.nrr-comm-fulltable th.txt { text-align: left; }
+.nrr-comm-ds table.nrr-comm-fulltable td.txt {
+  text-align: left; font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--ink);
+}
+/* Truncation lives on an inner span, NOT the <td>: with the default
+   table-layout:auto a max-width on a cell is treated as a suggestion and
+   loses to content width, so the ellipsis never appears and the table just
+   keeps growing (which is exactly how these columns ended up forcing a
+   horizontal scrollbar). A block-level inner element honours it reliably.
+   Every truncating cell carries title= with the full text for hover. */
+.nrr-comm-ds .nrr-trunc { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrr-comm-ds .nrr-trunc-kam   { max-width: 96px; }
+.nrr-comm-ds .nrr-trunc-acct  { max-width: 230px; }
+.nrr-comm-ds .nrr-trunc-group { max-width: 200px; }
 .nrr-comm-ds table.nrr-comm-fulltable tr:last-child td { border-bottom: none; }
 .nrr-comm-ds table.nrr-comm-fulltable tr.nrr-comm-total-row td { border-top: 1.5px solid var(--ink); border-bottom: none; font-weight: 700; }
 .nrr-comm-ds .nrr-comm-cell-meta { font-size: 11px; font-weight: 400; font-family: var(--font-ui); color: var(--ink3); margin-top: 1px; }
@@ -900,6 +937,35 @@
 .nrr-comm-ds .nrr-pace-badge.onpace  { background: var(--sun-soft);   color: var(--sun-deep); }
 .nrr-comm-ds .nrr-pace-badge.offpace { background: var(--fill-deep);  color: var(--ink3); }
 .nrr-comm-ds .nrr-pace-badge.pending { background: var(--fill-deep);  color: var(--ink3); font-weight: 500; }
+
+/* Simulator hero cards — the answer row. Three questions the page exists to
+   answer (how much upsell GMV / how much commission / how many items), each
+   as MTD-now + projected-month-end + delta-vs-current-config, so moving a
+   threshold shows its whole-org effect without reading a single table row.
+   auto-fit rather than a fixed 3-up: at the narrow end they stack cleanly
+   instead of squeezing three columns of numbers into a phone width. */
+.nrr-comm-ds .nrr-sim-heroes {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px; margin: 14px 0 24px;
+}
+.nrr-comm-ds .nrr-sim-hero {
+  border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 3px; background: var(--bg);
+}
+.nrr-comm-ds .nrr-sim-hero.changed { border-color: var(--green); background: var(--green-soft); }
+.nrr-comm-ds .nrr-sim-hero-label {
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3);
+}
+.nrr-comm-ds .nrr-sim-hero-value {
+  font-family: var(--font-num); font-size: 27px; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; color: var(--green-deep); line-height: 1.15;
+}
+.nrr-comm-ds .nrr-sim-hero-delta { font-family: var(--font-num); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.nrr-comm-ds .nrr-sim-hero-delta.up   { color: var(--green-deep); }
+.nrr-comm-ds .nrr-sim-hero-delta.down { color: var(--coral); }
+.nrr-comm-ds .nrr-sim-hero-delta.flat { color: var(--ink3); font-weight: 500; }
+.nrr-comm-ds .nrr-sim-hero-sub { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+.nrr-comm-ds .nrr-sim-hero-sub .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
 
 /* ── Slide-over (640px, 3 modes) ──────────────────────────────────────── */
 #nrr-slideover-backdrop {

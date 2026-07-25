@@ -168,6 +168,21 @@ function nrrFmtDelta(v) {
 }
 window.nrrFmtDelta = nrrFmtDelta;
 
+// Every owner/KAM name in this data follows "FirstName (Nickname) LastName";
+// dense tables and the signage board only have room for the nickname. Applied
+// at RENDER time, never baked into the model, so the full name stays available
+// for a title=/hover. Returns the full string unchanged when there are no
+// parens (some rows carry an email or a bare name) — a caller that needs it
+// short should also truncate, which is what the table cells do.
+// v_simtab (2026-07-25): promoted here from nrr_pulse.js's own _nrrPulseNick
+// (which now delegates to this) once the Commission breakdown table needed the
+// same thing — one implementation, not two that could drift.
+function nrrPersonNick(fullName) {
+  var m = /\(([^)]+)\)/.exec(fullName || '');
+  return m ? m[1] : (fullName || '');
+}
+window.nrrPersonNick = nrrPersonNick;
+
 // ── CountUp — cubic ease-out, ported from src/06_portview_teamview.js ──
 function nrrCountUp(el, target, duration, formatter) {
   duration = duration || 900;
