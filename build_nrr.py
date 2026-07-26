@@ -29,7 +29,7 @@ bundler). Modules (inject order matters — dependencies before dependents):
   nrr_components.js  render helpers (stat tiles, movement chart, tags)
   nrr_view.js        page controller — wires fetch -> compute -> render
 """
-import os, sys
+import os, sys, json
 
 VERSION = sys.argv[1] if len(sys.argv) > 1 else 'v1'
 
@@ -45,6 +45,7 @@ nrr_logic        = read('src/nrr/nrr_logic.js')
 nrr_data         = read('src/nrr/nrr_data.js')
 nrr_core         = read('src/nrr/nrr_core.js')
 nrr_router       = read('src/nrr/nrr_router.js')
+nrr_freshness    = read('src/nrr/nrr_freshness.js')
 nrr_aggregate    = read('src/nrr/nrr_aggregate.js')
 nrr_commission   = read('src/nrr/nrr_commission.js')
 nrr_exclusions   = read('src/nrr/nrr_exclusions.js')
@@ -65,6 +66,7 @@ SLOTS = [
     ('<!-- INJECT_DATA -->',           nrr_data,            'script'),
     ('<!-- INJECT_CORE -->',           nrr_core,            'script'),
     ('<!-- INJECT_ROUTER -->',         nrr_router,          'script'),
+    ('<!-- INJECT_FRESHNESS -->',      nrr_freshness,       'script'),
     ('<!-- INJECT_AGGREGATE -->',      nrr_aggregate,       'script'),
     ('<!-- INJECT_COMMISSION -->',     nrr_commission,      'script'),
     ('<!-- INJECT_EXCLUSIONS -->',     nrr_exclusions,      'script'),
@@ -85,6 +87,14 @@ for placeholder, content, kind in SLOTS:
     old = f'{tag_open}\n{placeholder}\n{tag_close}'
     new = f'{tag_open}\n{content}{tag_close}'
     out = out.replace(old, new)
+
+# v_freshtab: bake the build id into the runtime output so an already-open
+# tab can compare its own window.NRR_BUILD against a freshly-fetched copy's
+# (see src/nrr/nrr_freshness.js) — VERSION was previously only ever used to
+# name the committed dist/ file, never substituted into the served HTML/JS.
+# json.dumps handles quoting safely; [1:-1] strips the wrapping double quotes
+# since the surrounding single-quoted JS string literal already provides them.
+out = out.replace('<!-- INJECT_BUILD_ID -->', json.dumps(VERSION)[1:-1])
 
 unresolved = [p for p, _, _ in SLOTS if p in out]
 if unresolved:

@@ -112,6 +112,11 @@ async function nrrInitApp() {
   await nrrRefresh(false);
   nrrHandleRoute();
   if (_bootLoader) _bootLoader.style.display = 'none';
+  // v_freshtab: arm the generic background-refresh timer (nrr_freshness.js)
+  // once per app lifetime — a tab left open continuously (never backgrounded)
+  // otherwise never re-fetches data, since nrrRefresh is only ever called on
+  // boot (above) and on the manual "รีเฟรช" button click.
+  if (typeof _nrrArmGenericRefreshTimer === 'function') _nrrArmGenericRefreshTimer();
 }
 
 // ── Portfolio layer view (Phase B, 2026-07-09) ───────────────────────────

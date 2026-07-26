@@ -3354,6 +3354,13 @@ function _renderOverviewPaceAndStrip(){
         }
       }catch(e){}
 
+      // v_freshtab: also re-check for a new deploy on the same cadence —
+      // checkRemoteBuild (defined in a later IIFE, exposed on global) is a
+      // no-op for regular desktop tabs (isStandalonePwa() gate) and only
+      // takes effect for installed PWA sessions, which previously only ever
+      // checked once, at boot.
+      try{ if(typeof global.checkRemoteBuild === 'function') global.checkRemoteBuild(reason); }catch(e){}
+
       var p = validator
         ? validator(reason, {force: true})
         : Promise.resolve(false);
@@ -3380,6 +3387,17 @@ function _renderOverviewPaceAndStrip(){
     // Network restored — check immediately (but still respect MIN_GAP)
     _schedule('online', 450);
   });
+  // v_freshtab (2026-07-26): the 4 listeners above are all "resume"-class
+  // events — a tab that stays continuously visible AND focused (never
+  // backgrounded/refocused) never fires any of them, so its data can go
+  // stale indefinitely with zero signal. This periodic tick is the only
+  // trigger that doesn't depend on the tab losing/regaining
+  // visibility/focus. Reuses _schedule/_run verbatim, so it inherits every
+  // existing gate for free (login-overlay check, logged-in check, the 60s
+  // MIN_GAP_MS dedup, single in-flight dedup) — no new logic, just a new
+  // trigger. 15 min: between Pulse's 10-min kiosk cadence (nrr_pulse.js)
+  // and this same file's own SW-update-check cadence (shell.html, 20 min).
+  setInterval(function(){ _schedule('interval-poll', 0); }, 15 * 60 * 1000);
 
   // Expose for diagnostics
   global.FreshketSenseResumeCoordinator = {
@@ -3689,49 +3707,21 @@ function _renderOverviewPaceAndStrip(){
   }
   markBuild();
 
-  async function askWaitingServiceWorkerToActivate(reg){
-    try{
-      if(reg&&reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING', source:'freshket-sense', version:VERSION});
-    }catch(e){}
-  }
-
-  function installServiceWorkerUpdateGuard(){
-    if(!('serviceWorker' in navigator)) return;
-    try{
-      navigator.serviceWorker.ready.then(function(reg){
-        try{ reg.update && reg.update(); }catch(e){}
-        askWaitingServiceWorkerToActivate(reg);
-        try{
-          reg.addEventListener('updatefound', function(){
-            const sw = reg.installing;
-            if(!sw) return;
-            sw.addEventListener('statechange', function(){
-              if(sw.state === 'installed' && navigator.serviceWorker.controller){
-                try{ sw.postMessage({type:'SKIP_WAITING', source:'freshket-sense', version:VERSION}); }catch(e){}
-              }
-            });
-          });
-        }catch(e){}
-      }).catch(function(){});
-      navigator.serviceWorker.addEventListener('controllerchange', function(){
-        // v215 NEUTRALIZED — duplicate SW reload handler.
-        // Reason: earlier handler at line ~5088 already reloads once on controllerchange with
-        //         its own sessionStorage guard. Having a second handler with a different guard
-        //         key meant a second reload could fire mid-boot if the first guard was cleared
-        //         (e.g., sessionStorage cleared by browser on PWA kill). Single owner is safer.
-        try{ console.info('[Sense v215] duplicate SW controllerchange handler neutralized'); }catch(e){}
-        return;
-        // ── original body below kept for forensic reference only; never executed ──
-        // Existing older handler may also reload. Keep a separate short-lived guard to prevent loops.
-        try{
-          if(sessionStorage.getItem('freshket_sw_controller_reloaded_v206f')) return;
-          sessionStorage.setItem('freshket_sw_controller_reloaded_v206f', String(now()));
-        }catch(e){}
-        setTimeout(function(){ try{ location.reload(); }catch(e){} }, 160);
-      });
-    }catch(e){}
-  }
-  installServiceWorkerUpdateGuard();
+  // v_freshtab (2026-07-26): removed installServiceWorkerUpdateGuard/
+  // askWaitingServiceWorkerToActivate — this guard unconditionally sent
+  // SKIP_WAITING to any waiting SW the instant navigator.serviceWorker.ready
+  // resolved (i.e. on every load, not gated on user action), racing and
+  // defeating shell.html's polite update pill (which only sends SKIP_WAITING
+  // when the user taps it). The new SW activated silently before the pill
+  // could matter; since window._senseUserRequestedUpdate was never set via
+  // this path, shell.html's own controllerchange handler just logged "SW
+  // claimed silently — no reload" and did nothing, leaving a tab
+  // network-controlled by new code but its JS/DOM never reloaded, with zero
+  // visible signal. Confirmed via repo-wide grep this function was
+  // unreferenced anywhere else — safe, self-contained removal.
+  // shell.html's own registration (reg.update() on load + 20-min interval +
+  // visibilitychange recheck, pill on reg.waiting/updatefound, tap → SKIP_
+  // WAITING → controllerchange → single reload) is now the sole SW-update path.
 
   async function checkRemoteBuild(reason){
     // v207c: live reload is useful for installed PWA, but harmful on desktop while testing/Sense flow.
@@ -3770,6 +3760,12 @@ function _renderOverviewPaceAndStrip(){
     })();
     return buildCheckInFlight;
   }
+  // v_freshtab: exposed so FreshketSenseResumeCoordinator (a separate IIFE,
+  // ~line 3305) can trigger a build-mismatch check from its own periodic
+  // interval — checkRemoteBuild already self-gates on isStandalonePwa(), so
+  // this is a no-op for regular desktop tabs; it only takes effect for
+  // installed PWA sessions, which today only ever check once, at boot.
+  global.checkRemoteBuild = checkRemoteBuild;
 
   async function repairCriticalData(reason, opts){
     opts = opts || {};
