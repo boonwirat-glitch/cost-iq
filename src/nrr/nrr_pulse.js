@@ -30,7 +30,22 @@ var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
 var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
 var NRR_PULSE_REFRESH_MS = 10 * 60 * 1000;      // re-pull + re-render every 10 min
-var NRR_PULSE_SCENE_SUBROT_MS = 3500;           // internal list re-slice cadence within a scene (faster than full-scene rotation, so more names get airtime before the scene moves on)
+// v_signage9 (2026-07-26): was a hardcoded 3500ms, completely independent of
+// the "ความเร็วหมุน" scene-speed picker below — a KAM watching the board at
+// the slowest 30s setting still saw list rows reshuffle every 3.5s regardless,
+// which read as "spinning fast" even though the scene-to-scene rotation itself
+// was correctly slow (user report, confirmed by reading the two timers: this
+// one was never wired to rotMs at all). Now derives from the same rotMs the
+// user actually controls, so picking a slower scene speed also slows the list
+// underneath it — no new control, per explicit request to tie it to the
+// existing setting rather than add a second knob.
+function _nrrPulseSubRotMs() {
+  // /2.3 preserves today's exact cadence at the 8s default (8000/2.3≈3478,
+  // matches the old hardcoded 3500 closely) while scaling proportionally at
+  // the other 3 choices (5s→~2.2s, 15s→~6.5s, 30s→~13s) instead of a fixed
+  // 3.5s no matter what's picked.
+  return Math.round(nrrPulseState.rotMs / 2.3);
+}
 // v_signage2 (2026-07-15): unified every rotating-list scene's cap at 5 per
 // screen, per explicit user request ("max สุดหน้าละ 5 ร้าน แต่ว่าค่อยๆ หมุนวนไป") —
 // was 8 for risk, 3 (no rotation) for wins. All of these now sub-rotate via
@@ -454,7 +469,80 @@ function _nrrPulseSetTvMode(on) {
   // sizing updates the instant TV mode toggles, not just on the next
   // rotation tick.
   if (nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
+  if (on) _nrrPulseFitToScreen();
+  else { _nrrPulseClearFitCorrection(); _nrrPulseMaybeShowFitNote(false); }
 }
+
+// ── Real-TV proportions: empirical fit-to-screen correction ──────────────
+// v_signage9 (2026-07-26): v_signage8 above already made .nrr-pulse-fs-active
+// apply unconditionally so TVs without real Fullscreen API support at least
+// get the full-bleed CSS -- but that alone doesn't fix a TV browser whose
+// EFFECTIVE reported viewport (window.innerWidth/innerHeight, whatever
+// 100vw/100vh resolve against) is itself narrower than the panel's true
+// resolution (a failed fullscreen request leaving the browser's own render
+// surface smaller than the screen, or a TV-browser zoom/scale default) --
+// the vh/vw-based CSS still computes correctly, just against the WRONG
+// basis, which is exactly the "content only fills a corner of the screen,
+// fonts/boxes distorted" symptom v_signage8's own comment already named,
+// reported again on a real LG webOS Browser TV. window.screen.width/height
+// (the OS-reported physical panel resolution) is the one measurement that
+// generally stays correct even when the browser's own viewport is off --
+// comparing the two and applying a compensating CSS transform:scale() is the
+// standard fix for this class of embedded/kiosk-browser bug. A page-level
+// transform can only stretch content within the browser's OWN render
+// surface though -- if THAT is genuinely smaller than the panel (not just a
+// zoom/scale quirk), no code fix can grow it, hence the fallback note below.
+var NRR_PULSE_FIT_TOLERANCE = 0.04; // ignore <4% mismatches -- ordinary browser noise, not worth a transform
+function _nrrPulseFitToScreen() {
+  try {
+    if (!nrrPulseState.tvMode) return;
+    var page = document.querySelector('.nrr-pulse-page');
+    if (!page) return;
+    // Clear any prior correction before measuring -- repeated calls (resize,
+    // fullscreenchange) must always measure the TRUE unscaled render, never
+    // one already shrunk by our own previous transform.
+    _nrrPulseClearFitCorrection();
+    var rect = page.getBoundingClientRect();
+    var sw = window.screen && window.screen.width;
+    var sh = window.screen && window.screen.height;
+    if (!sw || !sh || !rect.width || !rect.height) return;
+    var sx = sw / rect.width;
+    var sy = sh / rect.height;
+    var mismatched = Math.abs(sx - 1) > NRR_PULSE_FIT_TOLERANCE || Math.abs(sy - 1) > NRR_PULSE_FIT_TOLERANCE;
+    if (mismatched) {
+      page.style.transformOrigin = 'top left';
+      page.style.transform = 'scale(' + sx.toFixed(4) + ',' + sy.toFixed(4) + ')';
+    }
+    // Only worth flagging to the user when: still mismatched by a wide
+    // margin (>15%, i.e. genuinely "confined to a corner", not a few px of
+    // browser chrome) AND there's no confirmed real Fullscreen API session
+    // to explain/fix it another way.
+    _nrrPulseMaybeShowFitNote(mismatched && !document.fullscreenElement && (sx > 1.15 || sy > 1.15));
+  } catch (e) {}
+}
+function _nrrPulseClearFitCorrection() {
+  try {
+    var page = document.querySelector('.nrr-pulse-page');
+    if (page) { page.style.transform = ''; page.style.transformOrigin = ''; }
+  } catch (e) {}
+}
+// Honest fallback: if the render surface itself is undersized (not just a
+// zoom mismatch we can compensate for), tell Bush there's a device-side
+// setting to check instead of silently leaving an uncorrected gap.
+function _nrrPulseMaybeShowFitNote(show) {
+  try {
+    var existing = document.getElementById('nrr-pulse-fit-note');
+    if (!show) { if (existing) existing.remove(); return; }
+    if (existing) return;
+    var n = document.createElement('div');
+    n.id = 'nrr-pulse-fit-note';
+    n.textContent = 'ถ้าจอยังไม่เต็ม ลองเช็คการตั้งค่าจอ/ซูมของทีวีเอง';
+    document.body.appendChild(n);
+    setTimeout(function () { var el = document.getElementById('nrr-pulse-fit-note'); if (el) el.remove(); }, 8000);
+  } catch (e) {}
+}
+window.addEventListener('resize', function () { if (nrrPulseState.tvMode) _nrrPulseFitToScreen(); });
+window.addEventListener('orientationchange', function () { if (nrrPulseState.tvMode) _nrrPulseFitToScreen(); });
 function _nrrPulseToggleFullscreen() {
   var goingOn = !nrrPulseState.tvMode;
   _nrrPulseSetTvMode(goingOn);
@@ -475,7 +563,11 @@ function _nrrPulseToggleFullscreen() {
 // TVs that never fire this event at all simply don't hit this listener,
 // which is fine, since the button click above is already authoritative.
 document.addEventListener('fullscreenchange', function () {
-  if (!document.fullscreenElement && nrrPulseState.tvMode) _nrrPulseSetTvMode(false);
+  if (!document.fullscreenElement && nrrPulseState.tvMode) { _nrrPulseSetTvMode(false); return; }
+  // Real Fullscreen API engaging (where supported) can shift the browser's
+  // own effective viewport asynchronously, after the initial button click
+  // already ran the fit correction once -- re-measure now that it's settled.
+  if (document.fullscreenElement && nrrPulseState.tvMode) _nrrPulseFitToScreen();
 });
 
 // ── Scenes ───────────────────────────────────────────────────────────────
@@ -728,7 +820,7 @@ function _nrrPulseArmSceneSubRotation(key) {
       : NRR_PULSE_SCENE_MONTH_MAX;
     nrrPulseState.rotIdx += _nrrPulseEffMax(max);
     _nrrPulseFillLists(key);
-  }, NRR_PULSE_SCENE_SUBROT_MS);
+  }, _nrrPulseSubRotMs());
 }
 
 function nrrRenderPulseView() {

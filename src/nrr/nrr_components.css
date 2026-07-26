@@ -1313,6 +1313,16 @@ body.nrr-pulse-on { background: #0E2A21; }
   cursor: pointer; white-space: nowrap; transition: border-color 140ms ease, background 140ms ease;
 }
 .nrr-pulse-fs-btn:hover { border-color: var(--pc-ink-dim); background: var(--pc-bg2); }
+/* v_signage9: honest fallback note when the fit-to-screen correction
+   (nrr_pulse.js _nrrPulseFitToScreen) can't fully close a large gap between
+   the panel's true resolution and the browser's own render surface — a
+   page-level transform can't grow a genuinely undersized window. */
+#nrr-pulse-fit-note {
+  position: fixed; bottom: 20px; right: 20px; z-index: 99989;
+  background: var(--pc-bg2); border: 1px solid var(--pc-line); color: var(--pc-ink-dim);
+  font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: var(--r-pill);
+  box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none;
+}
 /* v47: TV fullscreen mode — hides the app's own masthead/nav (shared across
    every view) so the board is pure signage with no browser/app chrome
    competing for space; only active while genuinely in the Fullscreen API
