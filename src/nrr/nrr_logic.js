@@ -27,6 +27,25 @@
 // src/07c_qnrr_view.js's _qnrrCompute in the same commit. See
 // nrr_exclusions.js for nrrAccountWaivedForPeriod().
 //
+// NOTE (2026-07-28, v_segfilter): _qnrrCompute gained an OPTIONAL third
+// `opts` param carrying `{segments:['sa','mc','chain','other']}` — a
+// customer-segment (account_type) filter for the /nrr dashboard's Movement +
+// KAM Leaderboard sections. Omitting it is byte-identical to the old
+// behavior, which is deliberate: nrrKamResult is also called by
+// nrr_commission.js, nrr_portfolio.js and the masthead, and NONE of them
+// may be affected by a dashboard filter. That guarantee is structural — a
+// call site that doesn't pass `opts` cannot be filtered — which is why this
+// is an explicit param and not an ambient module-level variable.
+//
+// The filter MUST live inside _rowInScope, never as a pre-filter on
+// bulkQnrrData. Pre-filtering empties qd.byTlEmail[tl], so myTlEmail
+// resolves to '' and the "Admin viewing team scope with no personal TL"
+// org-wide fallback silently fires — measured: a team with zero SA outlets
+// returned the whole ORG's SA figure (nrr=100.6) under its own team
+// heading, no error. _rowInScope runs after myTlEmail is resolved from the
+// unfiltered index, so it is immune. tools/verify_segment_filter.js locks
+// this with an explicit assertion.
+//
 // Consumes window.bulkQnrrData, built by nrr_data.js in the exact same shape
 // Sense itself builds it in (src/02_data_pipeline.js, bulk-qnrr-single
 // handler): { byKamEmail:{email:[row]}, byTlEmail:{email:[row]}, allRows:[],
@@ -60,9 +79,30 @@ window.QNRR_CFG = QNRR_CFG;
 // the KAM team's %NRR (and the TL's commission NRR). scope 'kam' is
 // deliberately untouched so her own self-view keeps working. Empty roster
 // (fetch failed / not yet loaded) = exactly the old behavior.
-function _qnrrCompute(kamEmail, scope) {
+// v_segfilter: 4-way customer-segment key. Deliberately NOT nrrAccountBucket()
+// (nrr_data.js), which collapses SA+MC into one 'sa_mc' bucket for the
+// Company/Squad views — the dashboard filter needs SA and MC apart. 'other'
+// catches 'Unknown', blank, and any value BigQuery starts emitting later, so
+// selecting all four keys always filters exactly nothing. That makes
+// "all tiles on == unfiltered" a provable invariant rather than an
+// approximation, which is why the tail is a real key and not a dropped row.
+function nrrSegmentKey(row) {
+  var t = (row.account_type || '').trim();
+  if (t === 'SA') return 'sa';
+  if (t === 'MC') return 'mc';
+  if (t === 'Chain') return 'chain';
+  return 'other';
+}
+window.nrrSegmentKey = nrrSegmentKey;
+
+function _qnrrCompute(kamEmail, scope, opts) {
   scope = scope || 'kam';
   if (scope === 'kam' && !kamEmail) return null;
+  // Captured once so it stays constant across every _rowInScope / baseMap /
+  // _effectiveMovement pass within this one compute. Empty/absent => null =>
+  // the predicate below short-circuits and this function is byte-identical
+  // to its pre-v_segfilter behavior.
+  var _segs = (opts && opts.segments && opts.segments.length) ? opts.segments : null;
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded) return null;
   var _roster = window.nrrRoleRoster || { nonKamSet: new Set(), adSet: new Set() };
@@ -96,6 +136,9 @@ function _qnrrCompute(kamEmail, scope) {
     return _nonKam.has((r.latest_kam_email || '').toLowerCase());
   }
   function _rowInScope(r) {
+    // v_segfilter: segment gate runs FIRST and is orthogonal to every scope
+    // branch below — an AND-condition, not a sibling of them.
+    if (_segs && _segs.indexOf(nrrSegmentKey(r)) === -1) return false;
     if (scope === 'kam')   return r.latest_kam_email === kamEmail;
     if (scope === 'tl')    return (myTlEmail ? r.latest_tl_email === myTlEmail : true) && !_isNonKamOwner(r);
     if (scope === 'admin') return !_isNonKamOwner(r);

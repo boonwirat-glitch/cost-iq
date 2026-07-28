@@ -68,6 +68,15 @@ async function nrrInitApp() {
     nrrCommSelectedPeriod = e.target.value;
     nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
   });
+  // v_segfilter: ONE delegated listener per permanent host section, bound once.
+  // Both #nrr-sec-kams and #nrr-sec-movement come from nrrShellHtml and are
+  // never torn down, so this survives every innerHTML/outerHTML repaint of the
+  // strip inside them — unlike the movement switcher's per-render
+  // addEventListener pattern, which would leak a handler on every repaint.
+  ['nrr-sec-kams', 'nrr-sec-movement'].forEach(function (id) {
+    var host = document.getElementById(id);
+    if (host) host.addEventListener('click', nrrHandleSegClick);
+  });
   document.getElementById('nrr-portfolio-body').addEventListener('click', nrrHandlePortfolioClick);
   document.getElementById('nrr-portfolio-body').addEventListener('input', nrrHandlePortfolioInput);
   document.getElementById('nrr-portfolio-body').addEventListener('change', nrrHandlePortfolioChange);
@@ -129,6 +138,175 @@ var nrrPortfolioState = { email: null, search: '', paceFilter: { ok: false, warn
   // or '' = off) + risk-queue expand toggle. Both reset on portfolio switch
   // (nrrRenderPortfolioLayerView) since tier membership is per-portfolio.
   tierFilter: '', queueExpanded: false };
+
+// ── v_segfilter (2026-07-28): SA/MC/Chain segment filter + mix view ───────
+// Scoped to the Movement + KAM/AD Leaderboard sections ONLY. Deliberately NOT
+// in nrrState: that object holds dashboard-wide selection (period,
+// selectedTeam) read by five sections including commission, and putting a
+// two-section filter there invites a future contributor to read it from a
+// sixth. nrrPortfolioState is the precedent for "state owned by one part of
+// the page".
+//
+// Flat booleans (not a Set/array) to match nrrPortfolioState.paceFilter above:
+// same all-off-means-no-filter contract, same delegated-toggle handler shape.
+var nrrSegState = { sa: false, mc: false, chain: false, other: false };
+
+// Which of the two stable containers hosts the tile strip. 'leaderboard' keeps
+// the tiles at the same always-team scope as the per-KAM mix bars directly
+// below them (so tiles and bars reconcile by construction); 'movement' keeps
+// them next to the chart they filter. Chosen from real screenshots with Bush
+// rather than in the abstract — see the plan file.
+var NRR_SEG_STRIP_PLACEMENT = 'leaderboard';
+
+var NRR_SEG_META = [
+  { key: 'sa',    label: 'SA',    full: 'Stand-alone' },
+  { key: 'mc',    label: 'MC',    full: 'Multi-branch' },
+  { key: 'chain', label: 'Chain', full: 'Chain' },
+  { key: 'other', label: 'อื่นๆ', full: 'ไม่ระบุกลุ่ม' }
+];
+
+// Returns the opts object the engine wants, or undefined when nothing is
+// selected. `undefined` (not `{segments:[]}`) is deliberate: it means every
+// downstream call is byte-identical to its pre-feature behavior, which is the
+// same "all off = no filter" contract nrrPortfolioAcctGridHtml uses via its
+// anyPaceSelected guard.
+function nrrSegOpts() {
+  var on = NRR_SEG_META.map(function (m) { return m.key; })
+    .filter(function (k) { return nrrSegState[k]; });
+  return on.length ? { segments: on } : undefined;
+}
+
+function nrrSegAnyOn() { return !!nrrSegOpts(); }
+
+// Human-readable list of what's active, for headers/exports/empty states.
+function nrrSegActiveLabel() {
+  var on = NRR_SEG_META.filter(function (m) { return nrrSegState[m.key]; });
+  return on.map(function (m) { return m.label; }).join(' · ');
+}
+
+// Drop any selected segment that no longer exists in freshly-loaded data.
+// Without this, a segment vanishing from the CSV would leave the two sections
+// permanently empty with no visible cause. Called from nrrRefresh.
+function nrrSegPruneStale() {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded || !qd.allRows) return;
+  var present = {};
+  qd.allRows.forEach(function (r) { present[nrrSegmentKey(r)] = 1; });
+  NRR_SEG_META.forEach(function (m) {
+    if (nrrSegState[m.key] && !present[m.key]) nrrSegState[m.key] = false;
+  });
+}
+
+// The tile strip — simultaneously the multi-select filter control AND the mix
+// view. Mirrors nrrPortfolioRiskSummaryHtml's structure (.selected on chosen
+// tiles + .has-selection on the container so unselected ones dim), which is
+// what makes multi-select legible at a glance.
+//
+// The 'other' tile is rendered ONLY when it actually has outlets. That keeps
+// the normal view to three tiles while preserving the invariant that selecting
+// every visible tile equals the unfiltered view — a footnote instead would
+// leave a small unexplained discrepancy, and the tail is data-dependent (today
+// exactly 1 row org-wide, but nothing pins it there).
+function nrrSegStripHtml(scope, email) {
+  var period = nrrState.period;
+  var anyOn = nrrSegAnyOn();
+  var cells = [];
+  NRR_SEG_META.forEach(function (m) {
+    var s = nrrSegSummary(scope, email, m.key, period);
+    // Hide the tail tile unless it's real; always show the three named ones so
+    // "this team has no SA" is itself visible information rather than an
+    // absence the user has to infer.
+    if (m.key === 'other' && (!s || !s.outlets)) return;
+    var on = nrrSegState[m.key];
+    var pct = (s && s.nrr_pct != null) ? nrrFmtPct(s.nrr_pct) : '—';
+    var pctColor = (s && s.nrr_pct != null) ? nrrThresholdColorVar(s.nrr_pct) : 'var(--ink3)';
+    var count = s ? s.outlets : 0;
+    var base = s ? s.base_gmv : 0;
+    cells.push(
+      '<button class="nrr-seg-tile seg-' + m.key + (on ? ' selected' : '') + (count ? '' : ' empty') + '"' +
+        ' data-seg-filter="' + m.key + '" aria-pressed="' + (on ? 'true' : 'false') + '"' +
+        ' title="' + nrrEsc(m.full) + (count ? '' : ' — ไม่มีร้านในมุมมองนี้') + '">' +
+        '<span class="nrr-seg-tile-top">' +
+          '<span class="nrr-seg-dot"></span>' +
+          '<span class="nrr-seg-tile-label">' + nrrEsc(m.label) + '</span>' +
+          '<span class="nrr-seg-tile-count num">' + count + ' ร้าน</span>' +
+        '</span>' +
+        '<span class="num nrr-seg-tile-pct" style="color:' + pctColor + '">' + pct + '</span>' +
+        '<span class="micro nrr-seg-tile-base">ฐาน ' + nrrFmtGMV(base) + '</span>' +
+      '</button>'
+    );
+  });
+  if (!cells.length) return '';
+  var clear = anyOn
+    ? '<button class="nrr-seg-clear" data-seg-filter="__clear">ล้างตัวกรอง</button>'
+    : '';
+  return '<div class="nrr-seg-strip-wrap" id="nrr-seg-strip-inner">' +
+    '<div class="nrr-seg-strip' + (anyOn ? ' has-selection' : '') + '">' + cells.join('') + clear + '</div>' +
+    '<div class="micro nrr-seg-strip-note">' +
+      (anyOn
+        ? 'กรองอยู่: <b>' + nrrEsc(nrrSegActiveLabel()) + '</b> — มีผลกับกราฟ Movement และตาราง KAM/AD ด้านล่าง (ไม่กระทบ %NRR ด้านบน หรือหน้า Commission)'
+        : 'กลุ่มลูกค้าในพอร์ต — คลิกเพื่อกรอง (เลือกได้หลายกลุ่ม)') +
+    '</div></div>';
+}
+
+// Paint the strip into whichever container placement selects. Always team
+// scope: the KAM/AD leaderboards are team-scoped by nature, and the tiles must
+// reconcile with the mix bars beneath them.
+function nrrRenderSegStrip() {
+  var isAdmin = nrrProfile.role === 'admin';
+  var tlEmail = isAdmin ? nrrState.selectedTeam : nrrProfile.email;
+  var host = document.getElementById('nrr-seg-strip-' + NRR_SEG_STRIP_PLACEMENT);
+  var other = document.getElementById('nrr-seg-strip-' +
+    (NRR_SEG_STRIP_PLACEMENT === 'leaderboard' ? 'movement' : 'leaderboard'));
+  if (other) other.innerHTML = '';
+  if (!host) return;
+  host.innerHTML = tlEmail ? nrrSegStripHtml('tl', tlEmail) : '';
+}
+
+// One repaint unit for a filter toggle. Deliberately NOT nrrRenderAll(), which
+// would also repaint the masthead capsule, pulse, team cards, both portfolio
+// sections and the commission section — all of which must stay unaffected.
+function nrrSegRepaint() {
+  nrrRenderSegStrip();
+  nrrRenderMovementSection();
+  nrrRenderKamLeaderboard();
+  nrrRenderAdLeaderboard();
+}
+
+// Delegated toggle handler, bound once in nrrInitApp to a permanent node.
+// Returns true if it consumed the event.
+function nrrHandleSegClick(e) {
+  var tile = e.target.closest && e.target.closest('[data-seg-filter]');
+  if (!tile) return false;
+  var key = tile.dataset.segFilter;
+  if (key === '__clear') {
+    NRR_SEG_META.forEach(function (m) { nrrSegState[m.key] = false; });
+  } else if (Object.prototype.hasOwnProperty.call(nrrSegState, key)) {
+    nrrSegState[key] = !nrrSegState[key];
+  } else {
+    return false;
+  }
+  nrrSegRepaint();
+  return true;
+}
+
+// Small stacked composition bar for one KAM's segment mix. Always fed the
+// UNFILTERED mix (see nrrKamSegMix's own comment) so "who is Chain-heavy"
+// stays readable even while filtered to a single segment.
+function nrrSegMixBarHtml(kamEmail, period) {
+  var mix = nrrKamSegMix(kamEmail, period);
+  if (!mix.total) return '<span class="micro" style="color:var(--ink3)">—</span>';
+  var parts = NRR_SEG_META.filter(function (m) { return mix.by[m.key] > 0; });
+  var tip = parts.map(function (m) {
+    return m.label + ' ' + Math.round(mix.by[m.key] / mix.total * 100) + '%';
+  }).join(' · ');
+  return '<span class="nrr-seg-mixbar" title="สัดส่วน GMV เดือนนี้ — ' + nrrEsc(tip) + '">' +
+    parts.map(function (m) {
+      var w = (mix.by[m.key] / mix.total * 100).toFixed(2);
+      return '<i class="seg-' + m.key + '" style="width:' + w + '%"></i>';
+    }).join('') +
+    '</span>';
+}
 
 // { email, name } list this profile is allowed to switch between — also
 // what nrr_router.js's TL guard checks against, so "what the switcher
@@ -1806,6 +1984,11 @@ async function nrrRefresh(force) {
     // Must resolve before nrrRenderAll() below -- nrr_logic.js's compute
     // functions call nrrAccountWaivedForPeriod synchronously off this cache.
     await nrrFetchExclusions();
+    // v_segfilter: drop any selected segment that no longer exists in the data
+    // that just landed. Without this, a segment disappearing from the CSV would
+    // leave the Movement + Leaderboard sections permanently empty with no
+    // visible cause. Must run before nrrRenderAll() reads nrrSegOpts().
+    nrrSegPruneStale();
     nrrRenderAll();
     if (status) status.textContent = 'อัปเดตล่าสุด ' + new Date(window.bulkQnrrData.loadedAt).toLocaleString('th-TH');
   } catch (e) {
@@ -1868,6 +2051,13 @@ function nrrShellHtml() {
     '    <div class="nrr-panel-head"><div class="h2" id="nrr-movement-title">Outlet Movement</div>' +
     '    <div class="nrr-mv-switch"><div class="seg" id="nrr-mv-portfolio-seg"></div><span id="nrr-mv-secondary"></span></div></div>' +
     '    <div class="nrr-takeaway micro" id="nrr-movement-takeaway"></div>' +
+    // v_segfilter: BOTH candidate homes for the segment tile strip exist as
+    // stable, permanent containers; NRR_SEG_STRIP_PLACEMENT decides which one
+    // gets populated (the other renders empty and collapses). Two containers
+    // rather than one movable node so the delegated click handler can bind
+    // once to a node that is guaranteed to exist, and so switching placement
+    // is a one-constant change with no DOM surgery.
+    '    <div id="nrr-seg-strip-movement"></div>' +
     '    <div id="nrr-movement-chart"></div><div style="margin-top:18px;overflow-x:auto" id="nrr-movement-table"></div>' +
     '  </div></div>' +
     '  <div class="nrr-section" id="nrr-sec-kams" style="animation-delay:.14s"><div class="nrr-panel-body">' +
@@ -1879,7 +2069,8 @@ function nrrShellHtml() {
     '      <button class="btn-secondary" id="nrr-kams-export">Export CSV</button>' +
     '      <button class="btn-secondary" id="nrr-copy-summary">คัดลอกสรุป</button>' +
     '    </div></div>' +
-    '    <table class="nrr-table"><thead><tr><th>KAM</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-kams-tbody"></tbody></table>' +
+    '    <div id="nrr-seg-strip-leaderboard"></div>' +
+    '    <table class="nrr-table"><thead><tr><th>KAM</th><th>%NRR</th><th style="text-align:right">GMV</th><th title="สัดส่วน GMV ตามกลุ่มลูกค้า — แสดงพอร์ตเต็มเสมอ ไม่ขึ้นกับตัวกรอง">Mix</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-kams-tbody"></tbody></table>' +
     '  </div></div>' +
     // v_adperson: AD leaderboard — same team-nested shape as the KAM table
     // right above it, but a clearly separate section (own header + muted
@@ -1888,7 +2079,7 @@ function nrrShellHtml() {
     '  <div class="nrr-section" id="nrr-sec-ads" style="animation-delay:.16s;display:none"><div class="nrr-panel-body">' +
     '    <div class="nrr-panel-head"><div class="h2" id="nrr-ads-title">AD</div>' +
     '    <span class="tag muted">ไม่รวมใน %NRR ทีม</span></div>' +
-    '    <table class="nrr-table"><thead><tr><th>AD</th><th>%NRR</th><th style="text-align:right">GMV</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-ads-tbody"></tbody></table>' +
+    '    <table class="nrr-table"><thead><tr><th>AD</th><th>%NRR</th><th style="text-align:right">GMV</th><th title="สัดส่วน GMV ตามกลุ่มลูกค้า — แสดงพอร์ตเต็มเสมอ ไม่ขึ้นกับตัวกรอง">Mix</th><th>ร้านค้า</th></tr></thead><tbody id="nrr-ads-tbody"></tbody></table>' +
     '  </div></div>' +
     '  <div class="nrr-section" id="nrr-sec-pm" style="animation-delay:.18s"><div class="nrr-panel-body" id="nrr-pm-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-admin" style="animation-delay:.22s"><div class="nrr-panel-body" id="nrr-admin-body"></div></div>' +
@@ -2172,20 +2363,26 @@ function nrrMovementViewModel() {
       title: 'Outlet Movement — ' + (mv.portfolio === 'pm' ? 'PM' : 'Admin') + ' · ' + (bucket === 'chain' ? 'Chain' : 'SA/MC')
     };
   }
-  // KAM tab
+  // KAM tab — the ONLY tab the segment filter can reach. The vp/pm/admin tabs
+  // above draw from different row pools (nrrComputeBucket over pm_view/
+  // admin_view/vp_view), which have no opts plumbing, and pm/admin already
+  // carry their own Chain | SA/MC toggle that segment tiles would collide with.
+  // segApplies is surfaced so the renderer can SAY the filter is inactive here
+  // rather than silently ignoring it.
+  var segOpts = nrrSegOpts();
   if (mv.kamKey === 'org') {
-    return { result: nrrOrgResult(), scopeCtx: { scope: 'admin', tlEmail: '' }, showKam: true, title: 'Outlet Movement — KAM · องค์กร' };
+    return { result: nrrOrgResult(segOpts), scopeCtx: { scope: 'admin', tlEmail: '' }, showKam: true, segApplies: true, title: 'Outlet Movement — KAM · องค์กร' };
   }
   if (mv.kamKey.indexOf('tl:') === 0) {
     var tlEmail = mv.kamKey.slice(3);
     var teamName = (nrrListTeams().find(function (t) { return t.email === tlEmail; }) || {}).name || tlEmail;
-    return { result: nrrTeamResult(tlEmail), scopeCtx: { scope: 'tl', tlEmail: tlEmail }, showKam: true, title: 'Outlet Movement — KAM · ทีม ' + teamName };
+    return { result: nrrTeamResult(tlEmail, segOpts), scopeCtx: { scope: 'tl', tlEmail: tlEmail }, showKam: true, segApplies: true, title: 'Outlet Movement — KAM · ทีม ' + teamName };
   }
   var kamEmail = mv.kamKey.slice(4);
   var qd = window.bulkQnrrData;
   var kamRow = ((qd && qd.byKamEmail[kamEmail]) || [])[0];
   var kamName = kamRow ? kamRow.latest_staff_owner : kamEmail;
-  return { result: nrrKamResult(kamEmail), scopeCtx: { scope: 'kam', tlEmail: '' }, showKam: false, title: 'Outlet Movement — KAM · ' + kamName };
+  return { result: nrrKamResult(kamEmail, segOpts), scopeCtx: { scope: 'kam', tlEmail: '' }, showKam: false, segApplies: true, title: 'Outlet Movement — KAM · ' + kamName };
 }
 
 function nrrRenderMovementSwitcher() {
@@ -2252,12 +2449,44 @@ function nrrRenderMovementSection() {
 
   var takeaway = document.getElementById('nrr-movement-takeaway');
   var bm = vm.result && vm.result.by_month[nrrState.period];
+  var segOn = nrrSegAnyOn();
+  var monthTh = QNRR_CFG.months_th[nrrState.period] || nrrState.period;
   if (bm) {
     var churnGmv = bm.segments.core_nrr_churn || 0;
     var upside = (bm.segments.expansion || 0) + (bm.segments.comeback || 0) + (bm.segments.transfer_in || 0);
-    takeaway.textContent = 'Core รักษาไว้ ' + nrrFmtGMV(bm.segments.core_nrr || 0) +
+    takeaway.innerHTML = nrrEsc('Core รักษาไว้ ' + nrrFmtGMV(bm.segments.core_nrr || 0) +
       ' · เสียจาก churn −' + nrrFmtGMV(churnGmv) + ' (' + (bm.outlets.core_nrr_churn || 0) + ' ร้าน)' +
-      ' · ชดเชยกลับ +' + nrrFmtGMV(upside);
+      ' · ชดเชยกลับ +' + nrrFmtGMV(upside)) +
+      // Two different lies to avoid here, and this branch (the view HAS data)
+      // is where both are possible:
+      //  · filter applied → the chart is a subset; say so or it reads as the
+      //    whole picture.
+      //  · filter on but NOT applicable to this tab (vp/pm/admin draw from a
+      //    different row pool) → the chart is unfiltered while the tiles above
+      //    show as selected; say that too, otherwise the filter looks broken.
+      (segOn
+        ? (vm.segApplies
+            ? ' <span class="nrr-seg-inline-tag">กลุ่ม ' + nrrEsc(nrrSegActiveLabel()) + '</span>'
+            : ' <span class="nrr-seg-inline-tag" title="' +
+              nrrEsc('แท็บนี้ใช้ข้อมูลอีกชุด (pm_view/admin_view/vp_view) ที่ยังกรองตามกลุ่มลูกค้าไม่ได้') +
+              '">ตัวกรองกลุ่มไม่มีผลกับแท็บนี้</span>')
+        : '');
+  } else if (segOn && vm.segApplies) {
+    // G1/G2: with a filter active, an empty result is the EXPECTED, common case
+    // (team Name owns zero SA outlets; 7 of 15 KAMs are 100% Chain). The old
+    // copy below blames a missing R2 upload, which would be actively
+    // misleading here — so branch on which of the two situations it is, and
+    // distinguish "no rows at all in this group" from "no rows THIS month".
+    var anyMonth = vm.result && Object.keys(vm.result.by_month || {}).length;
+    takeaway.innerHTML = anyMonth
+      ? 'กลุ่ม <b>' + nrrEsc(nrrSegActiveLabel()) + '</b> ไม่มีข้อมูลเดือน ' + nrrEsc(monthTh) +
+        ' (มีข้อมูลเดือนอื่น) — <button class="nrr-seg-clear-inline" data-seg-filter="__clear">ล้างตัวกรอง</button>'
+      : 'ไม่มีร้านในกลุ่ม <b>' + nrrEsc(nrrSegActiveLabel()) + '</b> สำหรับมุมมองนี้ — ' +
+        '<button class="nrr-seg-clear-inline" data-seg-filter="__clear">ล้างตัวกรอง</button>';
+  } else if (!vm.segApplies && segOn) {
+    // Say it plainly rather than silently ignoring the filter the user can see
+    // is switched on.
+    takeaway.innerHTML = '<span style="color:var(--ink3)">ตัวกรองกลุ่มลูกค้าไม่มีผลกับมุมมองนี้ (ใช้ได้กับแท็บ KAM)</span>';
   } else {
     takeaway.textContent = vm.result ? '' : 'ยังไม่มีข้อมูลสำหรับมุมมองนี้ (ไฟล์ CSV ยังไม่ถูกอัปโหลดไป R2)';
   }
@@ -2296,11 +2525,16 @@ function nrrRenderKamLeaderboard() {
     });
   } else { chipWrap.innerHTML = ''; }
 
-  var kams = nrrKamRowsForTeam(tlEmail, nrrState.period);
+  // v_segfilter: paint the tile strip before the table so the mix numbers above
+  // and the rows below always come from the same render pass.
+  nrrRenderSegStrip();
+
+  var segOpts = nrrSegOpts();
+  var kams = nrrKamRowsForTeam(tlEmail, nrrState.period, segOpts);
   nrrLastKamRows = kams;
   var tbody = document.getElementById('nrr-kams-tbody');
   tbody.innerHTML = kams.map(function (k, i) {
-    var kamResult = nrrKamResult(k.kam_email);
+    var kamResult = nrrKamResult(k.kam_email, segOpts);
     var triple = nrrMonthTriple(kamResult, k.period);
     var kamBm = kamResult && kamResult.by_month ? kamResult.by_month[k.period] : null;
     var waivedCount = (kamBm && typeof nrrWaivedAccountCountForRows === 'function') ? nrrWaivedAccountCountForRows(kamBm.rows, k.period) : 0;
@@ -2311,6 +2545,9 @@ function nrrRenderKamLeaderboard() {
       '<td>' + nrrEsc(k.kam_name) + '</td>' +
       '<td class="num-cell" style="color:' + nrrThresholdColorVar(k.nrr_pct) + '">' + nrrFmtPct(k.nrr_pct) + waivedTag + '</td>' +
       '<td>' + nrrTripleHtml('md', triple) + '</td>' +
+      // Mix bar is deliberately fed nrrState.period and NO segOpts — it must
+      // keep showing this KAM's full composition while the filter is active.
+      '<td>' + nrrSegMixBarHtml(k.kam_email, nrrState.period) + '</td>' +
       '<td class="num-cell">' + k.outlet_count + '</td>' +
       '</tr>';
   }).join('');
@@ -2321,7 +2558,16 @@ function nrrRenderKamLeaderboard() {
   var browseBtn = document.getElementById('nrr-team-browse-btn');
   var totalOutlets = kams.reduce(function (s, k) { return s + k.outlet_count; }, 0);
   browseBtn.textContent = 'ดูร้านค้าทั้งทีม (' + totalOutlets + ')';
-  browseBtn.onclick = function () { nrrOpenSlideoverTeam(tlEmail); };
+  // Pass segOpts through so the drawer contains exactly the outlets the count
+  // on this button claims — nrrOutletsForTeam reads raw byTlEmail rows and
+  // would otherwise open an unfiltered list under a filtered count.
+  browseBtn.onclick = function () { nrrOpenSlideoverTeam(tlEmail, segOpts); };
+
+  // Re-apply any active name search: rebuilding tbody.innerHTML above discards
+  // the inline display:none that nrrFilterTableRows set, while the input still
+  // shows the query. (Pre-existing on the team chips too — fixed for both here.)
+  var searchEl = document.getElementById('nrr-kams-search');
+  if (searchEl && searchEl.value.trim()) nrrFilterTableRows('nrr-kams-tbody', searchEl.value);
 }
 
 // v_adperson: AD leaderboard for the currently selected team — same tlEmail
@@ -2336,21 +2582,36 @@ function nrrRenderAdLeaderboard() {
   var section = document.getElementById('nrr-sec-ads');
   if (!tlEmail || !section) return;
 
-  var ads = nrrAdRowsForTeam(tlEmail, nrrState.period);
-  if (!ads.length) { section.style.display = 'none'; return; }
+  // v_segfilter: hide the section on the UNFILTERED roster only. Gating on the
+  // filtered rows would make a whole section vanish on a tile click for a team
+  // that does have ADs — which reads as a bug, not as a filter result.
+  var rosterCount = (typeof nrrListAdsForTeam === 'function') ? nrrListAdsForTeam(tlEmail).length : 0;
+  if (!rosterCount) { section.style.display = 'none'; return; }
   section.style.display = '';
+
+  var segOpts = nrrSegOpts();
+  var ads = nrrAdRowsForTeam(tlEmail, nrrState.period, segOpts);
 
   var teamName = (nrrListTeams().find(function (t) { return t.email === tlEmail; }) || {}).name || tlEmail;
   document.getElementById('nrr-ads-title').textContent = 'AD — ทีม ' + teamName;
 
   var tbody = document.getElementById('nrr-ads-tbody');
+  if (!ads.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="ds-empty"><div class="ds-empty-title">' +
+      (nrrSegAnyOn()
+        ? 'ไม่มีร้านในกลุ่ม ' + nrrEsc(nrrSegActiveLabel()) + ' สำหรับ AD ทีมนี้'
+        : 'ยังไม่มีข้อมูล AD สำหรับเดือนนี้') +
+      '</div></div></td></tr>';
+    return;
+  }
   tbody.innerHTML = ads.map(function (k, i) {
-    var kamResult = nrrKamResult(k.kam_email);
+    var kamResult = nrrKamResult(k.kam_email, segOpts);
     var triple = nrrMonthTriple(kamResult, k.period);
     return '<tr data-email="' + nrrEsc(k.kam_email) + '" data-period="' + nrrEsc(k.period) + '" data-name="' + nrrEsc(k.kam_name.toLowerCase()) + '" style="animation-delay:' + (i * 0.05) + 's" class="nrr-fade-row">' +
       '<td>' + nrrEsc(k.kam_name) + '</td>' +
       '<td class="num-cell" style="color:' + nrrThresholdColorVar(k.nrr_pct) + '">' + nrrFmtPct(k.nrr_pct) + '</td>' +
       '<td>' + nrrTripleHtml('md', triple) + '</td>' +
+      '<td>' + nrrSegMixBarHtml(k.kam_email, nrrState.period) + '</td>' +
       '<td class="num-cell">' + k.outlet_count + '</td>' +
       '</tr>';
   }).join('');
@@ -2381,13 +2642,22 @@ function nrrFilterTableRows(tbodyId, query) {
 
 function nrrExportKamsCsv() {
   if (!nrrLastKamRows) return;
-  nrrExportCsv('nrr-kams-' + QNRR_CFG.quarter + '.csv',
+  // v_segfilter: stamp the active filter into the FILENAME. A filtered export
+  // landing in a spreadsheet with no record of the filter is worse than no
+  // export — the rows look like the full team.
+  var segTag = nrrSegAnyOn()
+    ? '-' + nrrSegOpts().segments.join('+')
+    : '';
+  nrrExportCsv('nrr-kams-' + QNRR_CFG.quarter + segTag + '.csv',
     ['KAM', '%NRR', 'Base GMV', 'ร้านค้า'],
     nrrLastKamRows.map(function (k) { return [k.kam_name, k.nrr_pct, k.base_gmv, k.outlet_count]; }));
 }
 
 function nrrBuildCopySummary() {
-  var lines = ['NRR ' + QNRR_CFG.quarter.toUpperCase() + ' · ' + (QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ' — ' + (nrrProfile.role === 'admin' ? 'องค์กร' : nrrLastTeamName)];
+  var lines = ['NRR ' + QNRR_CFG.quarter.toUpperCase() + ' · ' + (QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ' — ' + (nrrProfile.role === 'admin' ? 'องค์กร' : nrrLastTeamName) +
+    // Same reasoning as the CSV filename above: pasted numbers must carry
+    // their own filter context.
+    (nrrSegAnyOn() ? ' · กลุ่ม: ' + nrrSegActiveLabel() : '')];
   if (nrrLastComparison && nrrProfile.role === 'admin') {
     nrrLastComparison.rows.forEach(function (r) { lines.push(r.tl_name + ': ' + nrrFmtPct(r.nrr_pct) + ' (' + nrrFmtGMV(r.base_gmv) + ')'); });
   }
@@ -3962,13 +4232,16 @@ function nrrOpenSlideoverPmPerson(name, period) {
   nrrLoadNotesFor(outlets, period);
 }
 
-function nrrOpenSlideoverTeam(tlEmail) {
+function nrrOpenSlideoverTeam(tlEmail, opts) {
   var period = nrrState.period;
-  var outlets = nrrOutletsForTeam(tlEmail, period);
+  // v_segfilter: opts comes from the button that displayed the count, so the
+  // drawer and its own trigger label can never disagree.
+  var outlets = nrrOutletsForTeam(tlEmail, period, opts);
   var teamName = (nrrListTeams().find(function (t) { return t.email === tlEmail; }) || {}).name || tlEmail;
+  var segNote = (opts && opts.segments && opts.segments.length) ? ' · กลุ่ม ' + nrrSegActiveLabel() : '';
   _nrrOpenSlideover({
     mode: 'team', title: 'ทีม ' + teamName,
-    sub: (QNRR_CFG.months_th[period] || period) + ' · ' + outlets.length + ' ร้าน · ทุก KAM',
+    sub: (QNRR_CFG.months_th[period] || period) + ' · ' + outlets.length + ' ร้าน · ทุก KAM' + segNote,
     outlets: outlets, period: period, showKam: true, showKamChips: true, showMvChips: true
   });
   nrrLoadNotesFor(outlets, period);

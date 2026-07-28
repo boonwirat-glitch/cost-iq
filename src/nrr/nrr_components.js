@@ -320,7 +320,17 @@ function _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAd
       // quarter view already shows. Signed + colored so the two views are
       // numerically distinct at a glance.
       var netChange = triple ? triple.run_rate - (baseAdjusted + handoverBase) : null;
-      if (netChange == null) topLabel = '—';
+      // v_segfilter (G3): with no base at all, "net change vs base" is not a
+      // meaningful number. A segment made entirely of new_sales/comeback has
+      // base 0, and this subtraction would then render its full run-rate as
+      // e.g. "+฿24.9M net growth" against a base that never existed. Suppress
+      // rather than mislead. (Unreachable unfiltered — every real scope has a
+      // base — so this only ever fires for a filtered sub-portfolio.)
+      if (triple && (baseAdjusted + handoverBase) <= 0) {
+        topLabel = '<span style="color:var(--ink3)" title="' +
+          nrrEsc('ไม่มีฐานเดือน ' + (QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' ในกลุ่มนี้ — เทียบการเปลี่ยนแปลงไม่ได้') +
+          '">—</span>';
+      } else if (netChange == null) topLabel = '—';
       else {
         var netCls = netChange >= 0 ? 'var(--green-deep)' : 'var(--coral)';
         topLabel = '<span style="color:' + netCls + '">' + (triple.is_partial ? '~' : '') + (netChange >= 0 ? '+' : '−') + nrrFmtGMV(Math.abs(netChange)) + '</span>';
@@ -385,7 +395,21 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
   var chartBodyHtml = mode === 'quarter'
     ? _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAdjustment)
     : _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAdjustment);
-  chartEl.innerHTML = modeHtml + '<div class="nrr-chart-body">' + chartBodyHtml + '</div>' + nrrLegendHtml();
+  // v_segfilter (G4): result.months is derived from the scoped rows, so a
+  // segment with no activity in some month produces FEWER columns than the
+  // quarter has — with no marker, that is indistinguishable from the app
+  // dropping a column. Name the missing months instead. Deliberately not
+  // synthesized as empty columns: that would need faked by_month entries and
+  // would break nrrMonthTriple's null contract.
+  var missingMonths = (QNRR_CFG.q_months || []).filter(function (m) {
+    return result.months.indexOf(m) === -1;
+  });
+  var missingNote = missingMonths.length
+    ? '<div class="micro" style="color:var(--ink3);margin-top:6px">ไม่มีข้อมูลเดือน ' +
+      missingMonths.map(function (m) { return QNRR_CFG.months_th[m] || m; }).join(' · ') +
+      ' ในมุมมองนี้</div>'
+    : '';
+  chartEl.innerHTML = modeHtml + '<div class="nrr-chart-body">' + chartBodyHtml + '</div>' + missingNote + nrrLegendHtml();
   chartEl.querySelectorAll('[data-chart-mode]').forEach(function (b) {
     b.addEventListener('click', function () {
       _nrrMvChartMode[chartContainerId] = b.dataset.chartMode;

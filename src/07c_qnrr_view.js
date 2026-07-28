@@ -59,8 +59,33 @@ window._qnrrFetchRoleRoster = _qnrrFetchRoleRoster;
 //   outlet ที่มาจาก transfer_in/handover/new_sales/comeback แล้ว transfer_out ใน Q
 //   → ไม่หักฐาน (ไม่อยู่ใน baseMap)
 // ══════════════════════════════════════════════════════════════════════════════
-function _qnrrCompute(kamEmail, scope) {
+// v_segfilter (2026-07-28, mirrored from src/nrr/nrr_logic.js in the same
+// commit): 4-way customer-segment key + the optional `opts.segments` param
+// below. Deliberately NOT nrrAccountBucket(), which collapses SA+MC.
+//
+// INTENTIONALLY INERT IN SENSE — nothing in this app passes a 3rd argument to
+// _qnrrCompute today (this is a /nrr dashboard feature). It is mirrored here
+// only to keep the two engines byte-diffable, which the header of
+// src/nrr/nrr_logic.js treats as a load-bearing debugging tool. Do not go
+// looking for the Sense caller; there isn't one yet.
+function nrrSegmentKey(row) {
+  var t = (row.account_type || '').trim();
+  if (t === 'SA') return 'sa';
+  if (t === 'MC') return 'mc';
+  if (t === 'Chain') return 'chain';
+  return 'other';
+}
+window.nrrSegmentKey = nrrSegmentKey;
+
+function _qnrrCompute(kamEmail, scope, opts) {
   scope = scope || 'kam';
+  // v_segfilter: captured once so it stays constant across every
+  // _rowInScope / baseMap / _effectiveMovement pass. Absent => byte-identical
+  // to pre-v_segfilter. MUST be applied inside _rowInScope, never as a
+  // pre-filter on bulkQnrrData — pre-filtering empties qd.byTlEmail[tl], so
+  // myTlEmail resolves to '' and the org-wide fallback at :92 silently fires,
+  // returning ORG numbers under a team heading with no error.
+  var _segs = (opts && opts.segments && opts.segments.length) ? opts.segments : null;
   // v850-fix: kamEmail is genuinely optional for 'tl'/'admin' org-wide scope -- allRows
   // selection and _rowInScope() below both already branch away from kamEmail for those
   // scopes (admin: allRows=qd.allRows, _rowInScope=true unconditionally; tl-with-no-
@@ -113,6 +138,9 @@ function _qnrrCompute(kamEmail, scope) {
     return _nonKam.has((r.latest_kam_email || '').toLowerCase());
   }
   function _rowInScope(r) {
+    // v_segfilter: segment gate runs FIRST and is orthogonal to every scope
+    // branch below — an AND-condition, not a sibling of them.
+    if (_segs && _segs.indexOf(nrrSegmentKey(r)) === -1) return false;
     if (scope === 'kam')   return r.latest_kam_email === kamEmail; // v827-fix
     if (scope === 'tl')    return (myTlEmail ? r.latest_tl_email === myTlEmail : true) && !_isNonKamOwner(r);
     if (scope === 'admin') return !_isNonKamOwner(r);

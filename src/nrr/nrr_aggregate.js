@@ -86,20 +86,42 @@ function _nrrActualizeResult(result) {
   return result;
 }
 
-function nrrOrgResult() {
-  return _nrrActualizeResult(_qnrrCompute(null, 'admin'));
+// v_segfilter: all three wrappers gained an OPTIONAL trailing `opts`
+// ({segments:[...]}, see nrrSegmentKey in nrr_logic.js). Omitting it is
+// byte-identical to the old behavior — which is the whole point: these three
+// are also called by nrr_commission.js, nrr_portfolio.js, the masthead
+// (nrrScopeResult) and the team cards (nrrTeamComparison below), and NONE of
+// those may be touched by the dashboard's segment filter. Only the Movement +
+// KAM/AD Leaderboard render paths pass opts.
+//
+// Safe to add as a trailing param: grepped for `map(nrrKamResult` /
+// `forEach(nrrKamResult` / bare-callback passing — zero hits, so no call site
+// can accidentally feed an array index in as `opts`.
+function nrrOrgResult(opts) {
+  return _nrrActualizeResult(_qnrrCompute(null, 'admin', opts));
 }
 window.nrrOrgResult = nrrOrgResult;
 
-function nrrTeamResult(tlEmail) {
-  return _nrrActualizeResult(_qnrrCompute(tlEmail, 'tl'));
+function nrrTeamResult(tlEmail, opts) {
+  return _nrrActualizeResult(_qnrrCompute(tlEmail, 'tl', opts));
 }
 window.nrrTeamResult = nrrTeamResult;
 
-function nrrKamResult(kamEmail) {
-  return _nrrActualizeResult(_qnrrCompute(kamEmail, 'kam'));
+function nrrKamResult(kamEmail, opts) {
+  return _nrrActualizeResult(_qnrrCompute(kamEmail, 'kam', opts));
 }
 window.nrrKamResult = nrrKamResult;
+
+// v_segfilter: shared row-level segment predicate for the several places that
+// derive lists from RAW bulkQnrrData rows instead of going through the engine
+// (outlet counts, drill-down lists). Without applying it in those places, a
+// filtered %NRR would sit next to an unfiltered outlet count on the same row.
+function _nrrRowInSegments(r, opts) {
+  var segs = opts && opts.segments;
+  if (!segs || !segs.length) return true;
+  return segs.indexOf(nrrSegmentKey(r)) !== -1;
+}
+window._nrrRowInSegments = _nrrRowInSegments;
 
 // Cross-team comparison rows for section 3 (admin only), sorted by %NRR desc.
 function nrrTeamComparison() {
@@ -158,19 +180,30 @@ function nrrMovementBreakdown(result, period) {
 window.nrrMovementBreakdown = nrrMovementBreakdown;
 
 // Team -> KAM drill-down rows (section 6).
-function nrrKamRowsForTeam(tlEmail, period) {
+function nrrKamRowsForTeam(tlEmail, period, opts) {
   var kams = nrrListKamsForTeam(tlEmail);
   return kams.map(function (k) {
-    var kamResult = nrrKamResult(k.email);
-    var kamPeriod = period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult);
+    var kamResult = nrrKamResult(k.email, opts);
+    // v_segfilter (G5): with a filter active, PIN the requested period instead
+    // of falling back to this KAM's own latest month. A segment can be absent
+    // from the selected month for one KAM but present for another, and the
+    // fallback would then silently show a DIFFERENT month's %NRR on that row
+    // with no month indicator in the table — a leaderboard must never mix
+    // months across its rows. Unfiltered behavior is unchanged.
+    var kamPeriod = (opts && opts.segments && opts.segments.length)
+      ? period
+      : (period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult));
     var bm = kamResult && kamPeriod ? kamResult.by_month[kamPeriod] : null;
 
     // Outlet rows for this KAM within this team, classified under the
     // TEAM's scope lens (scope='tl', myTlEmail=tlEmail) so badges reconcile
     // with the team-level movement breakdown shown above this table.
+    // v_segfilter: the segment predicate MUST be applied here too — this list
+    // is derived from raw rows, bypassing the engine, so filtering only
+    // nrrKamResult above would pair a filtered %NRR with an unfiltered count.
     var qd = window.bulkQnrrData;
     var rawRows = ((qd && qd.byKamEmail[k.email]) || []).filter(function (r) {
-      return r.period_month === kamPeriod;
+      return r.period_month === kamPeriod && _nrrRowInSegments(r, opts);
     });
     var outlets = rawRows.map(function (r) {
       return { row: r, movement: nrrClassifyRow(r, 'tl', tlEmail) };
@@ -199,16 +232,20 @@ window.nrrKamRowsForTeam = nrrKamRowsForTeam;
 // from nrrListAdsForTeam instead. AD rows share the SAME return shape as KAM
 // rows (kam_email/kam_name keys kept, not renamed) so both feed the same
 // row-rendering + slide-over code with zero branching.
-function nrrAdRowsForTeam(tlEmail, period) {
+function nrrAdRowsForTeam(tlEmail, period, opts) {
   var ads = nrrListAdsForTeam(tlEmail);
   return ads.map(function (k) {
-    var kamResult = nrrKamResult(k.email);
-    var kamPeriod = period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult);
+    var kamResult = nrrKamResult(k.email, opts);
+    // v_segfilter (G5): same period pin as nrrKamRowsForTeam — see the comment
+    // there for why the fallback is suppressed once a filter is active.
+    var kamPeriod = (opts && opts.segments && opts.segments.length)
+      ? period
+      : (period && kamResult && kamResult.by_month[period] ? period : nrrCurrentPeriod(kamResult));
     var bm = kamResult && kamPeriod ? kamResult.by_month[kamPeriod] : null;
 
     var qd = window.bulkQnrrData;
     var rawRows = ((qd && qd.byKamEmail[k.email]) || []).filter(function (r) {
-      return r.period_month === kamPeriod;
+      return r.period_month === kamPeriod && _nrrRowInSegments(r, opts);
     });
     var outlets = rawRows.map(function (r) {
       return { row: r, movement: nrrClassifyRow(r, 'tl', tlEmail) };
@@ -232,7 +269,7 @@ function nrrAdRowsForTeam(tlEmail, period) {
 window.nrrAdRowsForTeam = nrrAdRowsForTeam;
 
 // KAM -> Outlet drill-down rows (section 7) — that KAM's own scope='kam' lens.
-function nrrOutletsForKam(kamEmail, period) {
+function nrrOutletsForKam(kamEmail, period, opts) {
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded) return [];
   var myTlEmail = '';
@@ -241,7 +278,9 @@ function nrrOutletsForKam(kamEmail, period) {
   if (withTl) myTlEmail = withTl.latest_tl_email;
 
   return kamRows
-    .filter(function (r) { return r.period_month === period; })
+    // v_segfilter: keep this drill-down consistent with the filtered row count
+    // shown on the leaderboard row that opens it.
+    .filter(function (r) { return r.period_month === period && _nrrRowInSegments(r, opts); })
     .map(function (r) {
       var mv = nrrClassifyRow(r, 'kam', myTlEmail);
       return { row: r, movement: mv };
@@ -298,6 +337,80 @@ function nrrMonthTriple(result, month) {
 }
 window.nrrMonthTriple = nrrMonthTriple;
 
+// ── v_segfilter: one KAM's customer-segment mix for a month ───────────────
+// Returns {by:{sa,mc,chain,other}, total} of raw curr_gmv, for the little
+// stacked composition bar on each leaderboard row.
+//
+// Deliberately a plain row aggregation with ZERO engine calls. Three reasons
+// it is exactly right rather than merely cheap:
+//
+//  1. It decomposes the number already displayed on that row. The movement
+//     rule below (reclassify zero-GMV core_nrr to churn, then skip churn and
+//     transfer_out, sum raw curr_gmv) is character-for-character
+//     nrrMonthTriple's own `mtd` derivation above, so the segment parts sum to
+//     the displayed MTD exactly.
+//  2. Raw byKamEmail rows ARE the scoped row set at kam scope: _rowInScope
+//     reduces to `latest_kam_email === kamEmail` there, which the index
+//     guarantees by construction, and _effectiveMovement at kam scope applies
+//     only the churn reclassification replicated here. So this equals
+//     by_month[m].rows without paying for a compute.
+//  3. NO outlet dedup on purpose. nrrMonthTriple doesn't dedup either, so
+//     adding a seenOutlets guard here would make the bar disagree with the
+//     MTD printed beside it. (There are currently 0 duplicate
+//     (period_month, outlet_id) pairs in the data, so this is moot today — but
+//     if duplicates ever appear, bar and total must double-count together.)
+//
+// ALWAYS called unfiltered: the bar must show a KAM's FULL mix even while the
+// segment filter is active, otherwise it reads 100% single-segment and defeats
+// the entire point of having it (Bush needs "who is Chain-heavy" to stay
+// legible while he is filtered to Chain).
+function nrrKamSegMix(kamEmail, period) {
+  var by = { sa: 0, mc: 0, chain: 0, other: 0 };
+  var total = 0;
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded || !period) return { by: by, total: 0 };
+  (qd.byKamEmail[kamEmail] || []).forEach(function (r) {
+    if (r.period_month !== period) return;
+    var mv = (r.movement_type === 'core_nrr' && (parseFloat(r.curr_gmv) || 0) === 0)
+      ? 'core_nrr_churn' : r.movement_type;
+    if (mv === 'core_nrr_churn' || mv === 'transfer_out') return;
+    var g = parseFloat(r.curr_gmv) || 0;
+    by[nrrSegmentKey(r)] += g;
+    total += g;
+  });
+  return { by: by, total: total };
+}
+window.nrrKamSegMix = nrrKamSegMix;
+
+// v_segfilter: per-segment summary for the clickable tile strip — count of
+// cohort outlets, base GMV and %NRR for ONE segment at the given scope. Each
+// tile is a real engine call (3-4 per repaint, measured at ~9ms each, which is
+// why no memo is warranted — see the plan's perf section). Returns null when
+// the scope genuinely owns no rows of that segment, which the caller renders
+// as an honest "—" rather than a zero.
+function nrrSegSummary(scope, email, segKey, period) {
+  var res = (scope === 'tl') ? nrrTeamResult(email, { segments: [segKey] })
+          : (scope === 'kam') ? nrrKamResult(email, { segments: [segKey] })
+          : nrrOrgResult({ segments: [segKey] });
+  if (!res) return null;
+  var m = (period && res.by_month[period]) ? period : nrrCurrentPeriod(res);
+  var bm = m ? res.by_month[m] : null;
+  if (!bm) return null;
+  var outlets = 0;
+  ['core_nrr', 'core_nrr_churn', 'comeback', 'transfer_in'].forEach(function (mv) {
+    outlets += bm.outlets[mv] || 0;
+  });
+  return {
+    seg: segKey,
+    outlets: outlets,
+    nrr_pct: bm.nrr_pct,
+    base_gmv: Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : res.base_norm) * nrrBaseDays()),
+    mtd: (nrrMonthTriple(res, m) || {}).mtd || 0,
+    period: m
+  };
+}
+window.nrrSegSummary = nrrSegSummary;
+
 // ── v4: outlets behind one movement number (the "why" drill) ─────────────
 // scopeCtx: {scope:'tl'|'admin'|'kam', tlEmail} for rep-view results, or
 // {scope:'bucket'} for PM/Admin bucket results (bucket rows are already
@@ -331,11 +444,13 @@ window.nrrOutletsForMovement = nrrOutletsForMovement;
 // ── v4: whole-team outlet browse ─────────────────────────────────────────
 // Same scope='tl' lens as nrrKamRowsForTeam, so totals reconcile with the
 // KAM table by construction.
-function nrrOutletsForTeam(tlEmail, period) {
+function nrrOutletsForTeam(tlEmail, period, opts) {
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded) return [];
   return (qd.byTlEmail[tlEmail] || [])
-    .filter(function (r) { return r.period_month === period; })
+    // v_segfilter: without this the "ดูร้านค้าทั้งทีม (N)" button would show a
+    // filtered N but open an unfiltered drawer.
+    .filter(function (r) { return r.period_month === period && _nrrRowInSegments(r, opts); })
     .map(function (r) {
       return { row: r, movement: nrrClassifyRow(r, 'tl', tlEmail) };
     })
