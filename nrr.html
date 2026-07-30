@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>window.NRR_BUILD = 'v119';</script>
+<script>window.NRR_BUILD = 'v120';</script>
 <style>
 /* ── nrr_tokens.css — "Fresh Canvas" design tokens ─────────────────────
    Adopted verbatim from the user-supplied Fresh Canvas spec, as the
@@ -1282,6 +1282,72 @@ html, body {
 .nrr-comm-ds .nrr-trunc-acct  { max-width: 230px; }
 .nrr-comm-ds .nrr-trunc-group { max-width: 200px; }
 .nrr-comm-ds table.nrr-comm-fulltable tr:last-child td { border-bottom: none; }
+
+/* ══ v_brkgrowth (2026-07-30): scroll the PANEL, not the page ═══════════════
+   The breakdown list runs to hundreds of rows, so reading row 80 used to mean
+   scrolling the whole document and losing the header. Give the wrapper its own
+   height and a sticky thead.
+
+   Two things this depends on:
+   · The scroll container must be the element with overflow — `position: sticky;
+     top: 0` on a th resolves against the nearest scrolling ancestor, so
+     without max-height here the sticky header would pin to the PAGE and slide
+     under the masthead instead.
+   · z-index must stay UNDER the masthead's 50 (see .nrr-masthead) or the
+     header row floats over the site nav when the page is scrolled. 5/6 leaves
+     plenty of room. */
+.nrr-comm-ds .nrr-comm-fulltable-scroll {
+  /* 68vh of screen, capped at 760px so it doesn't get silly on a tall monitor,
+     with a hard 360px FLOOR. The floor is not cosmetic: any context where vh
+     resolves to 0 (a zero-height viewport — headless capture, a hidden pane,
+     some embedded webviews) would otherwise collapse the panel to nothing and
+     hide the table entirely. Measured that exact collapse during verification. */
+  max-height: max(360px, min(68vh, 760px));
+  overflow-y: auto;
+  overscroll-behavior: contain;      /* don't chain to the page at the ends */
+  /* The last row's hairline is suppressed above, so give the box its own edge
+     rather than ending on nothing mid-scroll. */
+  border-bottom: 1px solid var(--line);
+}
+.nrr-comm-ds .nrr-comm-fulltable-scroll thead th {
+  position: sticky; top: 0; z-index: 5;
+  /* Opaque — rows scroll UNDER this, and the shared --bg keeps it seamless
+     with the page rather than reading as a floating bar. */
+  background: var(--bg);
+  /* border-bottom on a sticky th doesn't travel with it in some engines, so
+     draw the rule as a shadow that definitely does. */
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+/* Keep the KAM column readable while scrolling sideways — the table is wide
+   enough to need it now that three columns were added. Higher z-index on the
+   header's own first cell so the two sticky axes don't fight at the corner. */
+.nrr-comm-ds .nrr-comm-fulltable-scroll tbody td:first-child {
+  position: sticky; left: 0; z-index: 4; background: var(--bg);
+}
+.nrr-comm-ds .nrr-comm-fulltable-scroll thead th:first-child { z-index: 6; }
+
+/* ── growth cell: ฐาน → ยอดเดือนนี้ (×N) ── */
+.nrr-comm-ds .nrr-grow-from { color: var(--ink3); }
+.nrr-comm-ds .nrr-grow-arrow { color: var(--ink3); margin: 0 5px; }
+.nrr-comm-ds .nrr-grow-to { font-weight: 700; }
+.nrr-comm-ds .nrr-grow-mult {
+  display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+  background: var(--fill); color: var(--ink2);
+}
+/* ok = the ratio condition is genuinely cleared, so the reader doesn't have to
+   compare "2.4×" against the threshold column themselves. */
+.nrr-comm-ds .nrr-grow-mult.ok { background: var(--green-soft); color: var(--green-deep); }
+.nrr-comm-ds .nrr-comm-newtag {
+  display: inline-block; padding: 0 5px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+  background: var(--mv-teal-soft); color: var(--mv-teal);
+}
+
+/* ── gap cell: ขาดอีก ── */
+.nrr-comm-ds .nrr-gap-ok   { color: var(--green-deep); font-weight: 600; }
+.nrr-comm-ds .nrr-gap-near { color: var(--sun-deep); font-weight: 700; }
+.nrr-comm-ds .nrr-gap-far  { color: var(--ink3); }
 .nrr-comm-ds table.nrr-comm-fulltable tr.nrr-comm-total-row td { border-top: 1.5px solid var(--ink); border-bottom: none; font-weight: 700; }
 .nrr-comm-ds .nrr-comm-cell-meta { font-size: 11px; font-weight: 400; font-family: var(--font-ui); color: var(--ink3); margin-top: 1px; }
 
@@ -1309,6 +1375,11 @@ html, body {
 }
 .nrr-comm-ds .nrr-pace-badge.qualify { background: var(--green-soft); color: var(--green-deep); }
 .nrr-comm-ds .nrr-pace-badge.onpace  { background: var(--sun-soft);   color: var(--sun-deep); }
+/* v_brkgrowth: 'near' is the new actionable tier — close to the bar but NOT
+   expected to clear it on current pace, i.e. the ones worth a push before
+   month-end. Coral-toned so it reads as "needs attention", distinct from
+   onpace's amber ("fine, will get there") and offpace's grey ("ignore"). */
+.nrr-comm-ds .nrr-pace-badge.near    { background: var(--coral-soft);  color: var(--coral); }
 .nrr-comm-ds .nrr-pace-badge.offpace { background: var(--fill-deep);  color: var(--ink3); }
 .nrr-comm-ds .nrr-pace-badge.pending { background: var(--fill-deep);  color: var(--ink3); font-weight: 500; }
 
@@ -6232,12 +6303,13 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
         var rawExistingGmv = row.existingGmv || 0;
         if (rawExistingGmv <= 0) return;
         var maxBaseline = 0;
+        var maxBaselineMonth = null;
         p3Labels.forEach(function (l) {
           var lRow = monthData[l];
           if (!lRow) return;
           var d = nrrDaysInLabel(l);
           var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-          if (norm30 > maxBaseline) maxBaseline = norm30;
+          if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
         });
         var incremental = rawExistingGmv - maxBaseline;
         var qualifies3 = rawExistingGmv > maxBaseline * p3Thresh && incremental >= p3MinIncr;
@@ -6246,7 +6318,15 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
         var projIncremental = projExisting - maxBaseline;
         out.push({
           person: person, accountId: accountId, outletId: outletId, groupKey: groupKey, category: category,
+          // v_brkgrowth: `current` is the INCREMENTAL for p3 (kept as-is — the
+          // commission is charged on it and the harness pins that). But a
+          // breakdown reader needs "grew FROM x TO y", and y was previously
+          // unrecoverable from the row. Carry the absolute alongside it, plus
+          // which lookback month set the bar — mirrors what
+          // nrrComputeUpsellSkuWithParams already returns (existing_curr /
+          // max_baseline / max_baseline_month).
           kind: 'p3', current: incremental, threshold: p3MinIncr, baseline: maxBaseline, thresholdPct: p3Thresh,
+          existing_curr: rawExistingGmv, baselineMonth: maxBaselineMonth,
           qualifies: qualifies3, commission: qualifies3 ? incremental * r3 : 0, applied_rate: r3,
           projected: projectionReady ? projIncremental : null, projectionReady: projectionReady,
           projectedQualifies: projectionReady ? (projExisting > maxBaseline * p3Thresh && projIncremental >= p3MinIncr) : null
@@ -6258,6 +6338,65 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   return out;
 }
 window.nrrEnumerateUpsellGroups = nrrEnumerateUpsellGroups;
+
+// ── v_brkgrowth: how far is this row from qualifying? ─────────────────────
+// ONE definition, consumed by both the status badge and the breakdown filter,
+// so the badge can never say "เกือบถึง" about a row the filter excludes.
+//
+// The useful insight for P3: its two AND-ed conditions —
+//   (1) existing > baseline × thresholdPct
+//   (2) (existing − baseline) >= minIncremental
+// are BOTH just "needs more GMV this month", so each converts to a baht gap
+// and the binding constraint is simply the larger one. That collapses a
+// two-dimensional threshold into a single honest number a KAM can act on:
+// "this family needs ฿X more before month-end."
+//
+//   gap for (1) = baseline × pct − existing
+//   gap for (2) = minIncremental − (existing − baseline)
+//
+// P1 has a single condition (total >= p1MinGmv), so its gap is direct.
+var NRR_UPSELL_NEAR_FRAC = 0.70; // >=70% of the way = "เกือบถึง". Tunable; see the
+                                 // gap column in the UI, which always shows the
+                                 // raw baht number so this band is never the only
+                                 // thing the reader has to go on.
+
+function nrrUpsellRowGap(r) {
+  if (!r) return null;
+  var achieved, needed;
+  if (r.kind === 'p1') {
+    achieved = r.current || 0;              // p1 `current` IS the absolute total
+    needed = r.threshold || 0;
+  } else {
+    // p3: work in absolute month GMV, which is the quantity a KAM moves.
+    var base = r.baseline || 0;
+    var abs = (r.existing_curr != null) ? r.existing_curr : (base + (r.current || 0));
+    // Condition (1) is a STRICT inequality (existing > base × pct), so the
+    // target is the smallest whole baht that actually EXCEEDS it — not
+    // base × pct itself. Landing exactly on the line fails, and a gap that
+    // leaves the row still short would be worse than no gap column at all.
+    // (Caught by tools/verify_nrrcomm_simulator.js Part 6, which adds the gap
+    // back and re-runs the real pass condition.)
+    var needRatio = Math.floor(base * (r.thresholdPct || 0)) + 1;
+    // Condition (2) is `>=`, so its target needs no such nudge.
+    var needFloor = base + (r.threshold || 0);
+    achieved = abs;
+    needed = Math.max(needRatio, needFloor);
+  }
+  var gap = Math.max(0, needed - achieved);
+  var progress = needed > 0 ? achieved / needed : (achieved > 0 ? 1 : 0);
+  return {
+    achieved: achieved,
+    needed: needed,
+    gap: gap,
+    progress: progress,
+    // Which condition is holding it back — worth naming, because "needs 2×"
+    // and "needs ฿8,000 more" call for different sales moves.
+    binding: (r.kind === 'p1') ? 'floor'
+      : (Math.floor((r.baseline || 0) * (r.thresholdPct || 0)) + 1 >= (r.baseline || 0) + (r.threshold || 0) ? 'ratio' : 'floor'),
+    near: !r.qualifies && gap > 0 && progress >= NRR_UPSELL_NEAR_FRAC
+  };
+}
+window.nrrUpsellRowGap = nrrUpsellRowGap;
 
 // ── Upsell quarter timeline (v_qtrux) — twin of _upsellQuarterTimeline
 // (07a_commission_engine.js), same shape/lockstep. Rep-facing display data:
@@ -13818,6 +13957,7 @@ function _nrrCommSimEnumerateAll(overrides) {
 // early enough to push the team, instead of a month-end surprise).
 function _nrrCommSimAggregate(rows) {
   var agg = { rows: rows, byEmail: {}, gmv: 0, comm: 0, qualify: 0, onPace: 0,
+              nearMiss: 0, nearGap: 0,
               projGmv: 0, projComm: 0, projQualify: 0,
               projReady: rows.length ? !!rows[0].projectionReady : false };
   rows.forEach(function (r) {
@@ -13828,6 +13968,12 @@ function _nrrCommSimAggregate(rows) {
       p.gmv += r.current; p.comm += r.commission; p.qualify++;
     } else if (r.projectedQualifies) {
       agg.onPace++;
+    } else {
+      // v_brkgrowth: count the near-misses and the baht it would take to
+      // rescue them all — otherwise the tier is only discoverable by knowing
+      // to change a dropdown.
+      var g = nrrUpsellRowGap(r);
+      if (g && g.near) { agg.nearMiss++; agg.nearGap += g.gap; }
     }
     if (r.projectedQualifies && r.projected != null) {
       var pc = r.projected * (Number(r.applied_rate) || 0);
@@ -13897,8 +14043,14 @@ function nrrCommSimHeroesHtml(baseline, adjusted, adjusting) {
       adjusting && dComm !== 0) +
     _nrrSimHeroCardHtml('รายการที่เข้าเกณฑ์',
       adjusted.qualify.toLocaleString('en-US') + '<span style="font-size:15px;font-weight:600"> รายการ</span>',
-      'ใกล้เข้าเกณฑ์อีก <span class="num">' + adjusted.onPace.toLocaleString('en-US') + '</span> รายการ · ' +
-        projLine(adjusted.projQualify, true),
+      'ตามจังหวะอีก <span class="num">' + adjusted.onPace.toLocaleString('en-US') + '</span> รายการ' +
+        // v_brkgrowth: the rescuable ones, with the total baht it would take —
+        // the whole point of splitting this tier out of 'offpace'.
+        (adjusted.nearMiss
+          ? ' · <span style="color:var(--coral)">เกือบถึง <span class="num">' + adjusted.nearMiss.toLocaleString('en-US') +
+            '</span> รายการ (ขาดรวม ' + nrrFmtGMVExact(adjusted.nearGap) + ')</span>'
+          : '') +
+        ' · ' + projLine(adjusted.projQualify, true),
       adjusting ? _nrrSimDeltaHtml(dCount, function (v) { return v.toLocaleString('en-US') + ' รายการ'; }) : '',
       adjusting && dCount !== 0) +
     '</div>';
@@ -13965,10 +14117,16 @@ function nrrRenderCommSimResults() {
     nrrCommBreakdownSectionHtml(adjusted.rows);
 }
 
-function nrrCommPaceBadgeHtml(r) {
+// v_brkgrowth: 5 tiers, not 4. The old 'offpace' bucket lumped a family that
+// needs ฿400 more together with one sitting at ฿50 of a ฿5,000 threshold —
+// thousands of rows, all labelled identically, so the genuinely-rescuable ones
+// were invisible. `near` splits them out (see nrrUpsellRowGap).
+function nrrCommPaceBadgeHtml(r, gap) {
   if (r.qualifies) return '<span class="nrr-pace-badge qualify">เข้าเกณฑ์แล้ว</span>';
   if (!r.projectionReady) return '<span class="nrr-pace-badge pending">รอข้อมูล</span>';
   if (r.projectedQualifies) return '<span class="nrr-pace-badge onpace">ตามจังหวะ คาดว่าจะถึง</span>';
+  var g = gap || nrrUpsellRowGap(r);
+  if (g && g.near) return '<span class="nrr-pace-badge near">เกือบถึง</span>';
   return '<span class="nrr-pace-badge offpace">ต่ำกว่าจังหวะ</span>';
 }
 
@@ -13982,10 +14140,60 @@ function _nrrTruncCell(text, widthCls, extraStyle) {
     ' title="' + nrrEsc(t) + '">' + nrrEsc(t) + '</span></td>';
 }
 
+// v_brkgrowth: the "โตจากเท่าไหร่ มาเป็นเท่าไหร่" cell.
+// P3 = ฐาน → ยอดเดือนนี้, with the growth multiple, because the P3 test is
+// fundamentally a RATIO against the best of the last 3 months.
+// P1 has no "from" by definition — it is an item family this outlet had never
+// bought — so it says so rather than printing a fake ฿0 baseline.
+function _nrrCommGrowthCellHtml(r) {
+  if (r.kind === 'p1') {
+    return '<td><span class="nrr-comm-newtag">ใหม่</span> ' +
+      '<span class="nrr-grow-to">' + nrrFmtGMVExact(r.current) + '</span>' +
+      '<div class="nrr-comm-cell-meta">ไม่เคยซื้อกลุ่มนี้มาก่อน</div></td>';
+  }
+  var base = r.baseline || 0;
+  var abs = (r.existing_curr != null) ? r.existing_curr : (base + (r.current || 0));
+  var mult = base > 0 ? (abs / base) : null;
+  // Colour the multiple against the actual pass ratio so "2.4×" reads as
+  // clearing the bar and "1.6×" as not, without the reader doing the maths.
+  var multOk = mult != null && r.thresholdPct != null && mult > r.thresholdPct;
+  var multHtml = mult != null
+    ? '<span class="nrr-grow-mult' + (multOk ? ' ok' : '') + '">' + mult.toFixed(1) + '×</span>'
+    : '';
+  var baseMeta = r.baselineMonth ? ('ฐานสูงสุด ' + r.baselineMonth) : 'ฐาน 3 เดือนย้อนหลัง';
+  return '<td>' +
+    '<span class="nrr-grow-from">' + nrrFmtGMVExact(base) + '</span>' +
+    '<span class="nrr-grow-arrow">→</span>' +
+    '<span class="nrr-grow-to">' + nrrFmtGMVExact(abs) + '</span> ' + multHtml +
+    '<div class="nrr-comm-cell-meta">' + nrrEsc(baseMeta) + '</div>' +
+    '</td>';
+}
+
+// "ขาดอีกเท่าไหร่" — always a real baht figure, so the ≥70% band that drives
+// the เกือบถึง badge is never the only thing the reader can see. Qualifying
+// rows show the headroom they cleared by instead of a blank.
+function _nrrCommGapCellHtml(r, g) {
+  if (r.qualifies) {
+    var over = Math.max(0, (g.achieved || 0) - (g.needed || 0));
+    return '<td class="nrr-gap-ok">ผ่านแล้ว' +
+      (over > 0 ? '<div class="nrr-comm-cell-meta">เกินเกณฑ์ ' + nrrFmtGMVExact(over) + '</div>' : '') +
+      '</td>';
+  }
+  var pct = Math.round((g.progress || 0) * 100);
+  var why = g.binding === 'ratio'
+    ? 'ติดเงื่อนไข ' + (r.thresholdPct || '') + '× ของฐาน'
+    : 'ติดเงื่อนไขส่วนที่โตขั้นต่ำ';
+  return '<td class="' + (g.near ? 'nrr-gap-near' : 'nrr-gap-far') + '">' +
+    'ขาดอีก ' + nrrFmtGMVExact(g.gap) +
+    '<div class="nrr-comm-cell-meta">' + pct + '% ของเกณฑ์ · ' + nrrEsc(why) + '</div>' +
+    '</td>';
+}
+
 function nrrCommBreakdownRowHtml(r) {
   var kindLabel = r.kind === 'p1' ? 'P1 ใหม่' : 'P3 โต';
   var thresholdLabel = r.kind === 'p1' ? nrrFmtGMVExact(r.threshold) : ('>' + r.thresholdPct + '× (' + nrrFmtGMVExact(r.threshold) + ')');
   var projectedLabel = r.projected != null ? nrrFmtGMVExact(r.projected) : '—';
+  var g = nrrUpsellRowGap(r);
   // KAM shows the NICKNAME only (Bush, 2026-07-25) — the full
   // "First (Nick) Last" was the widest thing in the row and pushed the
   // numeric columns off screen. Full name stays available on hover.
@@ -13996,10 +14204,15 @@ function nrrCommBreakdownRowHtml(r) {
     '<td class="txt"><span class="nrr-trunc nrr-trunc-group" title="' + nrrEsc(r.groupKey) + '">' + nrrEsc(r.groupKey) + '</span>' +
     (r.category ? '<div class="nrr-comm-cell-meta nrr-trunc nrr-trunc-group" title="' + nrrEsc(r.category) + '">' + nrrEsc(r.category) + '</div>' : '') + '</td>' +
     '<td class="txt">' + kindLabel + '</td>' +
+    _nrrCommGrowthCellHtml(r) +
+    // Kept, but now explicitly labelled as the incremental in the header —
+    // this is the number the ฿ floor is tested against and the commission is
+    // charged on, so it can't just be replaced by the absolute above.
     '<td>' + nrrFmtGMVExact(r.current) + '</td>' +
     '<td>' + thresholdLabel + '</td>' +
+    _nrrCommGapCellHtml(r, g) +
     '<td>' + projectedLabel + '</td>' +
-    '<td class="txt">' + nrrCommPaceBadgeHtml(r) + '</td>' +
+    '<td class="txt">' + nrrCommPaceBadgeHtml(r, g) + '</td>' +
     '</tr>';
 }
 
@@ -14011,18 +14224,39 @@ function nrrCommBreakdownSectionHtml(allRows) {
   var f = nrrCommSimState.filters;
   var categories = Array.from(new Set(allRows.map(function (r) { return r.category; }).filter(Boolean))).sort();
 
+  // v_brkgrowth: gap computed once per row here and threaded into both the
+  // filter and the renderer, so nothing recomputes it three times per paint.
+  var gapOf = new Map();
+  function gapFor(r) {
+    var g = gapOf.get(r);
+    if (!g) { g = nrrUpsellRowGap(r); gapOf.set(r, g); }
+    return g;
+  }
+
   var filtered = allRows.filter(function (r) {
     if (f.kam && r.person.email !== f.kam) return false;
     if (f.category && r.category !== f.category) return false;
     if (f.kind && r.kind !== f.kind) return false;
-    if (f.pass === 'relevant' && !(r.qualifies || r.projectedQualifies)) return false;
+    // 'relevant' now also keeps near-misses — the whole point of the default
+    // view is "rows worth looking at", and a family ฿400 short is exactly that.
+    if (f.pass === 'relevant' && !(r.qualifies || r.projectedQualifies || gapFor(r).near)) return false;
     if (f.pass === 'qualify' && !r.qualifies) return false;
     if (f.pass === 'onpace' && !(!r.qualifies && r.projectedQualifies)) return false;
+    // 'near' = เกือบถึงแต่ยังไม่ถึง, and NOT already expected to make it on
+    // pace — those have their own tier and don't need rescuing.
+    if (f.pass === 'near' && !(!r.qualifies && !r.projectedQualifies && gapFor(r).near)) return false;
     if (f.pass === 'offpace' && (r.qualifies || r.projectedQualifies)) return false;
     // f.pass === 'all' → no pass/fail filtering at all
     return true;
   });
-  filtered.sort(function (a, b) { return (b.current || 0) - (a.current || 0); });
+  // Sort: for the near-miss view, CLOSEST TO THE LINE first — that is the
+  // actionable order ("what can I still rescue before month-end"). Everywhere
+  // else keep the established biggest-amount-first.
+  if (f.pass === 'near') {
+    filtered.sort(function (a, b) { return (gapFor(a).gap || 0) - (gapFor(b).gap || 0); });
+  } else {
+    filtered.sort(function (a, b) { return (b.current || 0) - (a.current || 0); });
+  }
 
   // Hard render cap — a KAM/category/kind filter narrow enough to still
   // leave thousands of rows (e.g. explicitly choosing "แสดงทั้งหมด" org-wide)
@@ -14045,27 +14279,41 @@ function nrrCommBreakdownSectionHtml(allRows) {
     '<option value="p1"' + (f.kind === 'p1' ? ' selected' : '') + '>P1 เท่านั้น</option>' +
     '<option value="p3"' + (f.kind === 'p3' ? ' selected' : '') + '>P3 เท่านั้น</option></select>' +
     '<select class="nrr-search nrr-sim-filter" id="nrr-sim-f-pass" data-filter="pass">' +
-    '<option value="relevant"' + (f.pass === 'relevant' ? ' selected' : '') + '>เข้าเกณฑ์ + ใกล้เข้าเกณฑ์</option>' +
+    '<option value="relevant"' + (f.pass === 'relevant' ? ' selected' : '') + '>เข้าเกณฑ์ + ตามจังหวะ + เกือบถึง</option>' +
     '<option value="qualify"' + (f.pass === 'qualify' ? ' selected' : '') + '>เข้าเกณฑ์แล้ว</option>' +
     '<option value="onpace"' + (f.pass === 'onpace' ? ' selected' : '') + '>ยังไม่ถึงแต่ตามจังหวะ</option>' +
+    '<option value="near"' + (f.pass === 'near' ? ' selected' : '') + '>เกือบถึง แต่ยังไม่ถึง (เรียงใกล้สุดก่อน)</option>' +
     '<option value="offpace"' + (f.pass === 'offpace' ? ' selected' : '') + '>ต่ำกว่าจังหวะ/ไม่เข้าเกณฑ์</option>' +
     '<option value="all"' + (f.pass === 'all' ? ' selected' : '') + '>แสดงทั้งหมด (รวมรายการเล็กน้อย)</option></select>' +
     '</div>';
 
   var rowsHtml = filtered.map(nrrCommBreakdownRowHtml).join('');
+  var sortNote = f.pass === 'near' ? 'เรียงจากที่ขาดน้อยที่สุด' : 'เรียงตามยอดสูงสุด';
   var truncNote = truncated
-    ? '<div class="micro" style="margin:6px 0;color:var(--sun-deep)">แสดง ' + RENDER_CAP + ' จาก ' + matchedCount + ' รายการที่ตรงตัวกรอง — เรียงตามยอดสูงสุด, กรองเพิ่ม (เช่น เลือก KAM) เพื่อดูรายการที่เหลือ</div>'
+    ? '<div class="micro" style="margin:6px 0;color:var(--sun-deep)">แสดง ' + RENDER_CAP + ' จาก ' + matchedCount + ' รายการที่ตรงตัวกรอง — ' + sortNote + ', กรองเพิ่ม (เช่น เลือก KAM) เพื่อดูรายการที่เหลือ</div>'
     : '';
+  // v_brkgrowth: .nrr-comm-fulltable-scroll gives the panel its own fixed
+  // height + sticky header, so the page itself no longer has to scroll to read
+  // a long list (Bush's ask). Header row order groups the story:
+  // identity → what it is → how it grew → what the bar is → how far off.
   var tableHtml = filtered.length
-    ? truncNote + '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
+    ? truncNote + '<div class="nrr-comm-fulltable-wrap nrr-comm-fulltable-scroll"><table class="nrr-comm-fulltable"><thead><tr>' +
       '<th class="txt">KAM</th><th class="txt">ร้าน</th><th class="txt">สาขา</th><th class="txt">กลุ่มสินค้า</th>' +
-      '<th class="txt">ประเภท</th><th>ยอดปัจจุบัน</th><th>เกณฑ์</th><th>คาดสิ้นเดือน</th><th class="txt">สถานะ</th>' +
+      '<th class="txt">ประเภท</th>' +
+      '<th title="P3: ฐานสูงสุด 3 เดือนย้อนหลัง → ยอดเดือนนี้ · P1: ไม่มีฐานเพราะเป็นกลุ่มสินค้าใหม่">โตจาก → เป็น</th>' +
+      '<th title="ส่วนที่โตขึ้นจากฐาน — ตัวเลขที่ใช้วัดกับเกณฑ์ขั้นต่ำ และใช้คิดคอมมิชชั่น">ส่วนที่โต</th>' +
+      '<th>เกณฑ์</th>' +
+      '<th title="ต้องมียอดเพิ่มอีกเท่าไหร่ในเดือนนี้จึงจะเข้าเกณฑ์">ขาดอีก</th>' +
+      '<th>คาดสิ้นเดือน</th><th class="txt">สถานะ</th>' +
       '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่พบรายการตามตัวกรองนี้</div></div>';
 
   return '<div class="ds-section-hd" style="margin-top:24px"><span class="ds-eyebrow">Breakdown รายรายการ (เดือน' +
     nrrEsc(QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ') <span class="ds-section-count">' + matchedCount + '/' + allRows.length + '</span></span></div>' +
-    '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">"กลุ่มสินค้า" คือกลุ่ม/หมวดย่อยของสินค้า ไม่ใช่ SKU รายตัว — ข้อมูล SKU ระดับนั้นยังไม่มีในไปป์ไลน์นี้ · ค่าเริ่มต้นแสดงเฉพาะรายการที่เข้าเกณฑ์แล้วหรือใกล้เข้าเกณฑ์ (' + allRows.length + ' รายการทั้งหมดในเดือนนี้ ส่วนใหญ่เป็นยอดเล็กน้อยที่ไม่มีนัยสำคัญ)</div>' +
+    '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">"กลุ่มสินค้า" คือกลุ่ม/หมวดย่อยของสินค้า ไม่ใช่ SKU รายตัว — ข้อมูล SKU ระดับนั้นยังไม่มีในไปป์ไลน์นี้ · ' +
+    '<b>P3</b> ต้องผ่าน 2 เงื่อนไขพร้อมกัน: ยอดเดือนนี้ > ' + nrrEsc(String(nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00))) + '× ของฐาน <b>และ</b> ส่วนที่โต ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000)) +
+    ' · <b>P1</b> (กลุ่มสินค้าใหม่) ต้องมียอด ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000)) +
+    ' · ค่าเริ่มต้นแสดงเฉพาะรายการที่เข้าเกณฑ์แล้ว ตามจังหวะ หรือเกือบถึง (' + allRows.length + ' รายการทั้งหมดในเดือนนี้ ส่วนใหญ่เป็นยอดเล็กน้อยที่ไม่มีนัยสำคัญ)</div>' +
     filtersHtml + tableHtml;
 }
 

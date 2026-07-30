@@ -832,12 +832,13 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
         var rawExistingGmv = row.existingGmv || 0;
         if (rawExistingGmv <= 0) return;
         var maxBaseline = 0;
+        var maxBaselineMonth = null;
         p3Labels.forEach(function (l) {
           var lRow = monthData[l];
           if (!lRow) return;
           var d = nrrDaysInLabel(l);
           var norm30 = d > 0 ? lRow.totalGmv / d * 30 : lRow.totalGmv;
-          if (norm30 > maxBaseline) maxBaseline = norm30;
+          if (norm30 > maxBaseline) { maxBaseline = norm30; maxBaselineMonth = l; }
         });
         var incremental = rawExistingGmv - maxBaseline;
         var qualifies3 = rawExistingGmv > maxBaseline * p3Thresh && incremental >= p3MinIncr;
@@ -846,7 +847,15 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
         var projIncremental = projExisting - maxBaseline;
         out.push({
           person: person, accountId: accountId, outletId: outletId, groupKey: groupKey, category: category,
+          // v_brkgrowth: `current` is the INCREMENTAL for p3 (kept as-is — the
+          // commission is charged on it and the harness pins that). But a
+          // breakdown reader needs "grew FROM x TO y", and y was previously
+          // unrecoverable from the row. Carry the absolute alongside it, plus
+          // which lookback month set the bar — mirrors what
+          // nrrComputeUpsellSkuWithParams already returns (existing_curr /
+          // max_baseline / max_baseline_month).
           kind: 'p3', current: incremental, threshold: p3MinIncr, baseline: maxBaseline, thresholdPct: p3Thresh,
+          existing_curr: rawExistingGmv, baselineMonth: maxBaselineMonth,
           qualifies: qualifies3, commission: qualifies3 ? incremental * r3 : 0, applied_rate: r3,
           projected: projectionReady ? projIncremental : null, projectionReady: projectionReady,
           projectedQualifies: projectionReady ? (projExisting > maxBaseline * p3Thresh && projIncremental >= p3MinIncr) : null
@@ -858,6 +867,65 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   return out;
 }
 window.nrrEnumerateUpsellGroups = nrrEnumerateUpsellGroups;
+
+// ── v_brkgrowth: how far is this row from qualifying? ─────────────────────
+// ONE definition, consumed by both the status badge and the breakdown filter,
+// so the badge can never say "เกือบถึง" about a row the filter excludes.
+//
+// The useful insight for P3: its two AND-ed conditions —
+//   (1) existing > baseline × thresholdPct
+//   (2) (existing − baseline) >= minIncremental
+// are BOTH just "needs more GMV this month", so each converts to a baht gap
+// and the binding constraint is simply the larger one. That collapses a
+// two-dimensional threshold into a single honest number a KAM can act on:
+// "this family needs ฿X more before month-end."
+//
+//   gap for (1) = baseline × pct − existing
+//   gap for (2) = minIncremental − (existing − baseline)
+//
+// P1 has a single condition (total >= p1MinGmv), so its gap is direct.
+var NRR_UPSELL_NEAR_FRAC = 0.70; // >=70% of the way = "เกือบถึง". Tunable; see the
+                                 // gap column in the UI, which always shows the
+                                 // raw baht number so this band is never the only
+                                 // thing the reader has to go on.
+
+function nrrUpsellRowGap(r) {
+  if (!r) return null;
+  var achieved, needed;
+  if (r.kind === 'p1') {
+    achieved = r.current || 0;              // p1 `current` IS the absolute total
+    needed = r.threshold || 0;
+  } else {
+    // p3: work in absolute month GMV, which is the quantity a KAM moves.
+    var base = r.baseline || 0;
+    var abs = (r.existing_curr != null) ? r.existing_curr : (base + (r.current || 0));
+    // Condition (1) is a STRICT inequality (existing > base × pct), so the
+    // target is the smallest whole baht that actually EXCEEDS it — not
+    // base × pct itself. Landing exactly on the line fails, and a gap that
+    // leaves the row still short would be worse than no gap column at all.
+    // (Caught by tools/verify_nrrcomm_simulator.js Part 6, which adds the gap
+    // back and re-runs the real pass condition.)
+    var needRatio = Math.floor(base * (r.thresholdPct || 0)) + 1;
+    // Condition (2) is `>=`, so its target needs no such nudge.
+    var needFloor = base + (r.threshold || 0);
+    achieved = abs;
+    needed = Math.max(needRatio, needFloor);
+  }
+  var gap = Math.max(0, needed - achieved);
+  var progress = needed > 0 ? achieved / needed : (achieved > 0 ? 1 : 0);
+  return {
+    achieved: achieved,
+    needed: needed,
+    gap: gap,
+    progress: progress,
+    // Which condition is holding it back — worth naming, because "needs 2×"
+    // and "needs ฿8,000 more" call for different sales moves.
+    binding: (r.kind === 'p1') ? 'floor'
+      : (Math.floor((r.baseline || 0) * (r.thresholdPct || 0)) + 1 >= (r.baseline || 0) + (r.threshold || 0) ? 'ratio' : 'floor'),
+    near: !r.qualifies && gap > 0 && progress >= NRR_UPSELL_NEAR_FRAC
+  };
+}
+window.nrrUpsellRowGap = nrrUpsellRowGap;
 
 // ── Upsell quarter timeline (v_qtrux) — twin of _upsellQuarterTimeline
 // (07a_commission_engine.js), same shape/lockstep. Rep-facing display data:

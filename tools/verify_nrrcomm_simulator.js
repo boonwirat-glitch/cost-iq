@@ -174,5 +174,63 @@ console.log('\n=== Part 5: Σ enumerate().commission === compute().total_comm ==
     qualifyCount, computed.p1.groups.length + computed.p3.groups.length);
 });
 
+// ── Part 6: nrrUpsellRowGap — the "ขาดอีกเท่าไหร่" number ─────────────────
+// v_brkgrowth. The breakdown table's gap column claims something specific and
+// falsifiable: "add exactly this much GMV this month and the row qualifies."
+// Prove it by actually adding the gap and re-testing the real pass condition,
+// rather than trusting the arithmetic by inspection.
+console.log('\n=== Part 6: gap is exactly what it takes to qualify ===');
+(function () {
+  var rows = nrrEnumerateUpsellGroups(person, bundle, baseMonth, null, expIds);
+  var p3Thresh = nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00);
+  var p3MinIncr = nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000);
+  var p1MinGmv = nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000);
+
+  var checkedNonQual = 0, checkedQual = 0;
+  rows.forEach(function (r, i) {
+    var g = nrrUpsellRowGap(r);
+    checkBool('[' + i + '] ' + r.kind + ' gap is never negative', g.gap >= 0, true);
+
+    if (r.qualifies) {
+      checkedQual++;
+      // A qualifying row must show zero gap — otherwise the column would tell
+      // a KAM to chase a threshold they already cleared.
+      checkBool('[' + i + '] ' + r.kind + ' qualifying row has gap 0', g.gap === 0, true);
+      return;
+    }
+    checkedNonQual++;
+
+    // Add exactly the gap and re-evaluate the REAL condition from
+    // nrrEnumerateUpsellGroups. Must flip to qualifying.
+    var boosted = g.achieved + g.gap;
+    var nowQualifies;
+    if (r.kind === 'p1') {
+      nowQualifies = boosted >= p1MinGmv;
+    } else {
+      var base = r.baseline || 0;
+      nowQualifies = boosted > base * p3Thresh && (boosted - base) >= p3MinIncr;
+    }
+    checkBool('[' + i + '] ' + r.kind + ' +gap flips it to qualifying', nowQualifies, true);
+
+    // And one baht less must NOT qualify — proves the gap is minimal, not
+    // merely sufficient (a gap that overshoots would understate how close
+    // a row is and hide real near-misses).
+    if (g.gap > 1) {
+      var justShort = boosted - 1;
+      var stillShort;
+      if (r.kind === 'p1') {
+        stillShort = !(justShort >= p1MinGmv);
+      } else {
+        var b2 = r.baseline || 0;
+        stillShort = !(justShort > b2 * p3Thresh && (justShort - b2) >= p3MinIncr);
+      }
+      checkBool('[' + i + '] ' + r.kind + ' gap is minimal (−฿1 still fails)', stillShort, true);
+    }
+  });
+  checkBool('exercised at least one non-qualifying row', checkedNonQual > 0, true);
+  checkBool('exercised at least one qualifying row', checkedQual > 0, true);
+  console.log('  (checked ' + checkedQual + ' qualifying + ' + checkedNonQual + ' non-qualifying rows)');
+})();
+
 console.log(`\n${fails === 0 ? 'ALL PASS' : fails + ' FAILURE(S)'}`);
 process.exit(fails === 0 ? 0 : 1);

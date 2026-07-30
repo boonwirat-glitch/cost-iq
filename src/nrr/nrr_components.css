@@ -1001,6 +1001,72 @@
 .nrr-comm-ds .nrr-trunc-acct  { max-width: 230px; }
 .nrr-comm-ds .nrr-trunc-group { max-width: 200px; }
 .nrr-comm-ds table.nrr-comm-fulltable tr:last-child td { border-bottom: none; }
+
+/* ══ v_brkgrowth (2026-07-30): scroll the PANEL, not the page ═══════════════
+   The breakdown list runs to hundreds of rows, so reading row 80 used to mean
+   scrolling the whole document and losing the header. Give the wrapper its own
+   height and a sticky thead.
+
+   Two things this depends on:
+   · The scroll container must be the element with overflow — `position: sticky;
+     top: 0` on a th resolves against the nearest scrolling ancestor, so
+     without max-height here the sticky header would pin to the PAGE and slide
+     under the masthead instead.
+   · z-index must stay UNDER the masthead's 50 (see .nrr-masthead) or the
+     header row floats over the site nav when the page is scrolled. 5/6 leaves
+     plenty of room. */
+.nrr-comm-ds .nrr-comm-fulltable-scroll {
+  /* 68vh of screen, capped at 760px so it doesn't get silly on a tall monitor,
+     with a hard 360px FLOOR. The floor is not cosmetic: any context where vh
+     resolves to 0 (a zero-height viewport — headless capture, a hidden pane,
+     some embedded webviews) would otherwise collapse the panel to nothing and
+     hide the table entirely. Measured that exact collapse during verification. */
+  max-height: max(360px, min(68vh, 760px));
+  overflow-y: auto;
+  overscroll-behavior: contain;      /* don't chain to the page at the ends */
+  /* The last row's hairline is suppressed above, so give the box its own edge
+     rather than ending on nothing mid-scroll. */
+  border-bottom: 1px solid var(--line);
+}
+.nrr-comm-ds .nrr-comm-fulltable-scroll thead th {
+  position: sticky; top: 0; z-index: 5;
+  /* Opaque — rows scroll UNDER this, and the shared --bg keeps it seamless
+     with the page rather than reading as a floating bar. */
+  background: var(--bg);
+  /* border-bottom on a sticky th doesn't travel with it in some engines, so
+     draw the rule as a shadow that definitely does. */
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+/* Keep the KAM column readable while scrolling sideways — the table is wide
+   enough to need it now that three columns were added. Higher z-index on the
+   header's own first cell so the two sticky axes don't fight at the corner. */
+.nrr-comm-ds .nrr-comm-fulltable-scroll tbody td:first-child {
+  position: sticky; left: 0; z-index: 4; background: var(--bg);
+}
+.nrr-comm-ds .nrr-comm-fulltable-scroll thead th:first-child { z-index: 6; }
+
+/* ── growth cell: ฐาน → ยอดเดือนนี้ (×N) ── */
+.nrr-comm-ds .nrr-grow-from { color: var(--ink3); }
+.nrr-comm-ds .nrr-grow-arrow { color: var(--ink3); margin: 0 5px; }
+.nrr-comm-ds .nrr-grow-to { font-weight: 700; }
+.nrr-comm-ds .nrr-grow-mult {
+  display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+  background: var(--fill); color: var(--ink2);
+}
+/* ok = the ratio condition is genuinely cleared, so the reader doesn't have to
+   compare "2.4×" against the threshold column themselves. */
+.nrr-comm-ds .nrr-grow-mult.ok { background: var(--green-soft); color: var(--green-deep); }
+.nrr-comm-ds .nrr-comm-newtag {
+  display: inline-block; padding: 0 5px; border-radius: var(--r-pill);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700;
+  background: var(--mv-teal-soft); color: var(--mv-teal);
+}
+
+/* ── gap cell: ขาดอีก ── */
+.nrr-comm-ds .nrr-gap-ok   { color: var(--green-deep); font-weight: 600; }
+.nrr-comm-ds .nrr-gap-near { color: var(--sun-deep); font-weight: 700; }
+.nrr-comm-ds .nrr-gap-far  { color: var(--ink3); }
 .nrr-comm-ds table.nrr-comm-fulltable tr.nrr-comm-total-row td { border-top: 1.5px solid var(--ink); border-bottom: none; font-weight: 700; }
 .nrr-comm-ds .nrr-comm-cell-meta { font-size: 11px; font-weight: 400; font-family: var(--font-ui); color: var(--ink3); margin-top: 1px; }
 
@@ -1028,6 +1094,11 @@
 }
 .nrr-comm-ds .nrr-pace-badge.qualify { background: var(--green-soft); color: var(--green-deep); }
 .nrr-comm-ds .nrr-pace-badge.onpace  { background: var(--sun-soft);   color: var(--sun-deep); }
+/* v_brkgrowth: 'near' is the new actionable tier — close to the bar but NOT
+   expected to clear it on current pace, i.e. the ones worth a push before
+   month-end. Coral-toned so it reads as "needs attention", distinct from
+   onpace's amber ("fine, will get there") and offpace's grey ("ignore"). */
+.nrr-comm-ds .nrr-pace-badge.near    { background: var(--coral-soft);  color: var(--coral); }
 .nrr-comm-ds .nrr-pace-badge.offpace { background: var(--fill-deep);  color: var(--ink3); }
 .nrr-comm-ds .nrr-pace-badge.pending { background: var(--fill-deep);  color: var(--ink3); font-weight: 500; }
 
