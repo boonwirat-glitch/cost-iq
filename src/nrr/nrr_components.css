@@ -966,13 +966,18 @@
    job is auditing, not reading flow; hairlines only, no box wrapper ── */
 .nrr-comm-ds .nrr-comm-fulltable-wrap { overflow-x: auto; margin-bottom: 10px; }
 .nrr-comm-ds table.nrr-comm-fulltable { width: 100%; border-collapse: collapse; white-space: nowrap; }
+/* v_brkgrowth: horizontal padding 10px → 7px. At 11 columns that reclaims
+   ~66px of pure whitespace, which is what finally lets the table fit a 1440
+   viewport without the left-right scrolling Bush flagged. Preferred over
+   truncating the shop/branch names further — padding costs nothing to read,
+   a shorter name costs a hover. */
 .nrr-comm-ds table.nrr-comm-fulltable th {
   text-align: right; font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--ink3); padding: 8px 10px; border-bottom: 1px solid var(--line); user-select: none;
+  color: var(--ink3); padding: 8px 7px; border-bottom: 1px solid var(--line); user-select: none;
 }
 .nrr-comm-ds table.nrr-comm-fulltable th:first-child { text-align: left; padding-left: 0; }
 .nrr-comm-ds table.nrr-comm-fulltable td {
-  text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top;
+  text-align: right; padding: 8px 7px; border-bottom: 1px solid var(--line); vertical-align: top;
   font-family: var(--font-num); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .nrr-comm-ds table.nrr-comm-fulltable td:first-child { text-align: left; padding-left: 0; font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; }
@@ -998,8 +1003,13 @@
    Every truncating cell carries title= with the full text for hover. */
 .nrr-comm-ds .nrr-trunc { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrr-comm-ds .nrr-trunc-kam   { max-width: 96px; }
-.nrr-comm-ds .nrr-trunc-acct  { max-width: 230px; }
-.nrr-comm-ds .nrr-trunc-group { max-width: 200px; }
+/* v_brkgrowth: tightened from 230/200 once the table went to 11 columns.
+   Measured: ร้าน and สาขา were taking 250px EACH, which together with the new
+   growth/gap columns pushed the table 97px past its panel and forced the
+   left-right scrolling Bush flagged. Every one of these cells already carries
+   the full string on title=, so narrowing costs a hover, not information. */
+.nrr-comm-ds .nrr-trunc-acct  { max-width: 176px; }
+.nrr-comm-ds .nrr-trunc-group { max-width: 168px; }
 .nrr-comm-ds table.nrr-comm-fulltable tr:last-child td { border-bottom: none; }
 
 /* ══ v_brkgrowth (2026-07-30): scroll the PANEL, not the page ═══════════════

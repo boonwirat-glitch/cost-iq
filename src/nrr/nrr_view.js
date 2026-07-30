@@ -3546,13 +3546,16 @@ function nrrRenderCommSimResults() {
 // needs ฿400 more together with one sitting at ฿50 of a ฿5,000 threshold —
 // thousands of rows, all labelled identically, so the genuinely-rescuable ones
 // were invisible. `near` splits them out (see nrrUpsellRowGap).
+// Labels stay SHORT — this is the last column of an 11-column nowrap table, so
+// every extra word here is width taken from the shop/branch names. The full
+// meaning goes on title=. ("ตามจังหวะ คาดว่าจะถึง" alone was costing ~50px.)
 function nrrCommPaceBadgeHtml(r, gap) {
-  if (r.qualifies) return '<span class="nrr-pace-badge qualify">เข้าเกณฑ์แล้ว</span>';
-  if (!r.projectionReady) return '<span class="nrr-pace-badge pending">รอข้อมูล</span>';
-  if (r.projectedQualifies) return '<span class="nrr-pace-badge onpace">ตามจังหวะ คาดว่าจะถึง</span>';
+  if (r.qualifies) return '<span class="nrr-pace-badge qualify">เข้าเกณฑ์</span>';
+  if (!r.projectionReady) return '<span class="nrr-pace-badge pending" title="ยังเช้าเกินจะคาดการณ์ (ต้องผ่านวันที่ 5 ของเดือน)">รอข้อมูล</span>';
+  if (r.projectedQualifies) return '<span class="nrr-pace-badge onpace" title="ยังไม่ถึงเกณฑ์ แต่ถ้ารักษาจังหวะนี้ไว้ คาดว่าจะถึงภายในสิ้นเดือน">ตามจังหวะ</span>';
   var g = gap || nrrUpsellRowGap(r);
-  if (g && g.near) return '<span class="nrr-pace-badge near">เกือบถึง</span>';
-  return '<span class="nrr-pace-badge offpace">ต่ำกว่าจังหวะ</span>';
+  if (g && g.near) return '<span class="nrr-pace-badge near" title="เกือบถึงเกณฑ์ แต่จังหวะปัจจุบันยังไม่พาไปถึง — ดูคอลัมน์ ขาดอีก">เกือบถึง</span>';
+  return '<span class="nrr-pace-badge offpace" title="ยังห่างจากเกณฑ์มาก">ต่ำกว่าจังหวะ</span>';
 }
 
 // One truncating text cell. The full string always goes on title= so nothing
@@ -3570,11 +3573,15 @@ function _nrrTruncCell(text, widthCls, extraStyle) {
 // fundamentally a RATIO against the best of the last 3 months.
 // P1 has no "from" by definition — it is an item family this outlet had never
 // bought — so it says so rather than printing a fake ฿0 baseline.
+// Same nowrap-width discipline as the gap cell: only compact tokens stay
+// visible, prose goes to title=. A month label ("มิ.ย. 2569") is a token and
+// earns its place — it says WHICH month set the bar, which changes how you read
+// the ratio. "ไม่เคยซื้อกลุ่มนี้มาก่อน" is prose and does not.
 function _nrrCommGrowthCellHtml(r) {
   if (r.kind === 'p1') {
-    return '<td><span class="nrr-comm-newtag">ใหม่</span> ' +
-      '<span class="nrr-grow-to">' + nrrFmtGMVExact(r.current) + '</span>' +
-      '<div class="nrr-comm-cell-meta">ไม่เคยซื้อกลุ่มนี้มาก่อน</div></td>';
+    return '<td title="' + nrrEsc('กลุ่มสินค้าใหม่ — ร้านนี้ไม่เคยซื้อกลุ่มนี้มาก่อน จึงไม่มีฐานให้เทียบ') + '">' +
+      '<span class="nrr-comm-newtag">ใหม่</span> ' +
+      '<span class="nrr-grow-to">' + nrrFmtGMVExact(r.current) + '</span></td>';
   }
   var base = r.baseline || 0;
   var abs = (r.existing_curr != null) ? r.existing_curr : (base + (r.current || 0));
@@ -3585,8 +3592,12 @@ function _nrrCommGrowthCellHtml(r) {
   var multHtml = mult != null
     ? '<span class="nrr-grow-mult' + (multOk ? ' ok' : '') + '">' + mult.toFixed(1) + '×</span>'
     : '';
-  var baseMeta = r.baselineMonth ? ('ฐานสูงสุด ' + r.baselineMonth) : 'ฐาน 3 เดือนย้อนหลัง';
-  return '<td>' +
+  var baseMeta = r.baselineMonth || '3 เดือนย้อนหลัง';
+  var tip = 'ฐาน = ยอดสูงสุดใน 3 เดือนย้อนหลัง' +
+    (r.baselineMonth ? (' (เดือน ' + r.baselineMonth + ')') : '') +
+    ' → ยอดเดือนนี้ ' + nrrFmtGMVExact(abs) +
+    (mult != null ? (' = ' + mult.toFixed(2) + '× ของฐาน') : '');
+  return '<td title="' + nrrEsc(tip) + '">' +
     '<span class="nrr-grow-from">' + nrrFmtGMVExact(base) + '</span>' +
     '<span class="nrr-grow-arrow">→</span>' +
     '<span class="nrr-grow-to">' + nrrFmtGMVExact(abs) + '</span> ' + multHtml +
@@ -3595,22 +3606,28 @@ function _nrrCommGrowthCellHtml(r) {
 }
 
 // "ขาดอีกเท่าไหร่" — always a real baht figure, so the ≥70% band that drives
-// the เกือบถึง badge is never the only thing the reader can see. Qualifying
-// rows show the headroom they cleared by instead of a blank.
+// the เกือบถึง badge is never the only thing the reader can see.
+//
+// The "N% ของเกณฑ์ · ติดเงื่อนไข…" detail lives in title= only, NOT as a meta
+// line (Bush, 2026-07-30). This table sets white-space:nowrap, so a long Thai
+// sub-sentence can't wrap — it forces the column as wide as the whole phrase,
+// which pushed the 11-column table past the viewport and made the page scroll
+// sideways. The baht figure is the number you act on; the rest is detail, and
+// detail belongs on hover in a table this dense.
 function _nrrCommGapCellHtml(r, g) {
   if (r.qualifies) {
     var over = Math.max(0, (g.achieved || 0) - (g.needed || 0));
-    return '<td class="nrr-gap-ok">ผ่านแล้ว' +
-      (over > 0 ? '<div class="nrr-comm-cell-meta">เกินเกณฑ์ ' + nrrFmtGMVExact(over) + '</div>' : '') +
-      '</td>';
+    return '<td class="nrr-gap-ok"' +
+      (over > 0 ? ' title="' + nrrEsc('เกินเกณฑ์ ' + nrrFmtGMVExact(over)) + '"' : '') +
+      '>ผ่านแล้ว</td>';
   }
   var pct = Math.round((g.progress || 0) * 100);
   var why = g.binding === 'ratio'
     ? 'ติดเงื่อนไข ' + (r.thresholdPct || '') + '× ของฐาน'
     : 'ติดเงื่อนไขส่วนที่โตขั้นต่ำ';
-  return '<td class="' + (g.near ? 'nrr-gap-near' : 'nrr-gap-far') + '">' +
+  return '<td class="' + (g.near ? 'nrr-gap-near' : 'nrr-gap-far') + '"' +
+    ' title="' + nrrEsc(pct + '% ของเกณฑ์ · ' + why) + '">' +
     'ขาดอีก ' + nrrFmtGMVExact(g.gap) +
-    '<div class="nrr-comm-cell-meta">' + pct + '% ของเกณฑ์ · ' + nrrEsc(why) + '</div>' +
     '</td>';
 }
 
