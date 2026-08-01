@@ -6833,26 +6833,34 @@ function nrrWaiverRowHtml(r, isAdmin) {
     ? '<span class="tag mv-violet">เฉพาะสาขา ' + nrrEsc(_nrrOutletNameFor(r.account_id, r.outlet_id)) + '</span>'
     : '<span class="tag muted">ทั้ง account</span>';
   var locked = nrrIsPeriodLocked(r.period_month);
+  // v_clock: เดือนที่ Lock แล้ว "ตัดสินต่อได้" ไม่ใช่ตันเหมือนเดิม
+  //
+  // ของเดิมปิดปุ่มทิ้งเพราะตอนนั้นแก้ตัวเลขย้อนหลังไม่ได้ — กด lock = จบ
+  // ตอนนี้ Sense มี "คำนวณ %NRR ใหม่" ที่คำนวณเฉพาะ %NRR จาก waiver ล่าสุด
+  // โดยไม่แตะ upsell/handover ที่แช่แข็งไว้ การปิดปุ่มไว้จึงขัดกับความสามารถใหม่
+  // และทำให้จุดประสงค์ทั้งหมด (lock วันที่ 1 แล้วค่อยตรวจ waiver) ใช้ไม่ได้จริง
+  //
+  // แต่การอนุมัติหลัง lock **ไม่ได้** ทำให้ยอดที่จ่ายเปลี่ยนเอง — ต้องไปกดคำนวณใหม่
+  // ที่ Sense อีกทีเสมอ จึงต้องเตือนตรงนี้ให้ชัด ไม่งั้นจะเข้าใจว่าอนุมัติแล้วจบ
+  // inline style ตามแบบเดิมของไฟล์นี้ — ไม่แตะ nrr_components.css เพื่อไม่ให้
+  // การแก้เล็กๆ นี้ไปพันกับงานอื่นที่ยังค้างอยู่ในไฟล์ CSS นั้น
+  var lockedNote = '<div class="micro" style="color:var(--warn-text);background:var(--warn-dim);' +
+    'border:1px solid var(--warn-border);border-radius:8px;padding:6px 9px;margin-top:6px;line-height:1.45">' +
+    'เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — ตัดสินได้ แต่<b>ยอดที่ล็อกไว้จะยังไม่เปลี่ยน</b> ' +
+    'จนกว่าจะไปกด “คำนวณ %NRR ใหม่” ที่ Sense › Commission Cockpit › Lock</div>';
   var actions = '';
   if (isAdmin && r.status === 'submitted') {
-    if (locked) {
-      actions = '<div class="micro" style="color:var(--ink3);margin-top:6px">เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — อนุมัติ/ปฏิเสธไม่ได้แล้ว</div>';
-    } else {
-      actions = '<div class="nrr-waiver-actions">' +
-        '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button>' +
-        '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>' +
-        '</div>';
-    }
+    actions = (locked ? lockedNote : '') +
+      '<div class="nrr-waiver-actions">' +
+      '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button>' +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>' +
+      '</div>';
   } else if (isAdmin && r.status === 'approved') {
-    // Revoking an already-effective waiver retroactively changes %NRR/
-    // commission math for that month -- disallow once the month is Lock-ed,
-    // same rule as new requests, so a paid-out period never silently
-    // changes after the fact.
-    actions = locked
-      ? '<div class="micro" style="color:var(--ink3);margin-top:6px">เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — เพิกถอนไม่ได้แล้ว</div>'
-      : '<div class="nrr-waiver-actions">' +
-        '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>' +
-        '</div>';
+    // เพิกถอนก็เข้าเส้นทางเดียวกัน — recompute จัดการได้เหมือนกันทุกประการ
+    actions = (locked ? lockedNote : '') +
+      '<div class="nrr-waiver-actions">' +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>' +
+      '</div>';
   }
   return '<div class="nrr-waiver-card ' + r.status + '">' +
     '<div class="nrr-waiver-top">' +
