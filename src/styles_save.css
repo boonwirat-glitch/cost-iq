@@ -1039,6 +1039,34 @@ body.sdt-light.kam-sense-active .topbar-right button[title="ออกจาก�
   margin-top:10px;padding:10px 11px;border-radius:11px;background:rgba(240,176,0,.10);
   border:1px solid rgba(240,176,0,.20);font-size:var(--text-xs);color:#f6ad55;line-height:1.45
 }
+.tgt-lock-warning-sub{margin-top:4px;font-size:var(--text-2xs);opacity:.78}
+/* v_clock: waiver มาหลัง lock — ใช้ฟ้าไม่ใช่เหลือง เพราะเป็น "มีของให้ทำ" ไม่ใช่ "ผิดพลาด" */
+.tgt-lock-warning.recompute{
+  background:rgba(100,170,255,.10);border-color:rgba(100,170,255,.24);color:#bcd7ff
+}
+/* เทียบก่อน/หลัง ตอนคำนวณ %NRR ใหม่ — แถวซ้อน ไม่ใช่ตาราง (จอ 440px) */
+.comm-diff-list{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.comm-diff-row{
+  padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07)
+}
+.comm-diff-who{display:flex;align-items:center;gap:9px}
+.comm-diff-detail{
+  display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:7px;padding-top:7px;
+  border-top:1px solid rgba(255,255,255,.055);
+  font-size:var(--text-xs);color:rgba(var(--ink-blue),.55)
+}
+.comm-diff-detail b{
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-weight:var(--fw-bold);
+  color:rgba(var(--ink-blue-hi),.85);font-variant-numeric:tabular-nums
+}
+.comm-diff-arrow{opacity:.42;padding:0 5px}
+.comm-diff-delta{
+  flex-shrink:0;font-weight:900;font-size:var(--text-lg);
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-variant-numeric:tabular-nums
+}
+.comm-diff-delta.up{color:var(--tk-ok-bright)}
+.comm-diff-delta.down{color:#f6ad55}
 .tgt-snap-table-wrap{overflow:auto;border-radius:13px;border:1px solid rgba(255,255,255,.07)}
 .tgt-snap-table{width:100%;border-collapse:collapse;min-width:640px;background:rgba(255,255,255,.035)}
 .tgt-snap-table th{

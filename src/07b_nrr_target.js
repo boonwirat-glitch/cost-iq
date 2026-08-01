@@ -1409,21 +1409,76 @@ setTimeout(async function _tgtInitCheck() {
   // Fires once (guarded by "draft/final already exists?") when an Admin opens the app
   // during the grace window (day 1-3) and last month has not been locked yet.
   // Saves as DRAFT only — Admin still reviews and clicks Lock manually (by design).
-  try {
-    if (typeof isAdminRole === 'function' ? isAdminRole(role) : role === 'admin') {
+  // v_clock: ยกเครื่องบล็อกนี้ทั้งก้อน — เดิมมี 4 ปัญหาที่ทำให้เงียบและเสี่ยง
+  //   1. `alreadyHasSnapshot` อ่านจาก `_commissionSnapshots` ที่โหลดแค่ไตรมาสปัจจุบัน
+  //      → รอยต่อไตรมาส (1-3 ต.ค.) ก.ย. ไม่อยู่ในลิสต์ → ยิงซ้ำทุกครั้งที่ admin เปิดแอป
+  //      และตัวกัน "อย่าทับของที่ lock แล้ว" ก็ตาบอดพร้อมกัน → ทับของที่ lock เงียบๆ
+  //   2. `.catch(function(){})` + `try{}catch(e){}` ว่าง → ล้มเหลวกับไม่เคยรันแยกไม่ออก
+  //   3. ไม่มี mutex → ชนกับคนกด Compute/Lock มือ และกับ admin คนอื่นที่เปิดพร้อมกัน
+  //   4. ยิงที่ T+1.5s ก่อน allCriticalReady() → คำนวณบนข้อมูลที่โหลดไม่ครบ ซึ่งเป็น
+  //      อาการเดียวกับที่ทำให้ต้อง revert v919-921 (c009c2a "racy partial %NRR values")
+  //
+  // ยังคงเจตนาเดิมไว้: **บันทึกเป็น draft เท่านั้น admin ต้องกด Lock เอง**
+  // (คอมเมนต์เดิมของผู้เขียนย้ำไว้ และเป็นเส้นที่ถูกต้อง — ไม่ทำ auto-lock)
+  (async function _commAutoDraftGuarded() {
+    try {
+      const isAdmin = (typeof isAdminRole === 'function') ? isAdminRole(role) : role === 'admin';
+      if (!isAdmin) return;
       const eom = (typeof _commEomStatus === 'function') ? _commEomStatus() : null;
-      if (eom && eom.showGraceBanner) {
-        const alreadyHasSnapshot = (_commissionSnapshots || []).some(r => r.period_month === eom.prevPeriod);
-        if (!alreadyHasSnapshot && typeof computeCommissionDraft === 'function') {
-          computeCommissionDraft(eom.prevPeriod).then(function(ok) {
-            if (ok && typeof showToast === 'function') {
-              showToast('Auto-compute ค่าคอมฯ ' + eom.prevPeriod + ' เสร็จแล้ว — ตรวจและกด Lock ที่ Commission Cockpit', 'ok');
-            }
-          }).catch(function(){});
+      if (!eom || !eom.showGraceBanner) return;
+      const target = eom.prevPeriod;
+
+      // ── ป้ายเตือนขึ้นก่อนเสมอ ──
+      // ตั้งใจให้ขึ้นก่อน auto-compute และไม่ผูกกับผลของมัน: ถ้า auto-compute ทำไม่ได้
+      // (ข้อมูลไม่ครบ/DB ล่ม) admin ยังต้องรู้ว่ายังไม่ได้ lock — นั่นคือเรื่องสำคัญกว่า
+      try { if (typeof _commMaybeShowLockPill === 'function') _commMaybeShowLockPill(); } catch (e) {
+        console.error('[CommAuto] แสดงป้ายเตือน lock ไม่สำเร็จ', e);
+      }
+
+      if (typeof computeCommissionDraft !== 'function') return;
+
+      // ── เกตข้อมูล: ห้ามคำนวณบนข้อมูลที่โหลดไม่ครบ ──
+      const _gates = [];
+      if (typeof allCriticalReady === 'function' && !allCriticalReady()) _gates.push('ข้อมูลหลักยังโหลดไม่ครบ');
+      if (typeof _tgtSettingsLoadFailed !== 'undefined' && _tgtSettingsLoadFailed) _gates.push('โหลด target_settings ไม่สำเร็จ');
+      if (window._nrrGovPoliciesLoaded !== true) _gates.push('ยังไม่รู้โหมดคำนวณ (nrr_policies)');
+      if (_gates.length) {
+        // เงียบไม่ได้ แต่ก็ไม่ควรกวน admin ด้วย toast เพราะนี่เป็นสภาพชั่วคราวตอนบูต
+        // ป้ายเตือน lock ขึ้นไปแล้วข้างบน → admin ยังไปกด Compute เองได้ทุกเมื่อ
+        console.warn('[CommAuto] ข้าม auto-compute ' + target + ' — ' + _gates.join(' · '));
+        return;
+      }
+
+      // ── มี snapshot อยู่แล้วหรือยัง: ถาม DB ตรงๆ ไม่พึ่ง array ที่ scope แค่ไตรมาสนี้ ──
+      const st = (typeof _commSnapshotStateFromDb === 'function')
+        ? await _commSnapshotStateFromDb(target) : null;
+      if (st === null) {
+        console.error('[CommAuto] อ่านสถานะ snapshot ' + target + ' ไม่ได้ — ข้าม auto-compute');
+        return;
+      }
+      if (st.hasAny) {
+        console.info('[CommAuto] ' + target + ' มี snapshot แล้ว (' + st.rows.length +
+                     ' แถว, final ' + st.finalCount + ') — ไม่ต้อง auto-compute');
+        return;
+      }
+
+      const ok = await computeCommissionDraft(target);
+      if (ok) {
+        if (typeof showToast === 'function') {
+          showToast('Auto-compute ค่าคอมฯ ' + target + ' เสร็จแล้ว — ตรวจและกด Lock ที่ Commission Cockpit', 'ok');
+        }
+      } else {
+        // เดิมเคสนี้เงียบสนิท: `if (ok && ...)` ไม่มี else เลย
+        console.error('[CommAuto] auto-compute ' + target + ' ไม่สำเร็จ (computeCommissionDraft คืน false)');
+        if (typeof showToast === 'function') {
+          showToast('Auto-compute ค่าคอมฯ ' + target + ' ไม่สำเร็จ — กด Compute เองที่ Commission Cockpit', '!');
         }
       }
+    } catch (e) {
+      // เดิมเป็น catch ว่าง — ล้มเหลวกับไม่เคยรันแยกไม่ออก
+      console.error('[CommAuto] auto-compute block ล้มเหลว', e);
     }
-  } catch(e) {}
+  })();
   // Commission strip: re-render now that _tgtLoaded=true
   try{ if(typeof window._commRenderKamSelfStrip==='function') window._commRenderKamSelfStrip(); }catch(e){}
   // v761: also call _commGatedRender with key reset — _tgtLoadedFromDB now true so

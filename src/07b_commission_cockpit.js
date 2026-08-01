@@ -2016,7 +2016,7 @@ function renderCommLockStep(body) {
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?'ยังมี exclusion pending ' + pending + ' รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ':'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
-      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()">Lock snapshot</button></div>
+      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot(_commTargetLockPeriod())" title="ล็อกเดือนที่ยังไม่ปิด — ช่วงวันที่ 1-3 จะเล็งเดือนก่อนหน้าให้อัตโนมัติ">Lock ${_commPeriodLabelTh(_commTargetLockPeriod())}</button></div>
     </div>
     <div id="comm-lock-detail-body">
     <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
@@ -2405,7 +2405,20 @@ async function saveCommissionAssignments() {
 function renderCommissionLockTab() {
   const body = document.getElementById('tgt-sheet-body');
   if (!body) return;
-  const period = _nrrExclusionCurrentPeriod();
+  // v_clock: ถ้ากำลังรอยืนยันการคำนวณใหม่ ให้โชว์ตารางเทียบก่อน/หลังแทนหน้าปกติ
+  // — เรนเดอร์ในหน้าเดียวกันไม่ใช้ modal ซ้อน sheet (z-index จะตีกัน)
+  if (window._commRecomputePreview) { _commRenderRecomputeDiff(body); return; }
+  // v_clock: เล็งเดือนเดียวกับที่ปุ่ม Lock เล็ง — เดิมหน้านี้โชว์เดือนปฏิทินวันนี้
+  // ขณะที่ปุ่มเขียนว่า "Lock ก.ค." → วันที่ 1-3 จะเห็นตารางเดือนหนึ่งแต่กดล็อกอีกเดือน
+  // ถ้าเดือนเป้าหมายยังไม่มี snapshot เลย ให้ถอยไปเดือนล่าสุดที่มีแถวจริง —
+  // ไม่งั้นพอ lock ก.ค. เสร็จ หน้านี้จะเด้งไป ส.ค. ที่ยังว่าง แล้วป้ายเตือน
+  // "มี waiver มาหลัง lock" ของ ก.ค. จะไม่มีที่โผล่
+  let period = _commTargetLockPeriod();
+  if (!(_commissionSnapshots || []).some(r => r.period_month === period)) {
+    const newest = (_commissionSnapshots || [])
+      .map(r => r.period_month).filter(Boolean).sort().pop();
+    if (newest) period = newest;
+  }
   // Prefer stored rows — live compute only if nothing stored yet
   const storedRows = (_commissionSnapshots || []).filter(r => r.period_month === period);
   const finalRows  = storedRows.filter(r => r.snapshot_status === 'final');
@@ -2415,6 +2428,9 @@ function renderCommissionLockTab() {
   const isLocked = finalRows.length > 0;
   const isDraft  = !isLocked && draftRows.length > 0;
   const total    = displayRows.reduce((s,r)=>s+Number(r.payout_amount||0),0);
+  // v_clock: waiver ที่อนุมัติหลัง locked_at → ตัวเลขที่ล็อกไว้ยังไม่นับรวม
+  const lateWaivers = (typeof _commWaiversDecidedAfterLock === 'function')
+    ? _commWaiversDecidedAfterLock(period) : [];
   // Status label
   const statusLabel = isLocked
     ? `🔒 Locked · ${finalRows.length} rows · ${_commFmtPayout(total)}`
@@ -2431,11 +2447,23 @@ function renderCommissionLockTab() {
       <div class="tgt-lock-sub">${period} · Compute เพื่อ freeze ตัวเลข → ตรวจ → Lock เพื่อ confirm จ่ายเงิน</div>
       <span class="tgt-lock-status ${statusCls}">${statusLabel}</span>
       ${pending ? `<div class="tgt-lock-warning">ยังมี exclusion pending ${pending} รายการ — approve ก่อน lock จะได้ตัวเลขถูกต้อง</div>` : ''}
+      ${isLocked ? (lateWaivers.length
+        ? `<div class="tgt-lock-warning recompute">
+             มี waiver ${lateWaivers.length} รายการที่อนุมัติ<u>หลัง</u>ล็อกเดือนนี้ไปแล้ว — ตัวเลขที่ล็อกไว้ยังไม่ได้นับ
+             <div class="tgt-lock-warning-sub">กด “คำนวณ %NRR ใหม่” ด้านล่างเพื่อดูว่าใครกระทบก่อนตัดสินใจ · <b>อย่ากด Compute</b> เพราะจะไปอ่าน P1/P3 จากไฟล์ upsell ล่าสุดบน R2 ซึ่งเป็นของเดือนปัจจุบัน ไม่ใช่ของเดือนที่ล็อกไว้</div>
+           </div>`
+        : `<div class="tgt-lock-warning">เดือนนี้ล็อกแล้ว — ถ้ามี waiver เพิ่มทีหลัง ให้ใช้ “คำนวณ %NRR ใหม่” อย่ากด Compute
+             <div class="tgt-lock-warning-sub">Compute จะอ่าน P1/P3 จากไฟล์ upsell ล่าสุดบน R2 ซึ่งเป็นของเดือนปัจจุบัน ไม่ใช่ของเดือนที่ล็อกไว้</div>
+           </div>`) : ''}
       <div class="tgt-lock-actions">
-        <button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()" ${!displayRows.length?'disabled':''}>Export CSV</button>
-        <button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">↻ Compute</button>
-        <button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot()" ${!isDraft&&!isLocked?'disabled':''}>${isLocked ? 'Re-lock' : 'Lock Final'}</button>
+        <button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv('${period}')" ${!displayRows.length?'disabled':''}>Export CSV</button>
+        <button class="tgt-lock-btn outline" onclick="_commComputeFromLockPanel('${period}')">Compute</button>
+        <button class="tgt-lock-btn ${isLocked ? 'secondary' : 'primary'}" onclick="lockCommissionSnapshot('${period}')" ${!isDraft&&!isLocked?'disabled':''}>${isLocked ? 'Re-lock ' : 'Lock '}${_commPeriodLabelTh(period)}</button>
       </div>
+      ${isLocked ? `<div class="tgt-lock-actions">
+        <button class="tgt-lock-btn ${lateWaivers.length ? 'primary' : 'outline'}" style="flex:1 1 100%"
+                onclick="openRecomputeNrrOnly('${period}')">คำนวณ %NRR ใหม่ (ไม่แตะ upsell/handover)</button>
+      </div>` : ''}
     </div>
     ${displayRows.length ? `<div class="tgt-snap-table-wrap">
       <table class="tgt-snap-table">
@@ -2454,6 +2482,138 @@ function renderCommissionLockTab() {
     </div>` : `<div class="tgt-lock-empty">กด Compute เพื่อสร้าง snapshot</div>`}
     <div class="tgt-rule-note">Compute = บันทึก draft · Lock = confirm final · Export ดึงจาก stored rows ไม่ recompute</div>
     </div>
+  `;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// v_clock: คำนวณ %NRR ใหม่หลัง lock — พรีวิว → ตารางเทียบก่อน/หลัง → ยืนยัน
+// ══════════════════════════════════════════════════════════════════════════
+// ทำไมต้องมีขั้นพรีวิว: นี่คือเงินของคน การกด confirm() เปล่าๆ แล้วเขียนทับเลย
+// แปลว่า admin ไม่มีทางรู้ว่าใครโดนกระทบจนกว่าจะเขียนไปแล้ว
+
+// Compute จากหน้า Lock — ถามยืนยันก่อนถ้าเล็งเดือนย้อนหลัง
+//
+// ทำไมต้องมี: เดิมปุ่มนี้ไม่ส่ง period จึงเล็ง "เดือนปฏิทินวันนี้" เสมอ พอเปลี่ยนให้
+// ส่ง period ของหน้า (ซึ่งถอยไปเดือนล่าสุดที่มีแถวได้) ปุ่มก็เล็งเดือนย้อนหลังได้
+// ตัวกันทับของ computeCommissionDraft กันแค่แถวที่ final แล้ว — แถว draft ไม่กัน
+// → ถ้าไฟล์ upsell บน R2 หมุนไปเดือนใหม่แล้ว การ Compute ทับ draft เดือนเก่า
+// จะเอา P1/P3 ของเดือนใหม่มาใส่ใต้ชื่อเดือนเก่าเงียบๆ ซึ่งเป็นความเสี่ยงที่
+// การเปลี่ยนปุ่มนี้สร้างขึ้นมาเอง จึงต้องมีด่านถามก่อน
+async function _commComputeFromLockPanel(period) {
+  try {
+    const natural = (typeof _commTargetLockPeriod === 'function') ? _commTargetLockPeriod() : period;
+    if (period && natural && String(period) !== String(natural)) {
+      const label = (typeof _commPeriodLabelTh === 'function') ? _commPeriodLabelTh(period) : period;
+      const ok = confirm('Compute จะคำนวณ ' + label + ' ใหม่ทั้งก้อนจากไฟล์ล่าสุดบน R2\n\n'
+        + 'ถ้าทีม data อัปโหลดไฟล์ upsell ของเดือนใหม่ไปแล้ว ยอด P1/P3 ที่ได้จะเป็น'
+        + 'ของเดือนใหม่ ไม่ใช่ของ ' + label + '\n\n'
+        + 'ถ้าต้องการอัปเดตเพราะมี waiver เพิ่ม ให้กดยกเลิกแล้วใช้ “คำนวณ %NRR ใหม่” แทน\n\n'
+        + 'ยืนยัน Compute ' + label + ' ต่อ?');
+      if (!ok) return false;
+    }
+  } catch (e) { /* ถามไม่ได้ก็ไม่บล็อก — ปล่อยไปตามเดิม */ }
+  return computeCommissionDraft(period);
+}
+window._commComputeFromLockPanel = _commComputeFromLockPanel;
+
+async function openRecomputeNrrOnly(period) {
+  const body = document.getElementById('tgt-sheet-body');
+  if (body) body.innerHTML = '<div class="tgt-lock-empty">กำลังคำนวณ %NRR ใหม่...</div>';
+  let res;
+  try {
+    res = await recomputeNrrOnlyPreview(period);
+  } catch (e) {
+    console.error('[Recompute] พรีวิวล้มเหลว', e);
+    res = { ok: false, reason: 'error', changes: [], skipped: [] };
+  }
+  if (!res.ok) {
+    const msg = res.reason === 'db_unreachable'
+      ? 'ต่อฐานข้อมูลไม่ได้ — ยังไม่ได้แก้อะไร ลองใหม่อีกครั้ง'
+      : res.reason === 'no_final_rows'
+        ? 'เดือนนี้ยังไม่มีแถวที่ล็อกไว้ — ไม่มีอะไรให้คำนวณใหม่'
+        : 'คำนวณใหม่ไม่สำเร็จ — ยังไม่ได้แก้อะไร';
+    if (typeof showToast === 'function') showToast(msg, '!');
+    renderCommissionLockTab();
+    return;
+  }
+  window._commRecomputePreview = res;
+  renderCommissionLockTab();
+}
+window.openRecomputeNrrOnly = openRecomputeNrrOnly;
+
+function closeRecomputeNrrOnly() {
+  window._commRecomputePreview = null;
+  renderCommissionLockTab();
+}
+window.closeRecomputeNrrOnly = closeRecomputeNrrOnly;
+
+async function confirmRecomputeNrrOnly() {
+  const pv = window._commRecomputePreview;
+  if (!pv || !pv.changes || !pv.changes.length) { closeRecomputeNrrOnly(); return; }
+  const btn = document.getElementById('comm-recompute-confirm');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
+  const ok = await recomputeNrrOnlyApply(pv.period, pv.changes, 'waiver อนุมัติหลัง lock');
+  window._commRecomputePreview = null;
+  if (ok && typeof _commRemoveLockPill === 'function') _commRemoveLockPill();
+  renderCommissionLockTab();
+}
+window.confirmRecomputeNrrOnly = confirmRecomputeNrrOnly;
+
+function _commRenderRecomputeDiff(body) {
+  const pv = window._commRecomputePreview || {};
+  const changes = pv.changes || [];
+  const skipped = pv.skipped || [];
+  const label = (typeof _commPeriodLabelTh === 'function') ? _commPeriodLabelTh(pv.period) : pv.period;
+  // เครื่องหมายต้องอยู่หน้า ฿ ไม่ใช่หลัง — _commFmtPayout(-10700) ให้ "฿-10,700" ซึ่งอ่านยาก
+  const sign = n => (n > 0 ? '+' : n < 0 ? '−' : '') + _commFmtPayout(Math.abs(n));
+
+  // แถวแบบซ้อน ไม่ใช่ตาราง 4 คอลัมน์ — จอกว้าง 440px ตารางจะดันคอลัมน์
+  // "ส่วนต่าง" ซึ่งเป็นตัวเลขสำคัญที่สุด ตกขอบจอไปซ่อนอยู่หลัง scroll
+  const rowsHtml = changes.map(c => `<div class="comm-diff-row">
+      <div class="comm-diff-who">
+        <div class="comm-role-dot ${c.role}">${String(c.role || '').toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div class="comm-person-name">${_commEscapeHtml(c.name)}</div>
+          <div class="comm-person-sub">${_commEscapeHtml(c.email)}</div>
+        </div>
+        <div class="comm-diff-delta ${c.diff > 0 ? 'up' : c.diff < 0 ? 'down' : ''}">${c.diff === 0 ? '—' : sign(c.diff)}</div>
+      </div>
+      <div class="comm-diff-detail">
+        <span>%NRR <b>${_commFmtPct(c.oldPct)}</b><span class="comm-diff-arrow">→</span><b>${_commFmtPct(c.newPct)}</b></span>
+        <span>ยอด <b>${_commFmtPayout(c.oldPayout)}</b><span class="comm-diff-arrow">→</span><b>${_commFmtPayout(c.newPayout)}</b></span>
+      </div>
+    </div>`).join('');
+
+  body.innerHTML = `
+    <div class="tgt-lock-hero">
+      <div class="tgt-lock-title">ตรวจก่อนยืนยัน · ${label}</div>
+      <div class="tgt-lock-sub">
+        คำนวณ <b>เฉพาะ %NRR</b> ใหม่จาก waiver ล่าสุด · ยอด upsell (P1/P3) · outlet · handover
+        ใช้ค่าที่แช่แข็งไว้ตอน lock ไม่ได้อ่านจากไฟล์ใหม่
+      </div>
+      ${changes.length
+        ? `<span class="tgt-lock-status draft">${changes.length} คนกระทบ · รวม ${sign(pv.totalDiff || 0)}</span>`
+        : `<span class="tgt-lock-status">ไม่มีใครกระทบ — ตัวเลขที่ล็อกไว้ถูกต้องอยู่แล้ว</span>`}
+      ${skipped.length ? `<div class="tgt-lock-warning">
+        ข้าม ${skipped.length} รายการ — <b>แถวเดิมไม่ถูกแตะ ยอดที่ล็อกไว้ยังอยู่ครบ</b>
+        <div class="tgt-lock-warning-sub">${
+          // จัดกลุ่มตามเหตุผลจริง ไม่ใช่ประโยคตายตัว — เหตุผลต่างกันแปลว่าต้องแก้คนละแบบ
+          Object.entries(skipped.reduce((m, s) => {
+            (m[s.reason] = m[s.reason] || []).push(s.email); return m;
+          }, {})).map(([reason, emails]) =>
+            `<div>${_commEscapeHtml(reason)} — ${emails.slice(0, 4).map(e => _commEscapeHtml(e)).join(' · ')}${emails.length > 4 ? ' และอีก ' + (emails.length - 4) : ''}</div>`
+          ).join('')
+        }</div>
+      </div>` : ''}
+      <div class="tgt-lock-actions">
+        <button class="tgt-lock-btn secondary" onclick="closeRecomputeNrrOnly()">ยกเลิก</button>
+        <button class="tgt-lock-btn primary" id="comm-recompute-confirm"
+                onclick="confirmRecomputeNrrOnly()" ${changes.length ? '' : 'disabled'}>ยืนยันเขียนทับ ${changes.length} รายการ</button>
+      </div>
+    </div>
+    ${changes.length ? `<div class="comm-diff-list">${rowsHtml}</div>` : ''}
+    <div class="tgt-rule-note">ประวัติการคำนวณใหม่จะถูกเก็บไว้ใน breakdown.revisions ของแต่ละแถว · สถานะยังเป็น Locked ไม่ถูกปลดกลับเป็น draft</div>
   `;
 }
 
@@ -2937,6 +3097,14 @@ function _commRenderRetroactiveSection() {
     + '<button class="tgt-lock-btn secondary" style="flex:1;min-width:100px"' + (!disp.length?' disabled':'') + ' onclick="exportCommissionSnapshotCsv(window._commRetroactivePeriod||\'' + sel.replace(/'/g,"\\'") + '\')">Export CSV</button>'
     + '<button class="tgt-lock-btn primary" style="flex:1;min-width:100px"' + (!draft&&!locked?' disabled':'') + ' onclick="lockCommissionSnapshot(window._commRetroactivePeriod||\'' + sel.replace(/'/g,"\\'") + '\')">' + (locked ? 'Re-lock' : 'Lock Final') + '</button>'
     + '</div>'
+    // v_clock: เดือนที่ล็อกแล้ว ให้ใช้ "คำนวณ %NRR ใหม่" แทน Compute
+    // Compute จะอ่าน P1/P3 จากไฟล์ upsell ปัจจุบัน ซึ่งเป็นของเดือนล่าสุดไม่ใช่เดือนนี้
+    + (locked ? '<div style="display:flex;gap:7px;margin-top:7px">'
+        + '<button class="tgt-lock-btn outline" style="flex:1" onclick="openRecomputeNrrOnly(\'' + sel.replace(/'/g,"\\'") + '\')">คำนวณ %NRR ใหม่ (ไม่แตะ upsell/handover)</button>'
+        + '</div>'
+        + '<div class="tgt-lock-warning" style="margin-top:8px">เดือนนี้ล็อกแล้ว — ถ้ามี waiver เพิ่ม ให้ใช้ปุ่ม “คำนวณ %NRR ใหม่” อย่ากด Compute'
+        + '<div class="tgt-lock-warning-sub">Compute จะอ่าน P1/P3 จากไฟล์ upsell ล่าสุดบน R2 ซึ่งเป็นของเดือนปัจจุบัน ไม่ใช่ของเดือนที่ล็อกไว้</div></div>'
+      : '')
     + (disp.length ? '<div style="font-size:var(--text-xs);color:rgba(var(--ink-blue),.45);margin-top:8px">' + disp.length + ' rows · ' + _commFmtPayout(tot) + '</div>' : '')
     + '</div>'
     + tHtml2

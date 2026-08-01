@@ -1442,7 +1442,7 @@ async function loadTargets(quarter) {
 
   try {
     const { data: snaps, error: snapErr } = await supa.from('commission_payout_snapshots')
-      .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at,updated_by')
+      .select('id,period_month,beneficiary_role,beneficiary_email,team_lead_email,raw_nrr_pct,governed_nrr_pct,payout_amount,snapshot_status,breakdown,updated_at,updated_by,locked_at')
       .in('period_month', months);
     if (snapErr) throw new Error(snapErr.message);
     _commissionSnapshots = snaps || [];
@@ -3382,7 +3382,7 @@ function _commOpenTlDetailSheet(opts) {
       </div>
       <div class="pv-comm-sheet-sub">NRR ทีม ${_commFmtPct(tlPayout.nrr_pct)} · NRR payout ${fmtP(tlPayout.nrr_payout)}</div>
       ${multSection}
-      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:var(--r-md);background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot()" style="flex-shrink:0;padding:6px 10px;border-radius:var(--r-8);background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
+      ${(()=>{try{var _e=typeof _commEomStatus==='function'?_commEomStatus():null;if(_e&&(_e.showEomBanner||_e.showGraceBanner)){var _d=_e.showGraceBanner?_e.prevPeriod:_e.period;var _mo=_d.split('-');var _thmo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(_mo[1])-1];var _lbl=_thmo+' '+( parseInt(_mo[0])+543);var _bg=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.12)':'rgba(240,160,0,.08)';var _bc=_e.showGraceBanner||_e.daysLeft<=1?'rgba(240,80,0,.35)':'rgba(240,160,0,.25)';var _txt=_e.showGraceBanner?'ยัง lock ค่าคอมฯ '+_lbl+' ไม่ได้':'เหลือ '+_e.daysLeft+' วัน — Lock ค่าคอมฯ '+_lbl+' ก่อนสิ้นเดือน';return '<div style="margin:8px 18px;padding:10px 12px;border-radius:var(--r-md);background:'+_bg+';border:1px solid '+_bc+';display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-size:var(--text-sm);color:rgba(var(--ink-blue-hi),.80);line-height:1.4">'+_txt+'</div><button onclick="event.stopPropagation();lockCommissionSnapshot(\''+_d+'\')" style="flex-shrink:0;padding:6px 10px;border-radius:var(--r-8);background:rgba(255,224,138,.15);border:1px solid rgba(255,224,138,.3);color:#ffe08a;font-size:var(--text-sm);font-weight:var(--fw-bold);cursor:pointer;font-family:\'Noto Sans Thai\',sans-serif">Lock ตอนนี้</button></div>';}return '';}catch(e){return '';}})()} 
       <div class="pv-comm-section-label" style="margin-top:4px">รายละเอียดต่อ KAM</div>
       <div class="pv-comm-tl-kam-header">
         <span>ชื่อ</span><span>NRR</span><span>ค่าคอมฯ</span>
@@ -3497,8 +3497,75 @@ function exportCommissionSnapshotCsv(periodOverride) {
 }
 // v288: computeCommissionDraft — บันทึก draft ก่อน lock
 // Admin กด Compute → เห็นตัวเลข frozen → กด Lock → เปลี่ยนเป็น final
+// ── v_clock: ถามฐานข้อมูลตรงๆ ว่าเดือนนั้นมี snapshot อยู่ไหม ────────────────
+//
+// ทำไมต้องมี: `_commissionSnapshots` ถูกโหลดมาแค่ไตรมาสปัจจุบัน
+// (loadTargets → `.in('period_month', months)` ~:1446) แต่โค้ดหลายจุดใช้มันเป็น
+// ตัวตัดสินว่า "เดือนนี้มี snapshot แล้วหรือยัง" ซึ่งพังที่รอยต่อไตรมาส:
+//
+//   วันที่ 1-3 ต.ค. → prevPeriod = '2026-09' ซึ่งเป็นเดือนของ Q3
+//   แต่ loadTargets โหลดแค่ Q4 (ต.ค./พ.ย./ธ.ค.) → ก.ย. ไม่อยู่ในหน่วยความจำ
+//   → ทั้ง auto-compute และตัวกัน "อย่าทับของที่ lock แล้ว" ตาบอดพร้อมกัน
+//   → ทับ snapshot ก.ย. ที่ lock ไปแล้วให้กลับเป็น draft พร้อมตัวเลขใหม่ เงียบๆ
+//
+// คืน { rows, hasAny, hasFinal, lockedTotal } · คืน null เมื่อ query ไม่สำเร็จ
+// (ผู้เรียกต้องแยก "ไม่มี" กับ "ถามไม่ได้" ให้ออก — ห้ามตีเป็นไม่มีแล้วเขียนทับ)
+async function _commSnapshotStateFromDb(period) {
+  try {
+    if (typeof supa === 'undefined' || !supa || !period) return null;
+    const { data, error } = await supa.from('commission_payout_snapshots')
+      .select('period_month,beneficiary_role,beneficiary_email,payout_amount,snapshot_status')
+      .eq('period_month', period);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    const finals = rows.filter(r => String(r.snapshot_status || '').toLowerCase() === 'final');
+    return {
+      rows,
+      hasAny: rows.length > 0,
+      hasFinal: finals.length > 0,
+      finalCount: finals.length,
+      lockedTotal: finals.reduce((s, r) => s + Number(r.payout_amount || 0), 0)
+    };
+  } catch (e) {
+    console.error('[CommEngine] _commSnapshotStateFromDb failed for ' + period, e);
+    return null;   // null = ถามไม่ได้ ไม่ใช่ "ไม่มี"
+  }
+}
+window._commSnapshotStateFromDb = _commSnapshotStateFromDb;
+
+// ── v_clock: mutex กัน compute ซ้อน ──────────────────────────────────────────
+// เดิมไม่มีอะไรกันเลย — auto-compute ยิงที่ T+1.5s ขณะที่ผู้ใช้กด Compute/Lock
+// มือได้พร้อมกัน ทั้งสองเขียนทับ key เดียวกัน (onConflict period+role+email)
+// last-write-wins · admin 2 คนเปิดพร้อมกันก็ยิงซ้อนกันได้เหมือนกัน
+let _commComputeInFlight = null;   // เก็บ period ที่กำลังทำ ไม่ใช่แค่ boolean
+window._commIsComputeInFlight = function () { return _commComputeInFlight; };
+
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
+  // v_clock: กัน compute ซ้อน — ยอมให้คนละเดือนทำพร้อมกันได้ แต่เดือนเดียวกันห้าม
+  if (_commComputeInFlight === period) {
+    console.warn('[CommDraft] compute ' + period + ' กำลังทำอยู่แล้ว — ข้ามรอบนี้');
+    if (typeof showToast === 'function') showToast('กำลังคำนวณ ' + period + ' อยู่ รอสักครู่', '!');
+    return false;
+  }
+  _commComputeInFlight = period;
+  try {
+    return await _computeCommissionDraftInner(periodOverride, period);
+  } finally {
+    _commComputeInFlight = null;
+  }
+}
+
+async function _computeCommissionDraftInner(periodOverride, period) {
+  // v_clock: ถาม DB ตรงๆ ก่อน แล้วเอาผลไปเสริมตัวกันเดิม — ไม่พึ่ง
+  // `_commissionSnapshots` เพียงอย่างเดียวอีก (ดูเหตุผลที่ _commSnapshotStateFromDb)
+  const _dbState = await _commSnapshotStateFromDb(period);
+  if (_dbState === null) {
+    // ถาม DB ไม่ได้ → ไม่รู้ว่ามีของ lock อยู่ไหม → ห้ามเขียนทับ ปลอดภัยกว่าเสี่ยง
+    console.error('[CommDraft] อ่านสถานะ snapshot ' + period + ' จาก DB ไม่ได้ — ยกเลิกเพื่อความปลอดภัย');
+    if (typeof showToast === 'function') showToast('ตรวจสถานะ ' + period + ' ไม่ได้ — ยกเลิกเพื่อไม่ให้เขียนทับ', '!');
+    return false;
+  }
   // v6-fix: guard against silently overwriting an already-locked (final) snapshot.
   // Root cause: this function previously unconditionally upserted fresh draft rows over
   // ANY existing row (including 'final') for the same period+role+email key -- no check,
@@ -3506,9 +3573,15 @@ async function computeCommissionDraft(periodOverride) {
   // demote it back to 'draft' with freshly-computed (possibly different) numbers, with
   // no way to know it happened. Same confirm() pattern already used below in
   // lockCommissionSnapshot() for the pending-exclusion check.
-  const _lockedRows = (_commissionSnapshots || []).filter(r =>
+  // v_clock: เดิมบรรทัดนี้อ่านจาก `_commissionSnapshots` ที่มีแค่ไตรมาสปัจจุบัน
+  // ทำให้ตัวกันนี้ตาบอดสนิทที่รอยต่อไตรมาส · ใช้ผลจาก DB เป็นความจริง แล้วเก็บ
+  // in-memory ไว้เป็นตัวสำรองเผื่อ DB คืนมาไม่ครบ (union ไม่ใช่ทางเลือกใดทางเดียว)
+  const _memLocked = (_commissionSnapshots || []).filter(r =>
     r.period_month === period && r.snapshot_status === 'final'
   );
+  const _lockedRows = _dbState.finalCount >= _memLocked.length
+    ? _dbState.rows.filter(r => String(r.snapshot_status || '').toLowerCase() === 'final')
+    : _memLocked;
   let _overwroteLock = false;
   if (_lockedRows.length) {
     const _lockedTotal = _lockedRows.reduce((sum, r) => sum + Number(r.payout_amount || r.final_payout || 0), 0);
@@ -3643,6 +3716,372 @@ function _commEomStatus() {
            isGrace, prevPeriod, prevHasLock, showGraceBanner: isGrace && !prevHasLock };
 }
 window._commEomStatus = _commEomStatus;
+
+// ══════════════════════════════════════════════════════════════════════════
+// v_clock: คำนวณใหม่เฉพาะส่วน %NRR — "แช่แข็งของที่เน่า คำนวณใหม่เฉพาะของที่อยู่ได้"
+// ══════════════════════════════════════════════════════════════════════════
+//
+// ปัญหาที่แก้: ไฟล์ R2 สองตัวอายุไม่เท่ากัน
+//   kam_rep_view.csv (%NRR)      → ยึด "ไตรมาส" อยู่ถึงสิ้น Q3 (1 ต.ค.)
+//   sense_upsell_*.csv (P1/P3)   → ยึด "เดือน" ถูกทับทุกครั้งที่ทีม data รัน
+// การกด Re-lock แบบเดิม = คำนวณใหม่ทั้งก้อนจาก R2 → หลังไฟล์ upsell ถูกทับ
+// จะได้ P1/P3 ของเดือนอื่น (หรือ 0) มาประทับใต้ชื่อเดือนเดิม
+//
+// ทางออก: waiver กระทบ **แค่ %NRR** เท่านั้น (ยืนยันจากโค้ด: `_nrrGovernedPct`
+// เป็น passthrough, waiver ถูก apply ใน `_qnrrCompute` ที่ตัวเศษ/ตัวส่วน,
+// `_nrrWaivedAccountsSummary` มีคอมเมนต์กำกับว่า "must never feed back into
+// payout math") ส่วน upsell/handover ไม่มีอะไรแตะ exclusion เลย
+// → ของที่ต้องคำนวณใหม่ มาจากไฟล์ที่อยู่ยาว · ของที่จะหาย ไม่ต้องคำนวณใหม่
+//
+// สูตรที่ใช้ ต้องตรงกับ `_commBuildKamPayout` / `_commBuildTlPayout` เป๊ะ:
+//   KAM/อื่นๆ : final = round((nrrPayout + upsell_sku + upsell_outlet + handover) × gateCap)
+//   TL        : final = round(nrrPayout × multiplier)
+// โดย nrrPayout กับ gateCap คำนวณใหม่ (ขึ้นกับ %NRR) ที่เหลือหยิบจาก breakdown เดิม
+
+// ดึงค่า component ที่ "แช่แข็งไว้" ออกจาก breakdown ของแถวที่ lock ไว้แล้ว
+// ชื่อ field ในที่เก็บต่างจากตอนคำนวณ (total_commission vs total_comm) — จุดพลาดง่าย
+function _commFrozenComponents(row) {
+  const bd = (row && row.breakdown) || {};
+  const sku = bd.upsell_sku || {};
+  const outlet = bd.upsell_outlet || {};
+  const handover = bd.handover || {};
+  const mult = bd.upsell_mult || {};
+  return {
+    upsellSku: Number(sku.total_commission != null ? sku.total_commission : (sku.total_comm || 0)) || 0,
+    upsellOutlet: Number(outlet.commission || 0) || 0,
+    handover: Number(handover.payout || 0) || 0,
+    // TL multiplier เก็บได้ 2 รูปแบบ (object หรือ string '1.50x' จาก Excel backfill)
+    // — เจอใน _nrrCommMultParts ของ /nrr มาแล้ว ต้องรับทั้งสองแบบ
+    // hasMultiplier แยกกรณี "เก็บไว้ว่าเป็น 1.0 จริงๆ" ออกจาก "ไม่มีให้อ่านเลย"
+    // เพราะกรณีหลังห้ามเดา — มันคือฐานคูณเงินของ TL ทั้งก้อน
+    multiplier: (function () {
+      if (mult && typeof mult === 'object' && mult.multiplier != null) return Number(mult.multiplier) || 1;
+      if (typeof mult === 'string') { const m = parseFloat(mult); return isNaN(m) ? 1 : m; }
+      return 1;
+    })(),
+    hasMultiplier: !!((mult && typeof mult === 'object' && mult.multiplier != null)
+                      || (typeof mult === 'string' && !isNaN(parseFloat(mult))))
+  };
+}
+
+// คำนวณผลลัพธ์ใหม่ของแถวเดียว โดยใช้ %NRR สด + component ที่แช่แข็งไว้
+// คืน null เมื่อคำนวณ %NRR ใหม่ไม่ได้ — **ห้ามตีเป็น 0** เพราะจะเป็นการตัดเงิน
+// คนโดยที่ข้อมูลแค่หายชั่วคราว
+function _commRecomputeRowNrrOnly(row, period) {
+  try {
+    if (!row) return null;
+    const role = String(row.beneficiary_role || '').toLowerCase();
+    const email = row.beneficiary_email;
+    if (!email) return { skip: 'ไม่มีอีเมลผู้รับ' };
+    const frozen = _commFrozenComponents(row);
+
+    // TL ที่ breakdown ไม่มี upsell_mult เลย = แถวผิดปกติ (backfill มือ / schema เก่า)
+    // ห้ามเดาว่าตัวคูณ = 1 เพราะนั่นคือการตั้งฐานจ่ายเงินเอง — ข้ามไปให้คนตรวจ
+    if (role === 'tl' && !frozen.hasMultiplier) {
+      return { skip: 'แถว TL ไม่มีตัวคูณ upsell ที่ล็อกไว้ — ต้องตรวจมือ' };
+    }
+
+    // %NRR สด — waiver ล่าสุดถูกนับเองเพราะ _qnrrCompute อ่าน _nrrExclusions สด
+    // ★ ต้องเลือกแหล่งข้อมูลแบบเดียวกับ _commBuildKamPayout/_commBuildTlPayout เป๊ะ
+    // (07a:1147-1161) ถ้า hardcode ใช้ตัวไตรมาสอย่างเดียว แล้วเดือนนั้นตั้งเป็น
+    // monthly mode ไว้ ฐานคำนวณจะคนละตัวกับตอน lock = ตัวเลขเพี้ยนทั้งแถว
+    const scope = (role === 'tl') ? 'tl' : 'kam';
+    const policy = _nrrGovGet(period, 'all', 'all');
+    const isQ = policy && policy.commission_mode === 'quarterly';
+    let raw = null;
+    if (isQ && typeof window._qnrrComputeForCommission === 'function') {
+      raw = window._qnrrComputeForCommission(email, scope, period);
+    } else if (!isQ) {
+      // โหมดรายเดือน — ยังไม่รองรับการคำนวณใหม่ เพราะ _tgtComputeKamNRR อ่านจาก
+      // bulkHistoryData ซึ่งไม่มีตัวบอกว่าได้เดือนไหนมาจริง จึงกันเดือนสลับไม่ได้
+      // ปล่อยผ่านแบบเดาไม่ได้ = เสี่ยงจ่ายผิด → ข้ามให้คนตรวจแทน
+      return { skip: 'เดือนนี้ตั้งเป็นโหมดรายเดือน — ยังไม่รองรับการคำนวณ %NRR ใหม่' };
+    }
+    if (!raw) return { skip: 'ไม่มีข้อมูล %NRR ของเดือนนี้แล้ว' };
+
+    // ★ กันเดือนสลับ — จุดที่อันตรายที่สุดของฟีเจอร์นี้
+    // _qnrrComputeForCommission จะ "แทนเดือนให้เงียบๆ" ได้ 2 ทาง:
+    //   1. period ที่ขอไม่อยู่ใน QNRR_CFG.q_months (เช่นขึ้น Q4 แล้วขอ ก.ค.)
+    //      → ตกไป else แล้วใช้เดือน lag-1 ของ "วันนี้" แทน (07c:524-531)
+    //   2. by_month ไม่มีเดือนที่ขอ → หยิบเดือนล่าสุดที่มีมาแทน (07c:541-550)
+    // ทั้งสองทางคืนผลลัพธ์หน้าตาปกติ ตัวเช็ค !raw จึงจับไม่ได้เลย
+    // ถ้าปล่อยผ่าน = เอา %NRR ของ ต.ค. ไปประทับใต้ชื่อเดือน ก.ค. แล้วจ่ายเงินตามนั้น
+    if (raw.currentPeriod && String(raw.currentPeriod) !== String(period)) {
+      console.error('[CommRecompute] ' + email + ': ขอเดือน ' + period +
+                    ' แต่ระบบคืนข้อมูลเดือน ' + raw.currentPeriod + ' — ข้ามแถวนี้');
+      return { skip: 'ข้อมูลที่ได้เป็นของเดือน ' + raw.currentPeriod + ' ไม่ใช่ ' + period };
+    }
+
+    const rawPct = (raw.nrr !== null && raw.nrr !== undefined) ? raw.nrr * 100 : null;
+    const governedPct = _nrrGovernedPct(raw, scope === 'kam' ? email : null, scope === 'tl' ? email : null);
+    const pct = governedPct !== null ? governedPct : rawPct;
+    if (pct === null || pct === undefined || isNaN(pct)) return { skip: 'คำนวณ %NRR ใหม่ไม่ได้' };
+
+    const planCode = _commGetAssignmentPlan(period, role, email, role);
+    const nrrPayout = _commPayoutForPctByCode(planCode, role, pct);
+
+    let finalPayout, gate = null, subtotal;
+    if (role === 'tl') {
+      subtotal = nrrPayout;
+      finalPayout = Math.round(nrrPayout * frozen.multiplier);
+    } else {
+      gate = _commComputeGmvGate(email, pct, planCode);
+      subtotal = nrrPayout + frozen.upsellSku + frozen.upsellOutlet + frozen.handover;
+      finalPayout = Math.round(subtotal * (gate ? gate.cap_multiplier : 1));
+    }
+
+    return {
+      role, email, period,
+      oldPct: (row.governed_nrr_pct != null ? Number(row.governed_nrr_pct)
+                                            : (row.raw_nrr_pct != null ? Number(row.raw_nrr_pct) : null)),
+      newPct: pct,
+      oldPayout: Number(row.payout_amount || 0),
+      newPayout: finalPayout,
+      diff: finalPayout - Number(row.payout_amount || 0),
+      nrrPayout, subtotal, gate, frozen,
+      name: ((row.breakdown || {}).kam_name) || ((row.breakdown || {}).team_lead_name) || email,
+      sourceRow: row
+    };
+  } catch (e) {
+    console.error('[CommRecompute] แถว ' + (row && row.beneficiary_email) + ' คำนวณใหม่ไม่ได้', e);
+    return { skip: 'เกิดข้อผิดพลาดระหว่างคำนวณ: ' + (e && e.message) };
+  }
+}
+
+// พรีวิว: อ่านแถว final ของเดือนนั้นจาก DB แล้วคืนรายการเปลี่ยนแปลง — **ไม่เขียนอะไร**
+// แยกจากตัวเขียนโดยตั้งใจ เพื่อให้ UI โชว์ตารางเทียบก่อน/หลังได้ และเทสต์ได้ตรงๆ
+async function recomputeNrrOnlyPreview(period) {
+  const st = await _commSnapshotStateFromDb(period);
+  if (st === null) return { ok: false, reason: 'db_unreachable', changes: [], skipped: [] };
+  const finals = st.rows.filter(r => String(r.snapshot_status || '').toLowerCase() === 'final');
+  if (!finals.length) return { ok: false, reason: 'no_final_rows', changes: [], skipped: [] };
+
+  // แถวจาก _commSnapshotStateFromDb เลือกมาไม่ครบคอลัมน์ (ไม่มี breakdown)
+  // ต้องดึงเต็มเพราะ component ที่แช่แข็งอยู่ใน breakdown
+  let fullRows = finals;
+  try {
+    const { data, error } = await supa.from('commission_payout_snapshots')
+      .select('*').eq('period_month', period).eq('snapshot_status', 'final');
+    if (!error && data && data.length) fullRows = data;
+  } catch (e) { console.warn('[CommRecompute] ดึงแถวเต็มไม่ได้ ใช้เท่าที่มี', e); }
+
+  const changes = [], skipped = [];
+  fullRows.forEach(r => {
+    const res = _commRecomputeRowNrrOnly(r, period);
+    if (!res || res.skip) {
+      skipped.push({ email: r.beneficiary_email, role: r.beneficiary_role,
+                     reason: (res && res.skip) || 'คำนวณ %NRR ใหม่ไม่ได้' });
+      return;
+    }
+    // เทียบ %NRR แบบมี tolerance — ค่าเดิมอ่านจาก DB (numeric ปัดทศนิยม)
+    // ส่วนค่าใหม่เป็น float เต็ม ถ้าเทียบ !== ตรงๆ แถวที่ยอดไม่ขยับเลย
+    // จะโผล่ในรายการ "คนกระทบ" ทั้งที่เงินเท่าเดิม
+    const pctMoved = res.oldPct === null || res.oldPct === undefined
+      || Math.abs(Number(res.newPct) - Number(res.oldPct)) > 0.005;
+    if (res.diff !== 0 || pctMoved) changes.push(res);
+  });
+  return { ok: true, period, changes, skipped, totalRows: fullRows.length,
+           totalDiff: changes.reduce((s, c) => s + c.diff, 0) };
+}
+window.recomputeNrrOnlyPreview = recomputeNrrOnlyPreview;
+
+// เขียนผลลัพธ์ที่พรีวิวไว้ลง DB — รับ changes ที่ผู้ใช้เห็นแล้วเท่านั้น
+// ไม่คำนวณซ้ำเอง เพื่อให้สิ่งที่เขียนคือสิ่งเดียวกับที่ผู้ใช้กดยืนยัน
+async function recomputeNrrOnlyApply(period, changes, reason) {
+  if (!changes || !changes.length) return false;
+  if (_commComputeInFlight === period) {
+    console.warn('[CommRecompute] ' + period + ' กำลังทำอยู่ — ข้าม');
+    return false;
+  }
+  _commComputeInFlight = period;
+  try {
+    const actor = (currentUserProfile && currentUserProfile.email) || '';
+    const now = new Date().toISOString();
+    const payload = changes.map(c => {
+      const row = c.sourceRow;
+      const bd = Object.assign({}, row.breakdown || {});
+      // เก็บประวัติใน jsonb ไม่เพิ่มคอลัมน์ใหม่ — ถ้า revision ไปอยู่ใน unique index
+      // (period,role,email) upsert จะกลายเป็น insert แล้วผู้อ่านที่สมมติว่ามีแถวเดียว
+      // ต่อคนจะพัง (ตาราง /nrr นับซ้ำ, summaryFromRows รวมยอดเบิ้ล, nrrIsPeriodLocked เพี้ยน)
+      bd.revisions = (bd.revisions || []).concat([{
+        at: now, by: actor, kind: 'nrr_only',
+        reason: reason || 'waiver updated after lock',
+        prev_payout: c.oldPayout, prev_nrr_pct: c.oldPct,
+        new_payout: c.newPayout, new_nrr_pct: c.newPct
+      }]);
+      bd.nrr_pct = c.newPct;
+      bd.nrr_payout = c.nrrPayout;
+      bd.components_subtotal = c.subtotal;
+      if (c.gate) bd.gmv_gate = c.gate;
+      bd.final_payout = c.newPayout;
+      // ป้ายบอกว่า component พวกนี้เป็นของแช่แข็ง ไม่ได้อ่านจาก R2 รอบนี้
+      bd.frozen_components = ['upsell_sku', 'upsell_outlet', 'handover', 'upsell_mult'];
+      bd.recomputed_at = now;
+      return Object.assign({}, row, {
+        breakdown: bd,
+        raw_nrr_pct: c.newPct,
+        governed_nrr_pct: c.newPct,
+        payout_amount: c.newPayout,
+        snapshot_status: 'final',      // ยังคง final — ไม่ปลดล็อกกลับเป็น draft
+        updated_at: now, updated_by: actor
+      });
+    });
+    const { data, error } = await supa.from('commission_payout_snapshots')
+      .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
+      .select('*');
+    if (error) throw new Error(error.message);
+    const others = (_commissionSnapshots || []).filter(r =>
+      !(r.period_month === period && payload.some(p =>
+        p.beneficiary_role === r.beneficiary_role && p.beneficiary_email === r.beneficiary_email)));
+    _commissionSnapshots = [...others, ...(data || payload)];
+    if (typeof showToast === 'function') showToast('คำนวณใหม่ ' + changes.length + ' รายการเสร็จแล้ว', 'ok');
+    return true;
+  } catch (e) {
+    console.error('[CommRecompute] เขียนผลไม่สำเร็จ', e);
+    if (typeof showToast === 'function') showToast('คำนวณใหม่ไม่สำเร็จ: ' + e.message, '!');
+    return false;
+  } finally {
+    _commComputeInFlight = null;
+  }
+}
+window.recomputeNrrOnlyApply = recomputeNrrOnlyApply;
+
+// มี waiver ที่ถูกอนุมัติหลังจากเดือนนั้นถูก lock ไหม → ใช้ขึ้นป้ายเตือน
+// เทียบเวลาอนุมัติ waiver กับเวลา lock ของ snapshot — ไม่ต้องมีคอลัมน์ใหม่
+//
+// ชื่อคอลัมน์จริงคือ `reviewed_at` (nrr_exclusions.js:182 เขียนตอน approve/reject
+// และอยู่ใน select ทั้ง 2 ที่: 07a:1433, nrr_exclusions.js:48) — ไม่ใช่ decided_at
+// ซึ่งไม่มีอยู่จริงในตารางนี้ ถ้าอ่านผิดชื่อ ป้ายเตือนจะไม่เคยขึ้นเลยแบบเงียบๆ
+function _commWaiversDecidedAfterLock(period) {
+  try {
+    const lockedRows = (_commissionSnapshots || []).filter(r =>
+      r.period_month === period && String(r.snapshot_status || '').toLowerCase() === 'final');
+    if (!lockedRows.length) return [];
+    // locked_at เขียนตอน lock (07a:3676) แต่ select หลักไม่ได้ดึงมาเสมอ
+    // → ถอยไปใช้ updated_at ซึ่งขยับตอน lock เหมือนกัน และขยับตอน recompute ด้วย
+    // (นั่นคือสิ่งที่ต้องการ: waiver ที่นับไปแล้วรอบก่อนจะไม่ถูกเตือนซ้ำ)
+    const lockedAt = lockedRows
+      .map(r => r.locked_at || r.updated_at).filter(Boolean).sort().pop();
+    if (!lockedAt) return [];
+    return (_nrrExclusions || []).filter(x => {
+      if (String(x.period_month || '') !== String(period)) return false;
+      if (String(x.status || '').toLowerCase() !== 'approved') return false;
+      const decided = x.reviewed_at || x.decided_at || x.updated_at;
+      return decided && decided > lockedAt;
+    });
+  } catch (e) { return []; }
+}
+window._commWaiversDecidedAfterLock = _commWaiversDecidedAfterLock;
+
+// ── v_clock: เดือนที่ปุ่ม Lock ควรเล็ง + ป้ายชื่อเดือนไทย ────────────────────
+//
+// บั๊กเดิม: ปุ่ม Lock เรียก `lockCommissionSnapshot()` แบบไม่ส่ง period
+// (07b_commission_cockpit.js:2019, :2437) → ตกไปใช้ `_nrrExclusionCurrentPeriod()`
+// ซึ่งคือ "เดือนตามปฏิทินวันนี้" · วันที่ 1 ส.ค. admin ตั้งใจ lock ก.ค. แต่ปุ่ม
+// จะ lock ส.ค. ที่มีข้อมูลวันเดียว · แถบเตือน (:3385) แย่กว่านั้น — ข้อความ
+// พูดถึงเดือนก่อน แต่ปุ่มข้างๆ ล็อกเดือนปัจจุบัน
+//
+// ตรรกะ grace (วันที่ 1-3 = ยังปิดเดือนที่แล้วอยู่) มีอยู่แล้วใน _commEomStatus
+// ใช้ซ้ำ ไม่สร้างนิยามที่สองให้ขัดกันเอง
+function _commTargetLockPeriod() {
+  try {
+    const eom = _commEomStatus();
+    // ช่วง grace และเดือนก่อนยังไม่ถูก lock → เป้าหมายคือเดือนก่อน
+    if (eom && eom.isGrace && !eom.prevHasLock) return eom.prevPeriod;
+    return (eom && eom.period) || _nrrExclusionCurrentPeriod();
+  } catch (e) { return _nrrExclusionCurrentPeriod(); }
+}
+window._commTargetLockPeriod = _commTargetLockPeriod;
+
+// 'ก.ค. 2569' จาก '2026-07' — ใช้เขียนชื่อเดือนบนปุ่ม ผู้ใช้จะได้ไม่กดผิดเดือน
+function _commPeriodLabelTh(period) {
+  try {
+    const p = String(period || '').split('-');
+    const th = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(p[1], 10) - 1];
+    if (!th) return String(period || '');
+    return th + ' ' + (parseInt(p[0], 10) + 543);
+  } catch (e) { return String(period || ''); }
+}
+window._commPeriodLabelTh = _commPeriodLabelTh;
+
+// ── v_clock: ป้ายเตือน "ยังไม่ได้ lock ค่าคอมฯ" แบบค้างจอ ────────────────────
+//
+// ปัญหาเดิม: แถบเตือน EOM (ดูที่ _commOpenTlDetailSheet ~:3385) ฝังอยู่ในโมดัลที่
+// ต้องคลิก 2 ชั้น เข้าถึงได้จากการ์ด Teamview จุดเดียว — admin ไม่มีเหตุผลต้องเปิด
+// ส่วน showToast() หายไปใน 2.2 วิ (01_core.js:1975) ถ้าแท็บอยู่หลังจออยู่ก็ไม่เห็นเลย
+// ผลคือลืม lock ได้ง่ายมาก ซึ่งเป็นเรื่องเงินคน
+//
+// ตัวนี้ลอกแพตเทิร์น #sense-update-pill (shell.html:2156-2183) ซึ่งเป็นตัวเดียวใน
+// แอปที่ค้างข้ามหน้าจอ ปิดได้ และกดแล้วทำงาน · ใช้ id + sessionStorage key ของ
+// ตัวเอง ไม่แตะ pill อัปเดตเวอร์ชันเลย (คนละเรื่อง อยู่ร่วมกันได้)
+//
+// เจตนา: **กดแล้วพาไปหน้า Cockpit ไม่ lock ให้เอง** — การตัดสินใจเรื่องจ่ายเงิน
+// ต้องเป็นการกดของคน ไม่ใช่ผลข้างเคียงของการกดป้ายเตือน
+function _commLockPillDismissKey(period) {
+  // ผูกกับ period → เดือนใหม่ป้ายกลับมาเองแม้เคยกดปิดไปแล้ว
+  return 'sense_lock_pill_dismissed_' + (period || '');
+}
+
+function _commMaybeShowLockPill() {
+  try {
+    if (typeof document === 'undefined' || !document.body) return;
+    const role = (currentUserProfile && currentUserProfile.role) || '';
+    const isAdmin = (typeof isAdminRole === 'function') ? isAdminRole(role) : role === 'admin';
+    if (!isAdmin) return;
+
+    const eom = _commEomStatus();
+    // แสดงเฉพาะช่วง grace (วันที่ 1-3) ที่เดือนก่อนยังไม่ถูก lock — เงื่อนไขเดียวกับ
+    // ที่ auto-compute ใช้ จึงไม่มีทางเตือนเรื่องที่ไม่มีอยู่จริง
+    if (!eom || !eom.showGraceBanner) { _commRemoveLockPill(); return; }
+
+    const period = eom.prevPeriod;
+    try { if (sessionStorage.getItem(_commLockPillDismissKey(period)) === '1') return; } catch (e) {}
+    if (document.getElementById('sense-lock-pill')) return;
+
+    const mo = String(period).split('-');
+    const thMo = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
+                  'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][parseInt(mo[1], 10) - 1] || '';
+    const label = thMo + ' ' + (parseInt(mo[0], 10) + 543);
+
+    const p = document.createElement('div');
+    p.id = 'sense-lock-pill';
+    // ยกขึ้นเหนือ pill อัปเดต (bottom +76px) เพื่อไม่ให้ทับกันถ้าโผล่พร้อมกัน
+    p.style.cssText = 'position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 124px);' +
+      'left:50%;transform:translateX(-50%);z-index:99987;background:#0d1f3c;' +
+      'border:1px solid rgba(240,176,0,.45);border-radius:999px;padding:9px 14px;' +
+      'display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);cursor:pointer';
+    p.innerHTML =
+      '<span style="font-family:\'Noto Sans Thai\',sans-serif;font-size:12px;font-weight:700;' +
+      'color:#ffe08a;white-space:nowrap">ยังไม่ได้ lock ค่าคอมฯ ' + label + ' · แตะเพื่อไปตรวจ</span>' +
+      '<button id="sense-lock-pill-x" style="width:20px;height:20px;border-radius:50%;' +
+      'background:rgba(255,255,255,.08);border:none;color:rgba(225,238,255,.5);font-size:10px;' +
+      'cursor:pointer;flex-shrink:0;line-height:1">✕</button>';
+    p.addEventListener('click', function (ev) {
+      if (ev.target && ev.target.id === 'sense-lock-pill-x') {
+        ev.stopPropagation();
+        try { sessionStorage.setItem(_commLockPillDismissKey(period), '1'); } catch (e) {}
+        p.remove();
+        return;
+      }
+      // พาไปขั้น Preview & Lock พร้อมเลือกแท็บ Retroactive ให้ เพราะเดือนที่ต้อง
+      // lock คือเดือนก่อน ซึ่งอยู่ในแท็บนั้น (แท็บ "เดือนนี้" จะเล็งเดือนปัจจุบัน)
+      try {
+        window._commRetroactivePeriod = period;
+        if (typeof _commLockSubtab !== 'undefined') _commLockSubtab = 'retroactive';
+        if (typeof openCommissionCockpit === 'function') openCommissionCockpit('lock');
+      } catch (e) { console.warn('[CommEngine] lock pill navigate failed', e); }
+      p.remove();
+    });
+    document.body.appendChild(p);
+  } catch (e) { console.warn('[CommEngine] _commMaybeShowLockPill failed', e); }
+}
+
+function _commRemoveLockPill() {
+  try { const el = document.getElementById('sense-lock-pill'); if (el) el.remove(); } catch (e) {}
+}
+window._commMaybeShowLockPill = _commMaybeShowLockPill;
+window._commRemoveLockPill = _commRemoveLockPill;
 
 // ── v247e: Commission History ────────────────────────────────────────────────
 let _commHistoryCache = {};

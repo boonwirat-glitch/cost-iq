@@ -1,0 +1,259 @@
+[
+  {
+    "assigned_plan_id": "r-kam",
+    "beneficiary_email": "kam.a@f.co",
+    "beneficiary_role": "kam",
+    "breakdown": {
+      "account_count": 0,
+      "baseline_month": "",
+      "components_subtotal": 10400,
+      "config_snapshot": {
+        "assigned_plan_code": "KAM_NRR_STD",
+        "assigned_plan_id": "r-kam",
+        "gmv_gate_cap_1": 0.3,
+        "gmv_gate_cap_2": 0,
+        "gmv_gate_threshold_1": 215,
+        "gmv_gate_threshold_2": 180,
+        "handover_gmv_tiers": [],
+        "upsell_category_bonus": {
+          "categoryRates": {},
+          "groupRates": {}
+        },
+        "upsell_outlet_rate": 0.005,
+        "upsell_sku_p1_min_gmv": 5000,
+        "upsell_sku_p1_rate": 0.01,
+        "upsell_sku_p3_min_incremental": 8000,
+        "upsell_sku_p3_rate": 0.01,
+        "upsell_sku_p3_threshold_pct": 2
+      },
+      "csv_data_as_of": "2026-07-15T03:00:00.000Z",
+      "excluded_base_gmv": 0,
+      "expansion_detail": [
+        {
+          "gmv": 80000,
+          "outletId": "O4",
+          "outletName": "ร้านทดสอบ"
+        }
+      ],
+      "final_payout": 10400,
+      "gmv_gate": {
+        "ach_pct": 217,
+        "cap_multiplier": 1,
+        "gate_active": false
+      },
+      "handover": {
+        "accounts": 0,
+        "baseline_gmv": 0,
+        "current_gmv": 0,
+        "detail": [],
+        "gmv_bucket_gmv": 0,
+        "gmv_tier_label": null,
+        "payout": 0,
+        "retention_pct": 0,
+        "tier": 0
+      },
+      "kam_name": "Alpha (Al) One",
+      "lock_trigger": "manual",
+      "nrr_cohort_detail": [
+        {
+          "acctId": "A1",
+          "acctName": "บริษัททดสอบ",
+          "outlets": [
+            {
+              "currGmv": 630000,
+              "outletId": "O1",
+              "outletName": "ร้านทดสอบ",
+              "prevGmv": 600000
+            }
+          ]
+        },
+        {
+          "acctId": "A2",
+          "acctName": "บริษัททดสอบ",
+          "outlets": [
+            {
+              "currGmv": 420000,
+              "outletId": "O2",
+              "outletName": "ร้านทดสอบ",
+              "prevGmv": 400000
+            }
+          ]
+        }
+      ],
+      "nrr_payout": 10000,
+      "nrr_pct": 217,
+      "period": "2026-07",
+      "role": "kam",
+      "type": "kam_full",
+      "upsell_outlet": {
+        "_expansionIds": {},
+        "commission": 400,
+        "expansion_gmv": 80000,
+        "expansion_outlets": [],
+        "outlet_gmv": 80000
+      },
+      "upsell_sku": {
+        "p1": {
+          "comm": 0,
+          "gmv": 0,
+          "groups": []
+        },
+        "p3": {
+          "comm": 0,
+          "gmv_incremental": 0,
+          "groups": []
+        },
+        "total_commission": 0
+      },
+      "version": 1
+    },
+    "created_by": "admin@f.co",
+    "governed_nrr_pct": 217,
+    "payout_amount": 10400,
+    "period_month": "2026-07",
+    "raw_nrr_pct": 217,
+    "snapshot_status": "final",
+    "team_lead_email": null
+  },
+  {
+    "assigned_plan_id": "r-kam",
+    "beneficiary_email": "kam.b@f.co",
+    "beneficiary_role": "kam",
+    "breakdown": {
+      "account_count": 0,
+      "baseline_month": "",
+      "components_subtotal": 5000,
+      "config_snapshot": {
+        "assigned_plan_code": "KAM_NRR_STD",
+        "assigned_plan_id": "r-kam",
+        "gmv_gate_cap_1": 0.3,
+        "gmv_gate_cap_2": 0,
+        "gmv_gate_threshold_1": 215,
+        "gmv_gate_threshold_2": 180,
+        "handover_gmv_tiers": [],
+        "upsell_category_bonus": {
+          "categoryRates": {},
+          "groupRates": {}
+        },
+        "upsell_outlet_rate": 0.005,
+        "upsell_sku_p1_min_gmv": 5000,
+        "upsell_sku_p1_rate": 0.01,
+        "upsell_sku_p3_min_incremental": 8000,
+        "upsell_sku_p3_rate": 0.01,
+        "upsell_sku_p3_threshold_pct": 2
+      },
+      "csv_data_as_of": "2026-07-15T03:00:00.000Z",
+      "excluded_base_gmv": 0,
+      "expansion_detail": [],
+      "final_payout": 1500,
+      "gmv_gate": {
+        "ach_pct": 190.133333,
+        "cap_multiplier": 0.3,
+        "gate_active": true
+      },
+      "handover": {
+        "accounts": 0,
+        "baseline_gmv": 0,
+        "current_gmv": 0,
+        "detail": [],
+        "gmv_bucket_gmv": 0,
+        "gmv_tier_label": null,
+        "payout": 0,
+        "retention_pct": 0,
+        "tier": 0
+      },
+      "kam_name": "Bravo (Bee) Two",
+      "lock_trigger": "manual",
+      "nrr_cohort_detail": [
+        {
+          "acctId": "B1",
+          "acctName": "บริษัททดสอบ",
+          "outlets": [
+            {
+              "currGmv": 460000,
+              "outletId": "O3",
+              "outletName": "ร้านทดสอบ",
+              "prevGmv": 500000
+            }
+          ]
+        }
+      ],
+      "nrr_payout": 5000,
+      "nrr_pct": 190.133333,
+      "period": "2026-07",
+      "role": "kam",
+      "type": "kam_full",
+      "upsell_outlet": {
+        "_expansionIds": {},
+        "commission": 0,
+        "expansion_gmv": 0,
+        "expansion_outlets": [],
+        "outlet_gmv": 0
+      },
+      "upsell_sku": {
+        "p1": {
+          "comm": 0,
+          "gmv": 0,
+          "groups": []
+        },
+        "p3": {
+          "comm": 0,
+          "gmv_incremental": 0,
+          "groups": []
+        },
+        "total_commission": 0
+      },
+      "version": 1
+    },
+    "created_by": "admin@f.co",
+    "governed_nrr_pct": 190.133333,
+    "payout_amount": 1500,
+    "period_month": "2026-07",
+    "raw_nrr_pct": 190.133333,
+    "snapshot_status": "final",
+    "team_lead_email": null
+  },
+  {
+    "assigned_plan_id": "r-tl",
+    "beneficiary_email": "tl.x@f.co",
+    "beneficiary_role": "tl",
+    "breakdown": {
+      "config_snapshot": {
+        "assigned_plan_code": "TL_NRR_STD",
+        "assigned_plan_id": "r-tl",
+        "tl_upsell_mult_tier": {
+          "kam_count": 2,
+          "multiplier": 1,
+          "team_baseline_gmv": 1451613,
+          "team_upsell_gmv": 0,
+          "team_upsell_pct": 0,
+          "tier": 1
+        }
+      },
+      "excluded_base_gmv": 0,
+      "final_payout": 20000,
+      "nrr_payout": 20000,
+      "nrr_pct": 208.044444,
+      "period": "2026-07",
+      "role": "tl",
+      "team_lead_name": "Xray (Ray) Lead",
+      "type": "tl_full",
+      "upsell_mult": {
+        "kam_count": 2,
+        "multiplier": 1,
+        "team_baseline_gmv": 1451613,
+        "team_upsell_gmv": 0,
+        "team_upsell_pct": 0,
+        "tier": 1
+      },
+      "version": 1
+    },
+    "created_by": "admin@f.co",
+    "governed_nrr_pct": 208.044444,
+    "payout_amount": 20000,
+    "period_month": "2026-07",
+    "raw_nrr_pct": 208.044444,
+    "snapshot_status": "final",
+    "team_lead_email": "tl.x@f.co"
+  }
+]
