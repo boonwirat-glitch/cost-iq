@@ -224,10 +224,23 @@ function nrrCommDefaultTiers(role) {
        { min_value: 103,  max_value: null, payout_value: 10000 }];
 }
 
+// v_round: round a percent to 1 decimal before comparing it against a tier
+// boundary — the exact twin of Sense's _commTierPct (07a_commission_engine.js).
+// These two MUST stay identical: if they drift, Sense and /nrr quote different
+// commission for the same person on the same month, and neither is checkable
+// against the other. Bush's rule, decided 2026-08-02: what the screen prints
+// at 1 decimal is what the payout rules see.
+function nrrTierPct(pct) {
+  if (pct == null || isNaN(pct)) return pct;
+  return Math.round(Number(pct) * 10) / 10;
+}
+window.nrrTierPct = nrrTierPct;
+
 // Tier match — same open-interval convention as _commMatchTierByCode:
 // pct >= min (null = open) && pct < max (null = open).
 function nrrCommTierPayout(role, email, period, pct) {
   if (pct == null || isNaN(pct)) return 0;
+  pct = nrrTierPct(pct);          // v_round: match Sense before comparing
   var std = role === 'tl' ? 'TL_NRR_STD' : 'KAM_NRR_STD';
   var code = nrrCommPlansCache.assignments[period + '|' + role + '|' + email] || std;
   var tiers = nrrCommPlansCache.tiersByPlan[code] || nrrCommPlansCache.tiersByPlan[std];
@@ -253,12 +266,17 @@ function nrrCommTierTable(role, email, period, pct) {
   if (!tiers || !tiers.length) tiers = nrrCommDefaultTiers(role);
   tiers = tiers.slice().sort(function (a, b) { return (Number(a.min_value) || -Infinity) - (Number(b.min_value) || -Infinity); });
 
+  // v_round: compare on the same 1dp-rounded value the payout uses, and reuse
+  // it for the gap below — otherwise the ladder could highlight one tier while
+  // nrrCommTierPayout pays another
+  var cmpPct = nrrTierPct(pct);
+
   var currentIdx = -1;
-  if (pct != null && !isNaN(pct)) {
+  if (cmpPct != null && !isNaN(cmpPct)) {
     for (var i = 0; i < tiers.length; i++) {
       var t = tiers[i];
-      var minOk = t.min_value == null || t.min_value === '' || pct >= Number(t.min_value);
-      var maxOk = t.max_value == null || t.max_value === '' || pct < Number(t.max_value);
+      var minOk = t.min_value == null || t.min_value === '' || cmpPct >= Number(t.min_value);
+      var maxOk = t.max_value == null || t.max_value === '' || cmpPct < Number(t.max_value);
       if (minOk && maxOk) { currentIdx = i; break; }
     }
   }
@@ -270,7 +288,9 @@ function nrrCommTierTable(role, email, period, pct) {
   // 1-decimal ceiling (was whole-pp) — "push at least this much more"
   // stays a round-UP (never understate the ask), just finer-grained now
   // that %NRR itself displays to 1 decimal everywhere else.
-  var gapPp = (nextIdx >= 0 && pct != null) ? Math.max(0, Math.ceil((Number(tiers[nextIdx].min_value) - pct) * 10) / 10) : null;
+  // v_round: measure the gap from the ROUNDED pct — that is the value the tier
+  // actually judges, so quoting a gap from the raw one would overstate the ask
+  var gapPp = (nextIdx >= 0 && cmpPct != null) ? Math.max(0, Math.ceil((Number(tiers[nextIdx].min_value) - cmpPct) * 10) / 10) : null;
   return { tiers: rows, currentTier: currentIdx >= 0 ? rows[currentIdx] : null, nextTier: nextIdx >= 0 ? rows[nextIdx] : null, gapPp: gapPp };
 }
 window.nrrCommTierTable = nrrCommTierTable;

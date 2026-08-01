@@ -466,7 +466,15 @@
 
     // Row definitions
     var nrrSub='NRR '+pctText+' · '+esc(st.tierLabel||st.ruleName||'—');
-    if(st.next)nrrSub+=' · ต้องอีก +'+(Number(st.next.min_value)-Number(st.pct||0)).toFixed(1)+'pts';
+    // v_round: measure the gap from the 1dp-rounded pct — the value the tier
+    // actually judges. Before this, someone 0.03pts short read "ต้องอีก +0.0pts"
+    // (toFixed(1) collapsing a real gap to zero); now they simply count as
+    // having reached it, and anyone still short gets a gap of at least 0.1.
+    if(st.next){
+      var _gapPct=(typeof _commTierPct==='function')?_commTierPct(Number(st.pct||0)):Number(st.pct||0);
+      var _gap=Math.max(0,Math.ceil((Number(st.next.min_value)-_gapPct)*10)/10);
+      nrrSub+=' · ต้องอีก +'+_gap.toFixed(1)+'pts';
+    }
     var nrrRowHtml=cRow('var(--tk-ok-bright)','NRR Commission',nrrSub,src.nrr,'var(--tk-ok-bright)','_commDrillNRR()');
 
     var upsellSub=(p1g&&p1g.length?'กลุ่มสินค้าใหม่ '+p1g.length+' รายการ':'')+(p1g&&p1g.length&&p3g&&p3g.length?' · ':'')+(p3g&&p3g.length?'ยอดเติบโต '+p3g.length+' รายการ':'');
@@ -2729,10 +2737,15 @@ window._cdsCopyTSV = function() {
     return normalizeRows(rows,{period:per}).filter(function(r){ return r.period_month===per && String(r.snapshot_status||'').toLowerCase()==='final'; });
   }
   function isLocked(p){ return rowsFinalForPeriod(p).length>0; }
-  function liveRows(){
+  // v_period: takes the period it should compute for. Previously it ignored the
+  // caller entirely and always built the CURRENT calendar month, so a screen
+  // asking for July got August's numbers stamped as July — the root of the
+  // Preview & Lock mismatch (page showed Aug while the button locked Jul).
+  function liveRows(per){
+    var p=per||period();
     try{
-      var rows=(typeof _commBuildSnapshotRowsLive==='function' ? _commBuildSnapshotRowsLive() : []);
-      return normalizeRows(rows,{period:period(),status:'live'});
+      var rows=(typeof _commBuildSnapshotRowsLive==='function' ? _commBuildSnapshotRowsLive(p) : []);
+      return normalizeRows(rows,{period:p,status:'live'});
     }catch(e){ console.warn('[v211a] live rows failed', e); return []; }
   }
   if(typeof window._commBuildSnapshotRowsLive!=='function'){
@@ -2742,9 +2755,10 @@ window._cdsCopyTSV = function() {
     opts=opts||{};
     var per=opts.period||period();
     var finalRows=rowsFinalForPeriod(per);
-    if(opts.forceLive) return liveRows();
+    // v_period: thread `per` down — liveRows used to silently ignore it
+    if(opts.forceLive) return liveRows(per);
     if(opts.preferLocked!==false && finalRows.length) return finalRows;
-    return liveRows();
+    return liveRows(per);
   }
   function scopeRows(rows, scope){
     var email=low((currentUserProfile&&currentUserProfile.email)||'');

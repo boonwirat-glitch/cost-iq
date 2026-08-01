@@ -89,18 +89,43 @@ check('  NEW behavior (unrounded pct=94.6) correctly stays below tier', vm.runIn
 check('  NEW payout for 94.6% is ฿0 (no tier matched)', vm.runInContext("_commPayoutForPctByCode('KAM_NRR_STD','kam',94.6)", ctx), 0);
 check('  NEW payout for exactly 95.0% is ฿10,000 (boundary inclusive)', vm.runInContext("_commPayoutForPctByCode('KAM_NRR_STD','kam',95.0)", ctx), 10000);
 
-console.log('\nGate boundary: true ratio 97.96%, gate threshold_1:98, cap_1:0.3');
-const oldGate = vm.runInContext("_commComputeGmvGate('kam@test.co', 98)", ctx); // old rounded pct
-const newGate = vm.runInContext("_commComputeGmvGate('kam@test.co', 97.96)", ctx); // new unrounded pct
-check('  OLD behavior (rounded pct=98) wrongly clears the gate (cap=1.0)', oldGate.cap_multiplier, 1.0);
-check('  NEW behavior (unrounded pct=97.96) correctly applies cap_1 (cap=0.3)', newGate.cap_multiplier, 0.3);
+// ═══════════════════════════════════════════════════════════════════════════
+// v_round 2026-08-02 — POLICY REVERSAL, recorded deliberately
+//
+// These two cases used to assert the opposite. They are rewritten because the
+// RULE changed, not to make a red test go green.
+//
+// Old rule: compare the raw unrounded pct, so 97.96% missed the 98 gate.
+// New rule (Bush, 2026-08-02): round percents to 1 decimal BEFORE any boundary
+// comparison, so what the screen prints is what the payout rules see. 97.96%
+// prints as "98.0%", therefore it now clears the 98 gate.
+//
+// Both rules are internally consistent. What was never acceptable is the state
+// in between — a screen reading "98.0%" beside a capped payout.
+//
+// ⚠ The gate is the highest-stakes boundary in the system: crossing it swings
+// a ฿100,000 subtotal between ฿30,000 and ฿100,000. Every other boundary moves
+// money in ฿5,000 steps. A 0.04pp rounding therefore decides ฿70,000 here.
+// Checked against live data 2026-08-02: nobody in Jul or Aug sits within
+// 0.05pp of 98 or 95, so this is currently theoretical — but it is the reason
+// to revisit if the gate ever needs a different rule from the NRR tiers.
+//
+// The 94.6% case above still asserts the ORIGINAL behaviour and still passes:
+// 94.6 rounds to 94.6, so it correctly stays below 95. Rounding to 1 decimal
+// only moves values already within 0.05 of a line — it did not undo the
+// whole-number-rounding bug this harness was built to lock out.
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\nGate boundary under the 1-decimal rule: threshold_1:98, cap_1:0.3');
+const gate9796 = vm.runInContext("_commComputeGmvGate('kam@test.co', 97.96)", ctx);
+const gate9794 = vm.runInContext("_commComputeGmvGate('kam@test.co', 97.94)", ctx);
+check('  97.96% rounds to 98.0 and clears the gate (cap=1.0)', gate9796.cap_multiplier, 1.0);
+check('  97.94% rounds to 97.9 and is still capped (cap=0.3)', gate9794.cap_multiplier, 0.3);
+check('  ach_pct keeps the raw value for audit', gate9796.ach_pct, 97.96);
 
-console.log('\nConcrete payout impact — ฿100,000 subtotal at 97.96% NRR');
-const oldFinal = Math.round(100000 * oldGate.cap_multiplier);
-const newFinal = Math.round(100000 * newGate.cap_multiplier);
-check('  OLD (buggy) final payout', oldFinal, 100000);
-check('  NEW (correct) final payout', newFinal, 30000);
-console.log('  → this is the exact ฿70,000 gate-cap miss documented in the audit, now fixed.');
+console.log('\nConcrete payout impact — ฿100,000 subtotal either side of the line');
+check('  at 97.96% → full payout', Math.round(100000 * gate9796.cap_multiplier), 100000);
+check('  at 97.94% → capped payout', Math.round(100000 * gate9794.cap_multiplier), 30000);
+console.log('  → the gate now cuts at the same 1 decimal the UI displays.');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

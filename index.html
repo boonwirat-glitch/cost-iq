@@ -1,4 +1,4 @@
-<!-- Freshket Sense v942: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v945: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1268,7 +1268,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v942',
+      version: 'v945',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -34702,6 +34702,14 @@ flex-wrap:wrap;}
 .comm-kam-subhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);font-weight:var(--fw-bold)}
 .comm-kam-payout-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-2) 0;border-top:1px solid rgba(255,255,255,.05)}
 .comm-kam-payout-row.hit .comm-person-payout{color:#ffe08a}
+/* v_period: ส่วนประกอบของยอดจ่ายใต้ชื่อแต่ละคนในการ์ดทีม */
+.comm-person-parts{
+  margin-top:3px;font-size:var(--text-2xs);color:rgba(var(--ink-blue),.48);
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-variant-numeric:tabular-nums;
+  line-height:1.5;word-break:break-word
+}
+.comm-person-parts:empty{display:none}
+.comm-parts-gate{color:#f6ad55;font-weight:var(--fw-bold)}
 .comm-person-name{font-size:var(--text-md);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.88)}
 .comm-person-sub{font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);margin-top:2px;line-height:1.4}
 .comm-person-payout{font-size:var(--text-lg);font-weight:900;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(var(--ink-blue),.60);flex-shrink:0}
@@ -36535,8 +36543,11 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
         gmvTierLabel = matched.label || null;
         const thresholds = (matched.thresholds || []).slice()
           .sort((a, b) => Number(b.min_retention_pct || 0) - Number(a.min_retention_pct || 0));
+        // v_round: retention% is a percent boundary too — same 1dp rule as the
+        // NRR tiers, so the system has one standard rather than two
+        const _retCmp = _commTierPct(retentionPct);
         for (let i = 0; i < thresholds.length; i++) {
-          if (retentionPct >= Number(thresholds[i].min_retention_pct || 0)) {
+          if (_retCmp >= Number(thresholds[i].min_retention_pct || 0)) {
             payout = Number(thresholds[i].payout || 0);
             tier = thresholds.length - i; // highest threshold cleared = highest tier number
             break;
@@ -36550,8 +36561,9 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
       const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
       const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
-      if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
-      else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
+      const _retCmp = _commTierPct(retentionPct);   // v_round: same 1dp rule
+      if (_retCmp >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
+      else if (_retCmp >= t2Pct) { tier = 2; payout = t2Pay; }
     }
 
     return {
@@ -36587,6 +36599,10 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
     }
 
     let cap = 1.0;
+    // v_round: the gate is a percent boundary like any tier — compare on the
+    // 1dp-rounded value so 97.96% is not capped while the screen reads "98.0%".
+    // (The tier-matched branch rounds inside _commMatchTierInRule.)
+    const gatePct = _commTierPct(nrrPct);
     const tierMatch = planCode ? _commMatchComponentTier(planCode, 'portfolio_gate', null, nrrPct, previewResolver) : null;
     if (tierMatch) {
       cap = Number(tierMatch.payout_value ?? 1.0);
@@ -36595,11 +36611,13 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
       const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
       const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
       const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
-      if (nrrPct < t2)      cap = c2;
-      else if (nrrPct < t1) cap = c1;
+      if (gatePct < t2)      cap = c2;
+      else if (gatePct < t1) cap = c1;
     }
 
     return {
+      // ach_pct stays UNROUNDED — it is the audit trail of what was actually
+      // measured. Only the comparison above uses the rounded value.
       ach_pct: nrrPct,
       cap_multiplier: cap,
       gate_active: cap < 1.0
@@ -38086,6 +38104,9 @@ function _commRulesForRole(role, opts) {
 }
 function _commMatchTierByCode(planCode, role, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
+  // v_round: every caller of this passes a %NRR — round to 1dp first so the
+  // tier we pick agrees with the % the UI shows. See _commTierPct.
+  pct = _commTierPct(pct);
   const effectiveCode = _commActivePlanCode(planCode || _commPlanCode(role), role);
   const d = _commGetDraftByCode(effectiveCode, role);
   const tiers = (d.tiers || []).slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
@@ -38114,6 +38135,13 @@ function _commPayoutForPctByCode(planCode, role, pct) {
 function _commMatchTierInRule(found, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
   if (!found || !found.active || !found.tiers.length) return null;
+  // v_round: same 1dp rounding as _commMatchTierByCode — but this matcher is
+  // generic, so guard the scope first. Today both callers (portfolio_gate,
+  // tl_upsell_mult) pass percentages, but the plan also carries `gmv_raw`
+  // tiers measured in baht (P1's ฿5,000 gate). Rounding those would let
+  // ฿4,999.96 read as ฿5,000.0 and open a gate that should stay shut.
+  const _scope = String((found.rule && found.rule.measurement_scope) || '');
+  if (!/gmv/.test(_scope)) pct = _commTierPct(pct);
   const tiers = found.tiers.slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
   for (const t of tiers) {
     const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
@@ -38131,13 +38159,35 @@ function _commFmtPayout(n) {
   return '฿' + Math.round(n).toLocaleString('en-US');
 }
 // v92: shared %NRR/retention% display formatter (mirrors /nrr's nrrFmtPct()).
-// Always 1 decimal — the underlying pct value itself is now UNROUNDED
-// through tier/gate decisions (see _nrrGovernedPct), so this is purely a
-// display concern, never a computation one.
+// Always 1 decimal — pairs with _commTierPct below, which rounds to the SAME
+// 1 decimal before any tier/gate comparison. That pairing is deliberate: what
+// this prints is what the payout rules see.
 function _commFmtPct(v) {
   return (v !== null && v !== undefined && !isNaN(v)) ? Number(v).toFixed(1) + '%' : '—';
 }
 window._commFmtPct = _commFmtPct;
+
+// v_round: round a PERCENT to 1 decimal before comparing it against a tier or
+// gate boundary. Bush's rule, decided 2026-08-02.
+//
+// Why this exists: a KAM sat at 99.9745% NRR. _commFmtPct printed "100.0%",
+// the ≥100 tier saw 99.9745 and paid ฿0, and the screen ended up asserting
+// "100.0% · Below threshold" next to ฿0 — indistinguishable from a bug.
+// Rounding here at the same 1 decimal the UI prints makes that state
+// unreachable by construction: you get what you see.
+//
+// 1 decimal specifically — 2 decimals would leave 99.9745 → 99.97, still short,
+// so it would not have fixed the case that prompted this.
+//
+// Applies to every percent boundary (NRR tiers, GMV gate, TL multiplier,
+// handover retention) so one rule covers the whole system.
+// NEVER pass baht through this — ฿4,999.96 must not become ฿5,000.0 and slip
+// past the P1 GMV gate. See the scope guard in _commMatchTierInRule.
+function _commTierPct(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return pct;
+  return Math.round(Number(pct) * 10) / 10;
+}
+window._commTierPct = _commTierPct;
 
 function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
@@ -40100,34 +40150,92 @@ function _commPlanNameByCode(code, role) {
   const p = ((_commRuleConfig && _commRuleConfig.plans) || {})[code];
   return p ? p.plan_name : (code || _commPlanName(role));
 }
-function _commBuildTeamPreviewGroups() {
-  const model = _commBuildPreviewModel();
-  const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-  const tlMap = {};
-  groups.forEach(g => {
-    const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || 'unassigned';
-    const tlName = (g.accounts && g.accounts[0] && g.accounts[0].tlName) || tlEmail;
-    if (!tlMap[tlEmail]) tlMap[tlEmail] = { tlEmail, tlName, kamRows: [], kamTotal:0, tlPayout:0, teamNrr:null, total:0 };
-    const row = model.kamRows.find(r => r.kamEmail === g.kamEmail) || {};
-    tlMap[tlEmail].kamRows.push(row);
-    tlMap[tlEmail].kamTotal += Number(row.payout || 0);
+// v_period: group the ACTUAL snapshot rows by team — the same rows that get
+// written to the DB on Compute/Lock and shown in the KPI tiles above.
+//
+// This used to build its own numbers from _commBuildPreviewModel, which is a
+// bare NRR-tier lookup: no upsell, no outlet, no handover, no GMV gate, and no
+// TL multiplier. On one real team that made the card read ฿115,000 against a
+// true locked total of ฿195,685 — understated by 41% — while the KPI tiles at
+// the top of the same screen (fed by _commBuildSnapshotRows) showed the right
+// figure. Two answers to the same question on one page, neither labelled.
+//
+// Taking `rows` as an argument is what keeps them in agreement: the caller
+// computes the rows once, for one explicit period, and everything on the
+// screen is a view of that single array.
+function _commBuildTeamPreviewGroups(rows, period) {
+  rows = rows || [];
+  period = period || (typeof _commTargetLockPeriod === 'function' ? _commTargetLockPeriod() : _nrrExclusionCurrentPeriod());
+
+  const tlRowByEmail = {};
+  rows.forEach(r => {
+    if (String(r.beneficiary_role || '').toLowerCase() === 'tl') {
+      tlRowByEmail[String(r.beneficiary_email || '').toLowerCase()] = r;
+    }
   });
-  const _policyForTeamNrr = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
-  const _isQTeamNrr = _policyForTeamNrr && _policyForTeamNrr.commission_mode === 'quarterly';
+
+  const tlMap = {};
+  const ensure = (email, name) => {
+    const key = String(email || 'unassigned').toLowerCase();
+    if (!tlMap[key]) tlMap[key] = {
+      tlEmail: email || 'unassigned', tlName: name || email || 'ไม่ได้สังกัดทีม',
+      kamRows: [], kamTotal: 0, tlPayout: 0, teamNrr: null, total: 0, tlRow: null
+    };
+    return tlMap[key];
+  };
+
+  // TL rows first so a team with no members still shows up
+  Object.keys(tlRowByEmail).forEach(k => {
+    const r = tlRowByEmail[k];
+    const bd = r.breakdown || {};
+    const g = ensure(r.beneficiary_email, bd.team_lead_name);
+    g.tlRow     = r;
+    g.tlPayout  = Number(r.payout_amount || 0);   // POST-multiplier, as locked
+    g.teamNrr   = r.governed_nrr_pct != null ? Number(r.governed_nrr_pct) : null;
+    g.tlPlanCode = bd.assigned_plan_code || _commGetAssignmentPlan(period, 'tl', r.beneficiary_email, 'tl');
+    g.tlPlanName = _commPlanNameByCode(g.tlPlanCode, 'tl');
+    g.tlMult    = (bd.upsell_mult && bd.upsell_mult.multiplier) || null;
+  });
+
+  // everyone who is not a TL hangs under their team_lead_email
+  rows.forEach(r => {
+    const role = String(r.beneficiary_role || '').toLowerCase();
+    if (role === 'tl') return;
+    const bd = r.breakdown || {};
+    const tlEmail = r.team_lead_email || '';
+    const g = ensure(tlEmail, (tlRowByEmail[String(tlEmail).toLowerCase()] || {}).breakdown &&
+                              tlRowByEmail[String(tlEmail).toLowerCase()].breakdown.team_lead_name);
+    const _pct = r.governed_nrr_pct != null ? Number(r.governed_nrr_pct) : null;
+    // the tier label is not stored on the row — look it up from the same pct
+    // the payout used, so label and money can never disagree
+    let _tierLabel = '';
+    try {
+      const _t = _commMatchTierByCode(bd.assigned_plan_code || _commGetAssignmentPlan(period, role, r.beneficiary_email, role), role, _pct);
+      _tierLabel = _t ? (_t.payout_label || '') : '';
+    } catch (e) { /* label is cosmetic — never let it break the row */ }
+    g.kamRows.push({
+      kamEmail: r.beneficiary_email,
+      kamName:  bd.kam_name || r.beneficiary_email,
+      role,
+      pct:      _pct,
+      tierLabel: _tierLabel,
+      payout:   Number(r.payout_amount || 0),      // FULL payout, as locked
+      breakdown: bd
+    });
+    g.kamTotal += Number(r.payout_amount || 0);
+  });
+
   Object.values(tlMap).forEach(t => {
-    // v828: quarterly mode reads Team NRR from QNRR source so it matches the commission total shown below it
-    const raw = t.tlEmail === 'unassigned' ? null
-      : (_isQTeamNrr && typeof window._qnrrComputeForCommission === 'function')
-        ? window._qnrrComputeForCommission(t.tlEmail, 'tl')
-        : _tgtComputeKamNRR(null, t.tlEmail);
-    const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
-    t.teamNrr = pct;
-    t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
-    t.tlPlanName = _commPlanNameByCode(t.tlPlanCode, 'tl');
-    t.tlPayout = _commPayoutForPctByCode(t.tlPlanCode, 'tl', pct);
+    t.kamRows.sort((a, b) => (b.payout - a.payout) || ((a.pct ?? -1) - (b.pct ?? -1)));
     t.total = t.tlPayout + t.kamTotal;
   });
-  return Object.values(tlMap).sort((a,b)=>b.total-a.total);
+  // real teams first, the "no team" bucket last so nobody is hidden but it
+  // never outranks an actual team lead
+  return Object.values(tlMap).sort((a, b) => {
+    const au = a.tlEmail === 'unassigned', bu = b.tlEmail === 'unassigned';
+    if (au !== bu) return au ? 1 : -1;
+    return b.total - a.total;
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -41860,10 +41968,19 @@ Archive ต่อหรือไม่? หลัง archive rule นี้จ�
 }
 
 function renderCommLockStep(body) {
+  // v_period: ONE period for the whole screen, and it is the period the Lock
+  // button targets. Every builder below used to be called with no period, so
+  // they all defaulted to today's calendar month while the button locked the
+  // previous one — on 2 Aug the page showed August figures under a button
+  // reading "Lock ก.ค. 2569".
+  const period = _commTargetLockPeriod();
+  const periodLabel = _commPeriodLabelTh(period);
   const model = _commBuildPreviewModel();
-  const teams = _commBuildTeamPreviewGroups();
-  const rows = _commBuildSnapshotRows();
-  const summary = _commBuildPayoutSummary((currentUserProfile&&currentUserProfile.role)==='tl'?'tl':undefined);
+  const rows = _commBuildSnapshotRows(period);
+  // teams are a VIEW of `rows` — not a second computation. That is what keeps
+  // the cards, the KPI tiles and the CSV showing the same money.
+  const teams = _commBuildTeamPreviewGroups(rows, period);
+  const summary = _commBuildPayoutSummary((currentUserProfile&&currentUserProfile.role)==='tl'?'tl':undefined, { period });
   const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
   const threshold = Number(_tgtSettings.nrr_threshold || 98);
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
@@ -41875,7 +41992,7 @@ function renderCommLockStep(body) {
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">3. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
+        <div><div class="comm-hero-title">3. Preview & Lock · ${periodLabel}</div><div class="comm-hero-sub">ทุกตัวเลขในหน้านี้คือเดือน ${periodLabel} — เดือนเดียวกับที่ปุ่ม Lock จะบันทึก</div></div>
         <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(summary.total)}</div></div>
       </div>
       <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
@@ -41885,64 +42002,57 @@ function renderCommLockStep(body) {
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?'ยังมี exclusion pending ' + pending + ' รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ':'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
-      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot(_commTargetLockPeriod())" title="ล็อกเดือนที่ยังไม่ปิด — ช่วงวันที่ 1-3 จะเล็งเดือนก่อนหน้าให้อัตโนมัติ">Lock ${_commPeriodLabelTh(_commTargetLockPeriod())}</button></div>
+      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv('${period}')">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft('${period}')">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot('${period}')" title="ล็อกเดือนที่ยังไม่ปิด — ช่วงวันที่ 1-3 จะเล็งเดือนก่อนหน้าให้อัตโนมัติ">Lock ${periodLabel}</button></div>
     </div>
     <div id="comm-lock-detail-body">
-    <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
+    <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>ยอดเต็มที่จะถูกล็อก — รวม upsell · outlet · handover · gate แล้ว</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
       <div class="comm-preview-tl-band">
         <div class="comm-preview-tl-left">
           <div class="comm-team-eyebrow">TEAM LEAD</div>
           <div class="comm-name">${_commEscapeHtml(t.tlName||t.tlEmail)}</div>
           <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${_commFmtPct(t.teamNrr)}</div>
-          <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}</div>
+          <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}${t.tlMult?' · ×'+t.tlMult:''}</div>
         </div>
-        <div class="comm-preview-tl-money"><span>Total payout</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
+        <div class="comm-preview-tl-money"><span>รวมทั้งทีม</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
       </div>
-      <div class="comm-kam-subhead"><span>KAM payout in this team</span><em>${t.kamRows.filter(k=>k.payout>0).length}/${t.kamRows.length} hit payout</em></div>
-      ${t.kamRows.slice(0,5).map(k=>{
-        // v226: show component breakdown if available in breakdown jsonb
-        const bd = k.breakdown || {};
-        const nrrP = bd.nrr_payout !== undefined ? _commFmtPayout(bd.nrr_payout) : null;
-        const upsellP = (bd.upsell_sku && bd.upsell_sku.total_commission !== undefined) ? _commFmtPayout(bd.upsell_sku.total_commission + ((bd.upsell_outlet && bd.upsell_outlet.commission)||0)) : null;
-        const handoverP = bd.handover ? _commFmtPayout(bd.handover.payout||0) : null;
-        const gateTxt = bd.gmv_gate && bd.gmv_gate.gate_active ? `⚠ gate×${bd.gmv_gate.cap}` : null;
-        const breakdown = nrrP ? `<span style="color:rgba(255,255,255,.5);font-size:var(--text-xs)"> NRR ${nrrP}${upsellP?' · Upsell '+upsellP:''}${handoverP?' · HO '+handoverP:''}${gateTxt?' · '+gateTxt:''}</span>` : '';
-        return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
-          <div>
+      <div class="comm-kam-subhead"><span>สมาชิกในทีม</span><em>${t.kamRows.filter(k=>k.payout>0).length}/${t.kamRows.length} ได้ค่าคอมฯ</em></div>
+      ${t.kamRows.map(k=>`<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
+          <div style="min-width:0">
             <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
-            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
+            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)}${k.tierLabel?' · '+_commEscapeHtml(k.tierLabel):''}</div>
+            <div class="comm-person-parts">${_commPayoutPartsHtml(k.breakdown)}</div>
           </div>
           <div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div>
-        </div>`;
-      }).join('')}
-      ${t.kamRows.length>5?`<div class="comm-meta comm-more-note">+${t.kamRows.length-5} more KAM in CSV/export</div>`:''}
+        </div>`).join('')
+        || '<div class="comm-meta comm-more-note">ไม่มีสมาชิกในทีมนี้</div>'}
     </div>`).join('') || `<div class="comm-empty">ยังไม่มีทีมให้ preview</div>`}
-    <div class="comm-section-title">Snapshot rows</div>
-    <div class="comm-lock-list">${rows.slice(0,12).map(r=>{
-      const bd = r.breakdown || {};
-      const isKam = r.beneficiary_role === 'kam';
-      const name = _commEscapeHtml(bd.kam_name || bd.team_lead_name || r.beneficiary_email);
-      let sub = `NRR ${_commFmtPct(r.governed_nrr_pct)}`;
-      if (isKam && bd.nrr_payout !== undefined) {
-        const parts = [`NRR ${_commFmtPayout(bd.nrr_payout)}`];
-        if (bd.upsell_sku && bd.upsell_sku.total_commission > 0) parts.push(`Upsell ${_commFmtPayout(bd.upsell_sku.total_commission)}`);
-        if (bd.upsell_outlet && bd.upsell_outlet.commission > 0) parts.push(`Outlet ${_commFmtPayout(bd.upsell_outlet.commission)}`);
-        if (bd.handover && bd.handover.payout > 0) parts.push(`HO ${_commFmtPayout(bd.handover.payout)}`);
-        if (bd.gmv_gate && bd.gmv_gate.gate_active) parts.push(`Gate×${bd.gmv_gate.cap}`);
-        sub = parts.join(' · ');
-      } else if (!isKam && bd.upsell_mult) {
-        sub = `NRR ${_commFmtPayout(bd.nrr_payout||0)} × ${bd.upsell_mult.multiplier||1}× (Upsell ${bd.upsell_mult.team_upsell_pct||0}%)`;
-      }
-      return `<div class="comm-lock-row">
-        <div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div>
-        <div><div class="comm-person-name">${name}</div><div class="comm-person-sub">${sub}</div></div>
-        <div class="comm-row-money ${Number(r.payout_amount||0)>0?'hit':''}">${_commFmtPayout(r.payout_amount)}</div>
-      </div>`;
-    }).join('')}</div>
     </div>
-    ${rows.length===0?'<div class="comm-empty" style="padding:16px;text-align:center">ยังไม่มี snapshot rows · กด Compute เพื่อสร้าง</div>':''}
+    ${rows.length===0?`<div class="comm-empty" style="padding:16px;text-align:center">ยังไม่มีข้อมูลของ ${periodLabel} · กด Compute เพื่อสร้าง</div>`:''}
   `;
+}
+
+// v_period: one renderer for "what makes up this payout", used by every KAM row
+// in the team cards. Shows the gate as its own multiply step rather than
+// folding it into the components, so the parts always reconcile with the total
+// printed beside them — they did not before, because the parts were pre-gate
+// and pre-rounding while the total was post-both.
+function _commPayoutPartsHtml(bd) {
+  bd = bd || {};
+  if (bd.nrr_payout === undefined) return '';
+  const parts = [];
+  const add = (label, v) => { if (Number(v) > 0) parts.push(label + ' ' + _commFmtPayout(v)); };
+  parts.push('NRR ' + _commFmtPayout(bd.nrr_payout || 0));
+  add('Upsell', bd.upsell_sku && bd.upsell_sku.total_commission);
+  add('Outlet', bd.upsell_outlet && bd.upsell_outlet.commission);
+  add('HO',     bd.handover && bd.handover.payout);
+  let html = _commEscapeHtml(parts.join(' · '));
+  // cap_multiplier is the real field name — the old code read `.cap`, which
+  // does not exist, and rendered the literal text "Gate×undefined"
+  if (bd.gmv_gate && bd.gmv_gate.gate_active) {
+    html += ' <span class="comm-parts-gate">× Gate ' + Number(bd.gmv_gate.cap_multiplier ?? 1) + '</span>';
+  }
+  return html;
 }
 
 // v879 (Commission Setup redesign, phase 4): generic save for the 5
@@ -45061,7 +45171,15 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
 
     // Row definitions
     var nrrSub='NRR '+pctText+' · '+esc(st.tierLabel||st.ruleName||'—');
-    if(st.next)nrrSub+=' · ต้องอีก +'+(Number(st.next.min_value)-Number(st.pct||0)).toFixed(1)+'pts';
+    // v_round: measure the gap from the 1dp-rounded pct — the value the tier
+    // actually judges. Before this, someone 0.03pts short read "ต้องอีก +0.0pts"
+    // (toFixed(1) collapsing a real gap to zero); now they simply count as
+    // having reached it, and anyone still short gets a gap of at least 0.1.
+    if(st.next){
+      var _gapPct=(typeof _commTierPct==='function')?_commTierPct(Number(st.pct||0)):Number(st.pct||0);
+      var _gap=Math.max(0,Math.ceil((Number(st.next.min_value)-_gapPct)*10)/10);
+      nrrSub+=' · ต้องอีก +'+_gap.toFixed(1)+'pts';
+    }
     var nrrRowHtml=cRow('var(--tk-ok-bright)','NRR Commission',nrrSub,src.nrr,'var(--tk-ok-bright)','_commDrillNRR()');
 
     var upsellSub=(p1g&&p1g.length?'กลุ่มสินค้าใหม่ '+p1g.length+' รายการ':'')+(p1g&&p1g.length&&p3g&&p3g.length?' · ':'')+(p3g&&p3g.length?'ยอดเติบโต '+p3g.length+' รายการ':'');
@@ -47324,10 +47442,15 @@ window._cdsCopyTSV = function() {
     return normalizeRows(rows,{period:per}).filter(function(r){ return r.period_month===per && String(r.snapshot_status||'').toLowerCase()==='final'; });
   }
   function isLocked(p){ return rowsFinalForPeriod(p).length>0; }
-  function liveRows(){
+  // v_period: takes the period it should compute for. Previously it ignored the
+  // caller entirely and always built the CURRENT calendar month, so a screen
+  // asking for July got August's numbers stamped as July — the root of the
+  // Preview & Lock mismatch (page showed Aug while the button locked Jul).
+  function liveRows(per){
+    var p=per||period();
     try{
-      var rows=(typeof _commBuildSnapshotRowsLive==='function' ? _commBuildSnapshotRowsLive() : []);
-      return normalizeRows(rows,{period:period(),status:'live'});
+      var rows=(typeof _commBuildSnapshotRowsLive==='function' ? _commBuildSnapshotRowsLive(p) : []);
+      return normalizeRows(rows,{period:p,status:'live'});
     }catch(e){ console.warn('[v211a] live rows failed', e); return []; }
   }
   if(typeof window._commBuildSnapshotRowsLive!=='function'){
@@ -47337,9 +47460,10 @@ window._cdsCopyTSV = function() {
     opts=opts||{};
     var per=opts.period||period();
     var finalRows=rowsFinalForPeriod(per);
-    if(opts.forceLive) return liveRows();
+    // v_period: thread `per` down — liveRows used to silently ignore it
+    if(opts.forceLive) return liveRows(per);
     if(opts.preferLocked!==false && finalRows.length) return finalRows;
-    return liveRows();
+    return liveRows(per);
   }
   function scopeRows(rows, scope){
     var email=low((currentUserProfile&&currentUserProfile.email)||'');

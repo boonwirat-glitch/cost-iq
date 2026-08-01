@@ -1567,6 +1567,14 @@ flex-wrap:wrap;}
 .comm-kam-subhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);font-weight:var(--fw-bold)}
 .comm-kam-payout-row{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-2) 0;border-top:1px solid rgba(255,255,255,.05)}
 .comm-kam-payout-row.hit .comm-person-payout{color:#ffe08a}
+/* v_period: ส่วนประกอบของยอดจ่ายใต้ชื่อแต่ละคนในการ์ดทีม */
+.comm-person-parts{
+  margin-top:3px;font-size:var(--text-2xs);color:rgba(var(--ink-blue),.48);
+  font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-variant-numeric:tabular-nums;
+  line-height:1.5;word-break:break-word
+}
+.comm-person-parts:empty{display:none}
+.comm-parts-gate{color:#f6ad55;font-weight:var(--fw-bold)}
 .comm-person-name{font-size:var(--text-md);font-weight:var(--fw-bold);color:rgba(var(--ink-blue-hi),.88)}
 .comm-person-sub{font-size:var(--text-xs);color:rgba(var(--ink-blue),.55);margin-top:2px;line-height:1.4}
 .comm-person-payout{font-size:var(--text-lg);font-weight:900;font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(var(--ink-blue),.60);flex-shrink:0}

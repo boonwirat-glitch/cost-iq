@@ -231,34 +231,92 @@ function _commPlanNameByCode(code, role) {
   const p = ((_commRuleConfig && _commRuleConfig.plans) || {})[code];
   return p ? p.plan_name : (code || _commPlanName(role));
 }
-function _commBuildTeamPreviewGroups() {
-  const model = _commBuildPreviewModel();
-  const groups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
-  const tlMap = {};
-  groups.forEach(g => {
-    const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || 'unassigned';
-    const tlName = (g.accounts && g.accounts[0] && g.accounts[0].tlName) || tlEmail;
-    if (!tlMap[tlEmail]) tlMap[tlEmail] = { tlEmail, tlName, kamRows: [], kamTotal:0, tlPayout:0, teamNrr:null, total:0 };
-    const row = model.kamRows.find(r => r.kamEmail === g.kamEmail) || {};
-    tlMap[tlEmail].kamRows.push(row);
-    tlMap[tlEmail].kamTotal += Number(row.payout || 0);
+// v_period: group the ACTUAL snapshot rows by team — the same rows that get
+// written to the DB on Compute/Lock and shown in the KPI tiles above.
+//
+// This used to build its own numbers from _commBuildPreviewModel, which is a
+// bare NRR-tier lookup: no upsell, no outlet, no handover, no GMV gate, and no
+// TL multiplier. On one real team that made the card read ฿115,000 against a
+// true locked total of ฿195,685 — understated by 41% — while the KPI tiles at
+// the top of the same screen (fed by _commBuildSnapshotRows) showed the right
+// figure. Two answers to the same question on one page, neither labelled.
+//
+// Taking `rows` as an argument is what keeps them in agreement: the caller
+// computes the rows once, for one explicit period, and everything on the
+// screen is a view of that single array.
+function _commBuildTeamPreviewGroups(rows, period) {
+  rows = rows || [];
+  period = period || (typeof _commTargetLockPeriod === 'function' ? _commTargetLockPeriod() : _nrrExclusionCurrentPeriod());
+
+  const tlRowByEmail = {};
+  rows.forEach(r => {
+    if (String(r.beneficiary_role || '').toLowerCase() === 'tl') {
+      tlRowByEmail[String(r.beneficiary_email || '').toLowerCase()] = r;
+    }
   });
-  const _policyForTeamNrr = (typeof _nrrGovResolveForVisibleScope === 'function') ? _nrrGovResolveForVisibleScope() : null;
-  const _isQTeamNrr = _policyForTeamNrr && _policyForTeamNrr.commission_mode === 'quarterly';
+
+  const tlMap = {};
+  const ensure = (email, name) => {
+    const key = String(email || 'unassigned').toLowerCase();
+    if (!tlMap[key]) tlMap[key] = {
+      tlEmail: email || 'unassigned', tlName: name || email || 'ไม่ได้สังกัดทีม',
+      kamRows: [], kamTotal: 0, tlPayout: 0, teamNrr: null, total: 0, tlRow: null
+    };
+    return tlMap[key];
+  };
+
+  // TL rows first so a team with no members still shows up
+  Object.keys(tlRowByEmail).forEach(k => {
+    const r = tlRowByEmail[k];
+    const bd = r.breakdown || {};
+    const g = ensure(r.beneficiary_email, bd.team_lead_name);
+    g.tlRow     = r;
+    g.tlPayout  = Number(r.payout_amount || 0);   // POST-multiplier, as locked
+    g.teamNrr   = r.governed_nrr_pct != null ? Number(r.governed_nrr_pct) : null;
+    g.tlPlanCode = bd.assigned_plan_code || _commGetAssignmentPlan(period, 'tl', r.beneficiary_email, 'tl');
+    g.tlPlanName = _commPlanNameByCode(g.tlPlanCode, 'tl');
+    g.tlMult    = (bd.upsell_mult && bd.upsell_mult.multiplier) || null;
+  });
+
+  // everyone who is not a TL hangs under their team_lead_email
+  rows.forEach(r => {
+    const role = String(r.beneficiary_role || '').toLowerCase();
+    if (role === 'tl') return;
+    const bd = r.breakdown || {};
+    const tlEmail = r.team_lead_email || '';
+    const g = ensure(tlEmail, (tlRowByEmail[String(tlEmail).toLowerCase()] || {}).breakdown &&
+                              tlRowByEmail[String(tlEmail).toLowerCase()].breakdown.team_lead_name);
+    const _pct = r.governed_nrr_pct != null ? Number(r.governed_nrr_pct) : null;
+    // the tier label is not stored on the row — look it up from the same pct
+    // the payout used, so label and money can never disagree
+    let _tierLabel = '';
+    try {
+      const _t = _commMatchTierByCode(bd.assigned_plan_code || _commGetAssignmentPlan(period, role, r.beneficiary_email, role), role, _pct);
+      _tierLabel = _t ? (_t.payout_label || '') : '';
+    } catch (e) { /* label is cosmetic — never let it break the row */ }
+    g.kamRows.push({
+      kamEmail: r.beneficiary_email,
+      kamName:  bd.kam_name || r.beneficiary_email,
+      role,
+      pct:      _pct,
+      tierLabel: _tierLabel,
+      payout:   Number(r.payout_amount || 0),      // FULL payout, as locked
+      breakdown: bd
+    });
+    g.kamTotal += Number(r.payout_amount || 0);
+  });
+
   Object.values(tlMap).forEach(t => {
-    // v828: quarterly mode reads Team NRR from QNRR source so it matches the commission total shown below it
-    const raw = t.tlEmail === 'unassigned' ? null
-      : (_isQTeamNrr && typeof window._qnrrComputeForCommission === 'function')
-        ? window._qnrrComputeForCommission(t.tlEmail, 'tl')
-        : _tgtComputeKamNRR(null, t.tlEmail);
-    const pct = raw ? _nrrGovernedPct(raw, null, t.tlEmail) : null;
-    t.teamNrr = pct;
-    t.tlPlanCode = _commGetAssignmentPlan(_nrrExclusionCurrentPeriod(), 'tl', t.tlEmail, 'tl');
-    t.tlPlanName = _commPlanNameByCode(t.tlPlanCode, 'tl');
-    t.tlPayout = _commPayoutForPctByCode(t.tlPlanCode, 'tl', pct);
+    t.kamRows.sort((a, b) => (b.payout - a.payout) || ((a.pct ?? -1) - (b.pct ?? -1)));
     t.total = t.tlPayout + t.kamTotal;
   });
-  return Object.values(tlMap).sort((a,b)=>b.total-a.total);
+  // real teams first, the "no team" bucket last so nobody is hidden but it
+  // never outranks an actual team lead
+  return Object.values(tlMap).sort((a, b) => {
+    const au = a.tlEmail === 'unassigned', bu = b.tlEmail === 'unassigned';
+    if (au !== bu) return au ? 1 : -1;
+    return b.total - a.total;
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1991,10 +2049,19 @@ Archive ต่อหรือไม่? หลัง archive rule นี้จ�
 }
 
 function renderCommLockStep(body) {
+  // v_period: ONE period for the whole screen, and it is the period the Lock
+  // button targets. Every builder below used to be called with no period, so
+  // they all defaulted to today's calendar month while the button locked the
+  // previous one — on 2 Aug the page showed August figures under a button
+  // reading "Lock ก.ค. 2569".
+  const period = _commTargetLockPeriod();
+  const periodLabel = _commPeriodLabelTh(period);
   const model = _commBuildPreviewModel();
-  const teams = _commBuildTeamPreviewGroups();
-  const rows = _commBuildSnapshotRows();
-  const summary = _commBuildPayoutSummary((currentUserProfile&&currentUserProfile.role)==='tl'?'tl':undefined);
+  const rows = _commBuildSnapshotRows(period);
+  // teams are a VIEW of `rows` — not a second computation. That is what keeps
+  // the cards, the KPI tiles and the CSV showing the same money.
+  const teams = _commBuildTeamPreviewGroups(rows, period);
+  const summary = _commBuildPayoutSummary((currentUserProfile&&currentUserProfile.role)==='tl'?'tl':undefined, { period });
   const pending = (_nrrExclusions || []).filter(r => r.status === 'submitted' || r.status === 'pending').length;
   const threshold = Number(_tgtSettings.nrr_threshold || 98);
   const teamHit = model.teamPct !== null && model.teamPct >= threshold;
@@ -2006,7 +2073,7 @@ function renderCommLockStep(body) {
   body.innerHTML = `
     <div class="comm-hero">
       <div class="comm-hero-top">
-        <div><div class="comm-hero-title">3. Preview & Lock</div><div class="comm-hero-sub">ตรวจภาพรวมก่อน lock snapshot และ export CSV</div></div>
+        <div><div class="comm-hero-title">3. Preview & Lock · ${periodLabel}</div><div class="comm-hero-sub">ทุกตัวเลขในหน้านี้คือเดือน ${periodLabel} — เดือนเดียวกับที่ปุ่ม Lock จะบันทึก</div></div>
         <div class="comm-total"><div class="comm-total-lbl">Exposure</div><div class="comm-total-val">${_commFmtPayout(summary.total)}</div></div>
       </div>
       <div class="comm-lock-subtabs" style="margin:10px 0 -2px"><button class="comm-lock-subtab ${_commLockSubtab==='current'?'active':''}" onclick="switchLockSubtab('current')">เดือนนี้</button><button class="comm-lock-subtab ${_commLockSubtab==='retroactive'?'active':''}" onclick="switchLockSubtab('retroactive')">Retroactive ↩</button></div>
@@ -2016,64 +2083,57 @@ function renderCommLockStep(body) {
         <div class="comm-kpi ${summary.kamPayout>0?'hit payout-hit':'miss'}"><div class="comm-kpi-lbl">KAM payout</div><div class="comm-kpi-val">${_commFmtPayout(summary.kamPayout)}</div><div class="comm-kpi-sub">${summary.hitKams}/${summary.kamCount} KAM hit payout</div></div>
       </div>
       <div class="comm-readiness-bar ${ready?'ready':'warn'}"><span class="comm-readiness-dot"></span><div class="comm-readiness-copy">${ready?'พร้อม lock: ไม่มี pending exception และมี snapshot rows แล้ว': pending?'ยังมี exclusion pending ' + pending + ' รายการ ถ้า lock ตอนนี้จะไม่ถูกนับ':'ยังไม่มีข้อมูล payout ให้ lock'}</div></div>
-      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv()">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft()">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot(_commTargetLockPeriod())" title="ล็อกเดือนที่ยังไม่ปิด — ช่วงวันที่ 1-3 จะเล็งเดือนก่อนหน้าให้อัตโนมัติ">Lock ${_commPeriodLabelTh(_commTargetLockPeriod())}</button></div>
+      <div class="tgt-lock-actions"><button class="tgt-lock-btn secondary" onclick="exportCommissionSnapshotCsv('${period}')">Export CSV</button><button class="tgt-lock-btn outline" onclick="computeCommissionDraft('${period}')">Compute</button><button class="tgt-lock-btn primary" onclick="lockCommissionSnapshot('${period}')" title="ล็อกเดือนที่ยังไม่ปิด — ช่วงวันที่ 1-3 จะเล็งเดือนก่อนหน้าให้อัตโนมัติ">Lock ${periodLabel}</button></div>
     </div>
     <div id="comm-lock-detail-body">
-    <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>TL payout + KAM payout grouped by team</em></div>
+    <div class="comm-section-title comm-preview-section-title"><span>By Team Lead</span><em>ยอดเต็มที่จะถูกล็อก — รวม upsell · outlet · handover · gate แล้ว</em></div>
     ${teams.map(t=>`<div class="comm-card comm-team-card comm-preview-team-card">
       <div class="comm-preview-tl-band">
         <div class="comm-preview-tl-left">
           <div class="comm-team-eyebrow">TEAM LEAD</div>
           <div class="comm-name">${_commEscapeHtml(t.tlName||t.tlEmail)}</div>
           <div class="comm-meta">${_commEscapeHtml(t.tlEmail||'')} · Team NRR ${_commFmtPct(t.teamNrr)}</div>
-          <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}</div>
+          <div class="comm-rule-chip">TL rule · ${_commEscapeHtml(t.tlPlanName || _commPlanNameByCode(t.tlPlanCode,'tl'))}${t.tlMult?' · ×'+t.tlMult:''}</div>
         </div>
-        <div class="comm-preview-tl-money"><span>Total payout</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
+        <div class="comm-preview-tl-money"><span>รวมทั้งทีม</span><strong>${_commFmtPayout(t.total)}</strong><em>TL ${_commFmtPayout(t.tlPayout)}</em></div>
       </div>
-      <div class="comm-kam-subhead"><span>KAM payout in this team</span><em>${t.kamRows.filter(k=>k.payout>0).length}/${t.kamRows.length} hit payout</em></div>
-      ${t.kamRows.slice(0,5).map(k=>{
-        // v226: show component breakdown if available in breakdown jsonb
-        const bd = k.breakdown || {};
-        const nrrP = bd.nrr_payout !== undefined ? _commFmtPayout(bd.nrr_payout) : null;
-        const upsellP = (bd.upsell_sku && bd.upsell_sku.total_commission !== undefined) ? _commFmtPayout(bd.upsell_sku.total_commission + ((bd.upsell_outlet && bd.upsell_outlet.commission)||0)) : null;
-        const handoverP = bd.handover ? _commFmtPayout(bd.handover.payout||0) : null;
-        const gateTxt = bd.gmv_gate && bd.gmv_gate.gate_active ? `⚠ gate×${bd.gmv_gate.cap}` : null;
-        const breakdown = nrrP ? `<span style="color:rgba(255,255,255,.5);font-size:var(--text-xs)"> NRR ${nrrP}${upsellP?' · Upsell '+upsellP:''}${handoverP?' · HO '+handoverP:''}${gateTxt?' · '+gateTxt:''}</span>` : '';
-        return `<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
-          <div>
+      <div class="comm-kam-subhead"><span>สมาชิกในทีม</span><em>${t.kamRows.filter(k=>k.payout>0).length}/${t.kamRows.length} ได้ค่าคอมฯ</em></div>
+      ${t.kamRows.map(k=>`<div class="comm-person-row comm-kam-payout-row ${k.payout>0?'hit':''}">
+          <div style="min-width:0">
             <div class="comm-person-name">${_commEscapeHtml(k.kamName||k.kamEmail)}</div>
-            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)} · ${_commEscapeHtml(k.tierLabel||'—')}${breakdown}</div>
+            <div class="comm-person-sub">NRR ${_commFmtPct(k.pct)}${k.tierLabel?' · '+_commEscapeHtml(k.tierLabel):''}</div>
+            <div class="comm-person-parts">${_commPayoutPartsHtml(k.breakdown)}</div>
           </div>
           <div class="comm-person-payout ${k.payout>0?'comm-row-money hit':'comm-row-money'}">${_commFmtPayout(k.payout)}</div>
-        </div>`;
-      }).join('')}
-      ${t.kamRows.length>5?`<div class="comm-meta comm-more-note">+${t.kamRows.length-5} more KAM in CSV/export</div>`:''}
+        </div>`).join('')
+        || '<div class="comm-meta comm-more-note">ไม่มีสมาชิกในทีมนี้</div>'}
     </div>`).join('') || `<div class="comm-empty">ยังไม่มีทีมให้ preview</div>`}
-    <div class="comm-section-title">Snapshot rows</div>
-    <div class="comm-lock-list">${rows.slice(0,12).map(r=>{
-      const bd = r.breakdown || {};
-      const isKam = r.beneficiary_role === 'kam';
-      const name = _commEscapeHtml(bd.kam_name || bd.team_lead_name || r.beneficiary_email);
-      let sub = `NRR ${_commFmtPct(r.governed_nrr_pct)}`;
-      if (isKam && bd.nrr_payout !== undefined) {
-        const parts = [`NRR ${_commFmtPayout(bd.nrr_payout)}`];
-        if (bd.upsell_sku && bd.upsell_sku.total_commission > 0) parts.push(`Upsell ${_commFmtPayout(bd.upsell_sku.total_commission)}`);
-        if (bd.upsell_outlet && bd.upsell_outlet.commission > 0) parts.push(`Outlet ${_commFmtPayout(bd.upsell_outlet.commission)}`);
-        if (bd.handover && bd.handover.payout > 0) parts.push(`HO ${_commFmtPayout(bd.handover.payout)}`);
-        if (bd.gmv_gate && bd.gmv_gate.gate_active) parts.push(`Gate×${bd.gmv_gate.cap}`);
-        sub = parts.join(' · ');
-      } else if (!isKam && bd.upsell_mult) {
-        sub = `NRR ${_commFmtPayout(bd.nrr_payout||0)} × ${bd.upsell_mult.multiplier||1}× (Upsell ${bd.upsell_mult.team_upsell_pct||0}%)`;
-      }
-      return `<div class="comm-lock-row">
-        <div class="comm-role-dot ${r.beneficiary_role}">${r.beneficiary_role.toUpperCase()}</div>
-        <div><div class="comm-person-name">${name}</div><div class="comm-person-sub">${sub}</div></div>
-        <div class="comm-row-money ${Number(r.payout_amount||0)>0?'hit':''}">${_commFmtPayout(r.payout_amount)}</div>
-      </div>`;
-    }).join('')}</div>
     </div>
-    ${rows.length===0?'<div class="comm-empty" style="padding:16px;text-align:center">ยังไม่มี snapshot rows · กด Compute เพื่อสร้าง</div>':''}
+    ${rows.length===0?`<div class="comm-empty" style="padding:16px;text-align:center">ยังไม่มีข้อมูลของ ${periodLabel} · กด Compute เพื่อสร้าง</div>`:''}
   `;
+}
+
+// v_period: one renderer for "what makes up this payout", used by every KAM row
+// in the team cards. Shows the gate as its own multiply step rather than
+// folding it into the components, so the parts always reconcile with the total
+// printed beside them — they did not before, because the parts were pre-gate
+// and pre-rounding while the total was post-both.
+function _commPayoutPartsHtml(bd) {
+  bd = bd || {};
+  if (bd.nrr_payout === undefined) return '';
+  const parts = [];
+  const add = (label, v) => { if (Number(v) > 0) parts.push(label + ' ' + _commFmtPayout(v)); };
+  parts.push('NRR ' + _commFmtPayout(bd.nrr_payout || 0));
+  add('Upsell', bd.upsell_sku && bd.upsell_sku.total_commission);
+  add('Outlet', bd.upsell_outlet && bd.upsell_outlet.commission);
+  add('HO',     bd.handover && bd.handover.payout);
+  let html = _commEscapeHtml(parts.join(' · '));
+  // cap_multiplier is the real field name — the old code read `.cap`, which
+  // does not exist, and rendered the literal text "Gate×undefined"
+  if (bd.gmv_gate && bd.gmv_gate.gate_active) {
+    html += ' <span class="comm-parts-gate">× Gate ' + Number(bd.gmv_gate.cap_multiplier ?? 1) + '</span>';
+  }
+  return html;
 }
 
 // v879 (Commission Setup redesign, phase 4): generic save for the 5

@@ -960,8 +960,11 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
         gmvTierLabel = matched.label || null;
         const thresholds = (matched.thresholds || []).slice()
           .sort((a, b) => Number(b.min_retention_pct || 0) - Number(a.min_retention_pct || 0));
+        // v_round: retention% is a percent boundary too — same 1dp rule as the
+        // NRR tiers, so the system has one standard rather than two
+        const _retCmp = _commTierPct(retentionPct);
         for (let i = 0; i < thresholds.length; i++) {
-          if (retentionPct >= Number(thresholds[i].min_retention_pct || 0)) {
+          if (_retCmp >= Number(thresholds[i].min_retention_pct || 0)) {
             payout = Number(thresholds[i].payout || 0);
             tier = thresholds.length - i; // highest threshold cleared = highest tier number
             break;
@@ -975,8 +978,9 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       const t3Pct   = _commGetConfig('handover', 'tier3_pct',    120);
       const t2Pay   = _commGetConfig('handover', 'tier2_payout', 2500);
       const t3Bonus = _commGetConfig('handover', 'tier3_bonus',  2500);
-      if (retentionPct >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
-      else if (retentionPct >= t2Pct) { tier = 2; payout = t2Pay; }
+      const _retCmp = _commTierPct(retentionPct);   // v_round: same 1dp rule
+      if (_retCmp >= t3Pct)      { tier = 3; payout = t2Pay + t3Bonus; }
+      else if (_retCmp >= t2Pct) { tier = 2; payout = t2Pay; }
     }
 
     return {
@@ -1012,6 +1016,10 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
     }
 
     let cap = 1.0;
+    // v_round: the gate is a percent boundary like any tier — compare on the
+    // 1dp-rounded value so 97.96% is not capped while the screen reads "98.0%".
+    // (The tier-matched branch rounds inside _commMatchTierInRule.)
+    const gatePct = _commTierPct(nrrPct);
     const tierMatch = planCode ? _commMatchComponentTier(planCode, 'portfolio_gate', null, nrrPct, previewResolver) : null;
     if (tierMatch) {
       cap = Number(tierMatch.payout_value ?? 1.0);
@@ -1020,11 +1028,13 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
       const t2 = _commGetConfig('gmv_gate', 'threshold_2', 95); // v835-fix: default was 90, live Supabase = 95
       const c1 = _commGetConfig('gmv_gate', 'cap_1', 0.3);      // v835-fix: default was 0.70, live Supabase = 0.3
       const c2 = _commGetConfig('gmv_gate', 'cap_2', 0);        // v835-fix: default was 0.35, live Supabase = 0
-      if (nrrPct < t2)      cap = c2;
-      else if (nrrPct < t1) cap = c1;
+      if (gatePct < t2)      cap = c2;
+      else if (gatePct < t1) cap = c1;
     }
 
     return {
+      // ach_pct stays UNROUNDED — it is the audit trail of what was actually
+      // measured. Only the comparison above uses the rounded value.
       ach_pct: nrrPct,
       cap_multiplier: cap,
       gate_active: cap < 1.0
@@ -2511,6 +2521,9 @@ function _commRulesForRole(role, opts) {
 }
 function _commMatchTierByCode(planCode, role, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
+  // v_round: every caller of this passes a %NRR — round to 1dp first so the
+  // tier we pick agrees with the % the UI shows. See _commTierPct.
+  pct = _commTierPct(pct);
   const effectiveCode = _commActivePlanCode(planCode || _commPlanCode(role), role);
   const d = _commGetDraftByCode(effectiveCode, role);
   const tiers = (d.tiers || []).slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
@@ -2539,6 +2552,13 @@ function _commPayoutForPctByCode(planCode, role, pct) {
 function _commMatchTierInRule(found, pct) {
   if (pct === null || pct === undefined || isNaN(pct)) return null;
   if (!found || !found.active || !found.tiers.length) return null;
+  // v_round: same 1dp rounding as _commMatchTierByCode — but this matcher is
+  // generic, so guard the scope first. Today both callers (portfolio_gate,
+  // tl_upsell_mult) pass percentages, but the plan also carries `gmv_raw`
+  // tiers measured in baht (P1's ฿5,000 gate). Rounding those would let
+  // ฿4,999.96 read as ฿5,000.0 and open a gate that should stay shut.
+  const _scope = String((found.rule && found.rule.measurement_scope) || '');
+  if (!/gmv/.test(_scope)) pct = _commTierPct(pct);
   const tiers = found.tiers.slice().sort((a,b)=>(Number(a.min_value ?? -999999))-(Number(b.min_value ?? -999999)));
   for (const t of tiers) {
     const minOk = (t.min_value === null || t.min_value === '' || pct >= Number(t.min_value));
@@ -2556,13 +2576,35 @@ function _commFmtPayout(n) {
   return '฿' + Math.round(n).toLocaleString('en-US');
 }
 // v92: shared %NRR/retention% display formatter (mirrors /nrr's nrrFmtPct()).
-// Always 1 decimal — the underlying pct value itself is now UNROUNDED
-// through tier/gate decisions (see _nrrGovernedPct), so this is purely a
-// display concern, never a computation one.
+// Always 1 decimal — pairs with _commTierPct below, which rounds to the SAME
+// 1 decimal before any tier/gate comparison. That pairing is deliberate: what
+// this prints is what the payout rules see.
 function _commFmtPct(v) {
   return (v !== null && v !== undefined && !isNaN(v)) ? Number(v).toFixed(1) + '%' : '—';
 }
 window._commFmtPct = _commFmtPct;
+
+// v_round: round a PERCENT to 1 decimal before comparing it against a tier or
+// gate boundary. Bush's rule, decided 2026-08-02.
+//
+// Why this exists: a KAM sat at 99.9745% NRR. _commFmtPct printed "100.0%",
+// the ≥100 tier saw 99.9745 and paid ฿0, and the screen ended up asserting
+// "100.0% · Below threshold" next to ฿0 — indistinguishable from a bug.
+// Rounding here at the same 1 decimal the UI prints makes that state
+// unreachable by construction: you get what you see.
+//
+// 1 decimal specifically — 2 decimals would leave 99.9745 → 99.97, still short,
+// so it would not have fixed the case that prompted this.
+//
+// Applies to every percent boundary (NRR tiers, GMV gate, TL multiplier,
+// handover retention) so one rule covers the whole system.
+// NEVER pass baht through this — ฿4,999.96 must not become ฿5,000.0 and slip
+// past the P1 GMV gate. See the scope guard in _commMatchTierInRule.
+function _commTierPct(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return pct;
+  return Math.round(Number(pct) * 10) / 10;
+}
+window._commTierPct = _commTierPct;
 
 function _commEscapeHtml(v) {
   return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
