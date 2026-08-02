@@ -1091,6 +1091,11 @@ function handleFileUpload(type,input){
         // v4: 7-col format (new_gmv + comeback_gmv removed — not used by commission engine)
         const byKam={};
         const baselineGroups={};
+        // v_augfix: which months this file actually contains — the file's own
+        // evidence, not a guess from the clock. The commission engine compares a
+        // requested period against this and refuses rather than silently paying
+        // out a different month (root cause of the bad 2026-08 draft).
+        const monthLabels=new Set();
         const groupCategory={}; // v_catbonus: group_key → category_high_level (1:1), for per-category rate lookup
         const _now=new Date();const _lagU=new Date(_now);_lagU.setDate(_lagU.getDate()-1); // day-1 lag anchor
         const _thMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -1157,6 +1162,7 @@ function handleFileUpload(type,input){
           if(!byKam[kamEmail][accountId][outletId])byKam[kamEmail][accountId][outletId]={};
           if(!byKam[kamEmail][accountId][outletId][groupKey])byKam[kamEmail][accountId][outletId][groupKey]={};
           byKam[kamEmail][accountId][outletId][groupKey][monthLabel]={existingGmv,totalGmv};
+          monthLabels.add(monthLabel); // v_augfix
           // v233-fix: only months within 3-month window qualify as P1 baseline
           // v854-fix: the !==_currLabel guard exists to stop rolling mode's "current
           // month" from counting as its own baseline. In quarterly mode _p1BaselineLabels
@@ -1173,7 +1179,7 @@ function handleFileUpload(type,input){
           }
           rowCount++;
         });
-        bulkUpsellData={byKam,baselineGroups,groupCategory,loaded:true,baselineLabel:_baselineLabel};
+        bulkUpsellData={byKam,baselineGroups,groupCategory,monthLabels,loaded:true,baselineLabel:_baselineLabel};
         const kamCount=Object.keys(byKam).length;
         const b=document.getElementById('badge-bulk-upsell-kam');
         if(b){b.textContent='✓ '+kamCount+' KAMs / '+rowCount+' rows';b.className='dp-slot-badge ok';}

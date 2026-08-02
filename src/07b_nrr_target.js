@@ -19,7 +19,17 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   // v_stab1: portviewBulkData can be briefly empty during token refresh.
   // If allAccounts is empty but we have a kamEmail and history data, build a minimal account list
   // from bulkHistoryData keys so NRR+Expansion+Comeback still compute correctly.
-  if (!allAccounts.length && kamEmail && typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
+  // v_augfix: this fallback hands EVERY account in the org to whoever asked, so
+  // it may only fire for the transient case it was written for — portviewBulkData
+  // briefly empty during a token refresh. When portviewBulkData IS populated and
+  // simply contains no rows for this person, they genuinely own nothing, and
+  // pretending otherwise credits them the whole company's GMV. That is exactly
+  // what happened in July: 24 sales/admin/sales_tl rows each earned ฿8,954 off
+  // the same org-wide ฿1,790,879 expansion pool. Own nothing → get nothing.
+  const _pvLoaded = typeof portviewBulkData !== 'undefined' &&
+                    Array.isArray(portviewBulkData) && portviewBulkData.length > 0;
+  if (!allAccounts.length && !_pvLoaded && kamEmail &&
+      typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _fallbackIds = Object.keys(bulkHistoryData).filter(id => {
       const rows = bulkHistoryData[id];
       return rows && rows.length > 0;

@@ -286,6 +286,79 @@ function _commElapsedQuarterLabels(baseMonthOverride) {
   return out;
 }
 
+// v_augfix: period ('2026-08') → Thai month label ('ส.ค. 2569'). The exact
+// inverse of the parse in _commBaseMonthLabels, and the ONLY clock-free way to
+// name the month a caller actually asked for. Returns null (never a guessed
+// "today") for anything unparseable so callers must handle the miss explicitly.
+function _commPeriodToLabel(period) {
+  if (!period || typeof period !== 'string') return null;
+  var m = /^(\d{4})-(\d{2})$/.exec(period.trim());
+  if (!m) return null;
+  var yr = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+  if (!yr || mo < 1 || mo > 12) return null;
+  return _TH_MONTHS[mo - 1] + ' ' + (yr + 543);
+}
+
+// v_augfix: THE month whose GMV becomes a payout. Before this existed the month
+// was always re-derived from the real clock (_commLagDate), so asking for any
+// period returned whatever month "today" happened to point at — on 2026-08-01
+// that produced a 2026-08 snapshot filled with July's ฿4.7M of upsell.
+//
+// periodOverride wins when given; otherwise this reproduces the previous
+// behaviour byte-for-byte (quarterly → last elapsed quarter month, monthly →
+// current lag-1 month) because ~10 display call sites pass no period at all and
+// legitimately mean "today".
+function _commUpsellEvalLabel(periodOverride, baseMonthOverride) {
+  var pinned = _commPeriodToLabel(periodOverride);
+  if (pinned) return pinned;
+  if (baseMonthOverride) {
+    var elapsed = _commElapsedQuarterLabels(baseMonthOverride);
+    // Empty = standing on the quarter's own day 1, before any of its months has
+    // elapsed. Must stay undefined so no month is evaluated: falling back to
+    // _commCurrentMonthLabel() here would read the BASE month (the frozen
+    // comparison baseline) as if it were quarter earnings.
+    return elapsed.length ? elapsed[elapsed.length - 1] : undefined;
+  }
+  return _commCurrentMonthLabel();
+}
+
+// v_augfix: which month does the currently-loaded sense_upsell_team.csv describe?
+// The file carries no month column, so this is inferred from the exporter's own
+// rule: q3c_upsell_team_summary_v4.sql anchors on DATE_TRUNC(CURRENT_DATE-1 day),
+// i.e. exactly _commLagDate(). Inference, not proof — if the data team's export
+// is a day late the two drift apart, which is why `report_month` is being added
+// to the CSV as a 6th column. Until then this is the strongest check available,
+// and it already catches the real failure: on 2026-08-01 the file said July while
+// the caller asked for August.
+function _commUpsellTeamCsvPeriod() {
+  const n = _commLagDate();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// v_augfix: may the month-less team CSV answer for this requested period? Yes
+// when no period is pinned (means "today" — the file's own month by definition),
+// or when the pinned period IS the month the file describes.
+function _commTeamCsvCoversPeriod(periodOverride) {
+  if (!periodOverride) return true;
+  return periodOverride === _commUpsellTeamCsvPeriod();
+}
+
+// v_augfix: has this period's month actually finished? A month still in flight
+// has no complete data by definition, so writing a payout snapshot for it can
+// only ever record a partial figure that looks final.
+//
+// Deliberately the REAL date, not _commLagDate(): "has August ended" is a
+// calendar fact (true from Sep 1), separate from "which month does today's CSV
+// describe" (the lag-1 question). Using the lag here would push the boundary to
+// Sep 2 and break the day-1 auto-compute that closes the previous month.
+function _commPeriodIsClosed(period) {
+  if (!_commPeriodToLabel(period)) return false;
+  var parts = period.split('-');
+  // First day of the month AFTER the requested one.
+  var nextMonthStart = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10), 1);
+  return new Date() >= nextMonthStart;
+}
+
 // ── Upsell SKU Engine ───────────────────────────────────────────
 // Returns { p1, p3, total_comm, total_gmv, tl_upsell_base }
 // p1: { gmv, comm, groups:[{group_key,total_gmv,commission}] }
@@ -298,25 +371,53 @@ function _commElapsedQuarterLabels(baseMonthOverride) {
 // sql/q3c_upsell_team_summary_v4.sql (the two must be kept in sync). Monthly/rolling
 // mode (baseMonthOverride null) is UNCHANGED — evalLabels degenerates to exactly
 // [currLabel], i.e. the original single-month behavior.
-function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCode, previewResolver) {
+function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCode, previewResolver, periodOverride) {
   // v244: expansionIds = Set of outlet IDs classified as expansion (from bulkOutletsData)
   // expansion outlets earn 1.5% via _commComputeUpsellOutlet — excluded from P1/P3 here
   // baseMonthOverride (optional): '2026-06' for quarterly Q3 — pins P1/P3 3M lookback window.
   //   null → rolling MoM (existing behavior unchanged)
+  // v_augfix: periodOverride (optional, appended LAST so every existing 3- and
+  //   5-arg call site is untouched) pins WHICH month's GMV is evaluated. Without
+  //   it the month came from the real clock alone, so a snapshot stamped
+  //   '2026-08' could legitimately contain July's numbers. When it is supplied
+  //   and that month isn't in the loaded file, this returns null rather than the
+  //   ฿0 EMPTY object — ฿0 is indistinguishable from "genuinely earned nothing",
+  //   and that ambiguity is precisely what let the bad August draft look normal.
   const _expIds = expansionIds instanceof Set ? expansionIds : new Set();
   const EMPTY = { p1:{gmv:0,comm:0,groups:[]}, p3:{gmv_incremental:0,comm:0,groups:[]},
                   total_comm:0, total_gmv_eligible:0, tl_upsell_base:0 };
   try {
-    if (!bulkUpsellData || !bulkUpsellData.loaded) return EMPTY;
+    if (!bulkUpsellData || !bulkUpsellData.loaded) return periodOverride ? null : EMPTY;
     const byKam = bulkUpsellData.byKam || {};
     const baselineGroups = bulkUpsellData.baselineGroups || {};
+
+    // v_augfix: refuse before doing any arithmetic when the caller pinned a
+    // month the loaded file doesn't actually contain. monthLabels is recorded at
+    // ingest (02_data_pipeline.js) — the file's own contents, not a guess from
+    // the clock. Absent (older cached parse) → skip the check rather than
+    // refuse everything.
+    if (periodOverride) {
+      const _want = _commPeriodToLabel(periodOverride);
+      const _have = bulkUpsellData.monthLabels;
+      if (!_want) return null;
+      if (_have && _have.size && !_have.has(_want)) {
+        console.warn('[CommEngine] upsell: ขอเดือน ' + _want + ' แต่ไฟล์ไม่มีเดือนนี้ — ปฏิเสธการคำนวณ',
+          { kamEmail, มีในไฟล์: Array.from(_have) });
+        return null;
+      }
+    }
 
     // Q3C CSV uses ka_owner (display name) as key, not email.
     // Map: kamEmail → kamName via portviewBulkData for lookup.
     const _pvRow = (portviewBulkData || []).find(r => r.kamEmail === kamEmail);
     const _kamKey = (_pvRow && _pvRow.kamName) ? _pvRow.kamName : kamEmail;
     const kamData = byKam[_kamKey] || byKam[kamEmail] || {};
-    if (Object.keys(kamData).length === 0) return EMPTY;
+    // v_augfix: bulkUpsellData.loaded is a GLOBAL flag — it flips true as soon as
+    // any one KAM's bundle arrives. An empty kamData therefore means "this
+    // person's bundle was never fetched", not "they earned nothing". Safe to
+    // report ฿0 on the live no-period views (unchanged), but a pinned period is
+    // writing a payout record, so refuse instead of banking the ambiguity.
+    if (Object.keys(kamData).length === 0) return periodOverride ? null : EMPTY;
 
     const baselineSet = baselineGroups[_kamKey] || baselineGroups[kamEmail] || {};
 
@@ -327,7 +428,11 @@ function _commComputeUpsellSku(kamEmail, expansionIds, baseMonthOverride, planCo
       : _commBaselineMonthLabel();
     // v836: months to classify+sum — every elapsed quarter month up to "today" when
     // quarterly, else just the single current month (original behavior, unchanged).
-    const evalLabels = baseMonthOverride ? _commElapsedQuarterLabels(baseMonthOverride) : [currLabel];
+    // v_augfix: only the LAST entry is ever read (see :lbl below), and it must be
+    // the month the caller asked for — not whatever month the clock lands on.
+    // _commUpsellEvalLabel returns the old clock-derived answer when no period is
+    // pinned, so the no-period call sites are byte-identical to before.
+    const evalLabels = [_commUpsellEvalLabel(periodOverride, baseMonthOverride)];
     console.log('%c[Sense Upsell] compute','color:#f0b000',
       {kamEmail, kamKey:_kamKey, currLabel, baseLabel, evalLabels, accounts:Object.keys(kamData).length});
 
@@ -1049,7 +1154,9 @@ function _commComputeGmvGate(kamEmail, nrrPct, planCode, previewResolver) {
 // team_upsell_gmv = Σ(P1_gmv + P3_incremental) across all KAMs in team
 // team_upsell_pct = team_upsell_gmv / team_NRR_baseline × 100
 // multiplier determined by tier table from commission_rules
-function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, planCode, previewResolver) {
+// v_augfix: periodOverride appended LAST (every existing 3-/5-arg call site is
+// untouched) — see _commComputeUpsellSku for why the month must be pinned.
+function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, planCode, previewResolver, periodOverride) {
   const EMPTY = { team_upsell_gmv:0, team_baseline_gmv:0, team_upsell_pct:0, multiplier:1.0, tier:1 };
   try {
     // v_adsplit: portview lists portfolio HOLDERS — someone whose real
@@ -1070,8 +1177,17 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, pla
 
     // Fast path: use pre-computed team summary (sense_upsell_team.csv)
     // Avoids loading 15 per-KAM bundles just for the multiplier
-    const hasTeamData = typeof bulkUpsellTeamData !== 'undefined' &&
+    // v_augfix: sense_upsell_team.csv carries NO month column — it only ever holds
+    // the month the exporter last ran for. It may answer when that month IS the one
+    // being asked about, and must not when it isn't: on 2026-08-01 the file held
+    // July while the caller asked for August, which is how ฿4.7M of July upsell
+    // landed in an August row. (Disabling the fast path for ALL pinned periods was
+    // too blunt — most KAMs have no per-KAM bundle loaded, so locking any month
+    // would become impossible.)
+    const hasTeamData = _commTeamCsvCoversPeriod(periodOverride) &&
+                        typeof bulkUpsellTeamData !== 'undefined' &&
                         bulkUpsellTeamData && Object.keys(bulkUpsellTeamData).length > 0;
+    let _refused = false;
 
     kamEmails.forEach(ke => {
       if (hasTeamData && bulkUpsellTeamData[ke]) {
@@ -1081,8 +1197,17 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, pla
         // v854-fix: was missing baseMonthOverride — silently fell back to rolling/
         // monthly logic for this KAM's contribution even in quarterly mode whenever
         // they were absent from that day's team-summary CSV.
-        const upsell = _commComputeUpsellSku(ke, undefined, baseMonthOverride);
-        teamUpsellGmv += upsell.tl_upsell_base;
+        // v_augfix: planCode/previewResolver were also missing, so a KAM taking this
+        // branch had their per-category rates resolved differently from one taking
+        // the main path. Threaded through now along with the period.
+        const upsell = _commComputeUpsellSku(ke, undefined, baseMonthOverride, planCode, previewResolver, periodOverride);
+        // null = the engine refused (wrong month / bundle absent). Skipping the
+        // member silently would shrink the numerator while the baseline below
+        // still counts them, quietly under-paying the whole team.
+        if (upsell === null) _refused = true;
+        else teamUpsellGmv += upsell.tl_upsell_base;
+      } else if (periodOverride) {
+        _refused = true;
       }
       // v828: quarterly mode sums each KAM's fixed-base GMV from QNRR, not MoM rolling base
       const raw = isQuarterly && typeof window._qnrrComputeForCommission === 'function'
@@ -1090,6 +1215,13 @@ function _commComputeTeamUpsellMult(tlEmail, isQuarterly, baseMonthOverride, pla
         : _tgtComputeKamNRR(ke, null);
       teamBaselineGmv += raw ? (raw.baselinePrevGmv || 0) : 0;
     });
+
+    // v_augfix: a partially-computed team total would silently land the TL in the
+    // wrong multiplier tier — a ฿25,000 swing at the 4% boundary. Refuse instead.
+    if (_refused) {
+      console.warn('[CommEngine] TL upsell: คำนวณเดือน ' + periodOverride + ' ไม่ครบทุกคนในทีม — ปฏิเสธ', { tlEmail });
+      return null;
+    }
 
     const upsellPct = teamBaselineGmv > 0 ? (teamUpsellGmv / teamBaselineGmv * 100) : 0;
 
@@ -1201,7 +1333,11 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
     const _teamRow = typeof bulkUpsellTeamData !== 'undefined' && bulkUpsellTeamData &&
       (bulkUpsellTeamData[kamEmail] || bulkUpsellTeamData[_kamDisplayName] || null);
     const upsellLoading = !_bundleLoaded && !_teamRow; // v228-fix: flag when upsell data unavailable
-    if (!_bundleLoaded && _teamRow) {
+    // v_augfix: the team CSV has no month column, so it may only serve a pinned
+    // period when that period is the month the file actually describes. Letting it
+    // answer for any month is how July's numbers were written into the August
+    // snapshot. (See _commTeamCsvCoversPeriod.)
+    if (!_bundleLoaded && _teamRow && _commTeamCsvCoversPeriod(periodOverride)) {
       // Fast path: use pre-computed totals from team summary (sense_upsell_team.csv)
       // v230fix2: return full p1/p3 sub-objects matching _commComputeUpsellSku structure
       // so _commBuildSnapshotRows can safely access .p1.gmv / .p3.gmv_incremental
@@ -1258,7 +1394,18 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
     } else {
       upsellOutlet = _commComputeUpsellOutlet(kamEmail, isQ ? raw : null, periodOverride, planCode, previewResolver);
       // [quarterly] pass baseMonthOverride to pin P1/P3 3M window; [monthly] null = rolling
-      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo, planCode, previewResolver);
+      // v_augfix: periodOverride was already reaching _commComputeUpsellOutlet on the
+      // line above but never this call — the pipe existed, it just wasn't connected.
+      upsellSku    = _commComputeUpsellSku(kamEmail, upsellOutlet._expansionIds, baseMo, planCode, previewResolver, periodOverride);
+    }
+    // v_augfix: refusal propagates as a flag the snapshot builder checks. Returning
+    // ฿0 here instead would write a real-looking payout row for a month we could
+    // not actually compute.
+    if (upsellSku === null) {
+      return { period, kamEmail, upsell_unavailable: true,
+               nrr_payout: 0, upsell_sku: { total_comm: 0 }, upsell_outlet: { commission: 0 },
+               handover: { payout: 0 }, gate: { cap_multiplier: 1, gate_active: false },
+               subtotal: 0, gate_cap: 1, final_payout: 0 };
     }
     const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver); // MoM always — do not touch
     const gate     = _commComputeGmvGate(kamEmail, pct, planCode, previewResolver);
@@ -1319,7 +1466,13 @@ function _commBuildTlPayout(tlEmail, periodOverride, previewResolver) {
     const planCode    = _commGetAssignmentPlan(period, 'tl', tlEmail, 'tl');
     const nrrPayout   = _commPayoutForPctByCode(planCode, 'tl', pct);
 
-    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ, baseMo, planCode, previewResolver);
+    // v_augfix: pin the month (see _commComputeUpsellSku). null = refused.
+    const upsellMult = _commComputeTeamUpsellMult(tlEmail, isQ, baseMo, planCode, previewResolver, periodOverride);
+    if (upsellMult === null) {
+      return { period, tlEmail, upsell_unavailable: true,
+               nrr_pct: pct, nrr_payout: 0,
+               upsell_mult: { multiplier: 1.0, tier: 1 }, final_payout: 0 };
+    }
     const finalPayout = Math.round(nrrPayout * upsellMult.multiplier);
 
     return { period, tlEmail, nrr_pct: pct, nrr_payout: nrrPayout,
@@ -1332,6 +1485,11 @@ function _commBuildTlPayout(tlEmail, periodOverride, previewResolver) {
 
 // Expose to window
 window._commGetConfig = _commGetConfig;
+// v_augfix: exposed so the Cockpit can grey out Compute for an unfinished month
+// and explain why, instead of letting the click fail silently.
+window._commPeriodIsClosed = _commPeriodIsClosed;
+window._commPeriodToLabel = _commPeriodToLabel;
+window._commUpsellTeamCsvPeriod = _commUpsellTeamCsvPeriod;
 window._commComputeUpsellSku = _commComputeUpsellSku;
 window._commComputeUpsellOutlet = _commComputeUpsellOutlet;
 window._commComputeHandoverRetention = _commComputeHandoverRetention;
@@ -2770,8 +2928,14 @@ function _commBuildPreviewModel() {
 }
 
 // SECTION:NRR_EXCLUSIONS
+// v_augfix: was a bare `new Date()` with NO lag while every data path uses
+// _commLagDate() (today − 1 day). On the 1st of any month the two disagreed:
+// this returned the NEW month while the CSVs still held the OLD one, so a
+// snapshot got stamped '2026-08' around data that was entirely July's. That one
+// mismatch is the mechanism behind the bad August draft. Both clocks now read
+// from the same anchor, and "today" means the same month everywhere.
 function _nrrExclusionCurrentPeriod() {
-  const now = new Date();
+  const now = _commLagDate();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 function _nrrExclusionRowKey(r) {
@@ -2878,6 +3042,11 @@ function _commBuildSnapshotRows(periodOverride) {
   const actor = (currentUserProfile && currentUserProfile.email) || '';
   const role = (currentUserProfile && currentUserProfile.role) || '';
   const rows = [];
+  // v_augfix: any person the engine refused to compute (wrong month / data not
+  // loaded). A payroll table that is silently missing people, or that quietly
+  // records ฿0 for them, is worse than no table — so one refusal voids the whole
+  // write (see the return check at the end of this function).
+  const _refused = [];
   const allGroups = (typeof _buildKamGroups === 'function') ? (_buildKamGroups() || []) : [];
   const visibleTlEmail = role === 'admin'
     ? null
@@ -2887,6 +3056,7 @@ function _commBuildSnapshotRows(periodOverride) {
   tls.filter(t => t.email).forEach(tl => {
     // v826: thread periodOverride so retroactive/auto-compute freezes the correct historical month
     const tlPayout = _commBuildTlPayout(tl.email, periodOverride);
+    if (tlPayout && tlPayout.upsell_unavailable) { _refused.push('tl:' + tl.email); return; } // v_augfix
     // v878 (phase 7): resolve+freeze which scheme actually produced this
     // payout — populates the previously-dead assigned_plan_id FK and gives
     // TL rows a config_snapshot for the first time (previously none at all).
@@ -2938,6 +3108,7 @@ function _commBuildSnapshotRows(periodOverride) {
     if (_otherRoleEmails.has(g.kamEmail.toLowerCase())) return;
     const tlEmail = (g.accounts && g.accounts[0] && g.accounts[0].tlEmail) || null;
     const kamPayout = _commBuildKamPayout(g.kamEmail, periodOverride);
+    if (kamPayout && kamPayout.upsell_unavailable) { _refused.push('kam:' + g.kamEmail); return; } // v_augfix
     // v878 (phase 7): resolve+freeze which scheme actually produced this
     // payout — populates the previously-dead assigned_plan_id FK.
     const kamPlanCode = _commGetAssignmentPlan(period, 'kam', g.kamEmail, 'kam');
@@ -3061,9 +3232,18 @@ function _commBuildSnapshotRows(periodOverride) {
     ? _commOtherRoleRoster
     : _commOtherRoleRoster.filter(p => p.email === actor);
   otherRoster.forEach(person => {
-    const personPayout = _commBuildKamPayout(person.email, periodOverride, person.role);
     const personPlanCode = _commGetAssignmentPlan(period, person.role, person.email, person.role);
     const personPlanRowId = ((_commRuleConfig && _commRuleConfig.plans) || {})[personPlanCode]?.id || null;
+    // v_augfix: no real scheme row for this person's role = the business has not
+    // decided what they earn yet, so they get no snapshot row at all. Phase 9
+    // switched these roles on before their rates existed, and they fell through
+    // to a default 0.5% Expansion — which, combined with the org-wide GMV leak
+    // fixed in _tgtComputeKamNRR, paid 24 sales/admin/sales_tl people an
+    // identical ฿8,954 each in July off the same company-wide pool.
+    // Configure the role in the Cockpit and the row appears on its own.
+    if (!personPlanRowId) return;
+    const personPayout = _commBuildKamPayout(person.email, periodOverride, person.role);
+    if (personPayout && personPayout.upsell_unavailable) { _refused.push(person.role + ':' + person.email); return; }
     rows.push({
       period_month: period,
       beneficiary_role: person.role,
@@ -3116,6 +3296,15 @@ function _commBuildSnapshotRows(periodOverride) {
     });
   });
 
+  // v_augfix: one refusal voids the whole write. Writing the people we COULD
+  // compute would produce a payroll table that looks complete but silently omits
+  // others — the caller (computeCommissionDraft) already surfaces [] as
+  // "ไม่มีข้อมูลสำหรับ compute" and leaves any existing rows untouched.
+  if (_refused.length) {
+    console.warn('[CommEngine] ปฏิเสธการสร้าง snapshot ของ ' + period +
+      ' — คำนวณ ' + _refused.length + ' คนไม่ได้ (ข้อมูลไม่ใช่เดือนนี้ หรือยังโหลดไม่เสร็จ)', _refused);
+    return [];
+  }
   return rows;
 }
 
@@ -3584,6 +3773,19 @@ window._commIsComputeInFlight = function () { return _commComputeInFlight; };
 
 async function computeCommissionDraft(periodOverride) {
   const period = periodOverride || _nrrExclusionCurrentPeriod();
+  // v_augfix: a month still in progress has no complete data, so a snapshot of it
+  // can only ever be a partial figure wearing a final-looking label. That is what
+  // the 2026-08 draft was: written at 00:27 on Aug 1 with July's numbers inside.
+  // Only closed months get snapshot rows; the in-flight month is viewed live in
+  // /nrr instead. Guard placed before the in-flight lock so a rejected call never
+  // takes it.
+  if (!_commPeriodIsClosed(period)) {
+    console.warn('[CommDraft] ' + period + ' ยังไม่จบเดือน — ไม่เขียน snapshot');
+    if (typeof showToast === 'function') {
+      showToast('เดือน ' + period + ' ยังไม่จบ — ค่าคอมฯ จะคำนวณให้เมื่อสิ้นเดือน ระหว่างนี้ดูยอดสดได้ที่หน้า NRR', '!');
+    }
+    return false;
+  }
   // v_clock: กัน compute ซ้อน — ยอมให้คนละเดือนทำพร้อมกันได้ แต่เดือนเดียวกันห้าม
   if (_commComputeInFlight === period) {
     console.warn('[CommDraft] compute ' + period + ' กำลังทำอยู่แล้ว — ข้ามรอบนี้');

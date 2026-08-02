@@ -140,7 +140,17 @@ function buildFixture(ctx) {
 
   // upsell bundle ต่อ KAM — grain กลุ่มสินค้า × สาขา × เดือน
   const upRow = (existing, total) => ({ existingGmv: existing, totalGmv: total });
+  //
+  // v_augfix (2026-08-02): `loaded: true` หายไปตั้งแต่ต้น — เอนจิ้นเช็ค
+  // `if (!bulkUpsellData.loaded) return EMPTY` เป็นบรรทัดแรก ข้อมูลข้างล่างนี้
+  // จึงไม่เคยถูกใช้เลย golden ที่ตรึงไว้ก่อนหน้านี้มี upsell = ฿0 ทุกแถว
+  // แปลว่า "ตัวตรึง" ตัวนี้ไม่เคยคุ้มครองเส้นทาง upsell เลยสักครั้ง
+  //
+  // ก่อนอัปเดต golden ใหม่ ได้พิสูจน์แล้วว่าโค้ดที่ HEAD (504e52d) กับโค้ดหลังแก้
+  // ให้ผลลัพธ์ **เหมือนกันทุก byte** บน fixture ที่แก้แล้วนี้ → ส่วนต่างของ golden
+  // มาจากการซ่อม fixture ล้วนๆ ไม่ใช่พฤติกรรมเอนจิ้นเปลี่ยน
   setGlobal(ctx, 'bulkUpsellData', {
+    loaded: true,
     byKam: {
       [KAMS[0].email]: { A1: { O1: {
         'เนื้อวัว': { 'ก.ค. 2569': upRow(200000, 200000), 'มิ.ย. 2569': upRow(0, 80000) },

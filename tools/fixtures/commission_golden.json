@@ -6,7 +6,7 @@
     "breakdown": {
       "account_count": 0,
       "baseline_month": "",
-      "components_subtotal": 10400,
+      "components_subtotal": 13000,
       "config_snapshot": {
         "assigned_plan_code": "KAM_NRR_STD",
         "assigned_plan_id": "r-kam",
@@ -35,7 +35,7 @@
           "outletName": "ร้านทดสอบ"
         }
       ],
-      "final_payout": 10400,
+      "final_payout": 13000,
       "gmv_gate": {
         "ach_pct": 217,
         "cap_multiplier": 1,
@@ -94,22 +94,41 @@
       },
       "upsell_sku": {
         "p1": {
-          "comm": 0,
-          "gmv": 0,
-          "groups": []
+          "comm": 2600,
+          "gmv": 260000,
+          "groups": [
+            {
+              "accountId": "A1",
+              "applied_rate": 0.01,
+              "category": null,
+              "commission": 2000,
+              "groupKey": "เนื้อวัว",
+              "outletId": "O1",
+              "total_gmv": 200000
+            },
+            {
+              "accountId": "A1",
+              "applied_rate": 0.01,
+              "category": null,
+              "commission": 600,
+              "groupKey": "ผักสด",
+              "outletId": "O1",
+              "total_gmv": 60000
+            }
+          ]
         },
         "p3": {
           "comm": 0,
           "gmv_incremental": 0,
           "groups": []
         },
-        "total_commission": 0
+        "total_commission": 2600
       },
       "version": 1
     },
     "created_by": "admin@f.co",
     "governed_nrr_pct": 217,
-    "payout_amount": 10400,
+    "payout_amount": 13000,
     "period_month": "2026-07",
     "raw_nrr_pct": 217,
     "snapshot_status": "final",
@@ -122,7 +141,7 @@
     "breakdown": {
       "account_count": 0,
       "baseline_month": "",
-      "components_subtotal": 5000,
+      "components_subtotal": 5300,
       "config_snapshot": {
         "assigned_plan_code": "KAM_NRR_STD",
         "assigned_plan_id": "r-kam",
@@ -145,7 +164,7 @@
       "csv_data_as_of": "2026-07-15T03:00:00.000Z",
       "excluded_base_gmv": 0,
       "expansion_detail": [],
-      "final_payout": 1500,
+      "final_payout": 1590,
       "gmv_gate": {
         "ach_pct": 190.133333,
         "cap_multiplier": 0.3,
@@ -192,22 +211,32 @@
       },
       "upsell_sku": {
         "p1": {
-          "comm": 0,
-          "gmv": 0,
-          "groups": []
+          "comm": 300,
+          "gmv": 30000,
+          "groups": [
+            {
+              "accountId": "B1",
+              "applied_rate": 0.01,
+              "category": null,
+              "commission": 300,
+              "groupKey": "อาหารทะเล",
+              "outletId": "O3",
+              "total_gmv": 30000
+            }
+          ]
         },
         "p3": {
           "comm": 0,
           "gmv_incremental": 0,
           "groups": []
         },
-        "total_commission": 0
+        "total_commission": 300
       },
       "version": 1
     },
     "created_by": "admin@f.co",
     "governed_nrr_pct": 190.133333,
-    "payout_amount": 1500,
+    "payout_amount": 1590,
     "period_month": "2026-07",
     "raw_nrr_pct": 190.133333,
     "snapshot_status": "final",
@@ -223,15 +252,15 @@
         "assigned_plan_id": "r-tl",
         "tl_upsell_mult_tier": {
           "kam_count": 2,
-          "multiplier": 1,
+          "multiplier": 1.8,
           "team_baseline_gmv": 1451613,
-          "team_upsell_gmv": 0,
-          "team_upsell_pct": 0,
-          "tier": 1
+          "team_upsell_gmv": 290000,
+          "team_upsell_pct": 19.98,
+          "tier": 5
         }
       },
       "excluded_base_gmv": 0,
-      "final_payout": 20000,
+      "final_payout": 36000,
       "nrr_payout": 20000,
       "nrr_pct": 208.044444,
       "period": "2026-07",
@@ -240,17 +269,17 @@
       "type": "tl_full",
       "upsell_mult": {
         "kam_count": 2,
-        "multiplier": 1,
+        "multiplier": 1.8,
         "team_baseline_gmv": 1451613,
-        "team_upsell_gmv": 0,
-        "team_upsell_pct": 0,
-        "tier": 1
+        "team_upsell_gmv": 290000,
+        "team_upsell_pct": 19.98,
+        "tier": 5
       },
       "version": 1
     },
     "created_by": "admin@f.co",
     "governed_nrr_pct": 208.044444,
-    "payout_amount": 20000,
+    "payout_amount": 36000,
     "period_month": "2026-07",
     "raw_nrr_pct": 208.044444,
     "snapshot_status": "final",
