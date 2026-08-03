@@ -1079,6 +1079,21 @@
 .nrr-comm-ds .nrr-gap-far  { color: var(--ink3); }
 .nrr-comm-ds table.nrr-comm-fulltable tr.nrr-comm-total-row td { border-top: 1.5px solid var(--ink); border-bottom: none; font-weight: 700; }
 .nrr-comm-ds .nrr-comm-cell-meta { font-size: 11px; font-weight: 400; font-family: var(--font-ui); color: var(--ink3); margin-top: 1px; }
+/* v_gp: เลนส์ GMV↔GP ของตาราง BREAKDOWN
+   เจตนาไม่ใช้ ramp สีสถานะ (nrrThresholdColorVar / --comm-*) กับ %GP เลย
+   สีชุดนั้นในแอปนี้แปลว่า "ผ่าน/ไม่ผ่านเกณฑ์" ถ้าใส่ตอนนี้ทีมจะอ่านว่า GP
+   ถูกวัดแล้ว ซึ่งยังไม่ใช่ (จะเริ่มวัดจริง Jan 2027) */
+.nrr-comm-ds .nrr-gp-lens { margin: 0 0 10px; }
+/* GP ติดลบ = ขายแล้วขาดทุน เป็นข้อเท็จจริงที่ต้องอ่านออกทันที ไม่ใช่ "ไม่ผ่านเกณฑ์"
+   ใช้ --coral ซึ่งโทเคนระบุบทบาทไว้ตรงตัวว่า "negative values only"
+   (ไม่ใช่ --sun/--attention ที่สงวนไว้สำหรับสถานะเตือนเกณฑ์) */
+.nrr-comm-ds td.nrr-gp-neg { color: var(--coral); font-weight: 700; }
+/* ยังไม่มีข้อมูล/ข้อมูลไม่พอ — จางลงเพื่อไม่ให้อ่านเป็นตัวเลขจริง */
+.nrr-comm-ds td.nrr-gp-nodata { color: var(--ink3); font-weight: 400; font-family: var(--font-ui); font-size: 12px; }
+/* v_gp: แท็บกำไร (#/margin) — สลับ entity ของควอดรันต์ */
+.nrr-comm-ds .nrr-gp-entity { margin: 0 0 12px; }
+/* GP รวมติดลบที่ hero — ใช้ --coral ตามบทบาท "negative values only" เหมือนในตาราง */
+.nrr-comm-ds .nrr-gp-neg-txt { color: var(--coral); }
 
 /* ── signature #3: money rendering — จำนวนเงินจริงเขียวเข้ม, ศูนย์จาง ── */
 .nrr-comm-ds table.nrr-comm-fulltable td b { font-weight: 700; color: var(--green-deep); }

@@ -1680,6 +1680,7 @@ let collapsedCats=new Set();  // plan builder category collapse state
 let skuFilter='ทั้งหมด';
 let kamSubtab='thismonth'; // 'thismonth' | 'lastmonth'
 let churnExpanded=false;let skuSignalInfoOpen=false;  // expand all SKU signals beyond initial 15
+let kamGpCatOpen=false;  // v_gp: กาง "กำไรมาจากไหน" ออกจากบรรทัด GP รวม (ปิดไว้ก่อน)
 let skuSubstituteMap={};  // {churned_item_id: {substituteName, spendChange, reason}} — เดือนนี้ tab
 let skuSubstituteLoading=false;
 let skuSubstituteDone=false;
@@ -1735,6 +1736,124 @@ let kamStateCache={html:null,insights:null,accountId:null};
 let skuView='gmv'; // 'gmv' | 'price' — SKU list view mode
 let priceMovFilter=null; // 'up'|'stable'|'down'|null
 let heroLockedToCurrent=false; // true when D.current_month is shown in hero (restaurant mode)
+
+// ════════════════════════════════════════
+// GROSS PROFIT (GP) — v_gp
+// ════════════════════════════════════════
+// SECTION:GROSS_PROFIT
+//
+// ผู้คำนวณ %GP รายเดียวของ Sense — ทุกจุดที่แสดง GP ต้องเรียกผ่านนี้
+// (แฝดของ nrrGpFor() ใน src/nrr/nrr_logic.js) วันที่ย้าย %NRR ไปวัดที่ฐาน GP
+// จะมีที่แก้ที่เดียว
+//
+// สัญญาที่จุดแสดงผลทุกจุดต้องเชื่อได้:
+//   - ยังไม่มีข้อมูล → คืน null ไม่เคยคืน {gp:0} เพราะเงินที่ขึ้น ฿0 แล้ว
+//     เปลี่ยนเป็นเลขจริงทีหลัง คือบั๊กความเชื่อใจที่รีโปนี้เคยเจอมาแล้ว
+//     (ดูแพตเทิร์นเดียวกันที่ 07b_cds.js:193-204)
+//   - coverage ต่ำกว่าเกณฑ์ → คืน {ready:false} ให้ผู้เรียกแสดงข้อความ
+//     "ข้อมูลกำไรยังไม่พอ" แทนตัวเลขที่ดูมั่นใจแต่ผิด
+//   - GP ติดลบเป็นเรื่องปกติ (สินค้าล่อลูกค้า) ห้ามตัดทิ้งหรือ clamp เป็น 0
+const SENSE_GP_MIN_COVERAGE = 0.70;   // ต่ำกว่านี้ = ไม่พอให้เชื่อ (บุชเคาะได้ แก้ที่นี่ที่เดียว)
+
+// รวม GP จาก array ของแถว SKU (รูปแบบที่ _parseSKULine คืนมา)
+// ใช้ได้ทั้งระดับร้าน (ทั้งเดือน), ระดับหมวด (กรองมาก่อน) และ SKU เดียว ([row])
+function senseGpFromSkuRows(rows){
+  if(!Array.isArray(rows)||!rows.length)return null;
+  let gp=0,gmv=0,gmvWithMargin=0,n=0;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    // ไม่ใช้ ||0 กับ margin แบบหลวมๆ ตรงนี้ เพราะ margin ติดลบต้องบวกเข้าไปตามจริง
+    gp+=(typeof r.margin==='number'?r.margin:0);
+    gmv+=(r.gmv||0);
+    gmvWithMargin+=(r.gmv_with_margin||0);
+    n++;
+  }
+  if(!n||gmv<=0)return null;
+  // coverage วัดจาก "GMV ที่มีค่า margin จริง" หารด้วย GMV ทั้งหมด — ไม่ใช่จำนวนแถว
+  // เพราะ SKU ตัวเล็ก 100 ตัวที่ไม่มี margin สำคัญน้อยกว่า SKU ตัวใหญ่ 1 ตัวที่ไม่มี
+  const coverage=gmvWithMargin/gmv;
+  return{
+    gp:gp,
+    gmv:gmv,                       // ตัวส่วนที่ใช้จริง มาจากไฟล์เดียวกับ GP
+    gpPct:gp/gmv*100,
+    coverage:coverage,
+    ready:coverage>=SENSE_GP_MIN_COVERAGE,
+    hasData:gmvWithMargin>0         // false = CSV ยังไม่มีคอลัมน์ GP เลย
+  };
+}
+
+// GP ระดับร้าน ของเดือนหนึ่ง — monthLabel เป็น key ของ D.skus_monthly ('ก.ค. 2569')
+// คืน null ถ้าไม่มีเดือนนั้น เพื่อให้ผู้เรียก fail-safe ไปที่ "ยังไม่มีข้อมูล"
+function senseGpFor(monthLabel){
+  if(!monthLabel||!D||!D.skus_monthly)return null;
+  const res=senseGpFromSkuRows(D.skus_monthly[monthLabel]);
+  if(!res||!res.hasData)return null;   // ไม่มีคอลัมน์ GP ในไฟล์ = ไม่แสดงอะไรเลย
+  return res;
+}
+
+// GP ของร้าน "ร้านใดก็ได้" ในพอร์ต ไม่ใช่แค่ร้านที่เปิดอยู่
+//
+// ใช้ที่หน้า Portview ซึ่งเป็นหน้าที่ KAM เปิดดูทุกวัน · อ่านจาก bulkSkusData
+// (ไฟล์เดียวกับ D.skus_monthly แต่ยังไม่ถูกตัดเหลือร้านเดียว — 02_data_pipeline.js
+// เก็บเป็น bulkSkusData[accountId][monthLabel] แล้ว 01_core.js ค่อยหยิบร้านที่เปิด
+// มาใส่ D.skus_monthly) จึงไม่ต้องโหลดไฟล์เพิ่มเลย
+//
+// monthLabel ไม่ใส่ = ใช้เดือนล่าสุดที่ร้านนั้นมีข้อมูล — คืนมาใน .month ด้วย
+// เพื่อให้จุดแสดงผลบอกได้ว่าเป็นเดือนไหน ไม่ให้เดา
+function senseGpForAccount(accountId,monthLabel){
+  if(!accountId)return null;
+  const src=(typeof bulkSkusData!=='undefined'&&bulkSkusData)?bulkSkusData[accountId]:null;
+  if(!src)return null;
+  let mo=monthLabel;
+  if(!mo){
+    const keys=Object.keys(src);
+    if(!keys.length)return null;
+    const _ms=m=>{const p=(m||'').split(' ');const arr=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+arr.indexOf(p[0]);};
+    mo=keys.slice().sort((a,b)=>_ms(b)-_ms(a))[0];
+  }
+  const res=senseGpFromSkuRows(src[mo]);
+  if(!res||!res.hasData)return null;
+  res.month=mo;
+  return res;
+}
+
+// GP แยกตามหมวดสินค้า (dept) ของเดือนหนึ่ง — เรียงจากกำไรมากไปน้อย
+//
+// นี่คือจุดที่ตอบคำถาม "อะไร drive GP" ได้จริง เพราะหมวดสินค้าคือระดับที่ KAM
+// ลงมือทำอะไรได้ (เชียร์หมวดไหน เลี่ยงหมวดไหน) ต่างจาก GP รวมของร้านที่บอกได้
+// แค่ว่าดีหรือไม่ดี แต่ไม่บอกว่าเพราะอะไร
+//
+// จัดกลุ่มจาก D.skus_monthly ไฟล์เดียวกับที่ GP มา ไม่ใช่ D.cats_monthly
+// (bulk_categories.csv ไม่มีคอลัมน์ margin) — ตัวเลขจึงบวกกันได้ลงตัวกับ
+// GP รวมของร้านที่แสดงในการ์ด "ยอดซื้อ" เป๊ะ ไม่ต้องกระทบยอดข้ามไฟล์
+function senseGpByCategory(monthLabel){
+  if(!monthLabel||!D||!D.skus_monthly)return null;
+  const rows=D.skus_monthly[monthLabel];
+  if(!Array.isArray(rows)||!rows.length)return null;
+  const byCat={};
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const cat=(r.d||'').trim()||'ไม่ระบุหมวด';
+    if(!byCat[cat])byCat[cat]=[];
+    byCat[cat].push(r);
+  }
+  const out=[];
+  Object.keys(byCat).forEach(function(cat){
+    const rowsOfCat=byCat[cat];
+    const g=senseGpFromSkuRows(rowsOfCat);
+    if(!g){return;}
+    // หมวดที่ไม่มีข้อมูลกำไรเลย ยังต้องคืนออกไปพร้อมธง hasData:false
+    // ไม่ใช่หายไปเงียบๆ — ไม่งั้นยอดขายของหมวดนั้นจะหลุดออกจากการ์ดโดยที่
+    // ไม่มีอะไรบอก แล้วผลรวมในการ์ดจะไม่ตรงกับ GP รวมของร้านแบบอธิบายไม่ได้
+    out.push({cat:cat,skuCount:rowsOfCat.length,gp:g.gp,gmv:g.gmv,gpPct:g.gpPct,
+              coverage:g.coverage,ready:g.ready,hasData:g.hasData});
+  });
+  if(!out.length)return null;
+  // เรียงตามจำนวนเงินกำไร ไม่ใช่ %GP — หมวดที่ทำกำไรเป็นก้อนใหญ่คือหมวดที่
+  // ต้องรู้ก่อน ส่วน %GP สูงในหมวดจิ๋วเป็นเรื่องน่ารู้แต่ไม่ใช่เรื่องเร่งด่วน
+  out.sort(function(a,b){return b.gp-a.gp;});
+  return out;
+}
 
 // ════════════════════════════════════════
 // KAM SIGNALS (rule-based, no AI)
@@ -2056,7 +2175,7 @@ function switchAccount(accountId){
   // switchAccount debug log removed (v257)
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
-  churnExpanded=false;_catExpanded=true;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
+  churnExpanded=false;_catExpanded=true;kamGpCatOpen=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
   skuSubstituteMapLM={};skuSubstituteLoadingLM=false;skuSubstituteDoneLM=false;
   // Reset insight button to default (non-done) state
   const _ib=document.getElementById('kam-insight-btn');

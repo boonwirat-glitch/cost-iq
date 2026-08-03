@@ -1195,6 +1195,32 @@ function onboardSetup(){
 // ════════════════════════════════════════
 // RENDER — REPORT (fixed: uses totalSel, shows both plan + full potential)
 // ════════════════════════════════════════
+// v_gp: ยามเฝ้าหน้ารายงาน — GP ห้ามปรากฏใน #rpt2-doc เด็ดขาด
+//
+// หน้ารายงานนี้ถูก "แชร์ให้ลูกค้า" จริง ทั้งเปิดให้ดูบนจอตรงหน้าและส่งเป็น PDF
+// ผ่าน shareReport() · GP คือกำไรของ Freshket จากร้านนั้น ไม่ใช่ข้อมูลของลูกค้า
+// ทั้งเรื่องเล่าของแอปยังเป็น "เราช่วยร้านลดต้นทุน" ตัวเลขกำไรของเราเองที่โผล่
+// ในเอกสารนั้นจะขัดกับสารทั้งฉบับ
+//
+// ทำเป็นตัวตรวจจับ ไม่ใช่คอมเมนต์เตือน เพราะคอมเมนต์กันคนที่ไม่ได้อ่านไม่ได้
+// และหน้ารายงานมี 2 body (renderer ใน shell.html + legacy fallback ข้างล่าง)
+// ที่ต่างคนต่างเขียน DOM — ดักที่ adapter ตัวนี้จึงคุมได้ทั้งคู่ในที่เดียว
+// ลบทิ้งด้วยไม่ใช่แค่เตือน: ถ้าหลุดมาถึงตรงนี้แล้ว การเตือนใน console
+// ไม่ช่วยอะไรถ้าลูกค้ากำลังมองจออยู่
+function _reportAssertNoGp(){
+  try{
+    const doc=document.getElementById('rpt2-doc');
+    if(!doc)return;
+    const leaks=doc.querySelectorAll('[data-gp]');
+    if(!leaks.length)return;
+    for(let i=0;i<leaks.length;i++){
+      if(leaks[i].parentNode)leaks[i].parentNode.removeChild(leaks[i]);
+    }
+    console.error('[gp] GP หลุดเข้าหน้ารายงานที่แชร์ให้ลูกค้า — ลบออก '+leaks.length+
+      ' element แล้ว แต่ต้องไปแก้ที่ต้นทางที่เขียนมันลง #rpt2-doc');
+  }catch(e){}
+}
+
 function renderReport(){
   const renderer = window.FreshketSenseReportRenderer;
   if(renderer && typeof renderer.renderFromLegacy === 'function'){
@@ -1209,12 +1235,14 @@ function renderReport(){
         curSpend: (typeof curSpend === 'function' ? curSpend : function(){ return 0; }),
         fmt: fmt
       });
-      if(result && result.ok) return result;
+      if(result && result.ok){_reportAssertNoGp();return result;}
     }catch(err){
       console.warn('[Freshket Sense] Report renderer failed, falling back to legacy renderer:', err && err.message ? err.message : err);
     }
   }
-  return __legacyRenderReportFallback();
+  const _r=__legacyRenderReportFallback();
+  _reportAssertNoGp();
+  return _r;
 }
 
 function __legacyRenderReportFallback(){

@@ -32,6 +32,8 @@ function nrrParseHash() {
   if (parts[0] === 'pulse') return { view: 'pulse', param: null };
   if (parts[0] === 'waivers') return { view: 'waivers', param: null };
   if (parts[0] === 'commission') return { view: 'commission', param: null };
+  // v_gp: หน้ากำไร (GP) — เลนส์ใหม่ ยอด × กำไร ยังไม่ใช่ตัวชี้วัดที่ทีมถูกวัด
+  if (parts[0] === 'margin') return { view: 'margin', param: null };
   return { view: 'dashboard', param: null };
 }
 
@@ -66,6 +68,13 @@ function nrrRouteGuard(route) {
   // this tab is the org/team-wide simulator + breakdown view.
   if (route.view === 'commission' && p.role === 'rep') {
     return { view: 'portfolio', param: null, redirect: true };
+  }
+  // Margin/GP tab (v_gp, 2026-07-31): ADMIN ONLY เพื่อเริ่มต้น — ไม่ใช่เพราะ
+  // TL ไม่ควรเห็นกำไร แต่เพราะ GP กำลังถูกแนะนำให้ทีมรู้จักแบบค่อยเป็นค่อยไป
+  // และจะเริ่มใช้เป็นตัวชี้วัดจริง Jan 2027 · เปิดให้ TL ได้ด้วยการเพิ่ม
+  // 'tl' ในเงื่อนไขนี้ที่เดียว เมื่อบุชพร้อม
+  if (route.view === 'margin' && p.role !== 'admin') {
+    return { view: 'dashboard', param: null, redirect: true };
   }
   if (p.role === 'rep') {
     if (route.view === 'dashboard') return { view: 'portfolio', param: null, redirect: true };
@@ -104,8 +113,10 @@ function nrrHandleRoute() {
 
   // App-level nav active state: the account view belongs to the portfolio
   // family; company/sales (v28) are their own tabs.
+  // v_gp: 'margin' ต้องอยู่ในลิสต์นี้ด้วย ไม่งั้นแท็บ Portfolio จะสว่างแทน
+  // (มันคือ else-branch ท้ายสุด — จุดที่ลืมง่ายสุดของการเพิ่มแท็บใหม่)
   var navFamily = route.view === 'dashboard' ? 'dashboard'
-    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse' || route.view === 'waivers' || route.view === 'commission') ? route.view
+    : (route.view === 'company' || route.view === 'sales' || route.view === 'pulse' || route.view === 'waivers' || route.view === 'commission' || route.view === 'margin') ? route.view
     : 'portfolio';
   document.querySelectorAll('#nrr-appnav a').forEach(function (a) {
     a.classList.toggle('on', a.dataset.view === navFamily);

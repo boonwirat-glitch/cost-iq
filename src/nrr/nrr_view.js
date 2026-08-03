@@ -106,6 +106,10 @@ async function nrrInitApp() {
     _commSimBody.addEventListener('input', nrrHandleCommSimInput);
     _commSimBody.addEventListener('change', nrrHandleCommSimChange);
   }
+  // v_gp: แท็บกำไร — #nrr-margin-body มาจาก nrrShellHtml และไม่ถูกรื้อ
+  // จึงผูก listener ครั้งเดียวที่นี่ได้ รอดทุก innerHTML ข้างใน
+  var _marginBody = document.getElementById('nrr-margin-body');
+  if (_marginBody) _marginBody.addEventListener('click', nrrHandleMarginClick);
 
   // ── Router wiring — see nrr_router.js ──
   // v_navfloat (2026-07-16): dashboard DOM stays rendered by nrrRenderAll();
@@ -117,6 +121,7 @@ async function nrrInitApp() {
   nrrRouterRegister('portfolio', nrrRenderPortfolioLayerView);
   nrrRouterRegister('account', nrrRenderAccountView);
   nrrRouterRegister('commission', nrrRenderCommissionTabView);
+  nrrRouterRegister('margin', nrrRenderMarginTabView);   // v_gp
 
   await nrrRefresh(false);
   nrrHandleRoute();
@@ -2029,6 +2034,11 @@ function nrrShellHtml() {
     (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
       ? '    <a href="#/commission" data-view="commission">Commission</a>'
       : '') +
+    // v_gp: แท็บกำไร — admin เท่านั้นในรอบแรก (เงื่อนไขเดียวกับ nrrRouteGuard)
+    // เปิดให้ TL ด้วยการเพิ่ม role check ที่นี่ + ที่ guard
+    (nrrProfile && nrrProfile.role === 'admin'
+      ? '    <a href="#/margin" data-view="margin">กำไร</a>'
+      : '') +
     '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
@@ -2117,6 +2127,11 @@ function nrrShellHtml() {
     '<div class="nrr-view" id="nrr-view-commission" hidden><div class="nrr-page-wide">' +
     '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-strip" id="nrr-comm-strip"></div></div>' +
     '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-ds" id="nrr-comm-sim-body"></div></div>' +
+    '</div></div>' +
+    // v_gp: แท็บกำไร (GP) — hidden ต้องมี ไม่งั้นจะโชว์ทับหน้าอื่นตอนบูต
+    // (nrrHandleRoute จะ toggle ให้ทีหลัง แต่ก่อนเรียกครั้งแรก มันเปิดอยู่)
+    '<div class="nrr-view" id="nrr-view-margin" hidden><div class="nrr-page-wide">' +
+    '  <div class="nrr-section"><div class="nrr-panel-body nrr-comm-ds" id="nrr-margin-body"></div></div>' +
     '</div></div>' +
     '<div id="nrr-slideover-backdrop"></div>' +
     '<div class="float" id="nrr-slideover">' +
@@ -3537,9 +3552,12 @@ function nrrRenderCommSimResults() {
   // cached aggregate instead of sweeping 100K rows to reach the same answer.
   var adjusted = overrides ? _nrrCommSimAggregate(_nrrCommSimEnumerateAll(overrides)) : baseline;
 
+  // v_gp: ครอบ breakdown ด้วย #nrr-comm-brk เพื่อให้ปุ่มสลับเลนส์ GMV↔GP
+  // เขียนทับได้แค่ก้อนนี้ ไม่ต้อง re-enumerate ทั้ง ~103,000 แถว
+  _nrrCommLastBrkRows = adjusted.rows;
   el.innerHTML = nrrCommSimHeroesHtml(baseline, adjusted, !!overrides) +
     nrrCommSimKamTableHtml(baseline, adjusted, !!overrides) +
-    nrrCommBreakdownSectionHtml(adjusted.rows);
+    '<div id="nrr-comm-brk">' + nrrCommBreakdownSectionHtml(adjusted.rows) + '</div>';
 }
 
 // v_brkgrowth: 5 tiers, not 4. The old 'offpace' bucket lumped a family that
@@ -3650,7 +3668,10 @@ function nrrCommBreakdownRowHtml(r) {
     // Kept, but now explicitly labelled as the incremental in the header —
     // this is the number the ฿ floor is tested against and the commission is
     // charged on, so it can't just be replaced by the absolute above.
-    '<td>' + nrrFmtGMVExact(r.current) + '</td>' +
+    // v_gp: เลนส์ GP เปลี่ยนแค่คอลัมน์นี้ — คอลัมน์เกณฑ์/ขาดอีก/คาดสิ้นเดือน
+    // ยังเป็น GMV เสมอ เพราะเกณฑ์คอมมิชชั่นวัดที่ยอดขาย ไม่ได้วัดที่กำไร
+    // (จะเปลี่ยนเมื่อ Jan 2027 ตอนที่ GP กลายเป็นตัวชี้วัดจริง)
+    _nrrCommLensMoneyCell(r) +
     '<td>' + thresholdLabel + '</td>' +
     _nrrCommGapCellHtml(r, g) +
     '<td>' + projectedLabel + '</td>' +
@@ -3661,6 +3682,55 @@ function nrrCommBreakdownRowHtml(r) {
 // allRows comes from the caller's single enumeration pass (see
 // nrrRenderCommSimResults) — this function must never enumerate again, or the
 // hero totals and these rows could be computed from two different sweeps.
+// v_gp: เลนส์ของตาราง BREAKDOWN — 'gmv' (เดิม) หรือ 'gp'
+//
+// ทำเป็นปุ่มสลับ ไม่ใช่เพิ่ม 2 คอลัมน์ เพราะตารางนี้เพิ่งถูกทำให้พอดี 1440px
+// ที่ 11 คอลัมน์แบบไม่เหลือที่ (วัดแล้ว ตาราง 1346 = พาเนล 1346) เพิ่มคอลัมน์
+// จะกลับไป scroll ซ้าย-ขวา ซึ่งเป็นสิ่งที่บุชเพิ่งให้แก้ไปรอบก่อน
+var nrrCommLens = 'gmv';
+// แถวที่ enumerate ไว้จาก paint ล่าสุด — ให้ปุ่มสลับเลนส์ใช้ซ้ำได้โดยไม่ต้อง
+// enumerate ใหม่ (ดูเหตุผลใน nrrHandleCommSimClick)
+var _nrrCommLastBrkRows = null;
+
+function _nrrRepaintCommBreakdown() {
+  var host = document.getElementById('nrr-comm-brk');
+  if (!host || !_nrrCommLastBrkRows) return;
+  host.innerHTML = nrrCommBreakdownSectionHtml(_nrrCommLastBrkRows);
+}
+
+// ใช้แพตเทิร์น .mode ที่มีอยู่ (ตัว .mode คือ "กล่อง" ไม่ใช่ปุ่ม — ปุ่มคือ
+// .mode button และตัวที่เลือกคือ .on บนปุ่ม) เหมือนสวิตช์ ทั้งไตรมาส/การเปลี่ยนแปลง
+function nrrGpLensSwitchHtml() {
+  return '<div class="mode nrr-gp-lens">' +
+    '<button type="button" class="nrr-gp-lens-btn' + (nrrCommLens === 'gmv' ? ' on' : '') + '" data-lens="gmv">ยอดขาย</button>' +
+    '<button type="button" class="nrr-gp-lens-btn' + (nrrCommLens === 'gp' ? ' on' : '') + '" data-lens="gp">กำไร (GP)</button>' +
+    '</div>';
+}
+
+// เซลล์เงินของแถว ปรับตามเลนส์ · ไม่มีข้อมูล GP → '—' ไม่ใช่ ฿0
+function _nrrCommLensMoneyCell(r) {
+  if (nrrCommLens !== 'gp') return '<td>' + nrrFmtGMVExact(r.current) + '</td>';
+  var g = r.gp;
+  if (!g) return '<td class="nrr-gp-nodata" title="ยังไม่มีข้อมูลกำไรในไฟล์นี้ — ต้องรัน SQL ใหม่ก่อน">—</td>';
+  if (!g.ready) {
+    // ต้อง nrrEsc: ข้อความนี้มีเครื่องหมายคำพูดคู่อยู่ข้างใน ซึ่งจะไปปิด
+    // attribute title= ก่อนเวลา ทำให้ HTML เพี้ยน (เจอจริงตอนเทสต์)
+    var why = g.baseMissingMargin
+      ? 'เดือนฐานไม่มีข้อมูลกำไร จึงหา "กำไรที่โต" ไม่ได้'
+      : 'ข้อมูลกำไรครอบคลุมแค่ ' + Math.round(g.coverage * 100) + '% ของยอด';
+    return '<td class="nrr-gp-nodata" title="' + nrrEsc(why) + '">ข้อมูลไม่พอ</td>';
+  }
+  var amt = g.gp < 0 ? ('−' + nrrFmtGMVExact(-g.gp)) : nrrFmtGMVExact(g.gp);
+  // ใช้ − ตัวเดียวกับจำนวนเงิน ไม่ใช่ hyphen ที่ toFixed คืนมา ไม่งั้นบรรทัดบน
+  // กับบรรทัดล่างในเซลล์เดียวกันใช้เครื่องหมายลบคนละตัว
+  var pctStr = g.pctValid
+    ? ((g.gpPct < 0 ? '−' + Math.abs(g.gpPct).toFixed(1) : g.gpPct.toFixed(1)) + '%')
+    : '—';
+  return '<td' + (g.gp < 0 ? ' class="nrr-gp-neg"' : '') +
+    ' title="' + nrrEsc('กำไร ' + amt + ' จากยอด ' + nrrFmtGMVExact(g.gmv)) + '">' + amt +
+    '<div class="nrr-comm-cell-meta">' + pctStr + '</div></td>';
+}
+
 function nrrCommBreakdownSectionHtml(allRows) {
   var roster = nrrCommSimState.roster;
   var f = nrrCommSimState.filters;
@@ -3743,7 +3813,9 @@ function nrrCommBreakdownSectionHtml(allRows) {
       '<th class="txt">KAM</th><th class="txt">ร้าน</th><th class="txt">สาขา</th><th class="txt">กลุ่มสินค้า</th>' +
       '<th class="txt">ประเภท</th>' +
       '<th title="P3: ฐานสูงสุด 3 เดือนย้อนหลัง → ยอดเดือนนี้ · P1: ไม่มีฐานเพราะเป็นกลุ่มสินค้าใหม่">โตจาก → เป็น</th>' +
-      '<th title="ส่วนที่โตขึ้นจากฐาน — ตัวเลขที่ใช้วัดกับเกณฑ์ขั้นต่ำ และใช้คิดคอมมิชชั่น">ส่วนที่โต</th>' +
+      (nrrCommLens === 'gp'
+        ? '<th title="กำไรของส่วนที่โต — P3 คือ margin เดือนนี้ ลบ margin ของเดือนฐาน · P1 คือ margin ทั้งกลุ่ม · บรรทัดล่างคือ %GP ของส่วนนั้น">กำไรที่โต</th>'
+        : '<th title="ส่วนที่โตขึ้นจากฐาน — ตัวเลขที่ใช้วัดกับเกณฑ์ขั้นต่ำ และใช้คิดคอมมิชชั่น">ส่วนที่โต</th>') +
       '<th>เกณฑ์</th>' +
       '<th title="ต้องมียอดเพิ่มอีกเท่าไหร่ในเดือนนี้จึงจะเข้าเกณฑ์">ขาดอีก</th>' +
       '<th>คาดสิ้นเดือน</th><th class="txt">สถานะ</th>' +
@@ -3756,7 +3828,10 @@ function nrrCommBreakdownSectionHtml(allRows) {
     '<b>P3</b> ต้องผ่าน 2 เงื่อนไขพร้อมกัน: ยอดเดือนนี้ > ' + nrrEsc(String(nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00))) + '× ของฐาน <b>และ</b> ส่วนที่โต ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000)) +
     ' · <b>P1</b> (กลุ่มสินค้าใหม่) ต้องมียอด ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000)) +
     ' · ค่าเริ่มต้นแสดงเฉพาะรายการที่เข้าเกณฑ์แล้ว ตามจังหวะ หรือเกือบถึง (' + allRows.length + ' รายการทั้งหมดในเดือนนี้ ส่วนใหญ่เป็นยอดเล็กน้อยที่ไม่มีนัยสำคัญ)</div>' +
-    filtersHtml + tableHtml;
+    (nrrCommLens === 'gp'
+      ? '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">กำลังดูเลนส์ <b>กำไร (GP)</b> — คอลัมน์ "กำไรที่โต" เปลี่ยนเป็นกำไร ส่วนคอลัมน์เกณฑ์ ขาดอีก และคาดสิ้นเดือน ยังเป็นยอดขายอยู่ เพราะเกณฑ์คอมมิชชั่นตอนนี้วัดที่ยอดขาย <b>ไม่ได้วัดที่กำไร</b></div>'
+      : '') +
+    nrrGpLensSwitchHtml() + filtersHtml + tableHtml;
 }
 
 var _nrrCommSimDebounce = null;
@@ -3779,7 +3854,299 @@ function nrrHandleCommSimChange(e) {
 }
 window.nrrHandleCommSimChange = nrrHandleCommSimChange;
 
+// ══════════════════════════════════════════════════════════════════════════
+// แท็บกำไร (GP) — v_gp
+// ══════════════════════════════════════════════════════════════════════════
+//
+// ทำไมแยกเป็นแท็บ ไม่ใช่ยัดใน hero หน้า Company ตามแผนเดิม:
+// GP อยู่ใน upsell bundle ซึ่งถูก fetch เฉพาะตอนเข้าแท็บ Commission
+// (nrr_view.js ~:3298) ส่วน hero หน้า Company เรนเดอร์จาก bulkQnrrData ตอนบูต
+// ถ้าเอา GP ไปไว้ที่ hero จะได้แค่ 2 ทางเลือกที่แย่ทั้งคู่: ลาก 19 ไฟล์ CSV
+// เข้า boot path หรือให้แถวโผล่ทีหลังผ่าน repaint hook ซึ่งเป็นคลาสบั๊ก
+// เดียวกับที่ทำให้เกิด hotfix "production strip stuck" มาแล้ว
+// แท็บนี้ fetch ข้อมูลของตัวเองตอนเข้า เหมือน Commission จึงไม่มี race
+var nrrMarginState = { status: 'idle', pairs: null, entity: 'kam' };
+
+function nrrRenderMarginTabView() {
+  var body = document.getElementById('nrr-margin-body');
+  if (!body) return;
+  if (nrrMarginState.status === 'loading') return;
+  if (nrrMarginState.status === 'loaded') { _nrrRenderMarginBody(); return; }
+
+  nrrMarginState.status = 'loading';
+  body.innerHTML = '<div class="ds-section-hd"><span class="ds-eyebrow">กำไร (GP)</span></div>' +
+    '<div class="micro" style="color:var(--ink2)">กำลังโหลดข้อมูล...</div>';
+
+  var roster = nrrCommRosterEmails();
+  Promise.all([
+    nrrFetchAllUpsellBundles(roster, QNRR_CFG.base_month),
+    nrrFetchPortviewCsv(), nrrFetchBulkOutletsCsv()
+  ]).then(function (results) {
+    nrrMarginState.pairs = results[0];
+    nrrMarginState.status = 'loaded';
+    _nrrRenderMarginBody();
+  }).catch(function (e) {
+    console.warn('[nrr] margin tab load failed', e);
+    nrrMarginState.status = 'idle';
+    body.innerHTML = '<div class="ds-empty"><div class="ds-empty-title">โหลดข้อมูลไม่สำเร็จ</div>' +
+      '<div class="micro">' + nrrEsc(String(e && e.message || e)) + '</div></div>';
+  });
+}
+window.nrrRenderMarginTabView = nrrRenderMarginTabView;
+
+function _nrrRenderMarginBody() {
+  var body = document.getElementById('nrr-margin-body');
+  if (!body) return;
+  var monthLabel = nrrCommCurrentMonthLabel();
+  var pairs = nrrMarginState.pairs || [];
+  var org = nrrGpForAll(pairs, monthLabel);
+
+  var head = '<div class="ds-section-hd"><span class="ds-eyebrow">กำไร (GP) · ' + nrrEsc(monthLabel) + '</span></div>';
+
+  // ยังไม่มีคอลัมน์ GP ในไฟล์ = ยังไม่ได้รัน SQL ใหม่ · บอกตรงๆ ว่าติดอะไร
+  // และห้ามแสดง ฿0 หรือ 0% ซึ่งจะอ่านเป็น "กำไรเป็นศูนย์" ไม่ใช่ "ยังไม่มีข้อมูล"
+  if (!org) {
+    body.innerHTML = head +
+      '<div class="ds-empty"><div class="ds-empty-title">ยังไม่มีข้อมูลกำไรในไฟล์</div>' +
+      '<div class="micro" style="margin-top:6px;color:var(--ink2)">หน้านี้อ่าน <b>margin_ex_vat</b> จาก ' +
+      '<code>sense_upsell_*.csv</code> ซึ่งต้องรัน <code>q3c_upsell_bulk_all_kams_v4.sql</code> ' +
+      'เวอร์ชันใหม่ใน BigQuery แล้วอัปขึ้น R2 ก่อน · โค้ดฝั่งหน้าเว็บพร้อมแล้ว ' +
+      'พอไฟล์มีคอลัมน์กำไร ตัวเลขจะขึ้นเองโดยไม่ต้องแก้อะไรอีก</div></div>';
+    return;
+  }
+
+  var covPct = Math.round(org.coverage * 100);
+  var covNote = org.ready
+    ? '<span class="micro" style="color:var(--ink3)">ข้อมูลกำไรครอบคลุม ' + covPct + '% ของยอด</span>'
+    : '<span class="micro" style="color:var(--attention)">ข้อมูลกำไรครอบคลุมแค่ ' + covPct +
+      '% ของยอด — ตัวเลขด้านล่างยังเชื่อไม่ได้เต็มที่</span>';
+
+  var heroes = '<div class="nrr-triple-lg" style="margin-bottom:6px">' +
+    '<div class="nrr-triple-cell"><div class="nrr-triple-label">ยอดขาย</div>' +
+    '<div class="num nrr-triple-base">' + nrrFmtGMV(org.gmv) + '</div></div>' +
+    '<div class="nrr-triple-cell"><div class="nrr-triple-label">กำไร (GP)</div>' +
+    '<div class="num nrr-triple-mtd' + (org.gp < 0 ? ' nrr-gp-neg-txt' : '') + '">' +
+    (org.gp < 0 ? '−' + nrrFmtGMV(-org.gp) : nrrFmtGMV(org.gp)) + '</div></div>' +
+    '<div class="nrr-triple-cell"><div class="nrr-triple-label">%GP</div>' +
+    '<div class="num nrr-triple-rr">' + org.gpPct.toFixed(1) + '%</div></div>' +
+    '</div>' + covNote;
+
+  var intro = '<div class="micro" style="margin:14px 0 10px;color:var(--ink2)">' +
+    'GP คือกำไรขั้นต้นจริงของพอร์ต (ยอดขาย ลบ ต้นทุนสินค้า) · <b>ยังไม่ใช่ตัวชี้วัดที่ทีมถูกวัด</b> ' +
+    'หน้านี้มีไว้ให้เห็นภาพก่อนว่าอะไรทำให้กำไรขึ้นหรือลง · %NRR ตอนนี้ยังวัดที่ยอดขายเหมือนเดิม' +
+    '</div>';
+
+  body.innerHTML = head + heroes + intro +
+    '<div class="mode nrr-gp-entity">' +
+    '<button type="button" class="nrr-gp-entity-btn' + (nrrMarginState.entity === 'kam' ? ' on' : '') + '" data-entity="kam">ต่อ KAM</button>' +
+    '<button type="button" class="nrr-gp-entity-btn' + (nrrMarginState.entity === 'category' ? ' on' : '') + '" data-entity="category">ต่อหมวดสินค้า</button>' +
+    '</div>' +
+    '<div id="nrr-margin-quad">' + _nrrMarginQuadrantHtml(monthLabel) +
+    _nrrMarginTableHtml(monthLabel) + '</div>';
+}
+
+// v_gp: ตารางจัดอันดับใต้ควอดรันต์
+//
+// ควอดรันต์บอก "ใครอยู่ตรงไหน" ได้ดี แต่บอก "เท่าไหร่" ไม่ได้ — ต้องเอาเมาส์ไปชี้
+// ทีละวงซึ่งอ่านรวมทั้งภาพไม่ได้ · ตารางนี้คือเลขจริงเรียงอันดับ อ่านทีเดียวจบ
+// ใช้จุดชุดเดียวกับควอดรันต์เป๊ะ (_nrrMarginPoints) จึงไม่มีทางขัดกันเอง
+function _nrrMarginTableHtml(monthLabel) {
+  var pts = _nrrMarginPoints(monthLabel);
+  if (!pts.length) return '';
+  var entityWord = nrrMarginState.entity === 'kam' ? 'KAM' : 'หมวดสินค้า';
+  // เรียงตามจำนวนเงินกำไร — ตัวที่ทำกำไรเป็นก้อนใหญ่คือตัวที่ต้องรู้ก่อน
+  // (%GP สูงในพอร์ตจิ๋วน่ารู้ แต่ไม่ใช่เรื่องเร่งด่วน) ดูคอลัมน์ %GP ควบคู่
+  var rows = pts.slice().sort(function (a, b) { return b.gp - a.gp; });
+  var totalGp = rows.reduce(function (s, r) { return s + r.gp; }, 0);
+  var totalGmv = rows.reduce(function (s, r) { return s + r.gmv; }, 0);
+  // ตั้งใจ *ไม่* ใส่คอลัมน์ "ส่วนแบ่งกำไร" (gp ÷ กำไรรวม)
+  //
+  // ลองแล้วมันอ่านเหมือนพัง: คนที่ขาดทุนทำให้ตัวหารเล็กลง แล้วคนอันดับ 1
+  // ได้ส่วนแบ่ง 106.7% ส่วนคนที่ขาดทุนได้ "—" · ถูกทางเลขแต่ต้องอธิบายเยอะ
+  // ซึ่งเป็นสิ่งที่บุชตีตกมาแล้วสองรอบ · ตารางเรียงตามกำไรอยู่แล้ว จึงตอบ
+  // "กำไรมาจากใครมากสุด" ได้โดยไม่ต้องมีคอลัมน์นี้เลย
+  var body = rows.map(function (r) {
+    var neg = r.gp < 0;
+    var amt = neg ? ('−' + nrrFmtGMVExact(-r.gp)) : nrrFmtGMVExact(r.gp);
+    var pct = (r.gpPct < 0 ? '−' + Math.abs(r.gpPct).toFixed(1) : r.gpPct.toFixed(1)) + '%';
+    return '<tr>' +
+      '<td class="txt"><span class="nrr-trunc nrr-trunc-kam" title="' + nrrEsc(r.full) + '">' + nrrEsc(r.full) + '</span></td>' +
+      '<td>' + nrrFmtGMVExact(r.gmv) + '</td>' +
+      '<td' + (neg ? ' class="nrr-gp-neg"' : '') + '>' + amt + '</td>' +
+      '<td' + (neg ? ' class="nrr-gp-neg"' : '') + '>' + pct + '</td>' +
+      '</tr>';
+  }).join('');
+  var totPct = totalGmv > 0 ? (totalGp / totalGmv * 100).toFixed(1) + '%' : '—';
+  return '<div class="ds-section-hd" style="margin-top:22px"><span class="ds-eyebrow">เลขจริงต่อ' +
+    entityWord + ' <span class="ds-section-count">' + rows.length + '</span></span></div>' +
+    '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">เรียงจากกำไรมากไปน้อย — บรรทัดบนสุดคือตัวที่ทำกำไรให้พอร์ตมากสุด</div>' +
+    '<div class="nrr-comm-fulltable-wrap"><table class="nrr-comm-fulltable"><thead><tr>' +
+    '<th class="txt">' + entityWord + '</th>' +
+    '<th>ยอดขาย</th>' +
+    '<th title="กำไรขั้นต้นเป็นจำนวนเงิน">กำไร (GP)</th>' +
+    '<th title="กำไรหารด้วยยอดขายของตัวเอง — เทียบข้ามขนาดได้">%GP</th>' +
+    '</tr></thead><tbody>' + body + '</tbody>' +
+    '<tfoot><tr><td class="txt"><b>รวม</b></td><td><b>' + nrrFmtGMVExact(totalGmv) + '</b></td>' +
+    '<td><b>' + (totalGp < 0 ? '−' + nrrFmtGMVExact(-totalGp) : nrrFmtGMVExact(totalGp)) + '</b></td>' +
+    '<td><b>' + totPct + '</b></td></tr></tfoot>' +
+    '</table></div>' +
+    '<div class="micro" style="margin-top:6px;color:var(--ink3)">แถว "รวม" นับเฉพาะที่แสดงในตารางนี้ ' +
+    'ซึ่งกรองเอาตัวที่ข้อมูลกำไรไม่ครบออกแล้ว จึงอาจไม่เท่ากับยอดรวมทั้งองค์กรด้านบน</div>';
+}
+
+// รวบรวมจุดของควอดรันต์ตาม entity ที่เลือก
+function _nrrMarginPoints(monthLabel) {
+  var pairs = nrrMarginState.pairs || [];
+  var pts = [];
+  if (nrrMarginState.entity === 'kam') {
+    pairs.forEach(function (pr) {
+      if (!pr || !pr.bundle) return;
+      var g = nrrGpFor(pr.bundle, monthLabel);
+      if (!g || !g.ready) return;
+      pts.push({ label: nrrPersonNick(pr.person.name), full: pr.person.name, gmv: g.gmv, gp: g.gp, gpPct: g.gpPct });
+    });
+    return pts;
+  }
+  // ต่อหมวด: รวมข้ามทุกบันเดิลก่อน แล้วค่อยคิด %GP ครั้งเดียวต่อหมวด
+  var cats = {};
+  pairs.forEach(function (pr) {
+    var b = pr && pr.bundle;
+    if (!b) return;
+    var gc = b.groupCategory || {};
+    Object.keys(gc).forEach(function (gk) { if (gc[gk]) cats[gc[gk]] = true; });
+  });
+  Object.keys(cats).forEach(function (cat) {
+    var g = nrrGpForAll(pairs, monthLabel, { category: cat });
+    if (!g || !g.ready) return;
+    pts.push({ label: cat, full: cat, gmv: g.gmv, gp: g.gp, gpPct: g.gpPct });
+  });
+  return pts;
+}
+
+// ควอดรันต์ ยอดขาย × %GP — ขนาดวงกลม = จำนวนเงินกำไร (GP amount)
+// ลอกโครงพิกัดจาก nrrPriceChartHtml ซึ่งเป็น SVG เดียวในแอปที่ทำ 2 มิติจริง
+// ห้ามใส่ preserveAspectRatio="none" (มีคอมเมนต์เตือนไว้ที่นั่น) ไม่งั้นวงกลม
+// จะยืดเป็นวงรีและบิดการอ่านควอดรันต์ทั้งหมด
+function _nrrMarginQuadrantHtml(monthLabel) {
+  var pts = _nrrMarginPoints(monthLabel);
+  if (pts.length < 2) {
+    return '<div class="ds-empty"><div class="ds-empty-title">ข้อมูลยังไม่พอวาดควอดรันต์</div>' +
+      '<div class="micro">ต้องมีอย่างน้อย 2 จุดที่ข้อมูลกำไรครอบคลุมถึงเกณฑ์ ' +
+      '(ตอนนี้มี ' + pts.length + ')</div></div>';
+  }
+  // pT/pB เผื่อที่ให้ป้ายควอดรันต์อยู่ "นอก" กรอบกราฟ (ดูเหตุผลที่ qlabels)
+  var W = 720, H = 442, pL = 62, pR = 22, pT = 32, pB = 66;
+  var cW = W - pL - pR, cH = H - pT - pB;
+
+  var gmvs = pts.map(function (p) { return p.gmv; });
+  var pcts = pts.map(function (p) { return p.gpPct; });
+  var gmvMax = Math.max.apply(null, gmvs) * 1.08 || 1;
+  var pctMin = Math.min.apply(null, pcts), pctMax = Math.max.apply(null, pcts);
+  var pctPad = ((pctMax - pctMin) || 2) * 0.15;
+  pctMin -= pctPad; pctMax += pctPad;
+  var pctRng = (pctMax - pctMin) || 1;
+
+  // เส้นแบ่งใช้ค่ากลาง (median) ไม่ใช่ค่าเฉลี่ย — ค่าเฉลี่ยถูก KAM รายใหญ่
+  // รายเดียวลากไปทั้งเส้น ทำให้เกือบทุกคนตกไปอยู่ควอดรันต์เดียวกันหมด
+  function median(arr) {
+    var s = arr.slice().sort(function (a, b) { return a - b; });
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  var gmvMid = median(gmvs), pctMid = median(pcts);
+
+  function X(v) { return pL + (v / gmvMax) * cW; }
+  function Y(v) { return pT + cH - ((v - pctMin) / pctRng) * cH; }
+
+  // ขนาดวงกลม = |GP| โดยแมปผ่าน sqrt เพื่อให้ "พื้นที่" แปรตามเงิน ไม่ใช่รัศมี
+  // (รัศมีแปรตรงจะทำให้รายใหญ่ดูใหญ่เกินจริงหลายเท่า)
+  var gpAbsMax = Math.max.apply(null, pts.map(function (p) { return Math.abs(p.gp); })) || 1;
+  function R(gp) { return 6 + Math.sqrt(Math.abs(gp) / gpAbsMax) * 22; }
+
+  var xMid = X(gmvMid), yMid = Y(pctMid);
+  var guides =
+    '<line x1="' + xMid + '" y1="' + pT + '" x2="' + xMid + '" y2="' + (pT + cH) + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="4,3"></line>' +
+    '<line x1="' + pL + '" y1="' + yMid + '" x2="' + (pL + cW) + '" y2="' + yMid + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="4,3"></line>';
+
+  // ป้ายควอดรันต์ — บอกว่าแต่ละมุมแปลว่าอะไรในเชิงการทำงาน ไม่ใช่แค่ hi/lo
+  //
+  // วางไว้ "นอก" กรอบกราฟ (บนเส้นบน / ใต้เส้นล่าง) ไม่ใช่ในมุมข้างใน
+  // เพราะตอนวางในมุม ป้ายชื่อของจุดที่อยู่มุมขวาบนทับกับป้าย "ยอดโต + กำไรดี"
+  // จนอ่านไม่ออก (เจอจริงตอนเทสต์) · จุดทุกจุดอยู่ในกรอบเสมอ ดังนั้นการย้าย
+  // ป้ายออกนอกกรอบทำให้ชนกันไม่ได้เลยโดยโครงสร้าง ไม่ใช่แค่บังเอิญไม่ชน
+  function qlab(x, y, anchor, txt) {
+    return '<text x="' + x + '" y="' + y + '" font-size="10.5" font-weight="700" fill="var(--ink3)" text-anchor="' + anchor + '">' + nrrEsc(txt) + '</text>';
+  }
+  var qlabels =
+    qlab(pL + cW, pT - 11, 'end', 'ยอดโต + กำไรดี ↗') +
+    qlab(pL, pT - 11, 'start', '↖ กำไรดี แต่ยอดเล็ก') +
+    qlab(pL + cW, pT + cH + 16, 'end', 'ยอดใหญ่ แต่กำไรบาง ↘') +
+    qlab(pL, pT + cH + 16, 'start', '↙ ยอดเล็ก + กำไรบาง');
+
+  var dots = pts.map(function (p) {
+    var x = X(p.gmv), y = Y(p.gpPct), r = R(p.gp);
+    var fill = p.gp < 0 ? 'var(--coral)' : 'var(--green)';
+    var tip = '<title>' + nrrEsc(p.full) + ' · ยอด ' + nrrFmtGMVExact(p.gmv) +
+      ' · กำไร ' + (p.gp < 0 ? '−' + nrrFmtGMVExact(-p.gp) : nrrFmtGMVExact(p.gp)) +
+      ' · %GP ' + p.gpPct.toFixed(1) + '%</title>';
+    return '<circle cx="' + x + '" cy="' + y + '" r="' + r.toFixed(1) + '" fill="' + fill + '" opacity="0.5" stroke="' + fill + '" stroke-width="1.5">' + tip + '</circle>' +
+      // วงใสซ้อนเพื่อให้ hover ติดแน่ๆ แม้จุดเล็ก (แพตเทิร์นเดียวกับ nrrPriceChartHtml)
+      '<circle cx="' + x + '" cy="' + y + '" r="' + Math.max(10, r).toFixed(1) + '" fill="transparent" style="cursor:default">' + tip + '</circle>' +
+      '<text x="' + x + '" y="' + (y - r - 4).toFixed(1) + '" font-size="9.5" font-weight="600" fill="var(--ink2)" text-anchor="middle">' + nrrEsc(p.label) + '</text>';
+  }).join('');
+
+  // แกน: ป้าย %GP 3 ค่า (ล่าง/กลาง/บน) + ยอดขาย 0/กลาง/สูงสุด
+  var yTicks = [pctMin + pctRng * 0.05, pctMid, pctMax - pctRng * 0.05].map(function (v) {
+    return '<text x="' + (pL - 8) + '" y="' + (Y(v) + 3.5) + '" font-size="9.5" fill="var(--ink3)" text-anchor="end">' + v.toFixed(1) + '%</text>';
+  }).join('');
+  var xTicks = [0, gmvMid, gmvMax].map(function (v, i) {
+    return '<text x="' + X(v) + '" y="' + (H - 30) + '" font-size="9.5" fill="var(--ink3)" text-anchor="' + (i === 0 ? 'start' : i === 2 ? 'end' : 'middle') + '">' + nrrFmtGMV(v) + '</text>';
+  }).join('');
+
+  var entityWord = nrrMarginState.entity === 'kam' ? 'KAM' : 'หมวดสินค้า';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block;height:auto;max-width:' + W + 'px">' +
+    '<line x1="' + pL + '" y1="' + (pT + cH) + '" x2="' + (pL + cW) + '" y2="' + (pT + cH) + '" stroke="var(--line)" stroke-width="1"></line>' +
+    '<line x1="' + pL + '" y1="' + pT + '" x2="' + pL + '" y2="' + (pT + cH) + '" stroke="var(--line)" stroke-width="1"></line>' +
+    guides + qlabels + dots + yTicks + xTicks +
+    '<text x="' + (pL + cW / 2) + '" y="' + (H - 8) + '" font-size="10" font-weight="600" fill="var(--ink2)" text-anchor="middle">ยอดขาย →</text>' +
+    '<text x="14" y="' + (pT + cH / 2) + '" font-size="10" font-weight="600" fill="var(--ink2)" text-anchor="middle" transform="rotate(-90 14 ' + (pT + cH / 2) + ')">%GP →</text>' +
+    '</svg>' +
+    '<div class="micro" style="margin-top:8px;color:var(--ink2)">1 วง = 1 ' + entityWord +
+    ' · แนวนอน = ยอดขายเดือนนี้ · แนวตั้ง = %GP · <b>ขนาดวงคือจำนวนเงินกำไร (GP บาท)</b> ' +
+    'ไม่ใช่ยอดขาย — วงใหญ่ที่อยู่ต่ำ คือทำกำไรได้เยอะเพราะตัวใหญ่ ทั้งที่อัตรากำไรบาง · ' +
+    'เส้นประคือค่ากลาง (median) ของกลุ่มนี้ ไม่ใช่เป้า · วงสีส้มแดง = กำไรติดลบ</div>' +
+    '<div class="micro" style="margin-top:4px;color:var(--ink3)">แสดงเฉพาะจุดที่ข้อมูลกำไรครอบคลุม ≥ ' +
+    Math.round((typeof NRR_GP_MIN_COVERAGE === 'number' ? NRR_GP_MIN_COVERAGE : 0.7) * 100) +
+    '% ของยอด · ไม่รวมพอร์ตที่ไม่ได้อยู่ในรายชื่อ roster ของไฟล์ upsell</div>';
+}
+
+function nrrHandleMarginClick(e) {
+  var btn = e.target.closest && e.target.closest('.nrr-gp-entity-btn');
+  if (!btn) return;
+  var ent = btn.dataset.entity;
+  if (!ent || ent === nrrMarginState.entity) return;
+  nrrMarginState.entity = ent;
+  _nrrRenderMarginBody();
+}
+window.nrrHandleMarginClick = nrrHandleMarginClick;
+
 function nrrHandleCommSimClick(e) {
+  // v_gp: เดิมฟังก์ชันนี้ early-return ทันทีถ้าไม่ใช่ปุ่ม reset จึงต้องรีสตรัคเจอร์
+  // ไม่ใช่ต่อท้าย ไม่งั้นปุ่มสลับเลนส์จะไม่มีวันได้รับ event
+  var lensBtn = e.target.closest && e.target.closest('.nrr-gp-lens-btn');
+  if (lensBtn) {
+    var mode = lensBtn.dataset.lens;
+    if (mode && mode !== nrrCommLens) {
+      nrrCommLens = mode;
+      // ซ่อมแค่ใน #nrr-comm-brk เท่านั้น — ห้ามเรียก nrrRenderCommSimResults()
+      // เพราะถ้ามี override ค้างอยู่ มันจะ re-enumerate ~103,000 แถวใหม่ทั้งที่
+      // GP ไม่เปลี่ยนเงื่อนไขผ่านเกณฑ์ของแถวไหนเลย (GP เป็นเลนส์แสดงผล
+      // ไม่ใช่ input ของสูตร) แถวที่ enumerate ไว้แล้วถูกเก็บใน
+      // _nrrCommLastBrkRows ตอน paint ครั้งก่อน ใช้ซ้ำได้ตรงๆ
+      _nrrRepaintCommBreakdown();
+    }
+    return;
+  }
   if (e.target.id !== 'nrr-sim-reset') return;
   nrrCommSimState.overrides = { p1MinGmv: null, p3ThreshPct: null, p3MinIncr: null };
   nrrRenderCommSimShell();

@@ -262,6 +262,12 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-acct-badges{display:flex;gap:4px;align-items:center}
 .portview-churn-badge{font-size:var(--text-2xs);font-weight:var(--fw-bold);padding:2px 6px;border-radius:var(--r-sm);background:rgba(229,62,62,.2);color:#ff8888;border:1px solid rgba(229,62,62,.3);animation:badge-reveal 200ms ease-out both}
 .portview-acct-arrow{font-size:var(--text-lg);color:var(--tk-text-faint);position:absolute;right:14px;top:50%;transform:translateY(-50%)}
+/* v_gp: badge %GP ต่อร้านในพอร์ต — ล้างสีแดงที่ .portview-churn-badge ตั้งไว้
+   ออกก่อน เพราะแดงในหน้านี้แปลว่า "SKU หาย" ซึ่ง GP ไม่ใช่เรื่องเดียวกัน
+   ปกติใช้โทนกลาง (ไม่ใช่ ok/amb/danger) เพราะ GP ยังไม่มีเกณฑ์ให้ผ่าน
+   ติดลบเท่านั้นที่ขึ้นแดง เพราะขายแล้วขาดทุนเป็นข้อเท็จจริงที่ต้องเห็นทันที */
+.portview-gp-badge{background:rgba(255,255,255,.07);color:rgba(220,235,255,.82);border-color:rgba(255,255,255,.16)}
+.portview-gp-badge.neg{background:rgba(229,62,62,.14);color:#ff8888;border-color:rgba(229,62,62,.3)}
 
 /* ══ TL VIEW ══ */
 .portview-rep-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-lg);padding:14px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative}

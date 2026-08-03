@@ -912,6 +912,137 @@ function renderKamLastMonth(){
   return __legacyRenderKamLastMonthFallback();
 }
 
+// v_gp: บรรทัด GP ในการ์ด "ยอดซื้อ" — คืน '' เมื่อยังไม่มีข้อมูล ไม่เคยคืน ฿0
+//
+// data-gp ทุก element ที่มี GP อยู่ ต้องมี attribute นี้ เพราะ _doShareReport()
+// แคป DOM ด้วย html2canvas แล้วส่งภาพให้ลูกค้า — ตัวตัด [data-gp] ออกจาก clone
+// พึ่ง attribute นี้เป็นตัวจับ (ดู task GP 6) · GP คือกำไรของ Freshket
+// ห้ามหลุดออกไปนอกองค์กรเด็ดขาด
+function _kamGpRowHtml(monthLabel){
+  if(typeof senseGpFor!=='function')return'';
+  const g=senseGpFor(monthLabel);
+  if(!g)return'';                       // ไม่มีคอลัมน์ GP ในไฟล์ → ไม่ต้องมีบรรทัดนี้เลย
+  if(!g.ready){
+    // มีข้อมูลแต่ไม่พอ — บอกตรงๆ ดีกว่าโชว์ %GP ที่ต่ำเพราะข้อมูลขาด
+    return`<div class="kam-gp-row" data-gp="1">
+      <span class="kam-gp-label">GP</span>
+      <span class="kam-gp-pct">ข้อมูลกำไรยังไม่พอ (${Math.round(g.coverage*100)}% ของยอด)</span>
+    </div>`;
+  }
+  // fmt() คืน "฿-1,234" สำหรับเลขติดลบ ซึ่งอ่านแปลก → จัดเป็น "−฿1,234"
+  const neg=g.gp<0?' neg':'';
+  const amt=g.gp<0?('−'+fmt(-g.gp)):fmt(g.gp);
+  // ใช้ − ตัวเดียวกับจำนวนเงิน ไม่ใช่ hyphen ที่ toFixed คืนมา
+  const pct=g.gpPct<0?('−'+Math.abs(g.gpPct).toFixed(1)):g.gpPct.toFixed(1);
+  // ตัวส่วนของ %GP คือ GMV จากไฟล์ sense_skus เดียวกับ GP ไม่ใช่ยอดพาดหัว
+  // ด้านบน (มาจาก bulk_history) — ระบุไว้ใน title เพื่อไม่ให้หารมือแล้วไม่ตรง
+  const tip=`GP ${amt} จากยอด ${fmt(g.gmv)} `+
+            `(ข้อมูลกำไรครอบคลุม ${Math.round(g.coverage*100)}% ของยอดเดือนนี้)`;
+  // v_gp รอบ 2 (บุช): "กำไรมาจากไหน" กางออกจากบรรทัด GP รวม ไม่ใช่การ์ดแยก
+  //
+  // เหตุผลอยู่ติดกับตัวเลขที่มันอธิบาย — กด GP รวม แล้วมันแตกออกเป็นหมวด
+  // ดีกว่าการ์ดใหม่ที่ลอยอยู่ข้างล่างแล้วผู้อ่านต้องเชื่อมโยงเองว่าเกี่ยวกัน
+  // และไม่ต้องเพิ่มการ์ดถาวรในหน้าที่การ์ดแน่นอยู่แล้ว
+  //
+  // เรนเดอร์เนื้อในไว้เลยแล้วซ่อนด้วย hidden ไม่ใช่ re-render ตอนกด — การกดจึง
+  // ไม่ต้องแตะ renderKamLastMonth() ทั้งก้อน (ไม่เสี่ยง race/เสียตำแหน่ง scroll)
+  const body=_kamGpByCatBodyHtml(monthLabel);
+  if(!body){
+    // ไม่มีรายละเอียดให้กาง → เป็นบรรทัดเฉยๆ ไม่ต้องทำให้กดได้ทั้งที่กดแล้วไม่มีอะไร
+    return`<div class="kam-gp-row" data-gp="1" title="${tip}">
+      <span class="kam-gp-label">กำไร (GP)</span>
+      <span class="kam-gp-val${neg}">${amt}</span>
+      <span class="kam-gp-pct">${pct}% ของยอด</span>
+    </div>`;
+  }
+  const open=(typeof kamGpCatOpen!=='undefined'&&kamGpCatOpen);
+  return`<div class="kam-gp-block" data-gp="1">
+    <div class="kam-gp-row kam-gp-row-btn${open?' open':''}" id="kam-gp-toggle" title="${tip}"
+         role="button" tabindex="0" aria-expanded="${open?'true':'false'}" aria-controls="kam-gp-cat-body"
+         onclick="toggleKamGpCat()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleKamGpCat();}">
+      <span class="kam-gp-label">กำไร (GP)</span>
+      <span class="kam-gp-val${neg}">${amt}</span>
+      <span class="kam-gp-pct">${pct}% ของยอด</span>
+      <span class="kam-gp-chev" aria-hidden="true">›</span>
+    </div>
+    <div class="kam-gp-cat-body" id="kam-gp-cat-body"${open?'':' hidden'}>${body}</div>
+  </div>`;
+}
+
+// v_gp: กาง/พับ "กำไรมาจากไหน" — สลับที่ DOM ตรงๆ ไม่ re-render การ์ดใหม่
+function toggleKamGpCat(){
+  kamGpCatOpen=!kamGpCatOpen;
+  const body=document.getElementById('kam-gp-cat-body');
+  const btn=document.getElementById('kam-gp-toggle');
+  if(body)body.hidden=!kamGpCatOpen;
+  if(btn){
+    btn.classList.toggle('open',kamGpCatOpen);
+    btn.setAttribute('aria-expanded',kamGpCatOpen?'true':'false');
+  }
+}
+window.toggleKamGpCat=toggleKamGpCat;
+
+// v_gp: เนื้อใน "กำไรมาจากไหน" — GP แยกตามหมวดสินค้า
+//
+// บรรทัด GP รวมบอกได้แค่ว่ากำไรเดือนนี้เท่าไหร่ · ส่วนนี้ตอบว่า *มาจากไหน*
+// ซึ่งเป็นสิ่งที่บุชบอกว่าทีมยังไม่รู้ ("ทีมยังไม่รู้วิธี control หรือเข้าใจว่า
+// อะไร drive สิ่งนี้") — เป็นเหตุผลของฟีเจอร์นี้ทั้งอัน ไม่ใช่ของแถม
+//
+// แถบสัดส่วนใช้ "ส่วนแบ่งของกำไร" ไม่ใช่ส่วนแบ่งของยอดขาย — จุดที่ทำให้อ่านรู้
+// เรื่องคือเห็นว่าหมวดที่ยอดใหญ่ไม่ใช่หมวดที่กำไรใหญ่ ซึ่งถ้าวาดด้วยส่วนแบ่ง
+// ยอดขายจะมองไม่เห็นเลย
+//
+// คืน '' เมื่อไม่มีอะไรให้กาง — ผู้เรียกใช้ค่านี้ตัดสินว่าจะทำให้บรรทัด GP
+// กดได้หรือไม่ (ห้ามมีปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น)
+function _kamGpByCatBodyHtml(monthLabel){
+  if(typeof senseGpByCategory!=='function')return'';
+  const cats=senseGpByCategory(monthLabel);
+  if(!cats||!cats.length)return'';
+  // แสดงเฉพาะหมวดที่ข้อมูลพอเชื่อ ที่เหลือรวบเป็นบรรทัดเดียวอย่างซื่อสัตย์
+  //
+  // ต้องบอกยอดขายของหมวดที่ถูกตัดออกด้วย ไม่ใช่แค่จำนวนหมวด เพราะถ้าเงียบ
+  // ผลรวมของแถบในการ์ดจะไม่ตรงกับ GP รวมของร้านในการ์ด "ยอดซื้อ" แล้วคนอ่าน
+  // จะจับได้ว่าไม่ตรงแต่หาสาเหตุไม่ได้ → เสียความเชื่อถือทั้งฟีเจอร์
+  const ready=cats.filter(function(c){return c.ready;});
+  const hidden=cats.filter(function(c){return !c.ready;});
+  const hiddenGmv=hidden.reduce(function(s,c){return s+(c.gmv||0);},0);
+  if(!ready.length)return'';
+  // จำกัด 6 หมวดเพื่อไม่ให้การ์ดยาวเกินจอ 440px — แต่ต้องบอกว่าตัดไปเท่าไหร่
+  // (เคยพลาดแบบเงียบมาแล้วทั้งเรื่องหมวดที่ไม่มีข้อมูล และ cap 500 แถวของ /nrr)
+  const CAT_CAP=6;
+  const top=ready.slice(0,CAT_CAP);
+  const cappedN=ready.length-top.length;
+  const cappedGmv=ready.slice(CAT_CAP).reduce(function(s,c){return s+(c.gmv||0);},0);
+  // ตัวหารของแถบ = ผลรวม |GP| ของหมวดที่แสดง เพื่อให้หมวดขาดทุนไม่ทำให้
+  // สเกลเพี้ยน (ถ้าใช้ผลรวมแบบมีเครื่องหมาย หมวดลบจะหักให้ตัวหารเล็กลง
+  // แล้วแถบของหมวดอื่นจะยาวเกินจริง)
+  const denom=top.reduce(function(s,c){return s+Math.abs(c.gp);},0)||1;
+  const rows=top.map(function(c){
+    const share=Math.max(2,Math.round(Math.abs(c.gp)/denom*100));
+    const neg=c.gp<0;
+    const amt=neg?('−'+fmt(-c.gp)):fmt(c.gp);
+    const pct=c.gpPct<0?('−'+Math.abs(c.gpPct).toFixed(1)):c.gpPct.toFixed(1);
+    return`<div class="kam-gpcat-row" title="${_commEscapeHtml(c.cat)} · ยอด ${fmt(c.gmv)} · กำไร ${amt} · ${c.skuCount} SKU">
+      <div class="kam-gpcat-top">
+        <span class="kam-gpcat-name">${_commEscapeHtml(c.cat)}</span>
+        <span class="kam-gpcat-amt${neg?' neg':''}">${amt}</span>
+        <span class="kam-gpcat-pct">${pct}%</span>
+      </div>
+      <div class="kam-gpcat-bar"><span class="kam-gpcat-fill${neg?' neg':''}" style="width:${share}%"></span></div>
+    </div>`;
+  }).join('');
+  const footParts=[];
+  if(cappedN>0)footParts.push(`แสดง ${top.length} หมวดที่กำไรมากสุด · อีก ${cappedN} หมวด (ยอด ${fmt(cappedGmv)}) ไม่ได้แสดง`);
+  if(hidden.length>0)footParts.push(`อีก ${hidden.length} หมวด (ยอด ${fmt(hiddenGmv)}) ข้อมูลกำไรไม่ครบพอ`);
+  const foot=footParts.length
+    ?`<div class="kam-gpcat-foot">${footParts.join(' · ')} — ยอดส่วนที่ไม่แสดงยังนับอยู่ในกำไรรวมด้านบน</div>`
+    :'';
+  return`<div class="kam-gpcat-title">กำไรมาจากไหน</div>
+    <div class="kam-gpcat-hint">ความยาวแถบ = ส่วนแบ่งของ<b>กำไร</b> ไม่ใช่ส่วนแบ่งของยอดขาย · ตัวเลขขวาคือ %GP ของหมวดนั้น</div>
+    ${rows}
+    ${foot}`;
+}
+
 function __legacyRenderKamLastMonthFallback(){
   _renderKamHeader();
   const ctx=buildKamContext();
@@ -943,6 +1074,7 @@ function __legacyRenderKamLastMonthFallback(){
       <div class="kam-dc-body">
         <div class="kam-gmv-main">${fmt(sp.current)}<span style="font-size:var(--text-base);font-weight:var(--fw-normal);color:rgba(220,235,255,.6)">/เดือน</span>${trendHtml}</div>
         <div class="kam-gmv-sub">${sp.orders} ออเดอร์${sp.prevMonth?' · เทียบจาก '+sp.prevMonth:''}</div>
+        ${_kamGpRowHtml(sp.month)}
       </div>
       <div class="kam-dc-insight" id="dc-insight-gmv" style="display:none"></div>
     </div>
@@ -2346,6 +2478,20 @@ async function _doShareReport(){
   _wrapper.style.cssText='position:fixed;left:-9999px;top:0;width:'+_captureW+'px;background:#fff;z-index:-1;';
   var _clone=doc.cloneNode(true);
   _clone.style.cssText='width:'+_captureW+'px;border-radius:0;box-shadow:none;background:#fff;';
+  // v_gp: ชั้นป้องกันที่สอง — ตัดทุก element ที่ติด data-gp ออกจาก clone ก่อนแคป
+  //
+  // ชั้นแรกคือ "ห้ามเขียน GP ลงใน #rpt2-doc ตั้งแต่แรก" (โครงสร้าง) แต่ชั้นเดียว
+  // ไม่พอ เพราะ html2canvas แคป DOM ตามที่เห็น ไม่ได้ re-render จากข้อมูล
+  // ถ้าอนาคตมีใครเผลอเพิ่ม GP ลงหน้ารายงาน ภาพที่ส่งให้ลูกค้าจะมีกำไรของ
+  // Freshket ติดไปด้วยทันทีโดยไม่มีอะไรเตือน · ตรงนี้ตัดจาก clone ไม่ใช่ DOM จริง
+  // จึงไม่กระทบสิ่งที่ KAM เห็นบนจอ
+  try{
+    var _gpLeaks=_clone.querySelectorAll('[data-gp]');
+    for(var _gi=0;_gi<_gpLeaks.length;_gi++){
+      if(_gpLeaks[_gi].parentNode)_gpLeaks[_gi].parentNode.removeChild(_gpLeaks[_gi]);
+    }
+    if(_gpLeaks.length)console.warn('[gp] ตัด '+_gpLeaks.length+' element ที่มี GP ออกจากรายงานที่จะแชร์');
+  }catch(e){}
   _wrapper.appendChild(_clone);
   document.body.appendChild(_wrapper);
   var canvas=await window.html2canvas(_clone,{
@@ -2862,6 +3008,32 @@ function renderSkuDetailContent(sku,priceData){
   const lastPr=last.price>=100?last.price.toFixed(0):last.price.toFixed(2);
   const mnStr=mn>=100?mn.toFixed(0):mn.toFixed(2);
   const mxStr=mx>=100?mx.toFixed(0):mx.toFixed(2);
+
+  // v_gp: ช่องที่ 4 — %GP ของ SKU นี้ (ไม่ใช่ GP ต่อหน่วยตามแผนตั้งต้น)
+  //
+  // เหตุผลที่เปลี่ยนจาก "GP/หน่วย": ราคาที่โชว์ในช่อง "ราคาล่าสุด" ไม่ได้มาจาก
+  // สูตรเดียวกันทุกชนิดสินค้า — per_kg/per_liter หารจาก unit_price แต่ per_ea
+  // หารจาก avg_piece_price (ดู _q6bFactor ใน 02_data_pipeline.js) ถ้าเอา
+  // margin/qty_kg/divisor มาวางข้างๆ มันจะไม่ตรงฐานกันเฉพาะกลุ่มสินค้านับชิ้น
+  // (ไข่ ขวด ผลไม้) = ตัวเลขผิดแบบเงียบๆ ในจุดที่กำลังสอนทีมให้เชื่อ GP
+  //
+  // %GP เป็นอัตราส่วนล้วน ไม่ต้องแปลงหน่วยเลย จึงผิดไม่ได้ และเทียบข้าม SKU
+  // ที่หน่วยต่างกันได้จริง ซึ่งตรงกับเป้าหมาย "ให้ทีมเข้าใจว่าอะไร drive GP"
+  // มากกว่า ฿/กก. ที่เทียบข้ามหน่วยไม่ได้ · GP บาท ยังอ่านได้ใน title
+  let gpCellHtml='';
+  const _gpSku=(typeof senseGpFromSkuRows==='function')?senseGpFromSkuRows([sku]):null;
+  if(_gpSku&&_gpSku.hasData&&_gpSku.ready){
+    const _gpPctStr=_gpSku.gpPct.toFixed(1);
+    const _gpC=_gpSku.gp<0?'var(--danger)':'var(--n900)';
+    const _gpAmt=_gpSku.gp<0?('−'+fmt(-_gpSku.gp)):fmt(_gpSku.gp);
+    gpCellHtml=`<div style="flex:1;padding:8px;text-align:center" data-gp="1" title="กำไร ${_gpAmt} จากยอด ${fmt(_gpSku.gmv)} ในเดือนล่าสุด">
+      <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">%GP</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:${_gpC}">${_gpPctStr}%</div>
+    </div>`;
+  }
+  // ไม่มี GP → ไม่ต้องมีช่องที่ 4 เลย และช่อง "สั่ง/เดือน" ต้องไม่มีเส้นขวา
+  // (เส้นขวาย้ายมาอยู่ที่ช่อง 3 เฉพาะเมื่อมีช่อง 4 จริง)
+  const _cell3Border=gpCellHtml?'border-right:1px solid var(--n100)':'';
   return`<div style="padding:12px 16px 0">
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div><div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
@@ -2890,10 +3062,11 @@ function renderSkuDetailContent(sku,priceData){
       <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สูงสุด</div>
       <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:#9a6500">฿${mxStr}</div>
     </div>
-    <div style="flex:1;padding:8px;text-align:center">
+    <div style="flex:1;padding:8px;text-align:center;${_cell3Border}">
       <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สั่ง/เดือน</div>
       <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
     </div>
+    ${gpCellHtml}
   </div>
   ${oppHtml}
   <div style="height:12px"></div>`;

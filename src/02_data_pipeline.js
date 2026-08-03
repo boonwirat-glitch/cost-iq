@@ -420,6 +420,14 @@ function handleFileUpload(type,input){
         const eaUnitName=(p[15+off]||'').trim();
         const universalEaValue=parseFloat(p[16+off])||0;
         const lastOrderDate=(p[17+off]||'').trim()||null; // SQL1 v207h: YYYY-MM-DD
+        // SQL1 v_gp: margin_ex_vat + gmv_with_margin, appended as the two
+        // trailing columns. gmvWithMargin is the load-bearing one: margin alone
+        // is ambiguous because parseFloat('')||0 and a genuine ฿0 margin are the
+        // same value, and a real margin can legitimately be 0 or negative. A
+        // pre-GP CSV has no column here → gmvWithMargin 0 → senseGpFor() reports
+        // "no data" instead of rendering a confident ฿0.
+        const margin=parseFloat(p[18+off])||0;
+        const gmvWithMargin=parseFloat(p[19+off])||0;
         if(!aid||!mo||!itemId)return null;
 
         // ── 4-tier display_price logic ──────────────────────────────────────
@@ -490,7 +498,9 @@ function handleFileUpload(type,input){
           q6b_factor:_q6bFactor,
           // legacy compat: keep q6b_ea_divide for any code still reading it
           q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1,
-          last_order_date: lastOrderDate  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
+          last_order_date: lastOrderDate,  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
+          margin: margin,                  // SQL1 v_gp: GP บาท ของ SKU นี้ในเดือนนี้ (ติดลบได้)
+          gmv_with_margin: gmvWithMargin   // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
         }};
       }
 

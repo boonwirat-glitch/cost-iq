@@ -1037,6 +1037,25 @@ function __legacyRenderPortviewListFallback(){
     return{churnBadge,catBadge,acctTypeBadge};
   }
 
+  // v_gp: %GP ของร้านนี้ — Portview คือหน้าที่ KAM เปิดทุกวัน ถ้า GP ไม่โผล่
+  // ที่นี่ ทีมก็จะไม่เคยเห็นมันเลยจนกว่าจะกดเข้าไปในร้านแต่ละร้าน
+  //
+  // โชว์เป็น % เท่านั้น ไม่โชว์จำนวนเงิน เพราะแถวนี้แน่นอยู่แล้ว และ % คือตัวที่
+  // เทียบข้ามร้านได้จริง (ร้านใหญ่กำไรเป็นก้อนใหญ่เป็นเรื่องธรรมดา ไม่ได้บอกว่าดี)
+  // จำนวนเงิน + เดือน อยู่ใน title · ไม่มีข้อมูล/ข้อมูลไม่พอ = ไม่มี badge เลย
+  // ไม่ใช่ badge ที่เขียน 0% ซึ่งจะอ่านว่า "ร้านนี้ไม่มีกำไร"
+  function _pvGpBadge(a){
+    try{
+      if(typeof senseGpForAccount!=='function')return'';
+      const g=senseGpForAccount(a.id);
+      if(!g||!g.ready)return'';
+      const neg=g.gp<0;
+      const p=neg?('−'+Math.abs(g.gpPct).toFixed(1)):g.gpPct.toFixed(1);
+      const amt=(neg?'−฿':'฿')+Math.round(Math.abs(g.gp)).toLocaleString();
+      return`<span class="portview-churn-badge portview-gp-badge${neg?' neg':''}" data-gp="1" title="กำไร ${amt} จากยอด ฿${Math.round(g.gmv).toLocaleString()} · เดือน ${g.month}">GP ${p}%</span>`;
+    }catch(e){ return''; }   // GP ต้องไม่ทำให้แถวในพอร์ตพัง
+  }
+
   function _buildSparkline(a, cls){
     const aid=a.id;
     const hist=(bulkHistoryData[aid]||[]);
@@ -1112,7 +1131,7 @@ function __legacyRenderPortviewListFallback(){
           <div class="pv-card-left">
             <div class="portview-acct-top">${_dotHtml}<div class="portview-acct-name">${a.name}</div>${acctTypeBadge}</div>
             <div class="portview-acct-gmv-row">ยอด ${sig?fmtK(sig.gmvToDate):'—'} · ยังไม่มี baseline</div>
-            <div class="portview-acct-badge-row">${churnSegs}</div>
+            <div class="portview-acct-badge-row">${churnSegs}${_pvGpBadge(a)}</div>
           </div>
           <div class="pv-right-block">
             <div class="portview-acct-pace new">ร้านใหม่</div>
@@ -1133,7 +1152,7 @@ function __legacyRenderPortviewListFallback(){
         <div class="pv-card-left">
           <div class="portview-acct-top">${_dotHtml}<div class="portview-acct-name">${a.name}</div>${acctTypeBadge}${handoffBadge}</div>
           <div class="portview-acct-gmv-row">${rrHtml}</div>
-          <div class="portview-acct-badge-row">${churnSegs}</div>
+          <div class="portview-acct-badge-row">${churnSegs}${_pvGpBadge(a)}</div>
         </div>
         <div class="pv-right-block">
           <div class="portview-acct-pace ${cls}">${pctStr}</div>

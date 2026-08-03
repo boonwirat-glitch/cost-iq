@@ -1,4 +1,4 @@
-<!-- Freshket Sense v947: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v948: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1113,6 +1113,52 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .kam-trend-chip{display:inline-block;font-size:var(--text-sm);font-weight:var(--fw-bold);padding:2px 8px;border-radius:var(--r-xl);margin-left:8px;font-family:"IBM Plex Mono",monospace}
 .kam-trend-chip.up{background:var(--tk-ok-dim);color:var(--tk-ok-bright)}
 .kam-trend-chip.dn{background:rgba(229,62,62,.12);color:rgba(255,120,120,.9)}
+/* v_gp: GP บรรทัดที่สองในการ์ด "ยอดซื้อ" — เลนส์คนละชนิดกับ GMV จึงคั่นด้วยเส้น
+   ไม่ใช่วางต่อกันเหมือนตัวเลขชุดเดียวกัน · เจตนาให้เล็กกว่า .kam-gmv-main
+   เพราะ GP ยังไม่ใช่ตัวชี้วัดที่ทีมถูกวัด (Jan 2027) — พอเริ่มวัดค่อยเลื่อนขึ้น
+   ห้ามใส่สี ok/amb/danger: สีชุดนั้นในแอปนี้แปลว่า "ผ่าน/ไม่ผ่านเกณฑ์" */
+.kam-gp-row{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.09);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.kam-gp-label{font-size:var(--text-sm);color:rgba(220,235,255,.62);text-transform:uppercase;letter-spacing:.5px;font-weight:var(--fw-semi)}
+.kam-gp-val{font-family:"IBM Plex Mono",monospace;font-size:var(--text-lg);font-weight:var(--fw-bold);color:rgba(220,235,255,.95)}
+.kam-gp-pct{font-family:"IBM Plex Mono",monospace;font-size:var(--text-sm);color:rgba(220,235,255,.72)}
+/* GP ติดลบ = สินค้าล่อลูกค้า เป็นข้อเท็จจริงที่ต้องอ่านออก ไม่ใช่สถานะ "แดง/ไม่ผ่าน" */
+.kam-gp-val.neg{color:rgba(255,150,150,.92)}
+.kam-gp-note{flex-basis:100%;font-size:var(--text-xs);color:rgba(220,235,255,.5);font-style:italic}
+/* v_gp: "กำไรมาจากไหน" — GP ต่อหมวดสินค้า กางออกจากบรรทัด GP รวม (บุช รอบ 2)
+   แถบใช้สีเขียวของ Sense (--tk-ok-*) เป็นสีของ "กำไร" ไม่ใช่สีของ "ผ่านเกณฑ์"
+   จึงไม่ชนความหมายกับ ramp สถานะ เพราะที่นี่ไม่มีเกณฑ์ให้ผ่านอยู่แล้ว */
+.kam-gp-block{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.09)}
+/* .kam-gp-row เดิมมี margin/border-top ของตัวเอง — ในโหมดกางได้ ให้ .kam-gp-block
+   เป็นเจ้าของเส้นคั่นแทน ไม่งั้นจะได้เส้นซ้อนสองเส้น */
+.kam-gp-block .kam-gp-row{margin-top:0;padding-top:0;border-top:none}
+.kam-gp-row-btn{cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:var(--r-sm);
+  margin:-4px -6px;padding:4px 6px;transition:background 140ms ease}
+.kam-gp-row-btn:hover,.kam-gp-row-btn:focus-visible{background:rgba(255,255,255,.05)}
+.kam-gp-row-btn:focus-visible{outline:1px solid var(--tk-ok-bright);outline-offset:1px}
+/* ลูกศรหมุนลงเมื่อกาง — ตัว › เดียวกับที่แอปใช้ที่อื่น (kna-recent-card) */
+.kam-gp-chev{margin-left:auto;flex-shrink:0;font-size:var(--text-lg);line-height:1;
+  color:rgba(220,235,255,.5);transition:transform 160ms cubic-bezier(.16,1,.3,1)}
+.kam-gp-row-btn.open .kam-gp-chev{transform:rotate(90deg)}
+.kam-gp-cat-body{margin-top:10px;animation:kamGpCatIn 180ms cubic-bezier(.16,1,.3,1) both}
+@keyframes kamGpCatIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .kam-gp-cat-body{animation:none}
+  .kam-gp-chev{transition:none}
+}
+.kam-gpcat-title{font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;
+  letter-spacing:.6px;color:rgba(220,235,255,.6);margin-bottom:6px}
+.kam-gpcat-hint{font-size:var(--text-xs);color:rgba(220,235,255,.55);line-height:1.5;margin-bottom:10px}
+.kam-gpcat-row{margin-bottom:9px}
+.kam-gpcat-row:last-of-type{margin-bottom:2px}
+.kam-gpcat-top{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.kam-gpcat-name{flex:1;min-width:0;font-size:var(--text-sm);font-weight:var(--fw-semi);color:rgba(255,255,255,.82);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kam-gpcat-amt{font-family:"IBM Plex Mono",monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(220,235,255,.95);flex-shrink:0}
+.kam-gpcat-amt.neg{color:rgba(255,150,150,.92)}
+.kam-gpcat-pct{font-family:"IBM Plex Mono",monospace;font-size:var(--text-xs);color:rgba(220,235,255,.6);flex-shrink:0;min-width:44px;text-align:right}
+.kam-gpcat-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden}
+.kam-gpcat-fill{display:block;height:100%;border-radius:3px;background:var(--tk-ok-bright)}
+.kam-gpcat-fill.neg{background:rgba(255,120,120,.75)}
+.kam-gpcat-foot{margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:var(--text-xs);color:rgba(220,235,255,.5)}
 /* Outlet rows */
 .kam-outlet-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:var(--text-md)}
 .kam-outlet-ind{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);font-weight:var(--fw-bold);flex-shrink:0}
@@ -1268,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v947',
+      version: 'v948',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -8264,6 +8310,12 @@ body.kad-mode .topbar{background:var(--tk-topbar-gradient)}
 .portview-acct-badges{display:flex;gap:4px;align-items:center}
 .portview-churn-badge{font-size:var(--text-2xs);font-weight:var(--fw-bold);padding:2px 6px;border-radius:var(--r-sm);background:rgba(229,62,62,.2);color:#ff8888;border:1px solid rgba(229,62,62,.3);animation:badge-reveal 200ms ease-out both}
 .portview-acct-arrow{font-size:var(--text-lg);color:var(--tk-text-faint);position:absolute;right:14px;top:50%;transform:translateY(-50%)}
+/* v_gp: badge %GP ต่อร้านในพอร์ต — ล้างสีแดงที่ .portview-churn-badge ตั้งไว้
+   ออกก่อน เพราะแดงในหน้านี้แปลว่า "SKU หาย" ซึ่ง GP ไม่ใช่เรื่องเดียวกัน
+   ปกติใช้โทนกลาง (ไม่ใช่ ok/amb/danger) เพราะ GP ยังไม่มีเกณฑ์ให้ผ่าน
+   ติดลบเท่านั้นที่ขึ้นแดง เพราะขายแล้วขาดทุนเป็นข้อเท็จจริงที่ต้องเห็นทันที */
+.portview-gp-badge{background:rgba(255,255,255,.07);color:rgba(220,235,255,.82);border-color:rgba(255,255,255,.16)}
+.portview-gp-badge.neg{background:rgba(229,62,62,.14);color:#ff8888;border-color:rgba(229,62,62,.3)}
 
 /* ══ TL VIEW ══ */
 .portview-rep-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-lg);padding:14px;margin-bottom:8px;cursor:pointer;transition:all .2s;position:relative}
@@ -14430,6 +14482,7 @@ let collapsedCats=new Set();  // plan builder category collapse state
 let skuFilter='ทั้งหมด';
 let kamSubtab='thismonth'; // 'thismonth' | 'lastmonth'
 let churnExpanded=false;let skuSignalInfoOpen=false;  // expand all SKU signals beyond initial 15
+let kamGpCatOpen=false;  // v_gp: กาง "กำไรมาจากไหน" ออกจากบรรทัด GP รวม (ปิดไว้ก่อน)
 let skuSubstituteMap={};  // {churned_item_id: {substituteName, spendChange, reason}} — เดือนนี้ tab
 let skuSubstituteLoading=false;
 let skuSubstituteDone=false;
@@ -14485,6 +14538,124 @@ let kamStateCache={html:null,insights:null,accountId:null};
 let skuView='gmv'; // 'gmv' | 'price' — SKU list view mode
 let priceMovFilter=null; // 'up'|'stable'|'down'|null
 let heroLockedToCurrent=false; // true when D.current_month is shown in hero (restaurant mode)
+
+// ════════════════════════════════════════
+// GROSS PROFIT (GP) — v_gp
+// ════════════════════════════════════════
+// SECTION:GROSS_PROFIT
+//
+// ผู้คำนวณ %GP รายเดียวของ Sense — ทุกจุดที่แสดง GP ต้องเรียกผ่านนี้
+// (แฝดของ nrrGpFor() ใน src/nrr/nrr_logic.js) วันที่ย้าย %NRR ไปวัดที่ฐาน GP
+// จะมีที่แก้ที่เดียว
+//
+// สัญญาที่จุดแสดงผลทุกจุดต้องเชื่อได้:
+//   - ยังไม่มีข้อมูล → คืน null ไม่เคยคืน {gp:0} เพราะเงินที่ขึ้น ฿0 แล้ว
+//     เปลี่ยนเป็นเลขจริงทีหลัง คือบั๊กความเชื่อใจที่รีโปนี้เคยเจอมาแล้ว
+//     (ดูแพตเทิร์นเดียวกันที่ 07b_cds.js:193-204)
+//   - coverage ต่ำกว่าเกณฑ์ → คืน {ready:false} ให้ผู้เรียกแสดงข้อความ
+//     "ข้อมูลกำไรยังไม่พอ" แทนตัวเลขที่ดูมั่นใจแต่ผิด
+//   - GP ติดลบเป็นเรื่องปกติ (สินค้าล่อลูกค้า) ห้ามตัดทิ้งหรือ clamp เป็น 0
+const SENSE_GP_MIN_COVERAGE = 0.70;   // ต่ำกว่านี้ = ไม่พอให้เชื่อ (บุชเคาะได้ แก้ที่นี่ที่เดียว)
+
+// รวม GP จาก array ของแถว SKU (รูปแบบที่ _parseSKULine คืนมา)
+// ใช้ได้ทั้งระดับร้าน (ทั้งเดือน), ระดับหมวด (กรองมาก่อน) และ SKU เดียว ([row])
+function senseGpFromSkuRows(rows){
+  if(!Array.isArray(rows)||!rows.length)return null;
+  let gp=0,gmv=0,gmvWithMargin=0,n=0;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    // ไม่ใช้ ||0 กับ margin แบบหลวมๆ ตรงนี้ เพราะ margin ติดลบต้องบวกเข้าไปตามจริง
+    gp+=(typeof r.margin==='number'?r.margin:0);
+    gmv+=(r.gmv||0);
+    gmvWithMargin+=(r.gmv_with_margin||0);
+    n++;
+  }
+  if(!n||gmv<=0)return null;
+  // coverage วัดจาก "GMV ที่มีค่า margin จริง" หารด้วย GMV ทั้งหมด — ไม่ใช่จำนวนแถว
+  // เพราะ SKU ตัวเล็ก 100 ตัวที่ไม่มี margin สำคัญน้อยกว่า SKU ตัวใหญ่ 1 ตัวที่ไม่มี
+  const coverage=gmvWithMargin/gmv;
+  return{
+    gp:gp,
+    gmv:gmv,                       // ตัวส่วนที่ใช้จริง มาจากไฟล์เดียวกับ GP
+    gpPct:gp/gmv*100,
+    coverage:coverage,
+    ready:coverage>=SENSE_GP_MIN_COVERAGE,
+    hasData:gmvWithMargin>0         // false = CSV ยังไม่มีคอลัมน์ GP เลย
+  };
+}
+
+// GP ระดับร้าน ของเดือนหนึ่ง — monthLabel เป็น key ของ D.skus_monthly ('ก.ค. 2569')
+// คืน null ถ้าไม่มีเดือนนั้น เพื่อให้ผู้เรียก fail-safe ไปที่ "ยังไม่มีข้อมูล"
+function senseGpFor(monthLabel){
+  if(!monthLabel||!D||!D.skus_monthly)return null;
+  const res=senseGpFromSkuRows(D.skus_monthly[monthLabel]);
+  if(!res||!res.hasData)return null;   // ไม่มีคอลัมน์ GP ในไฟล์ = ไม่แสดงอะไรเลย
+  return res;
+}
+
+// GP ของร้าน "ร้านใดก็ได้" ในพอร์ต ไม่ใช่แค่ร้านที่เปิดอยู่
+//
+// ใช้ที่หน้า Portview ซึ่งเป็นหน้าที่ KAM เปิดดูทุกวัน · อ่านจาก bulkSkusData
+// (ไฟล์เดียวกับ D.skus_monthly แต่ยังไม่ถูกตัดเหลือร้านเดียว — 02_data_pipeline.js
+// เก็บเป็น bulkSkusData[accountId][monthLabel] แล้ว 01_core.js ค่อยหยิบร้านที่เปิด
+// มาใส่ D.skus_monthly) จึงไม่ต้องโหลดไฟล์เพิ่มเลย
+//
+// monthLabel ไม่ใส่ = ใช้เดือนล่าสุดที่ร้านนั้นมีข้อมูล — คืนมาใน .month ด้วย
+// เพื่อให้จุดแสดงผลบอกได้ว่าเป็นเดือนไหน ไม่ให้เดา
+function senseGpForAccount(accountId,monthLabel){
+  if(!accountId)return null;
+  const src=(typeof bulkSkusData!=='undefined'&&bulkSkusData)?bulkSkusData[accountId]:null;
+  if(!src)return null;
+  let mo=monthLabel;
+  if(!mo){
+    const keys=Object.keys(src);
+    if(!keys.length)return null;
+    const _ms=m=>{const p=(m||'').split(' ');const arr=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(p[1]||0)*12)+arr.indexOf(p[0]);};
+    mo=keys.slice().sort((a,b)=>_ms(b)-_ms(a))[0];
+  }
+  const res=senseGpFromSkuRows(src[mo]);
+  if(!res||!res.hasData)return null;
+  res.month=mo;
+  return res;
+}
+
+// GP แยกตามหมวดสินค้า (dept) ของเดือนหนึ่ง — เรียงจากกำไรมากไปน้อย
+//
+// นี่คือจุดที่ตอบคำถาม "อะไร drive GP" ได้จริง เพราะหมวดสินค้าคือระดับที่ KAM
+// ลงมือทำอะไรได้ (เชียร์หมวดไหน เลี่ยงหมวดไหน) ต่างจาก GP รวมของร้านที่บอกได้
+// แค่ว่าดีหรือไม่ดี แต่ไม่บอกว่าเพราะอะไร
+//
+// จัดกลุ่มจาก D.skus_monthly ไฟล์เดียวกับที่ GP มา ไม่ใช่ D.cats_monthly
+// (bulk_categories.csv ไม่มีคอลัมน์ margin) — ตัวเลขจึงบวกกันได้ลงตัวกับ
+// GP รวมของร้านที่แสดงในการ์ด "ยอดซื้อ" เป๊ะ ไม่ต้องกระทบยอดข้ามไฟล์
+function senseGpByCategory(monthLabel){
+  if(!monthLabel||!D||!D.skus_monthly)return null;
+  const rows=D.skus_monthly[monthLabel];
+  if(!Array.isArray(rows)||!rows.length)return null;
+  const byCat={};
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r)continue;
+    const cat=(r.d||'').trim()||'ไม่ระบุหมวด';
+    if(!byCat[cat])byCat[cat]=[];
+    byCat[cat].push(r);
+  }
+  const out=[];
+  Object.keys(byCat).forEach(function(cat){
+    const rowsOfCat=byCat[cat];
+    const g=senseGpFromSkuRows(rowsOfCat);
+    if(!g){return;}
+    // หมวดที่ไม่มีข้อมูลกำไรเลย ยังต้องคืนออกไปพร้อมธง hasData:false
+    // ไม่ใช่หายไปเงียบๆ — ไม่งั้นยอดขายของหมวดนั้นจะหลุดออกจากการ์ดโดยที่
+    // ไม่มีอะไรบอก แล้วผลรวมในการ์ดจะไม่ตรงกับ GP รวมของร้านแบบอธิบายไม่ได้
+    out.push({cat:cat,skuCount:rowsOfCat.length,gp:g.gp,gmv:g.gmv,gpPct:g.gpPct,
+              coverage:g.coverage,ready:g.ready,hasData:g.hasData});
+  });
+  if(!out.length)return null;
+  // เรียงตามจำนวนเงินกำไร ไม่ใช่ %GP — หมวดที่ทำกำไรเป็นก้อนใหญ่คือหมวดที่
+  // ต้องรู้ก่อน ส่วน %GP สูงในหมวดจิ๋วเป็นเรื่องน่ารู้แต่ไม่ใช่เรื่องเร่งด่วน
+  out.sort(function(a,b){return b.gp-a.gp;});
+  return out;
+}
 
 // ════════════════════════════════════════
 // KAM SIGNALS (rule-based, no AI)
@@ -14806,7 +14977,7 @@ function switchAccount(accountId){
   // switchAccount debug log removed (v257)
   saveToStorage();
   kamStateCache={html:null,insights:null,accountId:null};
-  churnExpanded=false;_catExpanded=true;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
+  churnExpanded=false;_catExpanded=true;kamGpCatOpen=false;skuSubstituteMap={};skuSubstituteLoading=false;skuSubstituteDone=false;
   skuSubstituteMapLM={};skuSubstituteLoadingLM=false;skuSubstituteDoneLM=false;
   // Reset insight button to default (non-done) state
   const _ib=document.getElementById('kam-insight-btn');
@@ -15342,6 +15513,14 @@ function handleFileUpload(type,input){
         const eaUnitName=(p[15+off]||'').trim();
         const universalEaValue=parseFloat(p[16+off])||0;
         const lastOrderDate=(p[17+off]||'').trim()||null; // SQL1 v207h: YYYY-MM-DD
+        // SQL1 v_gp: margin_ex_vat + gmv_with_margin, appended as the two
+        // trailing columns. gmvWithMargin is the load-bearing one: margin alone
+        // is ambiguous because parseFloat('')||0 and a genuine ฿0 margin are the
+        // same value, and a real margin can legitimately be 0 or negative. A
+        // pre-GP CSV has no column here → gmvWithMargin 0 → senseGpFor() reports
+        // "no data" instead of rendering a confident ฿0.
+        const margin=parseFloat(p[18+off])||0;
+        const gmvWithMargin=parseFloat(p[19+off])||0;
         if(!aid||!mo||!itemId)return null;
 
         // ── 4-tier display_price logic ──────────────────────────────────────
@@ -15412,7 +15591,9 @@ function handleFileUpload(type,input){
           q6b_factor:_q6bFactor,
           // legacy compat: keep q6b_ea_divide for any code still reading it
           q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1,
-          last_order_date: lastOrderDate  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
+          last_order_date: lastOrderDate,  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
+          margin: margin,                  // SQL1 v_gp: GP บาท ของ SKU นี้ในเดือนนี้ (ติดลบได้)
+          gmv_with_margin: gmvWithMargin   // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
         }};
       }
 
@@ -19955,6 +20136,32 @@ function onboardSetup(){
 // ════════════════════════════════════════
 // RENDER — REPORT (fixed: uses totalSel, shows both plan + full potential)
 // ════════════════════════════════════════
+// v_gp: ยามเฝ้าหน้ารายงาน — GP ห้ามปรากฏใน #rpt2-doc เด็ดขาด
+//
+// หน้ารายงานนี้ถูก "แชร์ให้ลูกค้า" จริง ทั้งเปิดให้ดูบนจอตรงหน้าและส่งเป็น PDF
+// ผ่าน shareReport() · GP คือกำไรของ Freshket จากร้านนั้น ไม่ใช่ข้อมูลของลูกค้า
+// ทั้งเรื่องเล่าของแอปยังเป็น "เราช่วยร้านลดต้นทุน" ตัวเลขกำไรของเราเองที่โผล่
+// ในเอกสารนั้นจะขัดกับสารทั้งฉบับ
+//
+// ทำเป็นตัวตรวจจับ ไม่ใช่คอมเมนต์เตือน เพราะคอมเมนต์กันคนที่ไม่ได้อ่านไม่ได้
+// และหน้ารายงานมี 2 body (renderer ใน shell.html + legacy fallback ข้างล่าง)
+// ที่ต่างคนต่างเขียน DOM — ดักที่ adapter ตัวนี้จึงคุมได้ทั้งคู่ในที่เดียว
+// ลบทิ้งด้วยไม่ใช่แค่เตือน: ถ้าหลุดมาถึงตรงนี้แล้ว การเตือนใน console
+// ไม่ช่วยอะไรถ้าลูกค้ากำลังมองจออยู่
+function _reportAssertNoGp(){
+  try{
+    const doc=document.getElementById('rpt2-doc');
+    if(!doc)return;
+    const leaks=doc.querySelectorAll('[data-gp]');
+    if(!leaks.length)return;
+    for(let i=0;i<leaks.length;i++){
+      if(leaks[i].parentNode)leaks[i].parentNode.removeChild(leaks[i]);
+    }
+    console.error('[gp] GP หลุดเข้าหน้ารายงานที่แชร์ให้ลูกค้า — ลบออก '+leaks.length+
+      ' element แล้ว แต่ต้องไปแก้ที่ต้นทางที่เขียนมันลง #rpt2-doc');
+  }catch(e){}
+}
+
 function renderReport(){
   const renderer = window.FreshketSenseReportRenderer;
   if(renderer && typeof renderer.renderFromLegacy === 'function'){
@@ -19969,12 +20176,14 @@ function renderReport(){
         curSpend: (typeof curSpend === 'function' ? curSpend : function(){ return 0; }),
         fmt: fmt
       });
-      if(result && result.ok) return result;
+      if(result && result.ok){_reportAssertNoGp();return result;}
     }catch(err){
       console.warn('[Freshket Sense] Report renderer failed, falling back to legacy renderer:', err && err.message ? err.message : err);
     }
   }
-  return __legacyRenderReportFallback();
+  const _r=__legacyRenderReportFallback();
+  _reportAssertNoGp();
+  return _r;
 }
 
 function __legacyRenderReportFallback(){
@@ -26193,6 +26402,137 @@ function renderKamLastMonth(){
   return __legacyRenderKamLastMonthFallback();
 }
 
+// v_gp: บรรทัด GP ในการ์ด "ยอดซื้อ" — คืน '' เมื่อยังไม่มีข้อมูล ไม่เคยคืน ฿0
+//
+// data-gp ทุก element ที่มี GP อยู่ ต้องมี attribute นี้ เพราะ _doShareReport()
+// แคป DOM ด้วย html2canvas แล้วส่งภาพให้ลูกค้า — ตัวตัด [data-gp] ออกจาก clone
+// พึ่ง attribute นี้เป็นตัวจับ (ดู task GP 6) · GP คือกำไรของ Freshket
+// ห้ามหลุดออกไปนอกองค์กรเด็ดขาด
+function _kamGpRowHtml(monthLabel){
+  if(typeof senseGpFor!=='function')return'';
+  const g=senseGpFor(monthLabel);
+  if(!g)return'';                       // ไม่มีคอลัมน์ GP ในไฟล์ → ไม่ต้องมีบรรทัดนี้เลย
+  if(!g.ready){
+    // มีข้อมูลแต่ไม่พอ — บอกตรงๆ ดีกว่าโชว์ %GP ที่ต่ำเพราะข้อมูลขาด
+    return`<div class="kam-gp-row" data-gp="1">
+      <span class="kam-gp-label">GP</span>
+      <span class="kam-gp-pct">ข้อมูลกำไรยังไม่พอ (${Math.round(g.coverage*100)}% ของยอด)</span>
+    </div>`;
+  }
+  // fmt() คืน "฿-1,234" สำหรับเลขติดลบ ซึ่งอ่านแปลก → จัดเป็น "−฿1,234"
+  const neg=g.gp<0?' neg':'';
+  const amt=g.gp<0?('−'+fmt(-g.gp)):fmt(g.gp);
+  // ใช้ − ตัวเดียวกับจำนวนเงิน ไม่ใช่ hyphen ที่ toFixed คืนมา
+  const pct=g.gpPct<0?('−'+Math.abs(g.gpPct).toFixed(1)):g.gpPct.toFixed(1);
+  // ตัวส่วนของ %GP คือ GMV จากไฟล์ sense_skus เดียวกับ GP ไม่ใช่ยอดพาดหัว
+  // ด้านบน (มาจาก bulk_history) — ระบุไว้ใน title เพื่อไม่ให้หารมือแล้วไม่ตรง
+  const tip=`GP ${amt} จากยอด ${fmt(g.gmv)} `+
+            `(ข้อมูลกำไรครอบคลุม ${Math.round(g.coverage*100)}% ของยอดเดือนนี้)`;
+  // v_gp รอบ 2 (บุช): "กำไรมาจากไหน" กางออกจากบรรทัด GP รวม ไม่ใช่การ์ดแยก
+  //
+  // เหตุผลอยู่ติดกับตัวเลขที่มันอธิบาย — กด GP รวม แล้วมันแตกออกเป็นหมวด
+  // ดีกว่าการ์ดใหม่ที่ลอยอยู่ข้างล่างแล้วผู้อ่านต้องเชื่อมโยงเองว่าเกี่ยวกัน
+  // และไม่ต้องเพิ่มการ์ดถาวรในหน้าที่การ์ดแน่นอยู่แล้ว
+  //
+  // เรนเดอร์เนื้อในไว้เลยแล้วซ่อนด้วย hidden ไม่ใช่ re-render ตอนกด — การกดจึง
+  // ไม่ต้องแตะ renderKamLastMonth() ทั้งก้อน (ไม่เสี่ยง race/เสียตำแหน่ง scroll)
+  const body=_kamGpByCatBodyHtml(monthLabel);
+  if(!body){
+    // ไม่มีรายละเอียดให้กาง → เป็นบรรทัดเฉยๆ ไม่ต้องทำให้กดได้ทั้งที่กดแล้วไม่มีอะไร
+    return`<div class="kam-gp-row" data-gp="1" title="${tip}">
+      <span class="kam-gp-label">กำไร (GP)</span>
+      <span class="kam-gp-val${neg}">${amt}</span>
+      <span class="kam-gp-pct">${pct}% ของยอด</span>
+    </div>`;
+  }
+  const open=(typeof kamGpCatOpen!=='undefined'&&kamGpCatOpen);
+  return`<div class="kam-gp-block" data-gp="1">
+    <div class="kam-gp-row kam-gp-row-btn${open?' open':''}" id="kam-gp-toggle" title="${tip}"
+         role="button" tabindex="0" aria-expanded="${open?'true':'false'}" aria-controls="kam-gp-cat-body"
+         onclick="toggleKamGpCat()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleKamGpCat();}">
+      <span class="kam-gp-label">กำไร (GP)</span>
+      <span class="kam-gp-val${neg}">${amt}</span>
+      <span class="kam-gp-pct">${pct}% ของยอด</span>
+      <span class="kam-gp-chev" aria-hidden="true">›</span>
+    </div>
+    <div class="kam-gp-cat-body" id="kam-gp-cat-body"${open?'':' hidden'}>${body}</div>
+  </div>`;
+}
+
+// v_gp: กาง/พับ "กำไรมาจากไหน" — สลับที่ DOM ตรงๆ ไม่ re-render การ์ดใหม่
+function toggleKamGpCat(){
+  kamGpCatOpen=!kamGpCatOpen;
+  const body=document.getElementById('kam-gp-cat-body');
+  const btn=document.getElementById('kam-gp-toggle');
+  if(body)body.hidden=!kamGpCatOpen;
+  if(btn){
+    btn.classList.toggle('open',kamGpCatOpen);
+    btn.setAttribute('aria-expanded',kamGpCatOpen?'true':'false');
+  }
+}
+window.toggleKamGpCat=toggleKamGpCat;
+
+// v_gp: เนื้อใน "กำไรมาจากไหน" — GP แยกตามหมวดสินค้า
+//
+// บรรทัด GP รวมบอกได้แค่ว่ากำไรเดือนนี้เท่าไหร่ · ส่วนนี้ตอบว่า *มาจากไหน*
+// ซึ่งเป็นสิ่งที่บุชบอกว่าทีมยังไม่รู้ ("ทีมยังไม่รู้วิธี control หรือเข้าใจว่า
+// อะไร drive สิ่งนี้") — เป็นเหตุผลของฟีเจอร์นี้ทั้งอัน ไม่ใช่ของแถม
+//
+// แถบสัดส่วนใช้ "ส่วนแบ่งของกำไร" ไม่ใช่ส่วนแบ่งของยอดขาย — จุดที่ทำให้อ่านรู้
+// เรื่องคือเห็นว่าหมวดที่ยอดใหญ่ไม่ใช่หมวดที่กำไรใหญ่ ซึ่งถ้าวาดด้วยส่วนแบ่ง
+// ยอดขายจะมองไม่เห็นเลย
+//
+// คืน '' เมื่อไม่มีอะไรให้กาง — ผู้เรียกใช้ค่านี้ตัดสินว่าจะทำให้บรรทัด GP
+// กดได้หรือไม่ (ห้ามมีปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น)
+function _kamGpByCatBodyHtml(monthLabel){
+  if(typeof senseGpByCategory!=='function')return'';
+  const cats=senseGpByCategory(monthLabel);
+  if(!cats||!cats.length)return'';
+  // แสดงเฉพาะหมวดที่ข้อมูลพอเชื่อ ที่เหลือรวบเป็นบรรทัดเดียวอย่างซื่อสัตย์
+  //
+  // ต้องบอกยอดขายของหมวดที่ถูกตัดออกด้วย ไม่ใช่แค่จำนวนหมวด เพราะถ้าเงียบ
+  // ผลรวมของแถบในการ์ดจะไม่ตรงกับ GP รวมของร้านในการ์ด "ยอดซื้อ" แล้วคนอ่าน
+  // จะจับได้ว่าไม่ตรงแต่หาสาเหตุไม่ได้ → เสียความเชื่อถือทั้งฟีเจอร์
+  const ready=cats.filter(function(c){return c.ready;});
+  const hidden=cats.filter(function(c){return !c.ready;});
+  const hiddenGmv=hidden.reduce(function(s,c){return s+(c.gmv||0);},0);
+  if(!ready.length)return'';
+  // จำกัด 6 หมวดเพื่อไม่ให้การ์ดยาวเกินจอ 440px — แต่ต้องบอกว่าตัดไปเท่าไหร่
+  // (เคยพลาดแบบเงียบมาแล้วทั้งเรื่องหมวดที่ไม่มีข้อมูล และ cap 500 แถวของ /nrr)
+  const CAT_CAP=6;
+  const top=ready.slice(0,CAT_CAP);
+  const cappedN=ready.length-top.length;
+  const cappedGmv=ready.slice(CAT_CAP).reduce(function(s,c){return s+(c.gmv||0);},0);
+  // ตัวหารของแถบ = ผลรวม |GP| ของหมวดที่แสดง เพื่อให้หมวดขาดทุนไม่ทำให้
+  // สเกลเพี้ยน (ถ้าใช้ผลรวมแบบมีเครื่องหมาย หมวดลบจะหักให้ตัวหารเล็กลง
+  // แล้วแถบของหมวดอื่นจะยาวเกินจริง)
+  const denom=top.reduce(function(s,c){return s+Math.abs(c.gp);},0)||1;
+  const rows=top.map(function(c){
+    const share=Math.max(2,Math.round(Math.abs(c.gp)/denom*100));
+    const neg=c.gp<0;
+    const amt=neg?('−'+fmt(-c.gp)):fmt(c.gp);
+    const pct=c.gpPct<0?('−'+Math.abs(c.gpPct).toFixed(1)):c.gpPct.toFixed(1);
+    return`<div class="kam-gpcat-row" title="${_commEscapeHtml(c.cat)} · ยอด ${fmt(c.gmv)} · กำไร ${amt} · ${c.skuCount} SKU">
+      <div class="kam-gpcat-top">
+        <span class="kam-gpcat-name">${_commEscapeHtml(c.cat)}</span>
+        <span class="kam-gpcat-amt${neg?' neg':''}">${amt}</span>
+        <span class="kam-gpcat-pct">${pct}%</span>
+      </div>
+      <div class="kam-gpcat-bar"><span class="kam-gpcat-fill${neg?' neg':''}" style="width:${share}%"></span></div>
+    </div>`;
+  }).join('');
+  const footParts=[];
+  if(cappedN>0)footParts.push(`แสดง ${top.length} หมวดที่กำไรมากสุด · อีก ${cappedN} หมวด (ยอด ${fmt(cappedGmv)}) ไม่ได้แสดง`);
+  if(hidden.length>0)footParts.push(`อีก ${hidden.length} หมวด (ยอด ${fmt(hiddenGmv)}) ข้อมูลกำไรไม่ครบพอ`);
+  const foot=footParts.length
+    ?`<div class="kam-gpcat-foot">${footParts.join(' · ')} — ยอดส่วนที่ไม่แสดงยังนับอยู่ในกำไรรวมด้านบน</div>`
+    :'';
+  return`<div class="kam-gpcat-title">กำไรมาจากไหน</div>
+    <div class="kam-gpcat-hint">ความยาวแถบ = ส่วนแบ่งของ<b>กำไร</b> ไม่ใช่ส่วนแบ่งของยอดขาย · ตัวเลขขวาคือ %GP ของหมวดนั้น</div>
+    ${rows}
+    ${foot}`;
+}
+
 function __legacyRenderKamLastMonthFallback(){
   _renderKamHeader();
   const ctx=buildKamContext();
@@ -26224,6 +26564,7 @@ function __legacyRenderKamLastMonthFallback(){
       <div class="kam-dc-body">
         <div class="kam-gmv-main">${fmt(sp.current)}<span style="font-size:var(--text-base);font-weight:var(--fw-normal);color:rgba(220,235,255,.6)">/เดือน</span>${trendHtml}</div>
         <div class="kam-gmv-sub">${sp.orders} ออเดอร์${sp.prevMonth?' · เทียบจาก '+sp.prevMonth:''}</div>
+        ${_kamGpRowHtml(sp.month)}
       </div>
       <div class="kam-dc-insight" id="dc-insight-gmv" style="display:none"></div>
     </div>
@@ -27627,6 +27968,20 @@ async function _doShareReport(){
   _wrapper.style.cssText='position:fixed;left:-9999px;top:0;width:'+_captureW+'px;background:#fff;z-index:-1;';
   var _clone=doc.cloneNode(true);
   _clone.style.cssText='width:'+_captureW+'px;border-radius:0;box-shadow:none;background:#fff;';
+  // v_gp: ชั้นป้องกันที่สอง — ตัดทุก element ที่ติด data-gp ออกจาก clone ก่อนแคป
+  //
+  // ชั้นแรกคือ "ห้ามเขียน GP ลงใน #rpt2-doc ตั้งแต่แรก" (โครงสร้าง) แต่ชั้นเดียว
+  // ไม่พอ เพราะ html2canvas แคป DOM ตามที่เห็น ไม่ได้ re-render จากข้อมูล
+  // ถ้าอนาคตมีใครเผลอเพิ่ม GP ลงหน้ารายงาน ภาพที่ส่งให้ลูกค้าจะมีกำไรของ
+  // Freshket ติดไปด้วยทันทีโดยไม่มีอะไรเตือน · ตรงนี้ตัดจาก clone ไม่ใช่ DOM จริง
+  // จึงไม่กระทบสิ่งที่ KAM เห็นบนจอ
+  try{
+    var _gpLeaks=_clone.querySelectorAll('[data-gp]');
+    for(var _gi=0;_gi<_gpLeaks.length;_gi++){
+      if(_gpLeaks[_gi].parentNode)_gpLeaks[_gi].parentNode.removeChild(_gpLeaks[_gi]);
+    }
+    if(_gpLeaks.length)console.warn('[gp] ตัด '+_gpLeaks.length+' element ที่มี GP ออกจากรายงานที่จะแชร์');
+  }catch(e){}
   _wrapper.appendChild(_clone);
   document.body.appendChild(_wrapper);
   var canvas=await window.html2canvas(_clone,{
@@ -28143,6 +28498,32 @@ function renderSkuDetailContent(sku,priceData){
   const lastPr=last.price>=100?last.price.toFixed(0):last.price.toFixed(2);
   const mnStr=mn>=100?mn.toFixed(0):mn.toFixed(2);
   const mxStr=mx>=100?mx.toFixed(0):mx.toFixed(2);
+
+  // v_gp: ช่องที่ 4 — %GP ของ SKU นี้ (ไม่ใช่ GP ต่อหน่วยตามแผนตั้งต้น)
+  //
+  // เหตุผลที่เปลี่ยนจาก "GP/หน่วย": ราคาที่โชว์ในช่อง "ราคาล่าสุด" ไม่ได้มาจาก
+  // สูตรเดียวกันทุกชนิดสินค้า — per_kg/per_liter หารจาก unit_price แต่ per_ea
+  // หารจาก avg_piece_price (ดู _q6bFactor ใน 02_data_pipeline.js) ถ้าเอา
+  // margin/qty_kg/divisor มาวางข้างๆ มันจะไม่ตรงฐานกันเฉพาะกลุ่มสินค้านับชิ้น
+  // (ไข่ ขวด ผลไม้) = ตัวเลขผิดแบบเงียบๆ ในจุดที่กำลังสอนทีมให้เชื่อ GP
+  //
+  // %GP เป็นอัตราส่วนล้วน ไม่ต้องแปลงหน่วยเลย จึงผิดไม่ได้ และเทียบข้าม SKU
+  // ที่หน่วยต่างกันได้จริง ซึ่งตรงกับเป้าหมาย "ให้ทีมเข้าใจว่าอะไร drive GP"
+  // มากกว่า ฿/กก. ที่เทียบข้ามหน่วยไม่ได้ · GP บาท ยังอ่านได้ใน title
+  let gpCellHtml='';
+  const _gpSku=(typeof senseGpFromSkuRows==='function')?senseGpFromSkuRows([sku]):null;
+  if(_gpSku&&_gpSku.hasData&&_gpSku.ready){
+    const _gpPctStr=_gpSku.gpPct.toFixed(1);
+    const _gpC=_gpSku.gp<0?'var(--danger)':'var(--n900)';
+    const _gpAmt=_gpSku.gp<0?('−'+fmt(-_gpSku.gp)):fmt(_gpSku.gp);
+    gpCellHtml=`<div style="flex:1;padding:8px;text-align:center" data-gp="1" title="กำไร ${_gpAmt} จากยอด ${fmt(_gpSku.gmv)} ในเดือนล่าสุด">
+      <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">%GP</div>
+      <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:${_gpC}">${_gpPctStr}%</div>
+    </div>`;
+  }
+  // ไม่มี GP → ไม่ต้องมีช่องที่ 4 เลย และช่อง "สั่ง/เดือน" ต้องไม่มีเส้นขวา
+  // (เส้นขวาย้ายมาอยู่ที่ช่อง 3 เฉพาะเมื่อมีช่อง 4 จริง)
+  const _cell3Border=gpCellHtml?'border-right:1px solid var(--n100)':'';
   return`<div style="padding:12px 16px 0">
     <div style="display:flex;gap:14px;flex-wrap:wrap">
       <div><div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">ราคาล่าสุด</div>
@@ -28171,10 +28552,11 @@ function renderSkuDetailContent(sku,priceData){
       <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สูงสุด</div>
       <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:#9a6500">฿${mxStr}</div>
     </div>
-    <div style="flex:1;padding:8px;text-align:center">
+    <div style="flex:1;padding:8px;text-align:center;${_cell3Border}">
       <div style="font-size:var(--text-2xs);color:var(--n400);font-weight:var(--fw-semi);margin-bottom:2px">สั่ง/เดือน</div>
       <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-base);font-weight:var(--fw-bold);color:var(--n900)">${sku.qty_kg||sku.q||'?'} ${sku.display_unit==='kg'||!sku.display_unit?'กก.':sku.display_unit}</div>
     </div>
+    ${gpCellHtml}
   </div>
   ${oppHtml}
   <div style="height:12px"></div>`;
@@ -29765,6 +30147,25 @@ function __legacyRenderPortviewListFallback(){
     return{churnBadge,catBadge,acctTypeBadge};
   }
 
+  // v_gp: %GP ของร้านนี้ — Portview คือหน้าที่ KAM เปิดทุกวัน ถ้า GP ไม่โผล่
+  // ที่นี่ ทีมก็จะไม่เคยเห็นมันเลยจนกว่าจะกดเข้าไปในร้านแต่ละร้าน
+  //
+  // โชว์เป็น % เท่านั้น ไม่โชว์จำนวนเงิน เพราะแถวนี้แน่นอยู่แล้ว และ % คือตัวที่
+  // เทียบข้ามร้านได้จริง (ร้านใหญ่กำไรเป็นก้อนใหญ่เป็นเรื่องธรรมดา ไม่ได้บอกว่าดี)
+  // จำนวนเงิน + เดือน อยู่ใน title · ไม่มีข้อมูล/ข้อมูลไม่พอ = ไม่มี badge เลย
+  // ไม่ใช่ badge ที่เขียน 0% ซึ่งจะอ่านว่า "ร้านนี้ไม่มีกำไร"
+  function _pvGpBadge(a){
+    try{
+      if(typeof senseGpForAccount!=='function')return'';
+      const g=senseGpForAccount(a.id);
+      if(!g||!g.ready)return'';
+      const neg=g.gp<0;
+      const p=neg?('−'+Math.abs(g.gpPct).toFixed(1)):g.gpPct.toFixed(1);
+      const amt=(neg?'−฿':'฿')+Math.round(Math.abs(g.gp)).toLocaleString();
+      return`<span class="portview-churn-badge portview-gp-badge${neg?' neg':''}" data-gp="1" title="กำไร ${amt} จากยอด ฿${Math.round(g.gmv).toLocaleString()} · เดือน ${g.month}">GP ${p}%</span>`;
+    }catch(e){ return''; }   // GP ต้องไม่ทำให้แถวในพอร์ตพัง
+  }
+
   function _buildSparkline(a, cls){
     const aid=a.id;
     const hist=(bulkHistoryData[aid]||[]);
@@ -29840,7 +30241,7 @@ function __legacyRenderPortviewListFallback(){
           <div class="pv-card-left">
             <div class="portview-acct-top">${_dotHtml}<div class="portview-acct-name">${a.name}</div>${acctTypeBadge}</div>
             <div class="portview-acct-gmv-row">ยอด ${sig?fmtK(sig.gmvToDate):'—'} · ยังไม่มี baseline</div>
-            <div class="portview-acct-badge-row">${churnSegs}</div>
+            <div class="portview-acct-badge-row">${churnSegs}${_pvGpBadge(a)}</div>
           </div>
           <div class="pv-right-block">
             <div class="portview-acct-pace new">ร้านใหม่</div>
@@ -29861,7 +30262,7 @@ function __legacyRenderPortviewListFallback(){
         <div class="pv-card-left">
           <div class="portview-acct-top">${_dotHtml}<div class="portview-acct-name">${a.name}</div>${acctTypeBadge}${handoffBadge}</div>
           <div class="portview-acct-gmv-row">${rrHtml}</div>
-          <div class="portview-acct-badge-row">${churnSegs}</div>
+          <div class="portview-acct-badge-row">${churnSegs}${_pvGpBadge(a)}</div>
         </div>
         <div class="pv-right-block">
           <div class="portview-acct-pace ${cls}">${pctStr}</div>

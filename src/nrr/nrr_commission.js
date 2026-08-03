@@ -790,6 +790,66 @@ window.nrrFetchAllUpsellBundles = nrrFetchAllUpsellBundles;
 // to cross the line by month-end" — so every row with real activity this
 // month is kept, tagged with qualifies/projectedQualifies. Never used to
 // alter a payout number; read-only display data for the breakdown table.
+// ── v_gp: GP ต่อแถวของตาราง BREAKDOWN ─────────────────────────────────────
+//
+// กฎเดียวที่ต้องถือ: GP ในแถวต้องจับคู่กับ "เลขเงินที่แถวนั้นแสดง" ให้ตรงฐาน
+// ไม่ใช่หยิบ margin ก้อนที่หาง่ายที่สุดมาวาง ถ้าไม่ตรงฐาน %GP จะผิดแบบเงียบๆ
+// ในหน้าที่กำลังจะใช้สอนทีมว่า GP คืออะไร
+//
+// คืน null เมื่อไฟล์ยังไม่มีคอลัมน์ GP (ทุกจุดแสดงผลต้องเช็ค null เสมอ)
+// pctValid=false เมื่อตัวส่วน <= 0 — ให้แสดงจำนวนบาทได้ แต่ห้ามแสดง %
+function _nrrRowGpBase(gp, denom, covWith, covTotal) {
+  if (!(covWith > 0)) return null;              // ไม่มีข้อมูล GP เลย → ไม่แสดงอะไร
+  var coverage = covTotal > 0 ? (covWith / covTotal) : 0;
+  return {
+    gp: gp,
+    gmv: denom,
+    pctValid: denom > 0,
+    gpPct: denom > 0 ? (gp / denom * 100) : null,
+    coverage: coverage,
+    ready: coverage >= (typeof NRR_GP_MIN_COVERAGE === 'number' ? NRR_GP_MIN_COVERAGE : 0.70),
+    hasData: true
+  };
+}
+
+// P1: ทั้งกลุ่มสินค้าเป็นของใหม่ → current = totalGmv จึงจับกับ totalMargin ตรงๆ
+function _nrrRowGpP1(row) {
+  if (!row) return null;
+  return _nrrRowGpBase(row.totalMargin || 0, row.totalGmv || 0, row.gmvWithMargin || 0, row.totalGmv || 0);
+}
+
+// P3: current = incremental (ยอดเดือนนี้ − ฐานสูงสุด normalize 30 วัน)
+// GP จึงต้องเป็น incremental ด้วย = margin เดือนนี้ − margin ของเดือนฐาน
+// (normalize ×30/วัน แบบเดียวกับที่ maxBaseline ทำกับ GMV เป๊ะๆ ไม่งั้นตัวลบ
+// สองตัวอยู่คนละสเกล แล้ว "GP ที่โต" จะเพี้ยนตามจำนวนวันของเดือนฐาน)
+//
+// กับดักที่ต้องกัน: ถ้าเดือนฐานมียอดแต่ไม่มีข้อมูล margin (margin=0 ทั้งที่ GMV>0)
+// การลบจะได้ incremental GP ที่สูงเกินจริง เพราะตัวลบเป็น 0 โดยที่ข้อมูลขาด
+// ไม่ใช่เพราะกำไรเป็นศูนย์จริง → เคสนี้ต้องตีเป็น "ข้อมูลไม่พอ" (ready=false)
+function _nrrRowGpP3(row, baseRow, baseLabel, incrementalGmv) {
+  if (!row) return null;
+  var curMargin = row.existingMargin || 0;
+  var baseMargin = 0;
+  var baseIncomplete = false;
+  if (baseRow) {
+    var d = nrrDaysInLabel(baseLabel);
+    var bm = baseRow.totalMargin || 0;
+    baseMargin = d > 0 ? (bm / d * 30) : bm;
+    if ((baseRow.totalGmv || 0) > 0 && !((baseRow.gmvWithMargin || 0) > 0)) baseIncomplete = true;
+  }
+  // ตัวส่วนคือ incremental GMV ตัวเดียวกับที่แถวแสดงในคอลัมน์ "ส่วนที่โต"
+  // ส่งเข้ามาจากผู้เรียกเพื่อให้เป็นเลขเดียวกันแน่ๆ ไม่คำนวณซ้ำที่นี่
+  var res = _nrrRowGpBase(
+    curMargin - baseMargin,
+    incrementalGmv || 0,
+    row.gmvWithMargin || 0,
+    row.totalGmv || 0
+  );
+  if (!res) return null;
+  if (baseIncomplete) { res.ready = false; res.baseMissingMargin = true; }
+  return res;
+}
+
 function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expansionOutletIds) {
   var out = [];
   if (!bundle || !bundle.loaded) return out;
@@ -844,7 +904,9 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
             kind: 'p1', current: rawTotalGmv, threshold: p1MinGmv, qualifies: qualifies1,
             commission: qualifies1 ? rawTotalGmv * r1 : 0, applied_rate: r1,
             projected: projectionReady ? projGmv1 : null, projectionReady: projectionReady,
-            projectedQualifies: projectionReady ? (projGmv1 >= p1MinGmv) : null
+            projectedQualifies: projectionReady ? (projGmv1 >= p1MinGmv) : null,
+            // v_gp: GP ของ P1 จับคู่กับ current = totalGmv ตรงๆ (ทั้งกลุ่มเป็นของใหม่)
+            gp: _nrrRowGpP1(row)
           });
           return;
         }
@@ -878,7 +940,10 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
           existing_curr: rawExistingGmv, baselineMonth: maxBaselineMonth,
           qualifies: qualifies3, commission: qualifies3 ? incremental * r3 : 0, applied_rate: r3,
           projected: projectionReady ? projIncremental : null, projectionReady: projectionReady,
-          projectedQualifies: projectionReady ? (projExisting > maxBaseline * p3Thresh && projIncremental >= p3MinIncr) : null
+          projectedQualifies: projectionReady ? (projExisting > maxBaseline * p3Thresh && projIncremental >= p3MinIncr) : null,
+          // v_gp: GP ของ P3 ต้องเป็น "ส่วนที่โต" ให้ตรงกับ current ที่เป็น incremental
+          // ไม่ใช่ GP ทั้งก้อนของเดือนนี้ — ดู _nrrRowGpP3
+          gp: _nrrRowGpP3(row, monthData[maxBaselineMonth], maxBaselineMonth, incremental)
         });
       });
     });

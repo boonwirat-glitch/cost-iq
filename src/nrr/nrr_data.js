@@ -647,6 +647,11 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
         // month_label, group_key, existing_gmv, total_gmv, category (7 cols).
         // v_catbonus: category appended as trailing p[6] — p[0..5] unchanged,
         // so this stays backward-compatible with a pre-category CSV (p[6]='').
+        // v_gp: existing_margin p[7], total_margin p[8], gmv_with_margin p[9]
+        // appended by the same trailing-only rule (10 cols). A pre-GP CSV gives
+        // '' at all three → 0 → gmvWithMargin 0 → nrrGpFor() reports "no data"
+        // rather than a confident ฿0. Margin is split the same two ways as GMV
+        // because P1 reads totalGmv while P3 reads existingGmv.
         var p = parseCSVRow(l);
         var accountId = (p[0] || '').trim();
         var outletId = (p[1] || '').trim();
@@ -655,13 +660,20 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
         var existingGmv = parseFloat(p[4]) || 0;
         var totalGmv = parseFloat(p[5]) || 0;
         var category = (p[6] || '').trim();
+        var existingMargin = parseFloat(p[7]) || 0;
+        var totalMargin = parseFloat(p[8]) || 0;
+        var gmvWithMargin = parseFloat(p[9]) || 0;
         if (!accountId || !outletId || !monthLabel || !groupKey) return;
         if (category && !groupCategory[groupKey]) groupCategory[groupKey] = category;
 
         if (!data[accountId]) data[accountId] = {};
         if (!data[accountId][outletId]) data[accountId][outletId] = {};
         if (!data[accountId][outletId][groupKey]) data[accountId][outletId][groupKey] = {};
-        data[accountId][outletId][groupKey][monthLabel] = { existingGmv: existingGmv, totalGmv: totalGmv };
+        data[accountId][outletId][groupKey][monthLabel] = {
+          existingGmv: existingGmv, totalGmv: totalGmv,
+          existingMargin: existingMargin, totalMargin: totalMargin,
+          gmvWithMargin: gmvWithMargin
+        };
 
         // v860-fix: mirrors 02_data_pipeline.js:1104-1111's v854 fix — in
         // quarterly mode (baseMonthIso set) p1Labels is already a closed,
@@ -692,6 +704,108 @@ async function nrrFetchUpsellBundle(kamEmail, baseMonthIso) {
   return p;
 }
 window.nrrFetchUpsellBundle = nrrFetchUpsellBundle;
+
+// ── GROSS PROFIT (GP) — v_gp ─────────────────────────────────────────────
+//
+// แฝดของ senseGpFor() ใน src/01_core.js — สัญญาเหมือนกันเป๊ะ:
+//   ไม่มีข้อมูล → null · coverage ไม่ถึงเกณฑ์ → ready:false · GP ติดลบผ่านได้
+// ตั้งใจไม่วางใน nrr_logic.js เพราะไฟล์นั้นเป็นฝาแฝดที่ต้อง diff กับ
+// src/07c_qnrr_view.js ได้ตลอด (ดูหัวไฟล์) การเติมฟังก์ชันที่ไม่มีคู่ลงไป
+// จะทำให้เครื่องมือ debug ที่พึ่ง diff นั้นเสียไป
+//
+// GP ที่นี่มาจาก upsell bundle (grain กลุ่มสินค้า × สาขา × เดือน) ซึ่งเป็น grain
+// เดียวกับที่ตาราง BREAKDOWN และควอดรันต์ใช้อยู่ — คนละไฟล์กับฝั่ง Sense
+// (sense_skus, grain SKU) โดยเจตนา ดูเหตุผล 4 ข้อในหัว sql/SQL1_sense_skus.sql
+var NRR_GP_MIN_COVERAGE = 0.70;   // ต้องเท่ากับ SENSE_GP_MIN_COVERAGE ในฝั่ง Sense
+
+// รวม GP จาก array ของ cell ในบันเดิล (รูปแบบที่ nrrFetchUpsellBundle เก็บไว้)
+// basis: 'total' (ค่าเริ่มต้น, ใช้กับ P1 และภาพรวม) | 'existing' (ใช้กับ P3)
+//
+// ตัวส่วนต้องเป็น GMV ฐานเดียวกับ GP ที่หยิบมา ไม่ใช่ totalGmv ตลอด — ถ้า P3
+// ใช้ existingMargin แต่หารด้วย totalGmv จะได้ %GP ที่ต่ำกว่าจริงแบบเงียบๆ
+function nrrGpFromCells(cells, basis) {
+  if (!cells || !cells.length) return null;
+  var useExisting = (basis === 'existing');
+  var gp = 0, gmv = 0, gmvWithMargin = 0, totalGmv = 0, n = 0;
+  for (var i = 0; i < cells.length; i++) {
+    var c = cells[i];
+    if (!c) continue;
+    gp  += useExisting ? (c.existingMargin || 0) : (c.totalMargin || 0);
+    gmv += useExisting ? (c.existingGmv || 0)    : (c.totalGmv || 0);
+    gmvWithMargin += (c.gmvWithMargin || 0);
+    totalGmv      += (c.totalGmv || 0);
+    n++;
+  }
+  if (!n || gmv <= 0) return null;
+  // coverage วัดเทียบ totalGmv เสมอ แม้ตอน basis='existing'
+  //
+  // ข้อสมมติที่ใช้ตรงนี้ ต้องรู้ไว้: SQL ให้ gmv_with_margin มาระดับกลุ่มสินค้า
+  // ไม่ได้แยก existing/new จึงวัด coverage ของฝั่ง existing เดี่ยวๆ ไม่ได้
+  // ที่ยอมรับได้เพราะการมี/ไม่มีค่า margin เป็นคุณสมบัติของตัวสินค้า (ข้อมูลต้นทุน
+  // ในมาสเตอร์) ไม่ใช่ของประเภทสาขา — สินค้าตัวเดียวกันที่ขายให้สาขาเก่าและสาขาใหม่
+  // จะมีหรือไม่มี margin พร้อมกัน · ถ้าวันหนึ่งพบว่าไม่จริง ต้องเพิ่มคอลัมน์
+  // existing_gmv_with_margin ใน q3c ไม่ใช่มาเดาที่ชั้นนี้
+  var coverage = totalGmv > 0 ? (gmvWithMargin / totalGmv) : 0;
+  return {
+    gp: gp,
+    gmv: gmv,
+    gpPct: gp / gmv * 100,
+    coverage: coverage,
+    ready: coverage >= NRR_GP_MIN_COVERAGE,
+    hasData: gmvWithMargin > 0
+  };
+}
+window.nrrGpFromCells = nrrGpFromCells;
+
+// เก็บ cell ทั้งหมดของบันเดิลหนึ่งใบสำหรับเดือนหนึ่ง (กรองตามกลุ่ม/หมวดได้)
+// ใช้กับ hero หน้า Company (รวมทุกบันเดิล) และควอดรันต์ (ต่อ KAM / ต่อหมวด)
+function nrrGpCellsForMonth(bundle, monthLabel, opts) {
+  var out = [];
+  if (!bundle || !bundle.data || !monthLabel) return out;
+  var groupFilter = opts && opts.groupKey;
+  var catFilter = opts && opts.category;
+  var groupCat = (bundle.groupCategory || {});
+  var accounts = bundle.data;
+  Object.keys(accounts).forEach(function (aid) {
+    var outlets = accounts[aid];
+    Object.keys(outlets).forEach(function (oid) {
+      var groups = outlets[oid];
+      Object.keys(groups).forEach(function (gk) {
+        if (groupFilter && gk !== groupFilter) return;
+        if (catFilter && groupCat[gk] !== catFilter) return;
+        var cell = groups[gk][monthLabel];
+        if (cell) out.push(cell);
+      });
+    });
+  });
+  return out;
+}
+window.nrrGpCellsForMonth = nrrGpCellsForMonth;
+
+// ทางเข้าหลักที่จุดแสดงผลควรเรียก — คืน null เมื่อยังไม่มีคอลัมน์ GP ในไฟล์
+// (เหมือน senseGpFor: ไม่มีข้อมูล = ไม่แสดงอะไร ไม่ใช่แสดง ฿0)
+function nrrGpFor(bundle, monthLabel, opts) {
+  var res = nrrGpFromCells(nrrGpCellsForMonth(bundle, monthLabel, opts), opts && opts.basis);
+  if (!res || !res.hasData) return null;
+  return res;
+}
+window.nrrGpFor = nrrGpFor;
+
+// รวม GP ข้ามหลายบันเดิล (ผลลัพธ์ของ nrrFetchAllUpsellBundles) สำหรับภาพรวมองค์กร
+// รับ array ของ {person, bundle} ตรงๆ เพื่อไม่ต้องให้ผู้เรียกแกะรูปแบบเอง
+function nrrGpForAll(bundlePairs, monthLabel, opts) {
+  if (!bundlePairs || !bundlePairs.length) return null;
+  var cells = [];
+  for (var i = 0; i < bundlePairs.length; i++) {
+    var b = bundlePairs[i] && bundlePairs[i].bundle;
+    if (!b) continue;
+    cells = cells.concat(nrrGpCellsForMonth(b, monthLabel, opts));
+  }
+  var res = nrrGpFromCells(cells, opts && opts.basis);
+  if (!res || !res.hasData) return null;
+  return res;
+}
+window.nrrGpForAll = nrrGpForAll;
 
 // ── Portfolio layer (Phase B) — portview.csv ─────────────────────────────
 // One row per account, precomputed pace/churn/missing-category signals —
