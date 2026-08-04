@@ -645,7 +645,7 @@ body:not(.echo-active) { background:unset; }
     <!-- v_echog1: ทางเข้าแผงสรุปผลการ visit (วัน/สัปดาห์/เดือน/ไตรมาส) สำหรับ TL/Admin -->
     <button onclick="CI._openVisitDashboard()"
       style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;padding:12px 14px;border:0.5px solid rgba(0,0,0,.1);border-radius:var(--r-lg);background:rgba(255,255,255,.72);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;-webkit-tap-highlight-color:transparent;width:100%">
-      <span style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">📊 ผลการ visit</span>
+      <span style="display:inline-flex;align-items:center;gap:7px;font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>ผลการ visit</span>
       <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2)">วัน · สัปดาห์ · เดือน · ไตรมาส →</span>
     </button>
     <div class="cv-list-wrap" id="ci-cv-list-body">
@@ -3030,7 +3030,7 @@ body:not(.echo-active) { background:unset; }
       if (s.pipeline_stage === 'checked_in') {
         const time = new Date(s.visited_at).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
         return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.55);border-radius:var(--r-lg);border:0.5px dashed rgba(0,0,0,.14);padding:10px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:8px">
-  <span style="font-size:var(--text-md)">📍</span>
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
   <div style="flex:1;min-width:0">
     <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
     <div style="font-size:var(--text-xs);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel} · ${date} ${time}</div>
@@ -3302,7 +3302,7 @@ body:not(.echo-active) { background:unset; }
 ${checkinBar}
 <div class="sd2-chips">${cvChip}</div>
 <div style="text-align:center;padding:40px 16px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">
-  <div style="font-size:28px;margin-bottom:10px">📍</div>
+  <div style="margin-bottom:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
   <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">เช็คอินอย่างเดียว</div>
   <div style="font-size:var(--text-sm);line-height:1.6">visit นี้ไม่มีบันทึกเสียง — นับเป็น visit ตามปกติ<br>ถ้า rep อัดเสียงต่อจากเช็คอินนี้ ผลวิเคราะห์จะมาแทนหน้านี้เอง</div>
 </div>`;
@@ -3501,7 +3501,7 @@ ${checkinBar}
       if (s.pipeline_stage === 'checked_in') {
         const time = new Date(s.visited_at).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
         return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.55);border-radius:var(--r-lg);border:0.5px dashed rgba(0,0,0,.14);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:var(--text-md)">📍</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
           <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
           <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">เช็คอินอย่างเดียว</span>
           <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date} ${time}</span>
