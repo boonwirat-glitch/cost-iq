@@ -162,13 +162,39 @@ console.log('\n[B] source locks — 09_conv_intel.js');
 check('check-in inserts ci_sessions with pipeline_stage checked_in',
   /pipeline_stage:\s*'checked_in',\s*\n?\s*status:\s*'draft'/.test(ci));
 check('_syncCheckinToDb is idempotent (session_id short-circuit)',
-  /if \(_checkinCache\.session_id\) return true;/.test(ci));
+  /if \(cache\.session_id\) return true;/.test(ci));
 check('startRecording retries the check-in sync',
   /_acquireWakeLock\(\);[\s\S]{0,400}_syncCheckinToDb\(\)\.catch/.test(ci));
 check('_saveTranscriptOnly updates the check-in row instead of inserting',
-  /_checkinCache\?\.session_id[\s\S]{0,800}pipeline_stage:\s*'transcribed'/.test(ci));
-check('_saveAnalysisToExistingSession guards fallback insert behind checkin row',
-  /} else if \(_checkinCache\?\.session_id\) \{/.test(ci));
+  /ctx\.checkinCache\?\.session_id[\s\S]{0,900}pipeline_stage: 'transcribed'/.test(ci));
+check('_saveAnalysisToExistingSession targets checkin row before fallback insert',
+  /ctx\.sessionId \|\| ctx\.checkinCache\?\.session_id/.test(ci));
+// v951 hotfix locks — เคสจริง 2026-08-04 (แถวกำพร้า analyzed 0 วิ ไม่มีชื่อร้าน)
+check('v951: _processBlob pins pipeline context at start',
+  /const _ctx = \{[\s\S]{0,400}checkinCache: _checkinCache \|\| null/.test(ci));
+check('v951: both saves receive pinned ctx',
+  /_saveTranscriptOnly\(segments, transcriptResult\.source \|\| 'unknown', _ctx\)/.test(ci) &&
+  /_saveAnalysisToExistingSession\(segments, summaryResult, analysisResult, _ctx\)/.test(ci));
+check('v951: transcript save self-heals update→insert',
+  /transcript update failed[\s\S]{0,300}self-healing via insert/.test(ci));
+check('v951: analysis save self-heals update→insert',
+  /analysis update failed[\s\S]{0,300}self-healing via insert/.test(ci));
+check('v951: fallback insert reads ctx not globals',
+  /account_id:\s+ctx\.accountGuid \|\| null,[\s\S]{0,200}account_name:\s+ctx\.accountName \|\| null/.test(ci));
+check('v951: checkin cache cleared only for the same visit',
+  /_checkinCache === ctx\.checkinCache/.test(ci));
+check('v951: check-in retries once before warning toast',
+  /setTimeout\(r, 1200\)[\s\S]{0,80}_syncCheckinToDb\(\)/.test(ci));
+check('v951: admin history query has no giant .in()',
+  /isAdminRole\(getCurrentRole\(\)\)[\s\S]{0,300}_getTeamEmails\(\);[\s\S]{0,120}q = q\.in\('owner_email', teamEmails\)/.test(ci));
+check('v951: covisit list skips .in() for admin',
+  /teamEmails\.length && !_adminScope\) cvQ = cvQ\.in/.test(ci));
+check('v951: dashboard skips .in() for admin',
+  /teamEmails\.length && !_adminScope\) q = q\.in/.test(ci));
+check('v951: TL/admin history error shown, not masked as empty',
+  /โหลดประวัติไม่สำเร็จ/.test(ci));
+check('v951: resume awaits pipeline then refreshes history',
+  /await _processBlob\(new Blob\(\[\]\), segments\);[\s\S]{0,80}_loadInlineHistory/.test(ci));
 check('covisit haversine uses != null (falsy-zero fix)',
   /target\.rep_lat != null && target\.rep_lng != null/.test(ci));
 check('covisit detail path fetches real row before verifying',

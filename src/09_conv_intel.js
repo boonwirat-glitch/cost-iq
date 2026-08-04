@@ -966,8 +966,13 @@ body:not(.echo-active) { background:unset; }
       _renderEchoState();
       _showScreen('ci-s-proc');
       _setStep('กำลังสรุปบทสนทนา...', 'วิเคราะห์ต่อจาก transcript ที่บันทึกไว้', 45);
-      _processBlob(new Blob([]), segments);
+      // v951: await + refresh — เดิม fire-and-forget ทำให้ history ไม่รู้ว่าจบแล้ว
+      // (_processBlob ตรึง ctx ของตัวเองจาก globals ที่เพิ่งตั้งข้างบน — การเซฟ
+      // จึงลงแถวนี้เสมอ ต่อให้ user ปิด/สลับหน้าระหว่างรอ)
+      await _processBlob(new Blob([]), segments);
+      try { _loadInlineHistory(); } catch(_) {}
     } catch(e) {
+      _phase = 'idle';
       _toast('เริ่มวิเคราะห์ต่อไม่สำเร็จ: ' + e.message);
     }
   }
@@ -1115,6 +1120,20 @@ body:not(.echo-active) { background:unset; }
   // แต่ละขั้น save IDB ก่อน proceed — recovery resume ได้จากขั้นที่ค้าง
   async function _processBlob(blob, _resumeFromSegments) {
     _startProcTimer();
+    // v951: ตรึง context ของ pipeline ตอนเริ่ม — การเซฟทุกจุดอ่านจาก ctx นี้เท่านั้น
+    // เดิมอ่าน globals ตอนเซฟ ซึ่ง open()/picker ล้างได้ระหว่างรอ AI 1-3 นาที
+    // → ผลวิเคราะห์หลุดไปสร้างแถวกำพร้า (เคสจริง 2026-08-04: แถว analyzed
+    // ที่ account=null, 0 วิ ทั้งที่ transcript คือเสียงร้านโยโยเล 19 วิ)
+    // หมายเหตุ: checkinCache เก็บเป็น "reference" ไม่ใช่สำเนา — กันเฉพาะเคสตัวแปร
+    // global ถูก set เป็น null แต่ยังแชร์ session_id ที่ sync สำเร็จทีหลังได้
+    const _ctx = {
+      sessionId:    _sessionId || null,          // resume ตั้งไว้ก่อนเรียก
+      checkinCache: _checkinCache || null,
+      accountGuid:  _accountGuid || null,
+      accountName:  _accountName || '',
+      ownerType:    _ownerType,
+      secs:         _secs,
+    };
     try {
       // ── audio integrity check ──────────────────────────────────────────────
       const _expectedBytes = _secs * 3000;
@@ -1151,7 +1170,7 @@ body:not(.echo-active) { background:unset; }
 
         // ── Echo v2: Save transcript to Supabase immediately (permanent ground truth) ──
         _setStep('กำลังบันทึก transcript...', '', 20);
-        await _saveTranscriptOnly(segments, transcriptResult.source || 'unknown');
+        await _saveTranscriptOnly(segments, transcriptResult.source || 'unknown', _ctx);
 
       } else {
         console.log('[CI pipeline] resuming from transcript —', segments.length, 'segments');
@@ -1161,7 +1180,10 @@ body:not(.echo-active) { background:unset; }
       _lastResult = { segments, summaryData: null, skillData: null, intelData: null,
                       transcriptSummary: null, toneSignals: null };
       _renderResult();
-      document.getElementById('ci-dur-chip').textContent = _durText;
+      // v951: guard null — ถ้า Echo DOM ถูกถอด (user ปิด sheet ระหว่างรอ) ห้าม throw
+      // ทั้ง pipeline เพราะขั้นเซฟยังต้องวิ่งต่อให้จบ
+      const _durChip = document.getElementById('ci-dur-chip');
+      if (_durChip) _durChip.textContent = _durText;
       _showScreen('ci-s-result');
       setTimeout(_initPill, 80);
 
@@ -1203,7 +1225,7 @@ body:not(.echo-active) { background:unset; }
       // Transcript was already saved in step 1 — this updates the same row
       _setStep('กำลังบันทึก...', '', 92);
       console.log('[CI pipeline] reaching save step, _sessionId=' + _sessionId);
-      await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult);
+      await _saveAnalysisToExistingSession(segments, summaryResult, analysisResult, _ctx);
       _sessionId = null; // v731: pipeline owns _sessionId — release after save completes
       _idbClear();
       _setStep('', '', 100);
@@ -1462,7 +1484,7 @@ body:not(.echo-active) { background:unset; }
 
   // ── v709: pipeline save — saves transcript to new column ─────────────────────
 // ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
-  async function _saveTranscriptOnly(segments, source) {
+  async function _saveTranscriptOnly(segments, source, ctx) {
     const email = currentUserProfile?.email;
     if (!email) {
       // v_echofix (2026-07-21): used to silently return — a profile-load race
@@ -1473,47 +1495,51 @@ body:not(.echo-active) { background:unset; }
       try { window.SenseSentinel?.report('ci_save_no_profile', 'stage=transcript'); } catch(_) {}
       return;
     }
+    // v951: อ่านจาก pinned ctx เท่านั้น — globals อาจถูก open()/picker ล้างไปแล้ว
+    ctx = ctx || { checkinCache: _checkinCache, accountGuid: _accountGuid,
+                   accountName: _accountName, ownerType: _ownerType, secs: _secs };
     const nowIso = new Date().toISOString();
     try {
       // v_echog1: ถ้าเช็คอินสร้างแถวไว้แล้ว (pipeline_stage:'checked_in') ให้
-      // UPDATE แถวเดิม ไม่ INSERT ซ้ำ — 1 visit ต้องเป็น 1 แถวเสมอ ไม่งั้นตัวนับ
-      // ทุกตัว (hero/badge/dashboard) นับการไปครั้งเดียวเป็นสอง
-      // ลอง retry เช็คอินก่อนหนึ่งรอบ เผื่อ insert ตอนกดพลาดเพราะเน็ต — จะได้
-      // แถวเดียวแทนที่จะสร้างแถวใหม่ที่ไม่มีพิกัดผูก
-      await _syncCheckinToDb().catch(() => {});
-      const _ciSessionId = _checkinCache?.session_id || null;
+      // UPDATE แถวเดิม ไม่ INSERT ซ้ำ — 1 visit ต้องเป็น 1 แถวเสมอ
+      // retry เช็คอินของ visit นี้ก่อนหนึ่งรอบ เผื่อ insert ตอนกดพลาดเพราะเน็ต
+      await _syncCheckinToDb(ctx.checkinCache).catch(() => {});
+      const _ciSessionId = ctx.checkinCache?.session_id || null;
 
       if (_ciSessionId) {
         // visited_at ไม่ทับ — วันที่ไปคือเวลาที่เช็คอิน ไม่ใช่เวลาถอดเสียงเสร็จ
         const { data: updRow, error } = await supa.from('ci_sessions').update({
-          duration_secs:  _secs,
+          duration_secs:  ctx.secs,
           transcript:     segments,
           pipeline_stage: 'transcribed',
           transcript_source: source || 'unknown'
         }).eq('id', _ciSessionId).select('id').single();
-        if (error || !updRow) {
-          console.error('[CI] _saveTranscriptOnly update FAILED:', error?.message);
-          _toast('บันทึก transcript ไม่สำเร็จ — เสียงยังอยู่ในเครื่อง เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
-        } else {
+        if (!error && updRow) {
+          ctx.sessionId = updRow.id;
           _sessionId = updRow.id;
-          console.log('[CI] transcript saved onto checkin row, session_id=' + _sessionId);
+          console.log('[CI] transcript saved onto checkin row, session_id=' + updRow.id);
+          return;
         }
-        return;
+        // v951 self-heal: UPDATE พลาด/0 แถว (แถวถูกลบ หรือ cache ค้างชี้แถวที่
+        // ไม่มีแล้ว) — ห้ามจบแค่ toast แล้วปล่อยข้อมูลหาย → ตกลงไป INSERT ข้างล่าง
+        console.error('[CI] transcript update failed (' + (error?.message || '0 rows') + ') — self-healing via insert');
+        try { window.SenseSentinel?.report('ci_save_selfheal', 'transcript update→insert: ' + (error?.message || '0 rows')); } catch(_) {}
+        if (ctx.checkinCache) ctx.checkinCache.session_id = null; // อย่าให้จุดอื่นใช้ id เสียซ้ำ
       }
 
       const { data: sessionRow, error } = await supa.from('ci_sessions').insert({
         owner_email:    email,
-        owner_type:     _ownerType,
-        account_id:     _accountGuid || null,
-        account_name:   _accountName || null,
-        visited_at:     nowIso,
-        duration_secs:  _secs,
+        owner_type:     ctx.ownerType,
+        account_id:     ctx.accountGuid || null,
+        account_name:   ctx.accountName || null,
+        visited_at:     ctx.checkinCache?.checked_in_at || nowIso,
+        duration_secs:  ctx.secs,
         transcript:     segments,
         pipeline_stage: 'transcribed',
         transcript_source: source || 'unknown',
-        rep_lat:        _checkinCache?.rep_lat || null,
-        rep_lng:        _checkinCache?.rep_lng || null,
-        checked_in_at:  _checkinCache?.checked_in_at || null,
+        rep_lat:        ctx.checkinCache?.rep_lat ?? null,
+        rep_lng:        ctx.checkinCache?.rep_lng ?? null,
+        checked_in_at:  ctx.checkinCache?.checked_in_at || null,
         status:         'draft'
       }).select('id').single();
       if (error) {
@@ -1521,8 +1547,10 @@ body:not(.echo-active) { background:unset; }
         // v_echog1: เดิมพังเงียบ — rep เห็นหน้า result ปกติทั้งที่ไม่มีอะไรถูกเซฟ
         _toast('บันทึก transcript ไม่สำเร็จ — เสียงยังอยู่ในเครื่อง เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
       } else if (sessionRow) {
+        ctx.sessionId = sessionRow.id;
+        if (ctx.checkinCache) ctx.checkinCache.session_id = sessionRow.id;
         _sessionId = sessionRow.id;
-        console.log('[CI] transcript saved, session_id=' + _sessionId);
+        console.log('[CI] transcript saved, session_id=' + sessionRow.id);
       } else {
         console.error('[CI] _saveTranscriptOnly: no error but no row returned');
       }
@@ -1533,7 +1561,9 @@ body:not(.echo-active) { background:unset; }
   }
 
   // ── Echo v2: Update existing session row with analysis ───────────────────
-  async function _saveAnalysisToExistingSession(segments, summaryData, analysisResult) {
+  // v951: รับ pinned ctx — การเซฟห้ามอ่าน globals (open()/picker ล้างได้ระหว่างรอ AI)
+  // + self-heal ทุก branch: UPDATE พลาด/0 แถว → ตกลงไป INSERT เสมอ ข้อมูลห้ามหาย
+  async function _saveAnalysisToExistingSession(segments, summaryData, analysisResult, ctx) {
     const skillData  = analysisResult?.skillData  || null;
     const intelData  = analysisResult?.intelData  || null;
     const transcriptSummary = summaryData?.transcript_summary || null;
@@ -1545,89 +1575,87 @@ body:not(.echo-active) { background:unset; }
       try { window.SenseSentinel?.report('ci_save_no_profile', 'stage=analysis'); } catch(_) {}
       return;
     }
+    ctx = ctx || { sessionId: _sessionId, checkinCache: _checkinCache, accountGuid: _accountGuid,
+                   accountName: _accountName, ownerType: _ownerType, secs: _secs };
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
 
-    // Update existing session if we have _sessionId from transcript save
-    console.log('[CI save] _sessionId=' + _sessionId + ' skillData=' + !!skillData + ' intelData=' + !!intelData);
-    if (_sessionId) {
+    const analysisFields = {
+      pipeline_stage:     'analyzed',
+      skill_scores:       skillData || null,
+      customer_intel:     intelData || null,
+      next_actions:       intelData?.next_actions || [],
+      transcript_summary: transcriptSummary || null,
+      tone_signals:       toneSignals || null,
+      summary_data:       summaryData || null,
+      status:             'saved'
+    };
+
+    // เป้าหมาย: แถวจาก transcript save ก่อน ถ้าไม่มีใช้แถวเช็คอิน
+    let targetId = ctx.sessionId || ctx.checkinCache?.session_id || null;
+    let saved = false;
+
+    console.log('[CI save] targetId=' + targetId + ' skillData=' + !!skillData + ' intelData=' + !!intelData);
+    if (targetId) {
       try {
-        const { error } = await supa.from('ci_sessions').update({
-          pipeline_stage:     'analyzed',
-          skill_scores:       skillData || null,
-          customer_intel:     intelData || null,
-          next_actions:       intelData?.next_actions || [],
-          transcript_summary: transcriptSummary || null,
-          tone_signals:       toneSignals || null,
-          summary_data:       summaryData || null,
-          status:             'saved'
-        }).eq('id', _sessionId);
-        if (error) console.warn('[CI] session update error:', error.message, error.code);
-        else console.log('[CI] analysis saved to session_id=' + _sessionId);
-      } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
-    } else if (_checkinCache?.session_id) {
-      // แถวเช็คอินมีอยู่แล้วใน DB (สร้างตอนกดเช็คอิน) — UPDATE แถวนั้น ห้าม insert ซ้ำ
-      try {
-        const { data: updRow, error: updErr } = await supa.from('ci_sessions').update({
-          duration_secs:      _secs,
-          transcript:         segments?.length ? segments : null,
-          pipeline_stage:     'analyzed',
-          transcript_source:  'unknown',
-          skill_scores:       skillData || null,
-          customer_intel:     intelData || null,
-          next_actions:       intelData?.next_actions || [],
-          transcript_summary: transcriptSummary || null,
-          tone_signals:       toneSignals || null,
-          summary_data:       summaryData || null,
-          status:             'saved'
-        }).eq('id', _checkinCache.session_id).select('id').single();
-        if (updErr || !updRow) {
-          console.warn('[CI] checkin-row update failed:', updErr?.message);
-          _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + (updErr?.message || 'ไม่พบแถวเช็คอิน'));
-        } else {
+        // แถวที่ยังไม่ผ่าน transcript save (มาจากเช็คอินล้วน) ต้องได้ transcript+duration ด้วย
+        const viaCheckinOnly = !ctx.sessionId;
+        const updFields = viaCheckinOnly
+          ? { ...analysisFields, duration_secs: ctx.secs,
+              transcript: segments?.length ? segments : null, transcript_source: 'unknown' }
+          : analysisFields;
+        const { data: updRow, error: updErr } = await supa.from('ci_sessions')
+          .update(updFields).eq('id', targetId).select('id').single();
+        if (!updErr && updRow) {
           _sessionId = updRow.id;
+          ctx.sessionId = updRow.id;
+          saved = true;
+          console.log('[CI] analysis saved to session_id=' + updRow.id);
+        } else {
+          // v951 self-heal: แถวเป้าหมายหาย (ถูกลบ/cache ค้าง) — ห้ามทิ้งผลวิเคราะห์
+          console.error('[CI] analysis update failed (' + (updErr?.message || '0 rows') + ') — self-healing via insert');
+          try { window.SenseSentinel?.report('ci_save_selfheal', 'analysis update→insert: ' + (updErr?.message || '0 rows')); } catch(_) {}
         }
       } catch(e) {
-        console.warn('[CI] checkin-row update unavailable:', e.message);
-        _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + e.message);
+        console.warn('[CI] analysis update unavailable:', e.message);
       }
-    } else {
-      // Fallback: insert everything together (transcript save failed earlier)
-      console.warn('[CI save] no _sessionId — using fallback insert');
+    }
+
+    if (!saved) {
+      // Fallback insert — ใช้ค่าจาก pinned ctx เท่านั้น (เดิมอ่าน globals ที่ถูกล้าง
+      // ระหว่างรอ AI → แถวกำพร้า account=null, 0 วิ อย่างเคสจริง 2026-08-04)
       try {
         const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
           owner_email:        email,
-          owner_type:         _ownerType,
-          account_id:         _accountGuid || null,
-          account_name:       _accountName || null,
-          visited_at:         nowIso,
-          duration_secs:      _secs,
+          owner_type:         ctx.ownerType,
+          account_id:         ctx.accountGuid || null,
+          account_name:       ctx.accountName || null,
+          visited_at:         ctx.checkinCache?.checked_in_at || nowIso,
+          duration_secs:      ctx.secs,
           transcript:         segments?.length ? segments : null,
-          pipeline_stage:     'analyzed',
           transcript_source:  'unknown',
-          skill_scores:       skillData || null,
-          customer_intel:     intelData || null,
-          next_actions:       intelData?.next_actions || [],
-          transcript_summary: transcriptSummary || null,
-          tone_signals:       toneSignals || null,
-          summary_data:       summaryData || null,
-          rep_lat:            _checkinCache?.rep_lat || null,
-          rep_lng:            _checkinCache?.rep_lng || null,
-          checked_in_at:      _checkinCache?.checked_in_at || null,
-          status:             'saved'
+          rep_lat:            ctx.checkinCache?.rep_lat ?? null,
+          rep_lng:            ctx.checkinCache?.rep_lng ?? null,
+          checked_in_at:      ctx.checkinCache?.checked_in_at || null,
+          ...analysisFields
         }).select('id').single();
         if (sessionErr) {
           console.warn('[CI] ci_sessions insert:', sessionErr.message);
           _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + sessionErr.message);
+        } else if (sessionRow) {
+          _sessionId = sessionRow.id;
+          ctx.sessionId = sessionRow.id;
+          saved = true;
         }
-        else if (sessionRow) _sessionId = sessionRow.id;
       } catch(e) {
         console.warn('[CI] ci_sessions unavailable:', e.message);
         _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + e.message);
       }
     }
 
-    if (_sessionId) {
+    // v951: เคลียร์เช็คอิน cache เฉพาะเมื่อ global ยังชี้ visit เดียวกับที่เพิ่งเซฟจบ
+    // — ถ้า user ไปเช็คอินร้านใหม่ระหว่างรอ AI ห้ามล้างของเขา
+    if (saved && _checkinCache && _checkinCache === ctx.checkinCache) {
       _checkinCache = null;
       try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
     }
@@ -1635,11 +1663,11 @@ body:not(.echo-active) { background:unset; }
     // skill log
     if (skillData?.skills?.length) {
       const rows = skillData.skills.map(s => ({
-        kam_email: email, account_id: _accountGuid || null,
+        kam_email: email, account_id: ctx.accountGuid || null,
         session_date: today, skill_code: s.code,
         score: s.score,
         evidence_summary: s.evidence || s.evidence_summary || '',
-        ci_session_id: _sessionId || null
+        ci_session_id: ctx.sessionId || null
       }));
       const { error } = await supa.from('kam_skill_log').insert(rows);
       if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
@@ -1659,7 +1687,7 @@ body:not(.echo-active) { background:unset; }
           // not_observed + warn แทน
           const _VALID_SCORES = ['pass', 'developing', 'not_observed', 'not_applicable'];
           const obsRows = skillData.skills.map(s => ({
-            session_id:    _sessionId || null,
+            session_id:    ctx.sessionId || null,
             user_id:       _userId,
             skill_code:    ECHO_TO_SKILL_CODE[s.code] || s.code,
             echo_code:     s.code,
@@ -1677,9 +1705,9 @@ body:not(.echo-active) { background:unset; }
     }
 
     // kam_visits snapshot
-    if (_accountGuid) {
+    if (ctx.accountGuid) {
       const { error: visitError } = await supa.from('kam_visits').upsert({
-        kam_email: email, account_id: _accountGuid,
+        kam_email: email, account_id: ctx.accountGuid,
         ci_skill_scores: skillData, ci_customer_signals: intelData,
         ci_next_actions: intelData?.next_actions || [], ci_mode: 'echo',
         ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
@@ -1688,11 +1716,11 @@ body:not(.echo-active) { background:unset; }
     }
 
     // localStorage echo visits dot
-    if (_accountGuid) {
+    if (ctx.accountGuid) {
       try {
         const _echoKey = 'ciq_echo_visits';
         const _store = JSON.parse(localStorage.getItem(_echoKey) || '{}');
-        const _eKey = email + '::' + _accountGuid;
+        const _eKey = email + '::' + ctx.accountGuid;
         _store[_eKey] = { ts: Date.now(), count: (_store[_eKey]?.count || 0) + 1 };
         const _cutoff = Date.now() - 30*24*60*60*1000;
         Object.keys(_store).forEach(k => { if (_store[k].ts < _cutoff) delete _store[k]; });
@@ -2700,7 +2728,8 @@ body:not(.echo-active) { background:unset; }
         .gte('visited_at', since)
         .order('visited_at', { ascending: false })
         .limit(LIMIT);
-      if (teamEmails.length) q = q.in('owner_email', teamEmails);
+      // v951: admin ไม่ใส่ .in() — รายชื่อทั้งบริษัททำ URL ยาวเกินจน request พัง
+      if (teamEmails.length && !_adminScope) q = q.in('owner_email', teamEmails);
       const { data: rows, error } = await q;
       if (error) throw error;
 
@@ -2934,9 +2963,14 @@ body:not(.echo-active) { background:unset; }
 
       if (isTL) {
         // TL — ดู sessions ของทุกคนในทีม (ใช้ portviewBulkData หา emails)
-        const teamEmails = _getTeamEmails();
-        if (teamEmails.length > 0) {
-          q = q.in('owner_email', teamEmails);
+        // v951: admin ห้ามใส่ .in() — รายชื่อทั้งบริษัทหลายร้อยอีเมลทำ URL ยาวเกิน
+        // request พังเงียบแล้วตกไป fallback ที่โชว์ "ยังไม่มีประวัติ" (เคสจริง
+        // 2026-08-04 admin เปิดประวัติไม่ได้) · RLS เปิดให้ admin เห็นทุกแถวอยู่แล้ว
+        if (!(typeof isAdminRole === 'function' && isAdminRole(getCurrentRole()))) {
+          const teamEmails = _getTeamEmails();
+          if (teamEmails.length > 0) {
+            q = q.in('owner_email', teamEmails);
+          }
         }
         // ไม่ filter by account — TL เห็นทุก session ของทีม
       } else {
@@ -2965,6 +2999,12 @@ body:not(.echo-active) { background:unset; }
       body.innerHTML = isTL ? _renderTLTeamFeed(data) : _renderInlineHistory(data);
     } catch(e) {
       console.warn('[CI inline history]', e.message);
+      // v951: error ≠ ว่าง — เดิม fallback ตีหน้าเป็น "ยังไม่มีประวัติ" ทำให้
+      // ปัญหา query (เช่น URL ยาวเกินของ admin) ถูกกลืนหาย ไล่บั๊กไม่ได้
+      if (_canDebrief()) {
+        body.innerHTML = `<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">โหลดประวัติไม่สำเร็จ<br><span style="font-size:var(--text-xs)">${(e.message || '').slice(0, 120)}</span></div>`;
+        return;
+      }
       const rows = await _loadHistory();
       const sessions = _groupHistoryBySessions(rows);
       if (!sessions.length) {
@@ -3953,10 +3993,21 @@ ${checkinBar}
       _showMicOrb();
 
       // v_echog1: เขียนขึ้นระบบจริง แล้วค่อยประกาศผลตามความจริง
-      const synced = await _syncCheckinToDb();
+      // v951: อย่ารีบฟ้อง — ครั้งแรกมักพลาดเพราะโปรไฟล์ยังโหลดไม่เสร็จ (เปิดแอปแล้ว
+      // เข้า Echo เร็ว) → รอ 1.2 วิ retry อีกรอบก่อน แล้วบอกเหตุผลจริงถ้ายังไม่ได้
+      let synced = await _syncCheckinToDb();
+      if (!synced) {
+        await new Promise(r => setTimeout(r, 1200));
+        synced = await _syncCheckinToDb();
+      }
       if (typeof showToast === 'function') {
         if (synced) showToast('เช็คอินสำเร็จ ' + _tStr, '✓');
-        else showToast('เช็คอินเก็บไว้ในเครื่องแล้ว — ยังส่งขึ้นระบบไม่ได้ จะส่งให้อัตโนมัติตอนเริ่มอัดเสียง', '⚠');
+        else {
+          const why = !currentUserProfile?.email
+            ? 'โปรไฟล์ยังโหลดไม่เสร็จ'
+            : (_lastCheckinSyncError || 'การเชื่อมต่อขัดข้อง');
+          showToast('เช็คอินเก็บไว้ในเครื่องแล้ว (' + why + ') — จะส่งขึ้นระบบให้อัตโนมัติตอนเริ่มอัดเสียง', '⚠');
+        }
       }
 
     } catch(e) {
@@ -3975,53 +4026,61 @@ ${checkinBar}
   // startRecording (retry เผื่อจุดแรกเน็ตหลุด), และ _saveTranscriptOnly ผ่านทาง
   // ธรรมชาติของมันเอง (insert ใหม่เมื่อไม่มี session_id)
   // คืน true = มีแถวใน DB แล้วแน่ๆ
-  async function _syncCheckinToDb() {
-    if (!_checkinCache) return false;
-    if (_checkinCache.session_id) return true;
+  async function _syncCheckinToDb(cacheArg) {
+    // v951: รับ cache ที่ pipeline ตรึงไว้ได้ — เดิมอ่าน global อย่างเดียว ซึ่ง
+    // อาจถูก null/สลับเป็นเช็คอินร้านใหม่ไปแล้วระหว่างรอ AI
+    const cache = cacheArg || _checkinCache;
+    if (!cache) return false;
+    if (cache.session_id) return true;
     const email = currentUserProfile?.email;
     if (!email) return false;   // โปรไฟล์ยังไม่พร้อม — จุด retry ถัดไปจะเก็บให้
     try {
       const { data: row, error } = await supa.from('ci_sessions').insert({
         owner_email:    email,
         owner_type:     _ownerType,
-        account_id:     _checkinCache.account_guid || null,
-        account_name:   _accountName || null,
+        account_id:     cache.account_guid || null,
+        account_name:   cache.account_name || _accountName || null,
         // visited_at = เวลาที่ไปถึงร้าน ไม่ใช่เวลาถอดเสียงเสร็จ — ตัวนับ visit
         // รายวัน/สัปดาห์ทุกตัว query จาก visited_at จึงต้องเป็นวันที่ไปจริง
-        visited_at:     _checkinCache.checked_in_at,
-        checked_in_at:  _checkinCache.checked_in_at,
-        rep_lat:        _checkinCache.rep_lat,
-        rep_lng:        _checkinCache.rep_lng,
+        visited_at:     cache.checked_in_at,
+        checked_in_at:  cache.checked_in_at,
+        rep_lat:        cache.rep_lat,
+        rep_lng:        cache.rep_lng,
         pipeline_stage: 'checked_in',
         status:         'draft'
       }).select('id').single();
       if (error || !row) {
         console.warn('[CI] checkin insert failed:', error?.message);
+        _lastCheckinSyncError = error?.message || 'no row returned';
         return false;
       }
-      _checkinCache.session_id = row.id;
-      try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
+      cache.session_id = row.id;
+      if (cache === _checkinCache) {
+        try { localStorage.setItem('ci_checkin_cache', JSON.stringify(cache)); } catch(_) {}
+      }
       // จุด echo บนพอร์ตติดตั้งแต่วันไป ไม่ต้องรอวิเคราะห์จบ (โครงเดียวกับ
       // upsert ใน _saveAnalysisToExistingSession — onConflict กันแถวซ้ำ)
-      if (_checkinCache.account_guid) {
+      if (cache.account_guid) {
         try {
           await supa.from('kam_visits').upsert({
             kam_email:     email,
-            account_id:    _checkinCache.account_guid,
-            last_seen:     _checkinCache.checked_in_at,
+            account_id:    cache.account_guid,
+            last_seen:     cache.checked_in_at,
             modes:         ['echo'],
             ci_session_id: row.id,
-            ci_created_at: _checkinCache.checked_in_at,
-            visit_date:    _checkinCache.checked_in_at.slice(0, 10)
+            ci_created_at: cache.checked_in_at,
+            visit_date:    cache.checked_in_at.slice(0, 10)
           }, { onConflict: 'kam_email,account_id' });
         } catch(_) {}
       }
       return true;
     } catch(e) {
       console.warn('[CI] checkin sync unavailable:', e.message);
+      _lastCheckinSyncError = e.message;
       return false;
     }
   }
+  let _lastCheckinSyncError = null; // v951: ให้ _doCheckin บอกเหตุผลจริงใน toast
 
   function _hidePicker() {
     // Hide inline picker, reveal record UI + update chip
@@ -4367,7 +4426,8 @@ ${checkinBar}
         .select('id,owner_email,account_name,checked_in_at,rep_lat,rep_lng,covisit_verified,pipeline_stage')
         .gte('checked_in_at', todayStart.toISOString())
         .order('checked_in_at', { ascending: false });
-      if (teamEmails.length) cvQ = cvQ.in('owner_email', teamEmails);
+      // v951: admin ไม่ใส่ .in() — รายชื่อทั้งบริษัททำ URL ยาวเกินจน request พัง
+      if (teamEmails.length && !_adminScope) cvQ = cvQ.in('owner_email', teamEmails);
       const { data, error } = await cvQ;
       if (error) throw error;
       // v552: covisit_events คือ source of truth (spec) — ci_sessions flag อาจโดน RLS block
