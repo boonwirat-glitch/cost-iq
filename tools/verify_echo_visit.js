@@ -195,6 +195,25 @@ check('v951: TL/admin history error shown, not masked as empty',
   /โหลดประวัติไม่สำเร็จ/.test(ci));
 check('v951: resume awaits pipeline then refreshes history',
   /await _processBlob\(new Blob\(\[\]\), segments\);[\s\S]{0,80}_loadInlineHistory/.test(ci));
+// v952 locks — check-in must not depend on the async profiles fetch or a stale token
+check('v952: _authEmail helper exists with JWT fallback',
+  /function _authEmail\(\)[\s\S]{0,400}sb-.*auth-token/.test(ci));
+check('v952: all three save paths use _authEmail',
+  (ci.match(/const email = _authEmail\(\)/g) || []).length >= 3);
+check('v952: checkin sync refreshes token before insert',
+  /await supa\.auth\.getSession\(\); \} catch\(_\) \{\}[\s\S]{0,600}pipeline_stage: 'checked_in'/.test(ci));
+check('v952: retry queue armed when checkin sync fails',
+  /if \(!synced\) _armCheckinRetry\(\)/.test(ci));
+check('v952: retry queue interval 15s capped at 8 tries',
+  /_checkinRetryCount >= 8/.test(ci) && /}, 15000\)/.test(ci));
+check('v952: visibilitychange re-syncs pending checkin',
+  /visibilitychange[\s\S]{0,300}_checkinCache\.session_id[\s\S]{0,200}_syncCheckinToDb/.test(ci));
+check('v952: final failure reports to sentinel',
+  /ci_checkin_sync_fail/.test(ci));
+check('v952: admin empty covisit list reports telemetry',
+  /ci_admin_covisit_empty/.test(ci));
+check('v952: resume owner-check uses _authEmail',
+  /const me = \(_authEmail\(\) \|\| ''\)\.toLowerCase\(\)/.test(ci));
 check('covisit haversine uses != null (falsy-zero fix)',
   /target\.rep_lat != null && target\.rep_lng != null/.test(ci));
 check('covisit detail path fetches real row before verifying',

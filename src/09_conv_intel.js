@@ -953,7 +953,7 @@ body:not(.echo-active) { background:unset; }
       if (error || !row) throw error || new Error('ไม่พบ session');
       const segments = Array.isArray(row.transcript) ? row.transcript : [];
       if (!segments.length) { _toast('แถวนี้ไม่มี transcript ให้วิเคราะห์ต่อ'); return; }
-      const me = (currentUserProfile?.email || '').toLowerCase();
+      const me = (_authEmail() || '').toLowerCase(); // v952
       if ((row.owner_email || '').toLowerCase() !== me) { _toast('วิเคราะห์ต่อได้เฉพาะ session ของตัวเอง'); return; }
 
       _closeHistory?.();
@@ -1428,6 +1428,25 @@ body:not(.echo-active) { background:unset; }
     'C4':'C04_OBJECTION','C5':'C05_CLOSE','D1':'D01_WALLET','D2':'D02_FOLLOWUP',
   };
 
+  // ── v952: email พร้อมตั้งแต่วินาทีที่ 0 — ไม่รอ profiles fetch ────────────
+  // สเปค "เช็คอิน insert ทันทีที่กด" เคยพังเพราะทุกจุดเซฟรอ currentUserProfile
+  // ซึ่งโหลด async — ทั้งที่ email อยู่ใน JWT ที่ localStorage/sessionStorage
+  // แบบ synchronous อยู่แล้ว (pattern เดียวกับ _userId lookup ใน save path)
+  function _authEmail() {
+    if (currentUserProfile?.email) return currentUserProfile.email;
+    try {
+      for (const store of [localStorage, sessionStorage]) {
+        const k = Object.keys(store).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (k) {
+          const s = JSON.parse(store.getItem(k));
+          const em = s?.user?.email || s?.data?.user?.email;
+          if (em) return em;
+        }
+      }
+    } catch(_) {}
+    return null;
+  }
+
   // ── Rubric cache — โหลดจาก DB ครั้งเดียว ──────────────────────────────────
   let _rubricCache = null; // null = ยังไม่โหลด
 
@@ -1485,7 +1504,7 @@ body:not(.echo-active) { background:unset; }
   // ── v709: pipeline save — saves transcript to new column ─────────────────────
 // ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
   async function _saveTranscriptOnly(segments, source, ctx) {
-    const email = currentUserProfile?.email;
+    const email = _authEmail(); // v952: ไม่รอ profiles fetch
     if (!email) {
       // v_echofix (2026-07-21): used to silently return — a profile-load race
       // at save time meant the transcript was NEVER persisted and the rep had
@@ -1568,7 +1587,7 @@ body:not(.echo-active) { background:unset; }
     const intelData  = analysisResult?.intelData  || null;
     const transcriptSummary = summaryData?.transcript_summary || null;
     const toneSignals = summaryData?.tone || null;
-    const email = currentUserProfile?.email;
+    const email = _authEmail(); // v952: ไม่รอ profiles fetch
     if (!email) {
       // v_echofix: same silent-loss guard as _saveTranscriptOnly above.
       _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ (โปรไฟล์ยังไม่พร้อม) — เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
@@ -4003,12 +4022,12 @@ ${checkinBar}
       if (typeof showToast === 'function') {
         if (synced) showToast('เช็คอินสำเร็จ ' + _tStr, '✓');
         else {
-          const why = !currentUserProfile?.email
-            ? 'โปรไฟล์ยังโหลดไม่เสร็จ'
-            : (_lastCheckinSyncError || 'การเชื่อมต่อขัดข้อง');
-          showToast('เช็คอินเก็บไว้ในเครื่องแล้ว (' + why + ') — จะส่งขึ้นระบบให้อัตโนมัติตอนเริ่มอัดเสียง', '⚠');
+          const why = _lastCheckinSyncError || 'การเชื่อมต่อขัดข้อง';
+          showToast('เช็คอินเก็บไว้ในเครื่องแล้ว (' + why + ') — ระบบจะส่งซ้ำให้เองอัตโนมัติ', '⚠');
         }
       }
+      // v952: ยังไม่เข้า → เข้าคิวยิงซ้ำเองจนกว่าจะสำเร็จ (ไม่ต้องรอเริ่มอัดเสียง)
+      if (!synced) _armCheckinRetry();
 
     } catch(e) {
       if (core) core.classList.remove('orb-snapping');
@@ -4032,9 +4051,14 @@ ${checkinBar}
     const cache = cacheArg || _checkinCache;
     if (!cache) return false;
     if (cache.session_id) return true;
-    const email = currentUserProfile?.email;
-    if (!email) return false;   // โปรไฟล์ยังไม่พร้อม — จุด retry ถัดไปจะเก็บให้
+    // v952: email จาก JWT ได้เลย ไม่รอ profiles fetch (สเปค = insert ทันทีที่กด)
+    const email = _authEmail();
+    if (!email) { _lastCheckinSyncError = 'ยังไม่พบ session ผู้ใช้'; return false; }
     try {
+      // v952: PWA ฟื้นจาก background แล้ว token ค้างเป็นปัญหาที่รู้จักของแอปนี้
+      // (01_core SIGNED_OUT handler) — getSession() ให้ supabase-js refresh ให้ก่อน
+      // insert เสมอ (pattern เดียวกับ _skCacheJWT ใน 11_skills)
+      try { await supa.auth.getSession(); } catch(_) {}
       const { data: row, error } = await supa.from('ci_sessions').insert({
         owner_email:    email,
         owner_type:     _ownerType,
@@ -4081,6 +4105,45 @@ ${checkinBar}
     }
   }
   let _lastCheckinSyncError = null; // v951: ให้ _doCheckin บอกเหตุผลจริงใน toast
+
+  // ── v952: retry queue — เช็คอินที่ค้างในเครื่องต้องหาทางขึ้นระบบเองจนได้ ────
+  // ยิงซ้ำทุก 15 วิ (สูงสุด 8 ครั้ง = 2 นาที) + ยิงทันทีตอนแอปกลับมา visible
+  // สำเร็จ → toast ✓ เงียบๆ · แพ้ครบ → รายงานเหตุผลจริงเข้า app_errors (เลิกเดา)
+  let _checkinRetryTimer = null, _checkinRetryCount = 0;
+  function _disarmCheckinRetry() {
+    if (_checkinRetryTimer) { clearInterval(_checkinRetryTimer); _checkinRetryTimer = null; }
+  }
+  function _armCheckinRetry() {
+    if (_checkinRetryTimer) return;
+    _checkinRetryCount = 0;
+    _checkinRetryTimer = setInterval(async () => {
+      if (!_checkinCache || _checkinCache.session_id) { _disarmCheckinRetry(); return; }
+      _checkinRetryCount++;
+      const ok = await _syncCheckinToDb().catch(() => false);
+      if (ok) {
+        _disarmCheckinRetry();
+        if (typeof showToast === 'function') showToast('เช็คอินส่งขึ้นระบบแล้ว', '✓');
+      } else if (_checkinRetryCount >= 8) {
+        _disarmCheckinRetry();
+        try {
+          window.SenseSentinel?.report('ci_checkin_sync_fail',
+            (_lastCheckinSyncError || 'unknown') + ' | role=' +
+            (typeof getCurrentRole === 'function' ? getCurrentRole() : '?'));
+        } catch(_) {}
+      }
+    }, 15000);
+  }
+  // กลับมาหน้าแอป (สลับแอพ/ปลดล็อคจอ) แล้วมีเช็คอินค้าง → ยิงทันที ไม่รอรอบ 15 วิ
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!_checkinCache || _checkinCache.session_id) return;
+    _syncCheckinToDb().then(ok => {
+      if (ok) {
+        _disarmCheckinRetry();
+        if (typeof showToast === 'function') showToast('เช็คอินส่งขึ้นระบบแล้ว', '✓');
+      }
+    }).catch(() => {});
+  });
 
   function _hidePicker() {
     // Hide inline picker, reveal record UI + update chip
@@ -4430,6 +4493,11 @@ ${checkinBar}
       if (teamEmails.length && !_adminScope) cvQ = cvQ.in('owner_email', teamEmails);
       const { data, error } = await cvQ;
       if (error) throw error;
+      // v952: admin เห็นจอว่างเป็นเคสที่เคยไล่บั๊กไม่ได้เพราะไม่มี telemetry —
+      // report เฉพาะเคสน่าสงสัย (admin + 0 แถว) จะได้เห็นจาก app_errors ทันที
+      if (_adminScope && !(data || []).length) {
+        try { window.SenseSentinel?.report('ci_admin_covisit_empty', 'rows=0 team=' + teamEmails.length); } catch(_) {}
+      }
       // v552: covisit_events คือ source of truth (spec) — ci_sessions flag อาจโดน RLS block
       const verifiedIds = new Set();
       try {
