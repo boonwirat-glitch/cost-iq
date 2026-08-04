@@ -642,6 +642,12 @@ body:not(.echo-active) { background:unset; }
   </div>
   <!-- TL covisit panel — shown for TL/Admin instead of orb -->
   <div id="ci-covisit-panel" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+    <!-- v_echog1: ทางเข้าแผงสรุปผลการ visit (วัน/สัปดาห์/เดือน/ไตรมาส) สำหรับ TL/Admin -->
+    <button onclick="CI._openVisitDashboard()"
+      style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;padding:12px 14px;border:0.5px solid rgba(0,0,0,.1);border-radius:var(--r-lg);background:rgba(255,255,255,.72);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;-webkit-tap-highlight-color:transparent;width:100%">
+      <span style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">📊 ผลการ visit</span>
+      <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2)">วัน · สัปดาห์ · เดือน · ไตรมาส →</span>
+    </button>
     <div class="cv-list-wrap" id="ci-cv-list-body">
       <div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>
     </div>
@@ -895,6 +901,20 @@ body:not(.echo-active) { background:unset; }
     _accountName = meta?.account_name || '';
     _accountSeg  = meta?.account_seg  || '';
     _ownerType   = meta?.owner_type   || _ownerType;
+    // v_echog1: กู้ _checkinCache ด้วย — เดิมกู้ทุกอย่างยกเว้นตัวนี้ ทำให้แถวที่
+    // save จากเส้นทางกู้คืนเสีย GPS (rep_lat=null) และไม่เชื่อมกับแถวเช็คอินใน DB
+    // เงื่อนไขจับคู่: ร้านเดียวกัน + เช็คอินเกิดก่อนเริ่มอัดไม่เกิน 90 นาที
+    try {
+      const cached = JSON.parse(localStorage.getItem('ci_checkin_cache') || 'null');
+      if (cached) {
+        const sameAcct = cached.account_guid
+          ? cached.account_guid === _accountGuid
+          : (!_accountGuid && cached.account_name && cached.account_name === _accountName);
+        const ciT  = new Date(cached.checked_in_at).getTime();
+        const recT = meta?.started_at || Date.now();
+        if (sameAcct && ciT <= recT && (recT - ciT) < 90 * 60000) _checkinCache = cached;
+      }
+    } catch(_) {}
     _secs = chunks.length; _durText = _fmt(_secs);
     _isOwnRecording = true;
     _phase = 'processing';
@@ -915,6 +935,41 @@ body:not(.echo-active) { background:unset; }
   async function _discardBuffer() {
     document.getElementById('ci-recover-banner')?.remove();
     await _idbClear();
+  }
+
+  // ── v_echog1: "วิเคราะห์ต่อ" จากแถว history ที่ค้างขั้น transcribed ──────────
+  // ปุ่มนี้ถูก error message สัญญาไว้ตั้งแต่ v709 แต่ไม่เคยมีจริง — session ที่
+  // transcript สำเร็จแต่วิเคราะห์พัง (AI คิวเต็ม ฯลฯ) เลยตันถาวร
+  // flow: อ่าน transcript จากแถว DB → ตั้ง _sessionId เป็นแถวนั้น → วิ่ง pipeline
+  // ครึ่งหลังเดิมผ่าน _processBlob(resume) → _saveAnalysisToExistingSession
+  // UPDATE แถวเดิมเป็น analyzed/saved เอง
+  async function _resumeAnalysis(sessionId) {
+    if (!sessionId) return;
+    if (_phase === 'recording' || _phase === 'processing') { _toast('มี session กำลังทำงานอยู่ — รอให้เสร็จก่อน'); return; }
+    try {
+      const { data: row, error } = await supa.from('ci_sessions')
+        .select('id,owner_email,account_id,account_name,duration_secs,transcript,pipeline_stage')
+        .eq('id', sessionId).single();
+      if (error || !row) throw error || new Error('ไม่พบ session');
+      const segments = Array.isArray(row.transcript) ? row.transcript : [];
+      if (!segments.length) { _toast('แถวนี้ไม่มี transcript ให้วิเคราะห์ต่อ'); return; }
+      const me = (currentUserProfile?.email || '').toLowerCase();
+      if ((row.owner_email || '').toLowerCase() !== me) { _toast('วิเคราะห์ต่อได้เฉพาะ session ของตัวเอง'); return; }
+
+      _closeHistory?.();
+      _sessionId   = row.id;
+      _accountGuid = row.account_id || null;
+      _accountName = row.account_name || '';
+      _secs = row.duration_secs || 0; _durText = _fmt(_secs);
+      _isOwnRecording = true;
+      _phase = 'processing';
+      _renderEchoState();
+      _showScreen('ci-s-proc');
+      _setStep('กำลังสรุปบทสนทนา...', 'วิเคราะห์ต่อจาก transcript ที่บันทึกไว้', 45);
+      _processBlob(new Blob([]), segments);
+    } catch(e) {
+      _toast('เริ่มวิเคราะห์ต่อไม่สำเร็จ: ' + e.message);
+    }
   }
 
   // ── Recording ─────────────────────────────────────────────────────────────
@@ -939,6 +994,9 @@ body:not(.echo-active) { background:unset; }
       _phase     = 'recording';
       _isOwnRecording = true; // recording own session
       _acquireWakeLock(); // v587: กันจอดับระหว่างอัด
+      // v_echog1: retry เช็คอินที่ค้างในเครื่อง (จุดกดเช็คอินเน็ตอาจหลุด) —
+      // idempotent: มี session_id แล้วจะข้ามเอง · fire-and-forget ไม่บล็อกการอัด
+      _syncCheckinToDb().catch(() => {});
       // AudioContext keep-alive — iOS audio session keep-alive
       // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
       // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
@@ -1062,7 +1120,8 @@ body:not(.echo-active) { background:unset; }
       const _expectedBytes = _secs * 3000;
       const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
       console.log('[CI audio] blob=' + blob.size + 'B expected≈' + _expectedBytes + 'B ratio=' + _ratio.toFixed(2));
-      if (_secs >= 60 && _ratio < 0.7) {
+      // v_echog1: resume จาก transcript ส่ง blob เปล่ามา — อย่าเตือนเสียงหายผิดๆ
+      if (!_resumeFromSegments && _secs >= 60 && _ratio < 0.7) {
         const _estMins = Math.round(blob.size / 3000 / 60);
         try { window.SenseSentinel?.report('ci_audio_gap', 'ratio=' + _ratio.toFixed(2)); } catch(_) {}
         _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ)');
@@ -1401,116 +1460,6 @@ body:not(.echo-active) { background:unset; }
 
 
 
-  // ── Supabase save ──────────────────────────────────────────────────────────
-  async function _saveToSupabase(skillData, intelData, transcriptSummary, toneSignals) {
-    if (!skillData && !intelData) return;
-    const email = currentUserProfile?.email;
-    if (!email) return;
-    const today = new Date().toISOString().split('T')[0];
-    const nowIso = new Date().toISOString();
-
-    // 1. Save ci_sessions row
-    try {
-      const { data: sessionRow, error: sessionErr } = await supa.from('ci_sessions').insert({
-        owner_email:        email,
-        owner_type:         _ownerType,
-        account_id:         _accountGuid || null,
-        account_name:       _accountName || null,
-        visited_at:         nowIso,
-        duration_secs:      _secs,
-        skill_scores:       skillData || null,
-        customer_intel:     intelData || null,
-        next_actions:       intelData?.next_actions || [],
-        transcript_summary: transcriptSummary || null,
-        tone_signals:       toneSignals || null,
-        // Check-in GPS — merged from _checkinCache (rep tapped check-in orb before recording)
-        rep_lat:            _checkinCache?.rep_lat || null,
-        rep_lng:            _checkinCache?.rep_lng || null,
-        checked_in_at:      _checkinCache?.checked_in_at || null,
-        status:             'saved'
-      }).select('id').single();
-      if (sessionErr) console.warn('[CI] ci_sessions insert (table may not exist yet):', sessionErr.message);
-      else if (sessionRow) {
-        _sessionId = sessionRow.id;
-        // Clear checkin cache after successful save
-        _checkinCache = null;
-        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
-      }
-    } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
-
-    // 2. Save skill log rows (all roles — Sales uses account_name fallback when no guid)
-    if (skillData?.skills?.length) {
-      // v579: account_name removed — column ไม่มีใน kam_skill_log schema (เคยทำให้ 400 ทุกครั้ง)
-      // ชื่อร้านดูได้จาก ci_sessions ผ่าน ci_session_id อยู่แล้ว
-      const rows = skillData.skills.map(s => ({
-        kam_email: email,
-        account_id: _accountGuid || null,
-        session_date: today, skill_code: s.code,
-        score: s.score,
-        evidence_summary: s.evidence || s.evidence_summary || '',
-        ci_session_id: _sessionId || null
-      }));
-      const { error } = await supa.from('kam_skill_log').insert(rows);
-      if (error) console.warn('[CI] kam_skill_log insert error:', error.message);
-    }
-
-    // 3. Write echo_skill_observations — bridge to Skills feature
-    //    Auto-send all skills (pass/developing/not_observed/not_applicable)
-    //    TL sees these as evidence in pending list — graceful fail if table not yet created
-    if (skillData?.skills?.length && !skillData?.no_speech) {
-      try {
-        // Get current user_id from Supabase session
-        let _userId = null;
-        try {
-          const _sk = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
-          if (_sk) { const _ss = JSON.parse(localStorage.getItem(_sk)); _userId = _ss?.user?.id || null; }
-        } catch(_) {}
-
-        if (_userId) {
-          const obsRows = skillData.skills.map(s => ({
-            session_id:    _sessionId || null,
-            user_id:       _userId,
-            skill_code:    ECHO_TO_SKILL_CODE[s.code] || s.code,
-            echo_code:     s.code,
-            ai_score:      s.score,
-            evidence:      s.evidence || s.evidence_summary || null,
-            coaching_note: s.coaching_note || null,
-            gap:           s.gap || null,
-            observed_at:   nowIso,
-          }));
-          const { error: obsErr } = await supa.from('echo_skill_observations').insert(obsRows);
-          if (obsErr) console.warn('[CI] echo_skill_observations insert (table may not exist yet):', obsErr.message);
-          else console.log('[CI] echo_skill_observations: saved', obsRows.length, 'rows');
-        }
-      } catch(e) { console.warn('[CI] echo_skill_observations unavailable:', e.message); }
-    }
-
-    // 4. Update kam_visits latest snapshot (KAM only)
-    if (_accountGuid) {
-      const { error: visitError } = await supa.from('kam_visits').upsert({
-        kam_email: email, account_id: _accountGuid,
-        ci_skill_scores: skillData, ci_customer_signals: intelData,
-        ci_next_actions: intelData?.next_actions || [], ci_mode: 'echo',
-        ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
-      }, { onConflict: 'kam_email,account_id' });
-      if (visitError) console.warn('[CI] kam_visits upsert error:', visitError.message);
-    }
-
-    // 5. Write echo visit to localStorage (fast, for portview dot)
-    if (_accountGuid) {
-      try {
-        const _echoKey = 'ciq_echo_visits';
-        const _store = JSON.parse(localStorage.getItem(_echoKey) || '{}');
-        const _eKey = email + '::' + _accountGuid;
-        _store[_eKey] = { ts: Date.now(), count: (_store[_eKey]?.count || 0) + 1 };
-        // Prune entries older than 30 days
-        const _cutoff = Date.now() - 30*24*60*60*1000;
-        Object.keys(_store).forEach(k => { if (_store[k].ts < _cutoff) delete _store[k]; });
-        localStorage.setItem(_echoKey, JSON.stringify(_store));
-      } catch(e) { /* non-fatal */ }
-    }
-  }
-
   // ── v709: pipeline save — saves transcript to new column ─────────────────────
 // ── Echo v2: Save transcript immediately (permanent ground truth) ─────────────
   async function _saveTranscriptOnly(segments, source) {
@@ -1526,6 +1475,32 @@ body:not(.echo-active) { background:unset; }
     }
     const nowIso = new Date().toISOString();
     try {
+      // v_echog1: ถ้าเช็คอินสร้างแถวไว้แล้ว (pipeline_stage:'checked_in') ให้
+      // UPDATE แถวเดิม ไม่ INSERT ซ้ำ — 1 visit ต้องเป็น 1 แถวเสมอ ไม่งั้นตัวนับ
+      // ทุกตัว (hero/badge/dashboard) นับการไปครั้งเดียวเป็นสอง
+      // ลอง retry เช็คอินก่อนหนึ่งรอบ เผื่อ insert ตอนกดพลาดเพราะเน็ต — จะได้
+      // แถวเดียวแทนที่จะสร้างแถวใหม่ที่ไม่มีพิกัดผูก
+      await _syncCheckinToDb().catch(() => {});
+      const _ciSessionId = _checkinCache?.session_id || null;
+
+      if (_ciSessionId) {
+        // visited_at ไม่ทับ — วันที่ไปคือเวลาที่เช็คอิน ไม่ใช่เวลาถอดเสียงเสร็จ
+        const { data: updRow, error } = await supa.from('ci_sessions').update({
+          duration_secs:  _secs,
+          transcript:     segments,
+          pipeline_stage: 'transcribed',
+          transcript_source: source || 'unknown'
+        }).eq('id', _ciSessionId).select('id').single();
+        if (error || !updRow) {
+          console.error('[CI] _saveTranscriptOnly update FAILED:', error?.message);
+          _toast('บันทึก transcript ไม่สำเร็จ — เสียงยังอยู่ในเครื่อง เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
+        } else {
+          _sessionId = updRow.id;
+          console.log('[CI] transcript saved onto checkin row, session_id=' + _sessionId);
+        }
+        return;
+      }
+
       const { data: sessionRow, error } = await supa.from('ci_sessions').insert({
         owner_email:    email,
         owner_type:     _ownerType,
@@ -1543,6 +1518,8 @@ body:not(.echo-active) { background:unset; }
       }).select('id').single();
       if (error) {
         console.error('[CI] _saveTranscriptOnly insert FAILED:', error.message, error.code, error.details, error.hint);
+        // v_echog1: เดิมพังเงียบ — rep เห็นหน้า result ปกติทั้งที่ไม่มีอะไรถูกเซฟ
+        _toast('บันทึก transcript ไม่สำเร็จ — เสียงยังอยู่ในเครื่อง เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
       } else if (sessionRow) {
         _sessionId = sessionRow.id;
         console.log('[CI] transcript saved, session_id=' + _sessionId);
@@ -1551,6 +1528,7 @@ body:not(.echo-active) { background:unset; }
       }
     } catch(e) {
       console.warn('[CI] _saveTranscriptOnly unavailable:', e.message);
+      _toast('บันทึก transcript ไม่สำเร็จ — เสียงยังอยู่ในเครื่อง เปิด Echo ใหม่แล้วกด "วิเคราะห์ต่อ"');
     }
   }
 
@@ -1587,6 +1565,32 @@ body:not(.echo-active) { background:unset; }
         if (error) console.warn('[CI] session update error:', error.message, error.code);
         else console.log('[CI] analysis saved to session_id=' + _sessionId);
       } catch(e) { console.warn('[CI] session update unavailable:', e.message); }
+    } else if (_checkinCache?.session_id) {
+      // แถวเช็คอินมีอยู่แล้วใน DB (สร้างตอนกดเช็คอิน) — UPDATE แถวนั้น ห้าม insert ซ้ำ
+      try {
+        const { data: updRow, error: updErr } = await supa.from('ci_sessions').update({
+          duration_secs:      _secs,
+          transcript:         segments?.length ? segments : null,
+          pipeline_stage:     'analyzed',
+          transcript_source:  'unknown',
+          skill_scores:       skillData || null,
+          customer_intel:     intelData || null,
+          next_actions:       intelData?.next_actions || [],
+          transcript_summary: transcriptSummary || null,
+          tone_signals:       toneSignals || null,
+          summary_data:       summaryData || null,
+          status:             'saved'
+        }).eq('id', _checkinCache.session_id).select('id').single();
+        if (updErr || !updRow) {
+          console.warn('[CI] checkin-row update failed:', updErr?.message);
+          _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + (updErr?.message || 'ไม่พบแถวเช็คอิน'));
+        } else {
+          _sessionId = updRow.id;
+        }
+      } catch(e) {
+        console.warn('[CI] checkin-row update unavailable:', e.message);
+        _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + e.message);
+      }
     } else {
       // Fallback: insert everything together (transcript save failed earlier)
       console.warn('[CI save] no _sessionId — using fallback insert');
@@ -1612,9 +1616,15 @@ body:not(.echo-active) { background:unset; }
           checked_in_at:      _checkinCache?.checked_in_at || null,
           status:             'saved'
         }).select('id').single();
-        if (sessionErr) console.warn('[CI] ci_sessions insert:', sessionErr.message);
+        if (sessionErr) {
+          console.warn('[CI] ci_sessions insert:', sessionErr.message);
+          _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + sessionErr.message);
+        }
         else if (sessionRow) _sessionId = sessionRow.id;
-      } catch(e) { console.warn('[CI] ci_sessions unavailable:', e.message); }
+      } catch(e) {
+        console.warn('[CI] ci_sessions unavailable:', e.message);
+        _toast('บันทึกผลวิเคราะห์ไม่สำเร็จ: ' + e.message);
+      }
     }
 
     if (_sessionId) {
@@ -1644,12 +1654,17 @@ body:not(.echo-active) { background:unset; }
           if (_sk) { const _ss = JSON.parse(localStorage.getItem(_sk)); _userId = _ss?.user?.id || null; }
         } catch(_) {}
         if (_userId) {
+          // v_echog1: DB enum รับแค่ 4 ค่านี้ — LLM เคยคืนค่านอก enum แล้วทำ batch
+          // insert ล่มทั้งชุดเงียบๆ (ทุก skill หาย ไม่ใช่แค่ตัวที่ผิด) → map เป็น
+          // not_observed + warn แทน
+          const _VALID_SCORES = ['pass', 'developing', 'not_observed', 'not_applicable'];
           const obsRows = skillData.skills.map(s => ({
             session_id:    _sessionId || null,
             user_id:       _userId,
             skill_code:    ECHO_TO_SKILL_CODE[s.code] || s.code,
             echo_code:     s.code,
-            ai_score:      s.score,
+            ai_score:      _VALID_SCORES.includes(s.score) ? s.score
+                             : (console.warn('[CI] off-enum ai_score:', s.code, s.score), 'not_observed'),
             evidence:      s.evidence || s.evidence_summary || null,
             coaching_note: s.coaching_note || null,
             gap:           s.gap || null,
@@ -2531,6 +2546,253 @@ body:not(.echo-active) { background:unset; }
     setTimeout(() => sheet.remove(), 400);
   }
 
+  // ── v_echog1: Visit Dashboard — ผลการ visit ราย วัน/สัปดาห์/เดือน/ไตรมาส ────
+  // full-screen sheet ตามแพตเทิร์น _openSkillTrend (ไม่แตะ state machine ของ Echo)
+  // นิยามการนับ (บุชเคาะ): เช็คอิน = visit จริง · นับทั้งเช็คอินเปล่าและมีอัดเสียง
+  // แยกตัวเลข — แยกด้วย pipeline_stage ('checked_in' = เปล่า, ที่เหลือ = มีเสียง)
+  let _vdPeriod = 'today';
+
+  function _vdSince(period) {
+    const now = new Date();
+    const d = new Date(now); d.setHours(0, 0, 0, 0);
+    if (period === 'week') {
+      // สัปดาห์เริ่มจันทร์ (convention เดิมของไฟล์)
+      const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+      d.setDate(now.getDate() - dow);
+    } else if (period === 'month') {
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (period === 'quarter') {
+      // calendar quarter = รอบ commission เป๊ะ (Q3 = ก.ค.–ก.ย.)
+      return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    }
+    return d;
+  }
+
+  function _buildVisitDashCSS() {
+    return `
+#ci-vd-sheet {
+  position:fixed;top:0;bottom:0;left:50%;
+  width:100%;max-width:440px;
+  transform:translateX(-50%) translateY(100%);
+  z-index:10000;
+  padding-top:env(safe-area-inset-top,44px);
+  background:#FFFFFF;
+  font-family:'Noto Sans Thai',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  transition:transform 380ms cubic-bezier(0.16,1,0.3,1);
+  overflow:hidden;
+}
+#ci-vd-sheet.open { transform:translateX(-50%) translateY(0); }
+.vd-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px 12px;border-bottom:0.5px solid var(--n-100,#E5E5EA);flex-shrink:0;
+}
+.vd-title { font-size:var(--text-lg2);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);letter-spacing:-.02em; }
+.vd-close { font-size:var(--text-lg2);color:var(--n-400,#636366);cursor:pointer;padding:4px; }
+.vd-periods { display:flex;gap:6px;padding:12px 24px 4px;flex-shrink:0; }
+.vd-pill {
+  font-size:var(--text-sm);font-weight:var(--fw-medium);padding:5px 12px;border-radius:100px;
+  border:0.5px solid rgba(0,0,0,.14);background:rgba(0,0,0,.04);color:var(--tx2,#636366);
+  cursor:pointer;font-family:'Noto Sans Thai',sans-serif;-webkit-tap-highlight-color:transparent;
+}
+.vd-pill.on { background:var(--ac,#FF385C);border-color:var(--ac,#FF385C);color:#fff; }
+.vd-body { flex:1;overflow-y:auto;padding:12px 24px 32px;-webkit-overflow-scrolling:touch; }
+.vd-body::-webkit-scrollbar { display:none; }
+.vd-cards { display:flex;gap:8px;margin-bottom:16px; }
+.vd-card {
+  flex:1;padding:12px 10px;border-radius:var(--r-lg);text-align:center;
+  border:0.5px solid rgba(0,0,0,.07);background:rgba(0,0,0,.02);
+}
+.vd-card-num { font-size:var(--text-xl);font-weight:var(--fw-semi);color:var(--n-900,#1C1C1E);font-variant-numeric:tabular-nums; }
+.vd-card-lbl { font-size:var(--text-2xs);color:var(--n-400,#636366);margin-top:2px;line-height:1.4; }
+.vd-sec-hd {
+  font-size:var(--text-2xs);font-weight:var(--fw-medium);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--tx3,#AEAEB2);margin:16px 0 8px;
+}
+.vd-rep-row {
+  display:flex;align-items:center;gap:8px;padding:8px 0;
+  border-bottom:0.5px solid rgba(0,0,0,.05);font-size:var(--text-md);
+}
+.vd-rep-name { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--n-900,#1C1C1E);font-weight:var(--fw-medium); }
+.vd-rep-num { width:52px;text-align:right;font-variant-numeric:tabular-nums;color:var(--tx2,#636366);font-size:var(--text-sm);flex-shrink:0; }
+.vd-rep-head { border-bottom:none;padding-bottom:2px; }
+.vd-rep-head .vd-rep-num { font-size:var(--text-3xs);letter-spacing:.05em;color:var(--tx3,#AEAEB2);text-transform:uppercase; }
+.vd-sess-row {
+  display:flex;align-items:center;gap:8px;padding:9px 0;cursor:pointer;
+  border-bottom:0.5px solid rgba(0,0,0,.05);-webkit-tap-highlight-color:transparent;
+}
+.vd-sess-main { flex:1;min-width:0; }
+.vd-sess-title { font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n-900,#1C1C1E);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.vd-sess-sub { font-size:var(--text-xs);color:var(--tx3,#AEAEB2); }
+.vd-chip { font-size:var(--text-2xs);font-weight:var(--fw-medium);padding:2px 7px;border-radius:var(--r-sm);flex-shrink:0;font-family:'Noto Sans Thai',sans-serif; }
+.vd-chip.ck { color:#FF9500;background:#FF950018; }
+.vd-chip.rec { color:#34C759;background:#34C75918; }
+.vd-chip.cv { color:#534AB7;background:#534AB718; }
+`;
+  }
+
+  function _openVisitDashboard() {
+    if (!_canDebrief()) return;
+    if (!document.getElementById('ci-vd-style')) {
+      const s = document.createElement('style');
+      s.id = 'ci-vd-style';
+      s.textContent = _buildVisitDashCSS();
+      document.head.appendChild(s);
+    }
+    document.getElementById('ci-vd-sheet')?.remove();
+
+    const periods = [
+      { key: 'today',   label: 'วันนี้' },
+      { key: 'week',    label: 'สัปดาห์นี้' },
+      { key: 'month',   label: 'เดือนนี้' },
+      { key: 'quarter', label: 'ไตรมาสนี้' },
+    ];
+    const sheet = document.createElement('div');
+    sheet.id = 'ci-vd-sheet';
+    sheet.innerHTML = `
+      <div class="vd-header">
+        <span class="vd-title">ผลการ visit</span>
+        <span class="vd-close" onclick="CI._closeVisitDashboard()">ปิด</span>
+      </div>
+      <div class="vd-periods">${periods.map(p =>
+        `<button class="vd-pill${p.key === _vdPeriod ? ' on' : ''}" id="ci-vd-p-${p.key}" onclick="CI._vdSetPeriod('${p.key}')">${p.label}</button>`).join('')}
+      </div>
+      <div class="vd-body" id="ci-vd-body">
+        <div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>
+      </div>`;
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+    _loadVisitDashboard();
+  }
+
+  function _closeVisitDashboard() {
+    const sheet = document.getElementById('ci-vd-sheet');
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    setTimeout(() => sheet.remove(), 400);
+  }
+
+  function _vdSetPeriod(period) {
+    _vdPeriod = period;
+    ['today', 'week', 'month', 'quarter'].forEach(k => {
+      const b = document.getElementById('ci-vd-p-' + k);
+      if (b) b.classList.toggle('on', k === period);
+    });
+    _loadVisitDashboard();
+  }
+
+  async function _loadVisitDashboard() {
+    const body = document.getElementById('ci-vd-body');
+    if (!body) return;
+    body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลด...</div>';
+    try {
+      const teamEmails = _getTeamEmails();
+      const _adminScope = typeof isAdminRole === 'function' && isAdminRole(getCurrentRole());
+      if (!teamEmails.length && !_adminScope) {
+        body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">กำลังโหลดข้อมูลทีม...</div>';
+        return;
+      }
+      const since = _vdSince(_vdPeriod).toISOString();
+      const LIMIT = 500;
+      let q = supa.from('ci_sessions')
+        .select('id,owner_email,account_name,visited_at,checked_in_at,duration_secs,pipeline_stage,covisit_verified')
+        .gte('visited_at', since)
+        .order('visited_at', { ascending: false })
+        .limit(LIMIT);
+      if (teamEmails.length) q = q.in('owner_email', teamEmails);
+      const { data: rows, error } = await q;
+      if (error) throw error;
+
+      // covisit_events = source of truth ของการยืนยัน (ci_sessions flag อาจโดน RLS
+      // ตอน TL update ไม่เข้า) — query ด้วยหน้าต่างเวลา ไม่ .in ด้วย 500 id (URL ระเบิด)
+      const cvBySession = new Set();
+      try {
+        const { data: evs } = await supa.from('covisit_events')
+          .select('session_id').eq('verified', true).gte('checked_at', since).limit(LIMIT);
+        (evs || []).forEach(e => cvBySession.add(e.session_id));
+      } catch(_) {}
+
+      const sessions = rows || [];
+      if (!sessions.length) {
+        body.innerHTML = '<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">ยังไม่มี visit ช่วงนี้</div>';
+        return;
+      }
+
+      const isCk  = s => s.pipeline_stage === 'checked_in';
+      const isCv  = s => !!(s.covisit_verified || cvBySession.has(s.id));
+      const total = sessions.length;
+      const rec   = sessions.filter(s => !isCk(s)).length;
+      const cv    = sessions.filter(isCv).length;
+
+      // ตารางรายคน
+      const perRep = {};
+      sessions.forEach(s => {
+        const k = (s.owner_email || '—').split('@')[0];
+        if (!perRep[k]) perRep[k] = { total: 0, rec: 0, cv: 0 };
+        perRep[k].total++;
+        if (!isCk(s)) perRep[k].rec++;
+        if (isCv(s)) perRep[k].cv++;
+      });
+      const repRows = Object.entries(perRep)
+        .sort((a, b) => b[1].total - a[1].total)
+        .map(([name, c]) => `<div class="vd-rep-row">
+          <span class="vd-rep-name">${name}</span>
+          <span class="vd-rep-num">${c.total}</span>
+          <span class="vd-rep-num">${c.rec}</span>
+          <span class="vd-rep-num">${c.cv}</span>
+        </div>`).join('');
+
+      // รายการ session ตามวัน
+      const byDay = {};
+      sessions.forEach(s => {
+        const d = new Date(s.visited_at);
+        const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        if (!byDay[k]) byDay[k] = { label: d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' }), items: [] };
+        byDay[k].items.push(s);
+      });
+      const dayBlocks = Object.entries(byDay).map(([, grp]) => {
+        const items = grp.items.map(s => {
+          const time = new Date(s.visited_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          const rep = (s.owner_email || '—').split('@')[0];
+          const chips = (isCk(s) ? '<span class="vd-chip ck">เช็คอิน</span>' : '<span class="vd-chip rec">มีเสียง</span>')
+            + (isCv(s) ? '<span class="vd-chip cv">co-visit</span>' : '');
+          return `<div class="vd-sess-row" onclick="CI._openSessionDetail('${s.id}')">
+            <div class="vd-sess-main">
+              <div class="vd-sess-title">${s.account_name || '—'}</div>
+              <div class="vd-sess-sub">${rep} · ${time}</div>
+            </div>
+            ${chips}
+          </div>`;
+        }).join('');
+        return `<div class="vd-sec-hd">${grp.label}</div>${items}`;
+      }).join('');
+
+      const capNote = sessions.length >= LIMIT
+        ? `<div style="text-align:center;padding:10px 0;font-size:var(--text-xs);color:#AEAEB2">แสดง ${LIMIT} รายการล่าสุด — ช่วงเวลานี้มีมากกว่านั้น</div>` : '';
+
+      body.innerHTML = `
+        <div class="vd-cards">
+          <div class="vd-card"><div class="vd-card-num">${total}</div><div class="vd-card-lbl">เช็คอินทั้งหมด</div></div>
+          <div class="vd-card"><div class="vd-card-num">${rec}</div><div class="vd-card-lbl">มีบันทึกเสียง<br>+วิเคราะห์</div></div>
+          <div class="vd-card"><div class="vd-card-num">${cv}</div><div class="vd-card-lbl">co-visit<br>ยืนยันแล้ว</div></div>
+        </div>
+        <div class="vd-sec-hd">รายคน</div>
+        <div class="vd-rep-row vd-rep-head">
+          <span class="vd-rep-name"></span>
+          <span class="vd-rep-num">เช็คอิน</span>
+          <span class="vd-rep-num">มีเสียง</span>
+          <span class="vd-rep-num">co-visit</span>
+        </div>
+        ${repRows}
+        ${dayBlocks}
+        ${capNote}`;
+    } catch(e) {
+      console.warn('[CI visit dashboard]', e.message);
+      body.innerHTML = `<div style="text-align:center;padding:48px 0;font-size:var(--text-base);color:#AEAEB2">โหลดไม่สำเร็จ: ${e.message}</div>`;
+    }
+  }
+
 
   // ── History filter ─────────────────────────────────────────────────────────
   function _histFilter(mode) {
@@ -2649,8 +2911,11 @@ body:not(.echo-active) { background:unset; }
     if (!email) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:var(--tx3,#AEAEB2)">ไม่พบผู้ใช้งาน</div>'; return; }
     try {
       const isTL = _canDebrief();
+      // v_echog1: + pipeline_stage — list ต้องแยกแถว "เช็คอินอย่างเดียว" ออกจาก
+      // session ที่วิเคราะห์จบ (transcript/summary_data ไม่ดึงที่นี่ — หนักเกินสำหรับ
+      // list 100 แถว detail view ดึงเองตอนเปิด)
       let q = supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage')
         .order('visited_at', { ascending: false })
         .limit(isTL ? 100 : 50);
 
@@ -2714,6 +2979,22 @@ body:not(.echo-active) { background:unset; }
     const tlEmail = (currentUserProfile?.email || '').toLowerCase();
     if (!tlEmail) return [];
     const emails = new Set();
+
+    // v_echog1: admin ไม่ใช่ TL ของใคร — เดิม match tlEmail === ตัวเองได้ 0 คน แล้ว
+    // fallback เป็น [ตัวเอง] ทำให้ admin เห็นหน้าว่างทุก feed โดยไม่รู้สาเหตุ
+    // → admin เห็น rep ทุกคนทั้งบริษัท · bulk ยังไม่โหลด = คืน [] ให้ผู้เรียกโชว์
+    // "กำลังโหลด" (ห้าม fallback เป็นตัวเอง เพราะจะกลายเป็นหน้าว่างถาวรอีก)
+    const _isAdmin = typeof isAdminRole === 'function' && isAdminRole(getCurrentRole());
+    if (_isAdmin) {
+      if (typeof portviewBulkData !== 'undefined' && portviewBulkData) {
+        portviewBulkData.forEach(r => { if (r.kamEmail) emails.add(r.kamEmail.toLowerCase()); });
+      }
+      if (typeof window.salesBulkData !== 'undefined' && window.salesBulkData) {
+        window.salesBulkData.forEach(r => { if (r.owner_email) emails.add(r.owner_email.toLowerCase()); });
+      }
+      return [...emails];
+    }
+
     // KAM team — portviewBulkData มี tlEmail + kamEmail
     if (typeof portviewBulkData !== 'undefined' && portviewBulkData) {
       portviewBulkData.forEach(r => {
@@ -2743,6 +3024,21 @@ body:not(.echo-active) { background:unset; }
       const repName  = s.owner_email ? s.owner_email.split('@')[0] : '—';
       const acctLabel = s.account_name || '—';
       const date     = new Date(s.visited_at).toLocaleDateString('th-TH', { day:'numeric', month:'short' });
+
+      // v_echog1: แถวเช็คอินอย่างเดียว (ยังไม่มีเสียง/วิเคราะห์) — การ์ดย่อของตัวเอง
+      // แทนที่จะเรนเดอร์เป็นการ์ด session พังๆ (dots ว่าง + ป้ายรอรีวิวที่ไม่มีวันจบ)
+      if (s.pipeline_stage === 'checked_in') {
+        const time = new Date(s.visited_at).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+        return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.55);border-radius:var(--r-lg);border:0.5px dashed rgba(0,0,0,.14);padding:10px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:8px">
+  <span style="font-size:var(--text-md)">📍</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
+    <div style="font-size:var(--text-xs);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel} · ${date} ${time}</div>
+  </div>
+  <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">เช็คอินอย่างเดียว</span>
+</div>`;
+      }
+
       const dur      = s.duration_secs ? _fmt(s.duration_secs) : '';
       const reviewed = !!s.tl_reviewed_at;
 
@@ -2911,8 +3207,11 @@ body:not(.echo-active) { background:unset; }
 
     // Load session data
     try {
+      // v_echog1: + transcript,summary_data (เดิมไม่ดึง → แท็บบทสนทนาว่างเสมอเมื่อ
+      // เปิดจาก history) + pipeline_stage,rep_lat,rep_lng,checked_in_at (แถบเช็คอิน
+      // + สถานะเช็คอินอย่างเดียว)
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -2980,6 +3279,37 @@ body:not(.echo-active) { background:unset; }
     const segments   = Array.isArray(s.transcript) ? s.transcript : [];
     const summaryData = s.summary_data || null;
 
+    // ── v_echog1: แถบเช็คอิน — เวลาถึงร้าน + ลิงก์พิกัดบน Google Maps
+    let checkinBar = '';
+    if (s.checked_in_at) {
+      const ckTime = new Date(s.checked_in_at).toLocaleString('th-TH', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+      const hasGps = s.rep_lat != null && s.rep_lng != null;
+      const mapLink = hasGps
+        ? ` · <a href="https://www.google.com/maps?q=${s.rep_lat},${s.rep_lng}" target="_blank" rel="noopener" style="color:#534AB7;text-decoration:none">ดูพิกัด ↗</a>`
+        : '';
+      checkinBar = `<div style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm);color:var(--tx2,#636366);font-family:'Noto Sans Thai',sans-serif;margin:6px 0 2px">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <span>เช็คอิน ${ckTime}${mapLink}</span>
+      </div>`;
+    }
+
+    // ── v_echog1: visit แบบเช็คอินอย่างเดียว — ไม่มีเสียง/วิเคราะห์ให้โชว์
+    // แสดงสถานะตรงๆ แทน 3 แท็บว่างที่ดูเหมือนข้อมูลหาย
+    if (s.pipeline_stage === 'checked_in') {
+      body.innerHTML = `
+<div class="sd2-name">${repName}</div>
+<div class="sd2-meta">${acctLabel} · ${date}</div>
+${checkinBar}
+<div class="sd2-chips">${cvChip}</div>
+<div style="text-align:center;padding:40px 16px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">
+  <div style="font-size:28px;margin-bottom:10px">📍</div>
+  <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">เช็คอินอย่างเดียว</div>
+  <div style="font-size:var(--text-sm);line-height:1.6">visit นี้ไม่มีบันทึกเสียง — นับเป็น visit ตามปกติ<br>ถ้า rep อัดเสียงต่อจากเช็คอินนี้ ผลวิเคราะห์จะมาแทนหน้านี้เอง</div>
+</div>`;
+      if (footer) footer.style.display = 'none';
+      return;
+    }
+
     // ── Build 3 panes (v606: รวม overview+transcript → "บทสนทนา")
     const pane1 = _overviewPanel(transcriptSummary, toneSignals, segments, summaryData);
     const pane2 = _skillsPanel(skillData);
@@ -2988,6 +3318,7 @@ body:not(.echo-active) { background:unset; }
     body.innerHTML = `
 <div class="sd2-name">${repName}</div>
 <div class="sd2-meta">${acctLabel} · ${date} · ${dur}</div>
+${checkinBar}
 <div class="sd2-chips">${verdictChip}${cvChip}${revChip}</div>
 <div class="sd2-tabs">
   <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">บทสนทนา</div>
@@ -3165,6 +3496,32 @@ body:not(.echo-active) { background:unset; }
       const date = new Date(s.visited_at).toLocaleDateString('th-TH',{day:'numeric',month:'short'});
       const dur = s.duration_secs ? _fmt(s.duration_secs) : '';
       const acctLabel = s.account_name || (portviewBulkData?.find(r=>(r.id||r.account_guid)===s.account_id)?.name) || s.account_id || '—';
+
+      // v_echog1: visit แบบเช็คอินอย่างเดียว — การ์ดย่อของตัวเอง ไม่ใช่การ์ด session เปล่า
+      if (s.pipeline_stage === 'checked_in') {
+        const time = new Date(s.visited_at).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+        return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.55);border-radius:var(--r-lg);border:0.5px dashed rgba(0,0,0,.14);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:var(--text-md)">📍</span>
+          <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
+          <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">เช็คอินอย่างเดียว</span>
+          <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date} ${time}</span>
+        </div>`;
+      }
+
+      // v_echog1: session ค้างขั้น transcribed (วิเคราะห์พังกลางทาง) — ปุ่มวิเคราะห์ต่อ
+      if (s.pipeline_stage === 'transcribed') {
+        return `<div style="background:rgba(255,255,255,.72);border-radius:var(--r-lg);border:0.5px solid rgba(255,149,0,.3);padding:12px 14px;margin-bottom:8px">
+          <div onclick="CI._openSessionDetail('${s.id}')" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+            <span style="font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tx,#1C1C1E);min-width:0;padding-right:8px">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
+            <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date}${dur ? ' · ' + dur : ''}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="flex:1;font-size:var(--text-xs);color:#a05800;font-family:'Noto Sans Thai',sans-serif">transcript บันทึกแล้ว · ยังไม่ได้วิเคราะห์</span>
+            <button onclick="event.stopPropagation();CI._resumeAnalysis('${s.id}')"
+              style="padding:6px 14px;border:none;border-radius:100px;background:#FF9500;color:#fff;font-size:var(--text-sm);font-weight:var(--fw-semi);font-family:'Noto Sans Thai',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent">วิเคราะห์ต่อ</button>
+          </div>
+        </div>`;
+      }
       const skills = s.skill_scores?.skills || [];
       // v569 module dot system: hue = module, tint = state — no labels (they never fit)
       const skillDots = skills.slice(0,10).map(sk => {
@@ -3512,30 +3869,6 @@ body:not(.echo-active) { background:unset; }
     // v728: _checkRecoverBuffer is called from _mount() — no duplicate needed here
   }
 
-  function _mountPicker() {
-    if (document.getElementById('ci-picker-sheet')) return;
-    if (!document.getElementById('ci-style')) {
-      const s = document.createElement('style');
-      s.id = 'ci-style'; s.textContent = _CSS;
-      document.head.appendChild(s);
-    }
-    const el = document.createElement('div');
-    el.id = 'ci-picker-sheet';
-    el.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(10,16,30,.72);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
-    el.innerHTML = _ownerType === 'sales' ? _buildSalesPickerHTML() : _buildKamPickerHTML();
-    document.body.appendChild(el);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const sheet = el.querySelector('.ci-picker-inner');
-      if (sheet) sheet.style.transform = 'translateY(0)';
-    }));
-  }
-
-  function _dismissPicker() {
-    // Legacy — kept for compat
-    const el = document.getElementById('ci-picker-sheet');
-    if (el) el.remove();
-  }
-
   // ── Orb tap dispatcher — check-in state vs record state ───────────────────
   function _orbTap() {
     if (_phase !== 'idle') return;
@@ -3567,7 +3900,18 @@ body:not(.echo-active) { background:unset; }
     if (hint) { hint.textContent = 'กดเพื่อเริ่มบันทึก'; hint.dataset.mode = 'record'; }
   }
 
-  // ── GPS check-in — snap location, cache, show bar + mic orb ──────────────
+  // ── GPS check-in — snap location, WRITE ci_sessions, show bar + mic orb ──
+  //
+  // v_echog1: เดิมกด "เช็คอิน" แล้วขึ้น toast สำเร็จทั้งที่ยังไม่มีอะไรถูกส่งขึ้น
+  // ระบบเลย — พิกัดนอนอยู่ใน localStorage แล้วค่อยติดไปกับแถว ci_sessions ตอนถอด
+  // เสียงจบ แปลว่าเช็คอินแล้วไม่อัด/อัดสั้น/AI พัง = การไปถึงร้านหายไปเงียบๆ
+  // และ TL ไม่มีทางเห็น rep ที่กำลังอยู่ในร้านเพื่อกดยืนยัน co-visit ได้เลย
+  // (แถวเพิ่งเกิดตอน rep เดินออกจากร้านไปแล้ว)
+  //
+  // ตอนนี้: เช็คอิน = INSERT ทันที (pipeline_stage:'checked_in') → co-visit เห็น
+  // แถวระหว่างยังอยู่ในร้าน · การอัดเสียงที่ตามมา UPDATE แถวเดิม (ดู
+  // _saveTranscriptOnly) · แถวที่ไม่มีเสียงตามมา = visit แบบ "เช็คอินอย่างเดียว"
+  // ซึ่งนับเป็น visit จริงตามนิยามที่บุชเคาะ (นับทั้งคู่ แยกตัวเลข)
   async function _doCheckin() {
     const hint = document.getElementById('ci-thint');
     const core = document.getElementById('ci-orb-core');
@@ -3586,11 +3930,13 @@ body:not(.echo-active) { background:unset; }
         rep_lng:       pos.coords.longitude,
         checked_in_at: now.toISOString(),
         account_guid:  _accountGuid,
+        account_name:  _accountName || null,  // v_echog1: ให้ sales (ไม่มี guid) restore cache ได้
+        session_id:    null,   // v_echog1: เติมโดย _syncCheckinToDb เมื่อ insert สำเร็จ
       };
       // Persist to localStorage so it survives app restart within session
       try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
 
-      // v552: success feedback — green flash + toast + pill บอกเวลาหมดอายุ (90 นาที)
+      // v552: visual feedback — green flash + pill บอกเวลาหมดอายุ (90 นาที)
       if (core) {
         core.classList.remove('orb-snapping');
         core.classList.add('orb-checkin-ok');
@@ -3598,14 +3944,20 @@ body:not(.echo-active) { background:unset; }
       }
       const _tStr = now.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
       const _expStr = new Date(now.getTime() + 90*60000).toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
-      if (typeof showToast === 'function') showToast('เช็คอินสำเร็จ ' + _tStr, '✓');
       const pill = document.getElementById('ci-checkin-pill');
       const timeEl = document.getElementById('ci-checkin-time');
       if (timeEl) timeEl.textContent = _tStr + ' · ถึง ' + _expStr;
       if (pill) pill.style.display = 'flex';
 
-      // Switch orb to mic
+      // Switch orb to mic — ทำก่อนรอ network เพื่อให้ UI ไม่ค้างบนเน็ตช้า
       _showMicOrb();
+
+      // v_echog1: เขียนขึ้นระบบจริง แล้วค่อยประกาศผลตามความจริง
+      const synced = await _syncCheckinToDb();
+      if (typeof showToast === 'function') {
+        if (synced) showToast('เช็คอินสำเร็จ ' + _tStr, '✓');
+        else showToast('เช็คอินเก็บไว้ในเครื่องแล้ว — ยังส่งขึ้นระบบไม่ได้ จะส่งให้อัตโนมัติตอนเริ่มอัดเสียง', '⚠');
+      }
 
     } catch(e) {
       if (core) core.classList.remove('orb-snapping');
@@ -3615,6 +3967,59 @@ body:not(.echo-active) { background:unset; }
                 : 'GPS error: ' + e.message;
       _toast(msg);
       if (hint) { hint.textContent = 'กดเพื่อเช็คอิน'; hint.dataset.mode = 'checkin'; }
+    }
+  }
+
+  // v_echog1: ส่งเช็คอินขึ้น ci_sessions — idempotent เรียกซ้ำได้ไม่เกิดแถวใหม่
+  // (มี session_id แล้ว = ส่งไปแล้ว ข้าม) · เรียกจาก 3 จุด: _doCheckin ทันทีที่กด,
+  // startRecording (retry เผื่อจุดแรกเน็ตหลุด), และ _saveTranscriptOnly ผ่านทาง
+  // ธรรมชาติของมันเอง (insert ใหม่เมื่อไม่มี session_id)
+  // คืน true = มีแถวใน DB แล้วแน่ๆ
+  async function _syncCheckinToDb() {
+    if (!_checkinCache) return false;
+    if (_checkinCache.session_id) return true;
+    const email = currentUserProfile?.email;
+    if (!email) return false;   // โปรไฟล์ยังไม่พร้อม — จุด retry ถัดไปจะเก็บให้
+    try {
+      const { data: row, error } = await supa.from('ci_sessions').insert({
+        owner_email:    email,
+        owner_type:     _ownerType,
+        account_id:     _checkinCache.account_guid || null,
+        account_name:   _accountName || null,
+        // visited_at = เวลาที่ไปถึงร้าน ไม่ใช่เวลาถอดเสียงเสร็จ — ตัวนับ visit
+        // รายวัน/สัปดาห์ทุกตัว query จาก visited_at จึงต้องเป็นวันที่ไปจริง
+        visited_at:     _checkinCache.checked_in_at,
+        checked_in_at:  _checkinCache.checked_in_at,
+        rep_lat:        _checkinCache.rep_lat,
+        rep_lng:        _checkinCache.rep_lng,
+        pipeline_stage: 'checked_in',
+        status:         'draft'
+      }).select('id').single();
+      if (error || !row) {
+        console.warn('[CI] checkin insert failed:', error?.message);
+        return false;
+      }
+      _checkinCache.session_id = row.id;
+      try { localStorage.setItem('ci_checkin_cache', JSON.stringify(_checkinCache)); } catch(_) {}
+      // จุด echo บนพอร์ตติดตั้งแต่วันไป ไม่ต้องรอวิเคราะห์จบ (โครงเดียวกับ
+      // upsert ใน _saveAnalysisToExistingSession — onConflict กันแถวซ้ำ)
+      if (_checkinCache.account_guid) {
+        try {
+          await supa.from('kam_visits').upsert({
+            kam_email:     email,
+            account_id:    _checkinCache.account_guid,
+            last_seen:     _checkinCache.checked_in_at,
+            modes:         ['echo'],
+            ci_session_id: row.id,
+            ci_created_at: _checkinCache.checked_in_at,
+            visit_date:    _checkinCache.checked_in_at.slice(0, 10)
+          }, { onConflict: 'kam_email,account_id' });
+        } catch(_) {}
+      }
+      return true;
+    } catch(e) {
+      console.warn('[CI] checkin sync unavailable:', e.message);
+      return false;
     }
   }
 
@@ -3635,29 +4040,32 @@ body:not(.echo-active) { background:unset; }
     }
   }
 
+  // v_echog1: restore เช็คอินจาก localStorage ถ้ายังสด (<90 นาที) และตรงร้าน
+  // ใช้ร่วมกันทั้ง KAM (match ด้วย guid) และ sales (match ด้วยชื่อ เพราะไม่มี guid)
+  // คืน true = restore แล้ว + อัปเดต pill เวลาเช็คอินให้ด้วย
+  function _restoreCheckinIfFresh(matches) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('ci_checkin_cache') || 'null');
+      if (!cached || !matches(cached)) return false;
+      const minsAgo = (Date.now() - new Date(cached.checked_in_at).getTime()) / 60000;
+      if (minsAgo >= 90) return false;
+      _checkinCache = cached;
+      const pill = document.getElementById('ci-checkin-pill');
+      const timeEl = document.getElementById('ci-checkin-time');
+      const t = new Date(cached.checked_in_at);
+      const _exp = new Date(t.getTime() + 90*60000);
+      if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' })
+        + ' · ถึง ' + _exp.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+      if (pill) pill.style.display = 'flex';
+      return true;
+    } catch(_) { return false; }
+  }
+
   function _pickerConfirmKam(guid, name, seg) {
     _accountGuid = guid; _accountName = name; _accountSeg = seg || '';
     _showPicker = false;
     _hidePicker();
-    // Restore checkin cache if same account was checked-in this session
-    try {
-      const cached = JSON.parse(localStorage.getItem('ci_checkin_cache') || 'null');
-      if (cached && cached.account_guid === guid) {
-        const minsAgo = (Date.now() - new Date(cached.checked_in_at).getTime()) / 60000;
-        if (minsAgo < 90) {
-          _checkinCache = cached;
-          const pill = document.getElementById('ci-checkin-pill');
-          const timeEl = document.getElementById('ci-checkin-time');
-          const t = new Date(cached.checked_in_at);
-          const _exp = new Date(t.getTime() + 90*60000);
-          if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' })
-            + ' · ถึง ' + _exp.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
-          if (pill) pill.style.display = 'flex';
-          _showMicOrb();
-          return;
-        }
-      }
-    } catch(_) {}
+    if (_restoreCheckinIfFresh(c => c.account_guid === guid)) { _showMicOrb(); return; }
     _showCheckinOrb();
   }
 
@@ -3666,63 +4074,11 @@ body:not(.echo-active) { background:unset; }
     _accountGuid = null; _accountName = name.trim(); _accountSeg = 'LEAD';
     _showPicker = false;
     _hidePicker();
+    // v_echog1: restore แบบเดียวกับ KAM — เดิม sales เลือกร้านแล้วเช็คอินหายทุกครั้ง
+    if (_restoreCheckinIfFresh(c => !c.account_guid && c.account_name === _accountName)) { _showMicOrb(); return; }
     _showCheckinOrb();
   }
 
-  function _buildKamPickerHTML() {
-    let recents = '';
-    try {
-      if (typeof portviewBulkData !== 'undefined' && portviewBulkData.length) {
-        recents = portviewBulkData
-          .filter(r => r.res_name)
-          .sort((a,b) => (b.gmv_mtd||0) - (a.gmv_mtd||0))
-          .slice(0, 5)
-          .map(r => `<button class="ci-pk-item" onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
-            <span class="ci-pk-name">${r.res_name||'-'}</span>
-            <span class="ci-pk-seg">${r.account_type||'-'}</span>
-          </button>`).join('');
-      }
-    } catch(e) {}
-    return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
-      <div style="width:36px;height:4px;border-radius:var(--r-xxs);background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
-      <div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:#1C1C1E;margin-bottom:4px;">เลือกร้านค้า</div>
-      <div style="font-size:var(--text-md);color:#636366;margin-bottom:16px;">หรือค้นหาด้านล่าง</div>
-      <input id="ci-pk-search" type="search" placeholder="ค้นหาชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:11px 14px;border:1px solid #E5E5EA;border-radius:var(--r-card);font-size:var(--text-lg);outline:none;margin-bottom:12px;box-sizing:border-box;"
-        oninput="CI._pickerSearch(this.value)" />
-      <div id="ci-pk-list" style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">${recents}</div>
-      <button onclick="CI._dismissPicker()" style="margin-top:16px;width:100%;padding:12px;border:none;border-radius:var(--r-card);background:rgba(0,0,0,.06);font-size:var(--text-lg);color:#636366;cursor:pointer;">ยกเลิก</button>
-    </div>`;
-  }
-
-  function _buildSalesPickerHTML() {
-    return `<div class="ci-picker-inner" style="background:#fff;border-radius:28px 28px 0 0;padding:20px 20px 32px;width:100%;max-width:440px;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);">
-      <div style="width:36px;height:4px;border-radius:var(--r-xxs);background:rgba(0,0,0,.12);margin:0 auto 20px;"></div>
-      <div style="font-size:var(--text-base);font-weight:var(--fw-semi);color:#1C1C1E;margin-bottom:4px;">คุณกำลังคุยกับร้านไหน?</div>
-      <div style="font-size:var(--text-md);color:#636366;margin-bottom:16px;">พิมพ์ชื่อร้าน ใช้สำหรับเก็บประวัติการสนทนา</div>
-      <input id="ci-sales-name" type="text" placeholder="ชื่อร้าน..." autocomplete="off"
-        style="width:100%;padding:13px 14px;border:1.5px solid #FF385C;border-radius:var(--r-card);font-size:var(--text-lg2);outline:none;margin-bottom:12px;box-sizing:border-box;"
-        onkeydown="if(event.key==='Enter')CI._pickerConfirmSales(this.value)" />
-      <button onclick="CI._pickerConfirmSales(document.getElementById('ci-sales-name').value)"
-        style="width:100%;padding:13px;border:none;border-radius:var(--r-card);background:#FF385C;color:var(--tk-text-primary);font-size:var(--text-lg2);font-weight:var(--fw-semi);cursor:pointer;margin-bottom:8px;">เริ่มบันทึก</button>
-      <button onclick="CI._dismissPicker()" style="width:100%;padding:12px;border:none;border-radius:var(--r-card);background:rgba(0,0,0,.06);font-size:var(--text-lg);color:#636366;cursor:pointer;">ยกเลิก</button>
-    </div>`;
-  }
-
-  function _pickerSearch(q) {
-    const list = document.getElementById('ci-pk-list');
-    if (!list) return;
-    try {
-      const filtered = (typeof portviewBulkData !== 'undefined' ? portviewBulkData : [])
-        .filter(r => r.res_name && r.res_name.toLowerCase().includes(q.toLowerCase()))
-        .slice(0, 8);
-      list.innerHTML = filtered.map(r =>
-        `<button class="ci-pk-item" onclick="CI._pickerConfirmKam('${r.account_guid}','${(r.res_name||'').replace(/'/g,"\\'")}','${r.account_type||''}')">
-          <span class="ci-pk-name">${r.res_name||'-'}</span>
-          <span class="ci-pk-seg">${r.account_type||'-'}</span>
-        </button>`).join('');
-    } catch(e) {}
-  }
   // ── Dark mode theme transition (recording ↔ idle) ─────────────────────────
   function _applyRecordingTheme(isRec) {
     const sheet = document.getElementById('ci-fullsheet');
@@ -4002,13 +4358,17 @@ body:not(.echo-active) { background:unset; }
     _updateCvVerifyBtn();
     try {
       const teamEmails = _getTeamEmails();
-      if (!teamEmails.length) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">ไม่พบน้องในทีม</div>'; return; }
+      // v_echog1: admin เห็นทั้งบริษัท — list ว่าง (bulk ยังไม่โหลด) ให้ query แบบ
+      // ไม่กรอง owner แทน (RLS เปิดให้ admin อ่านทุกแถวอยู่แล้ว) · TL list ว่าง = ตันจริง
+      const _adminScope = typeof isAdminRole === 'function' && isAdminRole(getCurrentRole());
+      if (!teamEmails.length && !_adminScope) { body.innerHTML = '<div style="text-align:center;padding:40px 0;font-size:var(--text-base);color:#AEAEB2">ไม่พบน้องในทีม</div>'; return; }
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_name,checked_in_at,rep_lat,rep_lng,covisit_verified')
-        .in('owner_email', teamEmails)
+      let cvQ = supa.from('ci_sessions')
+        .select('id,owner_email,account_name,checked_in_at,rep_lat,rep_lng,covisit_verified,pipeline_stage')
         .gte('checked_in_at', todayStart.toISOString())
         .order('checked_in_at', { ascending: false });
+      if (teamEmails.length) cvQ = cvQ.in('owner_email', teamEmails);
+      const { data, error } = await cvQ;
       if (error) throw error;
       // v552: covisit_events คือ source of truth (spec) — ci_sessions flag อาจโดน RLS block
       const verifiedIds = new Set();
@@ -4056,14 +4416,19 @@ body:not(.echo-active) { background:unset; }
         clickable = true;
       }
       const selStyle = clickable ? 'cursor:pointer;' : 'opacity:.6;';
+      // v_echog1: != null ไม่ใช่ truthy — พิกัด 0 คือค่าจริง
       const onclickAttr = clickable
-        ? `onclick="CI._cvSelectRow('${s.id}','${s.owner_email}',${s.rep_lat||'null'},${s.rep_lng||'null'},'${s.checked_in_at}','${repName}')"`
+        ? `onclick="CI._cvSelectRow('${s.id}','${s.owner_email}',${s.rep_lat != null ? s.rep_lat : 'null'},${s.rep_lng != null ? s.rep_lng : 'null'},'${s.checked_in_at}','${repName}')"`
         : '';
+      // v_echog1: แถวที่เพิ่งเช็คอิน (ยังไม่มีเสียง) โผล่ที่นี่ได้แล้วตั้งแต่กดเช็คอิน
+      // — บอกสถานะให้ TL รู้ว่า rep ยังอยู่ในร้าน ไม่ใช่ visit ที่จบแล้ว
+      const stageNote = s.pipeline_stage === 'checked_in'
+        ? ' · <span style="color:#FF9500">ยังไม่อัดเสียง</span>' : '';
       return `<div class="cv-row" id="cv-row-${s.id}" style="${selStyle}" ${onclickAttr}>
         <div class="cv-avatar">${initials}</div>
         <div style="flex:1;min-width:0">
           <div class="cv-name">${repName}</div>
-          <div class="cv-sub">${acct} · เช็คอิน ${checkinTime}</div>
+          <div class="cv-sub">${acct} · เช็คอิน ${checkinTime}${stageNote}</div>
         </div>
         ${badgeHtml}
       </div>`;
@@ -4110,6 +4475,22 @@ body:not(.echo-active) { background:unset; }
     const WINDOW_MS = 90 * 60 * 1000;
 
     try {
+      // v_echog1: ทางเข้าจาก session detail ส่ง null มา ซึ่งเดิมทำให้ "ข้าม" ทั้ง
+      // เช็คระยะและเช็คเวลาเงียบๆ (verify ผ่านตลอด) — ดึงค่าจริงของแถวมาก่อนเสมอ
+      // ค่าที่ยังเป็น null หลัง fetch = แถวนั้นไม่มีข้อมูลจริงๆ (เช่น อัดโดยไม่เช็คอิน)
+      // ถึงจะข้ามเช็คนั้นได้อย่างถูกต้อง
+      if (target.session_id && (target.rep_lat == null || !target.checked_in_at)) {
+        const { data: srow } = await supa.from('ci_sessions')
+          .select('rep_lat,rep_lng,checked_in_at,owner_email')
+          .eq('id', target.session_id).single();
+        if (srow) {
+          if (target.rep_lat == null) target.rep_lat = srow.rep_lat;
+          if (target.rep_lng == null) target.rep_lng = srow.rep_lng;
+          if (!target.checked_in_at)  target.checked_in_at = srow.checked_in_at;
+          if (!target.rep_email)      target.rep_email = srow.owner_email;
+        }
+      }
+
       // 1. TL GPS snap
       const pos = await new Promise((resolve, reject) => {
         if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
@@ -4129,8 +4510,9 @@ body:not(.echo-active) { background:unset; }
       }
 
       // 3. Haversine check (if rep has GPS)
+      // v_echog1: != null ไม่ใช่ truthy — พิกัด 0 คือค่าจริง (เส้นศูนย์สูตร/เส้นเมริเดียน)
       let proximityM = null;
-      if (target.rep_lat && target.rep_lng) {
+      if (target.rep_lat != null && target.rep_lng != null) {
         proximityM = Math.round(_haversine(tlLat, tlLng, target.rep_lat, target.rep_lng));
         if (proximityM > THRESHOLD_M) {
           throw new Error(`ไกลเกินไป — ห่างกัน ${proximityM} เมตร (ต้องอยู่ใน ${THRESHOLD_M} เมตร)`);
@@ -4234,7 +4616,7 @@ body:not(.echo-active) { background:unset; }
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _dismissPicker, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearch, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _openVisitDashboard, _closeVisitDashboard, _vdSetPeriod, _resumeAnalysis };
 
 })();
 
