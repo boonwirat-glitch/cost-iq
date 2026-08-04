@@ -321,10 +321,22 @@ async function _loadTLSquad() {
     console.log('[Skills] _loadTLSquad: tlEmail =', tlEmail);
 
     // 1. Get TL's own squad name
-    const tlRows = await _skFetch(`profiles?select=squad,sale_team&email=eq.${encodeURIComponent(tlEmail)}&limit=1`);
+    const tlRows = await _skFetch(`profiles?select=squad,sale_team,role&email=eq.${encodeURIComponent(tlEmail)}&limit=1`);
     const tlRow = tlRows && tlRows[0];
     const squadName = tlRow?.squad || tlRow?.sale_team || null;
-    if (!squadName) { console.warn('[Skills] TL squad not set for', tlEmail); return; }
+    if (!squadName) {
+      // v_echog1: admin ไม่มี squad — เดิมจบที่ "ไม่พบข้อมูลทีม" → ใช้ roster ทั้งบริษัทแทน
+      if ((tlRow?.role || '').toLowerCase() === 'admin') {
+        const allRows = await _skFetch(`profiles?select=email&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam)`);
+        _tlSquadEmails = (allRows || [])
+          .map(r => (r.email || '').toLowerCase())
+          .filter(e => e && e !== tlEmail);
+        _tlSquad = 'ทั้งบริษัท';
+        console.log('[Skills] admin org-wide roster:', _tlSquadEmails.length, 'reps');
+        return;
+      }
+      console.warn('[Skills] TL squad not set for', tlEmail); return;
+    }
     _tlSquad = squadName;
 
     // 2. Get all reps in same squad
@@ -586,16 +598,22 @@ async function _renderTLVisitContent(container) {
     const emails = _tlSquadEmails.length > 0 ? _tlSquadEmails : [];
     if (!emails.length) { container.innerHTML = _emptyTeam; return; }
 
-    const since = new Date(Date.now() - 35 * 86400000).toISOString();
+    // v_echog1: fetch window = ต้นไตรมาส (เดิม 35 วัน — เดือนที่ 3 ของไตรมาสนับขาด
+    // เชิงโครงสร้าง: filter จากต้นไตรมาสแต่ข้อมูลมีแค่ 35 วันย้อนหลัง)
+    // + account_id เพื่อนับ distinct ร้าน (เป้าคือครบทุกร้าน ไม่ใช่ไปร้านเดิมหลายครั้ง)
+    const now = new Date();
+    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+    const _FETCH_LIMIT = 500;
+    const since = qStart.toISOString();
     const emailFilter = emails.map(e => `"${e}"`).join(',');
     const rows = await _skFetch(
-      `ci_sessions?select=owner_email,visited_at,account_name,duration_secs` +
-      `&owner_email=in.(${emailFilter})&visited_at=gte.${since}&order=visited_at.desc&limit=500`
+      `ci_sessions?select=owner_email,visited_at,account_name,account_id,duration_secs` +
+      `&owner_email=in.(${emailFilter})&visited_at=gte.${since}&order=visited_at.desc&limit=${_FETCH_LIMIT}`
     );
     if (!rows || !rows.length) { container.innerHTML = _noData; return; }
+    const _hitCap = rows.length >= _FETCH_LIMIT;
 
     // Week boundaries (Mon–Sun)
-    const now = new Date();
     const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
     const thisMonStart = new Date(now); thisMonStart.setHours(0,0,0,0); thisMonStart.setDate(now.getDate() - dow);
     const lastMonStart = new Date(thisMonStart); lastMonStart.setDate(thisMonStart.getDate() - 7);
@@ -622,12 +640,13 @@ async function _renderTLVisitContent(container) {
       if (acctPerRep[e] !== undefined) acctPerRep[e]++;
     });
 
-    // Quarterly visit count per rep
-    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+    // Quarterly visit coverage per rep — v_echog1: นับ distinct account_id
+    // (เป้าคือ visit ครบทุกร้านในไตรมาส — ไปร้านเดิม 5 ครั้งนับเป็น 1 ร้าน)
     emails.forEach(e => {
-      repMap[e].thisQuarter = rows.filter(r =>
-        (r.owner_email||'').toLowerCase() === e && new Date(r.visited_at) >= qStart
-      ).length;
+      repMap[e].thisQuarter = new Set(
+        rows.filter(r => (r.owner_email||'').toLowerCase() === e && new Date(r.visited_at) >= qStart)
+            .map(r => r.account_id).filter(Boolean)
+      ).size;
     });
 
     const totalThis  = emails.reduce((s,e) => s + repMap[e].thisWeek, 0);
@@ -704,6 +723,8 @@ async function _renderTLVisitContent(container) {
 </div>`;
     });
     html += `</div>`;
+    // v_echog1: no silent cap — ถ้าชนเพดาน fetch ให้บอกตรงๆ ว่าตัวเลขอาจต่ำกว่าจริง
+    if (_hitCap) html += `<div style="padding:0 14px;text-align:center;"><span class="sk-eyebrow" style="color:var(--sk-warn);">ข้อมูลชนเพดาน ${_FETCH_LIMIT} แถว — ตัวเลขไตรมาสอาจต่ำกว่าจริง</span></div>`;
     html += `<div style="padding:10px 14px 24px;text-align:center;"><span class="sk-eyebrow">เดือนนี้ ${totalMonth} visits · ${qLabel} เป้า 100% accounts</span></div>`;
 
     container.innerHTML = html;

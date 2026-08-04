@@ -2463,7 +2463,7 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
   const groups=_buildKamGroups();
   // Pre-fetch visit data from Supabase for TL/Admin (so "ทำการบ้าน" shows KAM's actual visits)
   // v499: ad_tl also uses team visit map (manages a portfolio of accounts)
-  const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin'||currentUserProfile.role==='ad_tl');
+  const _isTLAdmin = currentUserProfile && (currentUserProfile.role==='tl'||currentUserProfile.role==='admin'||currentUserProfile.role==='ad_tl'||currentUserProfile.role==='sales_tl');
   if(_isTLAdmin && typeof getTeamVisitMapFromSupabase === 'function'){
     const kamEmails = [...new Set(groups.map(g=>g.kamEmail).filter(Boolean))];
     window._tvVisitMap = await getTeamVisitMapFromSupabase(kamEmails);
@@ -2520,9 +2520,16 @@ function __legacyRenderTeamviewKamListSync(groups, el){
 
   const fmtSF=n=>n>=1000000?'฿'+(n/1000000).toFixed(1)+'M':n>=1000?'฿'+(n/1000).toFixed(0)+'K':'฿'+Math.round(n);
 
+  // v_echog1: การบ้านนับรายไตรมาส (ตรงรอบ commission) + TL/admin อ่าน server map
+  // เท่านั้น — เดิม rep ที่ไม่อยู่ใน _tvVisitMap fallback ไป localStorage ของ "คนดู"
+  // ทำให้ TL เห็นเลขการบ้านของตัวเองแปะอยู่บนชื่อ rep คนอื่น
+  const _hwQStart=_visitQuarterStartMs();
+  const _hwVm=g=>window._tvVisitMap?(window._tvVisitMap[g.kamEmail]||{}):getVisitMap(g.kamEmail||'');
+  const _hwCount=(g,vm)=>g.accounts.filter(a=>vm[a.id]&&vm[a.id].lastSeen>=_hwQStart).length;
+
   function fullCard(g){
-    const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
-    const visited=g.accounts.filter(a=>vm[a.id]).length;
+    const vm=_hwVm(g);
+    const visited=_hwCount(g,vm);
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const rrStr=(g.targetDenominator||g.baseline)>0?`<span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:rgba(255,255,255,.75)">${fmtSF(g.runRate)}<span style="color:rgba(255,255,255,.55);font-weight:var(--fw-normal)"> / ${fmtSF(g.targetDenominator||g.baseline)}</span><span style="font-size:var(--text-2xs);color:rgba(255,255,255,.52);font-family:var(--tk-font-body);margin-left:4px">${_tvDenomLabel(g)}</span></span>`:'';
@@ -2544,7 +2551,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     // button was already a dead no-op click in production.
     return`<div class="tv-full-card ${g.paceCls}" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
-        <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+        <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total} (ไตรมาสนี้)</span></div>
         <div class="tv-full-pace ${g.paceCls}">${g.pace||'—'}%</div>
       </div>
       <div class="tv-full-bar"><div class="tv-full-fill ${g.paceCls}" style="width:${Math.min(g.pace||0,100)}%"></div></div>
@@ -2556,8 +2563,8 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   }
 
   function starCard(g){
-    const vm=(window._tvVisitMap&&window._tvVisitMap[g.kamEmail])||getVisitMap(g.kamEmail||'');
-    const visited=g.accounts.filter(a=>vm[a.id]).length;
+    const vm=_hwVm(g);
+    const visited=_hwCount(g,vm);
     const surplus=g.pace-100;
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px"><span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
@@ -2581,7 +2588,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     return`<div class="tv-star-card tv-star-glow" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-full-top">
         <div style="display:flex;align-items:center;gap:7px;min-width:0">
-          <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+          <div class="tv-full-name">${g.kamName}<span style="font-size:var(--text-2xs);font-weight:var(--fw-semi);color:rgba(255,255,255,.65);margin-left:6px"> ทำการบ้าน ${visited}/${g.total} (ไตรมาสนี้)</span></div>
           <span class="tv-star-badge">+${surplus}%</span>
         </div>
         <div class="tv-star-pace">${g.pace}%</div>
@@ -2595,8 +2602,9 @@ function __legacyRenderTeamviewKamListSync(groups, el){
   }
 
   function chipRow(g){
-    const vm=getVisitMap(g.kamEmail||'');
-    const visited=g.accounts.filter(a=>vm[a.id]).length;
+    // v_echog1: ใช้ server map เหมือนการ์ดพี่น้อง — เดิมอ่าน localStorage คนดูล้วน
+    const vm=_hwVm(g);
+    const visited=_hwCount(g,vm);
     const dot=(color,n)=>n>0?`<span style="display:inline-flex;align-items:center;gap:2px;margin-right:5px"><span style="width:5px;height:5px;border-radius:50%;background:${color}"></span><span style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-xs);font-weight:var(--fw-bold);color:${color}">${n}</span></span>`:'';
     const chips=dot('var(--tk-ok-bright)',g.ok)+dot('var(--amb)',g.warn)+dot('#ff8888',g.danger);
     const _nrr=_getCachedKamNrr(g.kamEmail);
@@ -2611,7 +2619,7 @@ function __legacyRenderTeamviewKamListSync(groups, el){
     const _kpCUL=!_teamUpsellReadyC; // shimmer only until team summary loaded
     return`<div class="tv-chip" onclick="teamviewDrillKam('${g.kamEmail||g.kamName}')">
       <div class="tv-chip-main">
-        <div class="tv-chip-name">${g.kamName}<span style="font-size:var(--text-2xs);color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total}</span></div>
+        <div class="tv-chip-name">${g.kamName}<span style="font-size:var(--text-2xs);color:rgba(255,255,255,.65);margin-left:4px"> ทำการบ้าน ${visited}/${g.total} (ไตรมาสนี้)</span></div>
         <div class="tv-chip-bottom">
           <div class="tv-chip-risk">${chips}${nrrPct!==null?`<span class="tv-chip-nrr">NRR ${_commFmtPct(nrrPct)}</span>`:''}</div>
         </div>
@@ -2735,7 +2743,21 @@ When mentioning a SKU, use ฿ — not %.`;
 //   -- RLS: KAM can insert/update own rows; TL/Admin can select all
 // ════════════════════════════════════════
 const _VISIT_KEY='ciq_visits';
-const _VISIT_TTL=90*24*60*60*1000; // 90 days ms
+const _VISIT_TTL=90*24*60*60*1000; // 90 days ms — storage bound (prune localStorage)
+
+// v_echog1: การบ้านนับเป็น "รายไตรมาส" ให้ตรงรอบ visit + รอบ commission
+// (calendar quarter: Q3 = ก.ค.–ก.ย.) — เดิมใช้หน้าต่าง 90 วันเลื่อน ทำให้ตัวเลข
+// ไม่เคย reset และไม่ตรงกับรอบที่ใช้จ่ายเงินจริง · TTL 90 วันข้างบนคงไว้เป็นแค่
+// ขอบเขต storage — การกรองเพื่อแสดงผลใช้ตัวนี้
+function _visitQuarterStartMs(){
+  const now=new Date();
+  return new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1).getTime();
+}
+// ขอบล่างของการ fetch จาก server: ไตรมาสยาวได้ถึง 92 วัน — ใช้ค่าที่เก่ากว่า
+// ระหว่าง (ต้นไตรมาส, now-90d) กันวันต้นไตรมาสโดนตัดตอนปลายไตรมาส
+function _visitFetchSinceIso(){
+  return new Date(Math.min(Date.now()-_VISIT_TTL,_visitQuarterStartMs())).toISOString();
+}
 
 // SECTION:VISIT_TRACKING
 function _visitKey(kamEmail,accountId){return kamEmail+'::'+accountId;}
@@ -2799,7 +2821,7 @@ async function getVisitMapFromSupabase(kamEmail){
     const {data,error}=await supa.from('kam_visits')
       .select('account_id,last_seen,modes')
       .eq('kam_email',kamEmail)
-      .gte('last_seen',new Date(Date.now()-_VISIT_TTL).toISOString());
+      .gte('last_seen',_visitFetchSinceIso());
     if(error||!data)return{};
     const result={};
     data.forEach(r=>{
@@ -2819,7 +2841,7 @@ async function getTeamVisitMapFromSupabase(kamEmails){
     const {data,error}=await supa.from('kam_visits')
       .select('kam_email,account_id,last_seen,modes')
       .in('kam_email',kamEmails)
-      .gte('last_seen',new Date(Date.now()-_VISIT_TTL).toISOString());
+      .gte('last_seen',_visitFetchSinceIso());
     if(error||!data)return{};
     // Returns {kamEmail: {accountId: {lastSeen, modes}}}
     const result={};
@@ -2847,7 +2869,8 @@ async function getTeamVisitMapFromSupabase(kamEmails){
 let _echoMapCache = { email: null, map: null };
 let _echoMapFetching = null;
 async function _fetchEchoMapFromSupabase(kamEmail){
-  const cutoffIso = new Date(Date.now() - 30*24*60*60*1000).toISOString();
+  // v_echog1: quarter window (ตรงรอบ commission) — เดิม 30 วันเลื่อน
+  const cutoffIso = new Date(_visitQuarterStartMs()).toISOString();
   const { data, error } = await supa.from('kam_visits')
     .select('account_id,ci_created_at')
     .eq('kam_email', kamEmail)
@@ -2862,11 +2885,10 @@ function _getEchoMapLocal(kamEmail){
   try{
     const store=JSON.parse(localStorage.getItem('ciq_echo_visits')||'{}');
     const prefix=(kamEmail||'local')+'::';
-    const now=Date.now();
-    const cutoff=30*24*60*60*1000;
+    const qStart=_visitQuarterStartMs(); // v_echog1: quarter window เหมือนฝั่ง server
     const result={};
     Object.entries(store).forEach(([k,v])=>{
-      if(k.startsWith(prefix)&&(now-v.ts)<=cutoff){
+      if(k.startsWith(prefix)&&v.ts>=qStart){
         result[k.slice(prefix.length)]=v;
       }
     });
