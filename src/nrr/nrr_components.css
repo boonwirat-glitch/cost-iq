@@ -147,6 +147,18 @@
 .nrr-waiver-status.rejected { background: rgba(0,0,0,.06); color: var(--ink3); }
 .nrr-waiver-actions { display: flex; gap: 8px; margin-top: 10px; }
 
+/* Export dropdown — reused wherever a page needs "give me this table" in
+   more than one format. .float already carries the elevated-surface look
+   (border+shadow), this just adds the menu-item row behavior on top. */
+.nrr-export-menu-item {
+  display: block; width: 100%; text-align: left; border: none; background: transparent;
+  font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink);
+  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer;
+  transition: background 120ms ease;
+}
+.nrr-export-menu-item:hover { background: var(--fill); }
+.nrr-export-menu-item:active { background: var(--fill-deep); }
+
 /* Sales handover-pipeline forecast chips — urgency status, not identity;
    border color carries the meaning, text label always present alongside.
    (v29: superseded by the pipeline table's .nrr-pipe-cell for #/sales, but

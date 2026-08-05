@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>window.NRR_BUILD = 'v123';</script>
+<script>window.NRR_BUILD = 'v1';</script>
 <style>
 /* ── nrr_tokens.css — "Fresh Canvas" design tokens ─────────────────────
    Adopted verbatim from the user-supplied Fresh Canvas spec, as the
@@ -427,6 +427,18 @@ html, body {
 .nrr-waiver-status.submitted { background: var(--sun-soft); color: var(--sun-deep); }
 .nrr-waiver-status.rejected { background: rgba(0,0,0,.06); color: var(--ink3); }
 .nrr-waiver-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* Export dropdown — reused wherever a page needs "give me this table" in
+   more than one format. .float already carries the elevated-surface look
+   (border+shadow), this just adds the menu-item row behavior on top. */
+.nrr-export-menu-item {
+  display: block; width: 100%; text-align: left; border: none; background: transparent;
+  font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--ink);
+  padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer;
+  transition: background 120ms ease;
+}
+.nrr-export-menu-item:hover { background: var(--fill); }
+.nrr-export-menu-item:active { background: var(--fill-deep); }
 
 /* Sales handover-pipeline forecast chips — urgency status, not identity;
    border color carries the meaning, text label always present alongside.
@@ -6973,6 +6985,9 @@ window.nrrReviewExclusion = nrrReviewExclusion;
 // nrr_exclusions.js's nrrExclusionsCache (already fetched in nrrRefresh()
 // before any view renders) -- this file is presentation only.
 
+// rows currently on screen (post role-filter) — read by the export menu.
+var nrrLastWaiverRows = null;
+
 function nrrRenderWaiversView(route) {
   var body = document.getElementById('nrr-waivers-body');
   if (!body) return;
@@ -7028,13 +7043,30 @@ function nrrWaiversPageHtml() {
   }
   rows.sort(function (a, b) { return (a.requested_at || '') < (b.requested_at || '') ? 1 : -1; });
 
+  // cached for the export functions below — mirrors nrrLastKamRows pattern
+  // in nrr_view.js (module-level "what's on screen right now" var)
+  nrrLastWaiverRows = rows;
+
   var pending = rows.filter(function (x) { return x.status === 'submitted'; });
   var approved = rows.filter(function (x) { return x.status === 'approved'; });
   var rejected = rows.filter(function (x) { return x.status === 'rejected'; });
   var revoked = rows.filter(function (x) { return x.status === 'revoked'; });
 
-  return '<div class="h2">' + title + '</div>' +
-    howTo +
+  var exportBtn = rows.length ? (
+    '<div style="position:relative;flex-shrink:0">' +
+    '<button class="btn-secondary" data-action="waivers-export-toggle" id="nrr-waivers-export-btn">Export</button>' +
+    '<div class="float" id="nrr-waivers-export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:190px;padding:5px;z-index:20">' +
+    '<button class="nrr-export-menu-item" data-action="waivers-export-excel">Excel (.xls)</button>' +
+    '<button class="nrr-export-menu-item" data-action="waivers-export-sheets">Google Sheets</button>' +
+    '<button class="nrr-export-menu-item" data-action="waivers-export-csv">CSV</button>' +
+    '<button class="nrr-export-menu-item" data-action="waivers-export-copy">คัดลอกไปวาง (Copy)</button>' +
+    '</div></div>'
+  ) : '';
+
+  return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+    '<div><div class="h2">' + title + '</div>' + howTo + '</div>' +
+    exportBtn +
+    '</div>' +
     '<div class="nrr-waivers-kpis">' +
     '<div class="nrr-waivers-kpi"><div class="num">' + pending.length + '</div><div class="micro">รออนุมัติ</div></div>' +
     '<div class="nrr-waivers-kpi"><div class="num">' + approved.length + '</div><div class="micro">อนุมัติแล้ว</div></div>' +
@@ -7104,6 +7136,9 @@ function nrrWaiverRowHtml(r, isAdmin) {
 }
 
 function nrrHandleWaiversClick(e) {
+  var exportBtn = e.target.closest('[data-action^="waivers-export"]');
+  if (exportBtn) { nrrHandleWaiverExportClick(exportBtn); return; }
+
   var btn = e.target.closest('[data-action="waiver-approve"],[data-action="waiver-reject"],[data-action="waiver-revoke"]');
   if (!btn) return;
   var status = btn.dataset.action === 'waiver-approve' ? 'approved'
@@ -7117,6 +7152,127 @@ function nrrHandleWaiversClick(e) {
   });
 }
 window.nrrHandleWaiversClick = nrrHandleWaiversClick;
+
+// ── Export menu — Excel / Google Sheets / CSV / copy-to-clipboard ────────
+// All four read the SAME cached rows (nrrLastWaiverRows, set by
+// nrrWaiversPageHtml right before render) so what you export always matches
+// what's on screen — same admin-vs-TL scoping, same sort order.
+
+function nrrHandleWaiverExportClick(btn) {
+  var action = btn.dataset.action;
+  if (action === 'waivers-export-toggle') { nrrToggleWaiverExportMenu(); return; }
+  nrrCloseWaiverExportMenu();
+  if (action === 'waivers-export-excel') nrrExportWaiversExcel();
+  else if (action === 'waivers-export-sheets') nrrExportWaiversGoogleSheets();
+  else if (action === 'waivers-export-csv') nrrExportWaiversCsv();
+  else if (action === 'waivers-export-copy') nrrCopyWaiversClipboard(btn);
+}
+
+var _nrrWaiverExportOutsideClickBound = false;
+function nrrToggleWaiverExportMenu() {
+  var menu = document.getElementById('nrr-waivers-export-menu');
+  if (!menu) return;
+  var opening = menu.style.display === 'none';
+  menu.style.display = opening ? 'block' : 'none';
+  if (opening && !_nrrWaiverExportOutsideClickBound) {
+    _nrrWaiverExportOutsideClickBound = true;
+    // one shared listener, not one per open — re-checks the menu's current
+    // state each time rather than assuming it's still the one that opened it
+    document.addEventListener('click', function _onDocClick(ev) {
+      var m = document.getElementById('nrr-waivers-export-menu');
+      if (!m || m.style.display === 'none') return;
+      if (ev.target.closest('#nrr-waivers-export-menu') || ev.target.closest('#nrr-waivers-export-btn')) return;
+      m.style.display = 'none';
+    });
+  }
+}
+function nrrCloseWaiverExportMenu() {
+  var menu = document.getElementById('nrr-waivers-export-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+function nrrWaiverExportRows(rows) {
+  var headers = ['บริษัท', 'ขอบเขต', 'เดือน', 'สถานะ', 'เหตุผล', 'หมายเหตุ', 'TL', 'KAM', 'วันที่ขอ'];
+  var data = rows.map(function (r) {
+    var acctName = _nrrAccountNameFor(r.account_id);
+    var scope = r.outlet_id ? ('เฉพาะสาขา ' + _nrrOutletNameFor(r.account_id, r.outlet_id)) : 'ทั้ง account';
+    var monthLabel = QNRR_CFG.months_th[r.period_month] || r.period_month;
+    return [
+      acctName, scope, monthLabel, nrrExclusionStatusLabel(r.status),
+      nrrExclusionReasonLabel(r.reason_code), r.reason_text || '',
+      r.target_tl_email || '', r.target_kam_email || '',
+      r.requested_at ? String(r.requested_at).slice(0, 10) : ''
+    ];
+  });
+  return { headers: headers, data: data };
+}
+
+function nrrWaiverExportFilename(ext) {
+  var q = (typeof QNRR_CFG !== 'undefined' && QNRR_CFG.quarter) || 'export';
+  return 'nrr-waivers-' + q + '.' + ext;
+}
+
+function nrrWaiverTsv(built) {
+  var esc = function (v) { return String(v == null ? '' : v).replace(/\t/g, ' ').replace(/\r?\n/g, ' '); };
+  return [built.headers.map(esc).join('\t')]
+    .concat(built.data.map(function (r) { return r.map(esc).join('\t'); }))
+    .join('\n');
+}
+
+function nrrExportWaiversCsv() {
+  if (!nrrLastWaiverRows) return;
+  var built = nrrWaiverExportRows(nrrLastWaiverRows);
+  nrrExportCsv(nrrWaiverExportFilename('csv'), built.headers, built.data);
+}
+
+function nrrCopyWaiversClipboard(btnEl) {
+  if (!nrrLastWaiverRows) return;
+  var built = nrrWaiverExportRows(nrrLastWaiverRows);
+  nrrCopyText(nrrWaiverTsv(built), btnEl);
+}
+
+// Google Sheets has no "import from webpage" without OAuth — the practical
+// no-backend move is: copy tab-separated data to the clipboard, then open a
+// blank sheet so the user just pastes (Ctrl/Cmd+V lands it in cells, not one
+// long string, because it's TSV not CSV).
+function nrrExportWaiversGoogleSheets() {
+  if (!nrrLastWaiverRows) return;
+  var built = nrrWaiverExportRows(nrrLastWaiverRows);
+  navigator.clipboard.writeText(nrrWaiverTsv(built)).then(function () {
+    if (typeof nrrToast === 'function') nrrToast('คัดลอกข้อมูลแล้ว — วางที่ Google Sheets ที่เพิ่งเปิด (Ctrl/Cmd+V)');
+    window.open('https://sheets.new', '_blank', 'noopener');
+  }).catch(function () {
+    if (typeof nrrToast === 'function') nrrToast('คัดลอกไม่สำเร็จ — ลองโหมด Excel หรือ CSV แทน');
+  });
+}
+
+// Excel via SpreadsheetML (Office XML) — no bundled library needed; Excel
+// opens this format natively via the mso-application hint below, and it
+// keeps Thai text intact (declared UTF-8, no separate BOM/encoding tricks
+// needed the way raw CSV does).
+function nrrExportWaiversExcel() {
+  if (!nrrLastWaiverRows) return;
+  var built = nrrWaiverExportRows(nrrLastWaiverRows);
+  var escXml = function (v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  };
+  var rowXml = function (cells) {
+    return '<Row>' + cells.map(function (c) { return '<Cell><Data ss:Type="String">' + escXml(c) + '</Data></Cell>'; }).join('') + '</Row>';
+  };
+  var xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<?mso-application progid="Excel.Sheet"?>' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+    '<Worksheet ss:Name="Waivers"><Table>' +
+    rowXml(built.headers) +
+    built.data.map(rowXml).join('') +
+    '</Table></Worksheet></Workbook>';
+  var blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = nrrWaiverExportFilename('xls');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 </script>
 <script>
 // ── nrr_portfolio.js — Portfolio layer pure logic (Phase B, 2026-07-09) ──
