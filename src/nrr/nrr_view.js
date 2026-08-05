@@ -4519,8 +4519,9 @@ function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
       : '';
     var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
+    var kamLabel = nrrEsc(bd.kam_name || r.beneficiary_email);
     return '<tr>' +
-      '<td><b>' + nrrEsc(bd.kam_name || r.beneficiary_email) + '</b>' + noteHtml + rowStamp +
+      '<td><button type="button" class="nrr-comm-drill-btn" style="all:unset;cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="ดูรายละเอียดใบเสร็จ" data-email="' + nrrEsc(r.beneficiary_email) + '" data-name="' + kamLabel + '" data-period="' + nrrEsc(r.period_month) + '"><b>' + kamLabel + '</b></button>' + noteHtml + rowStamp +
       '<div class="nrr-comm-cell-meta">' + nrrEsc((r.beneficiary_email || '').split('@')[0]) + '</div></td>' +
       '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
@@ -4577,8 +4578,27 @@ window.nrrOpenCommissionDrawer = nrrOpenCommissionDrawer;
 // reimplement" design). p1ElId/p3ElId let each caller give the async upsell
 // section its own DOM ids (drawer vs. portfolio body render at the same
 // time in different callers, so they can't share one hardcoded id).
+// v_periodfix: exact-period snapshot lookup — nrrLatestSnapshotFor ignores
+// which period was asked for, so once ANY later month locks (e.g. Sep locks
+// while this drawer is asked for Jul/Aug), every earlier period would
+// silently render the newest snapshot's numbers under the wrong month's
+// label. Checks the "ตารางเต็ม" per-period cache first (already loaded —
+// that's where a drill-button click originates from), then the
+// quarter-scoped cache the live summary/Portfolio views use.
+function _nrrSnapshotForPeriod(kamEmail, period) {
+  if (!period) return null;
+  var cached = nrrCommPeriodCache[period];
+  if (cached && cached.loaded) {
+    var hit = cached.rows.find(function (r) { return r.beneficiary_email === kamEmail; });
+    if (hit) return hit;
+  }
+  return nrrSnapshotsForEmailAcrossMonths(kamEmail)[period] || null;
+}
+
 function nrrCommReceiptBundle(kamEmail, period, p1ElId, p3ElId) {
-  var snap = nrrLatestSnapshotFor(kamEmail);
+  // A period with no real snapshot yet correctly falls through to the
+  // estimate path below instead of borrowing a neighboring month's data.
+  var snap = _nrrSnapshotForPeriod(kamEmail, period);
   var bd = snap && snap.breakdown ? snap.breakdown : null;
   var result = nrrKamResult(kamEmail);
   var bm = result && period && result.by_month ? result.by_month[period] : null;
