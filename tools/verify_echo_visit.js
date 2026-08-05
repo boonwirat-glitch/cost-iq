@@ -231,7 +231,7 @@ check('checked_in renders its own card in TL feed',
 check('visit dashboard exported on CI',
   /_openVisitDashboard, _closeVisitDashboard, _vdSetPeriod/.test(ci));
 check('_resumeAnalysis exists and is exported',
-  /async function _resumeAnalysis/.test(ci) && /_resumeAnalysis \};/.test(ci));
+  /async function _resumeAnalysis/.test(ci) && /, _resumeAnalysis,/.test(ci));
 check('resume guards owner (RLS would zero-row silently otherwise)',
   /วิเคราะห์ต่อได้เฉพาะ session ของตัวเอง/.test(ci));
 check('_renderEchoState exported (v715 fix finally live)',
@@ -385,6 +385,67 @@ check('client: session detail select carries transcript_confidence',
 check('client: low-confidence banner renders honest copy (no false claim about replaying audio)',
   /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < 0\.6\)/.test(ci) &&
   !/ฟังต้นฉบับ/.test(ci));
+
+console.log('\n[B] source locks — ECHO GOAL 2 Phase A2v2.1 (async pipeline)');
+// worker side
+check('worker: /process route registered with ctx',
+  /if \(url\.pathname === '\/process'\)\s+return handleProcess\(request, env, cfCtx\);/.test(worker) &&
+  /async fetch\(request, env, cfCtx\)/.test(worker));
+check('worker: cores extracted and reused by legacy endpoints',
+  /await runTranscribe\(_b64ToBytes\(audio_b64\)/.test(worker) &&
+  /await runSummarize\(segments, env\)/.test(worker) &&
+  /await runAnalyze\(segments, summary, rubric, env\)/.test(worker));
+check('worker: /process validates session_id as uuid before query interpolation',
+  /\/\^\[0-9a-f-\]\{36\}\$\/i\.test\(sessionId\)/.test(worker));
+check('worker: stage claim is conditional on pipeline_stage + null-or-stale processing_since',
+  /pipeline_stage=eq\.\$\{stage\}&or=\(processing_since\.is\.null,processing_since\.lt\./.test(worker) &&
+  (worker.match(/if \(!claimed\.length\) return;/g) || []).length >= 2);
+check('worker: claim released on stage error (sweep can retry)',
+  (worker.match(/\{ processing_since: null \}\)\.catch\(\(\) => \{\}\);/g) || []).length >= 2);
+check('worker: audio deleted from storage right after transcription lands',
+  /audio_path:\s+null\s*\n\s*\}\);\s*\n\s*await sbStorageDelete\(env, row\.audio_path\)\.catch/.test(worker));
+check('worker: rubric fetched from DB and role-filtered server-side (Phase R semantics)',
+  /skill_definitions\?echo_enabled=eq\.true/.test(worker) &&
+  /!d\.roles \|\| !d\.roles\.length \|\| d\.roles\.includes\(bucket\)/.test(worker));
+check('worker: out-of-rubric skill codes dropped (v953 guard mirrored)',
+  /const sentCodes = new Set\(rubric\.map\(d => d\.skill_code\)\);/.test(worker));
+check('worker: side tables written server-side (kam_skill_log + observations + kam_visits)',
+  /sbInsert\(env, 'kam_skill_log'/.test(worker) &&
+  /sbInsert\(env, 'echo_skill_observations'/.test(worker) &&
+  /sbUpsert\(env, 'kam_visits'/.test(worker));
+check('worker: self-triggers the next stage via a fresh invocation',
+  /await fetch\(`\$\{origin\}\/process`/.test(worker));
+check('worker: no_speech recorded honestly instead of leaving the row stuck',
+  /pipeline_stage: 'no_speech'/.test(worker));
+// client side
+check('client: _onStop routes into the async pipeline',
+  /_startAsyncPipeline\(blob\);\s*\n\s*\}/.test(ci));
+check('client: upload goes to the rep\'s own echo-audio prefix',
+  /`echo-audio\/\$\{userId\}\/\$\{rand\}\.\$\{ext\}`/.test(ci) &&
+  /supa\.storage\.from\('ciq-data'\)/.test(ci));
+check('client: trigger uses keepalive so it survives immediate app close',
+  /keepalive: true,\s*\n\s*headers: \{ 'Content-Type': 'application\/json' \},\s*\n\s*body: JSON\.stringify\(\{ session_id: rowId \}\)/.test(ci));
+check('client: 404/405 from old worker falls back to the local pipeline on the SAME row',
+  /if \(res\.status === 404 \|\| res\.status === 405\) endpointMissing = true;/.test(ci) &&
+  /_sessionId = rowId; \/\/ local pipeline's pinned ctx targets this row/.test(ci) &&
+  /return _processBlob\(blob\);/.test(ci));
+check('client: upload failure falls back to the legacy pipeline entirely',
+  /ci_async_upload_fail/.test(ci));
+check('client: sweep re-triggers own stuck rows, throttled, never racing a live pipeline',
+  /async function _sweepStuckAsyncRows\(force\)/.test(ci) &&
+  /if \(_phase !== 'idle'\) return;/.test(ci) &&
+  /\.in\('pipeline_stage', \['uploaded', 'transcribed'\]\)/.test(ci));
+check('client: sweep registered on visibilitychange + boot',
+  /visibilitychange[\s\S]{0,120}setTimeout\(_sweepStuckAsyncRows, 4000\)/.test(ci) &&
+  /setTimeout\(_sweepStuckAsyncRows, 9000\);/.test(ci));
+check('client: วิเคราะห์ต่อ prefers server-side /process with local fallback',
+  /_resumeAnalysis[\s\S]{0,2000}if \(!_asyncEndpointMissing\) \{[\s\S]{0,400}session_id: row\.id/.test(ci));
+check('client: history renders uploaded + no_speech cards',
+  /กำลังวิเคราะห์เบื้องหลัง/.test(ci) && /ไม่พบเสียงพูด<\/span>|>ไม่พบเสียงพูด</.test(ci));
+check('client: session detail handles uploaded/no_speech without empty tabs',
+  /s\.pipeline_stage === 'uploaded' \|\| s\.pipeline_stage === 'no_speech'/.test(ci));
+check('client: _saveTranscriptOnly prefers ctx.sessionId (fallback path targets the pre-created row)',
+  /const _ciSessionId = ctx\.sessionId \|\| ctx\.checkinCache\?\.session_id \|\| null;/.test(ci));
 
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);

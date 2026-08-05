@@ -956,6 +956,23 @@ body:not(.echo-active) { background:unset; }
       const me = (_authEmail() || '').toLowerCase(); // v952
       if ((row.owner_email || '').toLowerCase() !== me) { _toast('วิเคราะห์ต่อได้เฉพาะ session ของตัวเอง'); return; }
 
+      // A2v2.1: prefer server-side processing — if the deployed worker has
+      // /process, the rep doesn't need to keep the app open for the analysis
+      if (!_asyncEndpointMissing) {
+        try {
+          const r = await fetch(`${WORKER_URL}/process`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: row.id })
+          });
+          if (r.status === 202) {
+            _closeHistory?.();
+            _toast('ส่งให้ระบบวิเคราะห์แล้ว — ผลจะขึ้นในประวัติสักครู่ ปิดหน้าจอได้เลย');
+            return;
+          }
+          if (r.status === 404 || r.status === 405) _asyncEndpointMissing = true;
+        } catch(_) { /* network — fall through to local resume */ }
+      }
+
       _closeHistory?.();
       _sessionId   = row.id;
       _accountGuid = row.account_id || null;
@@ -1129,8 +1146,173 @@ body:not(.echo-active) { background:unset; }
       _toast('กรุณาบันทึกอย่างน้อย 5 วินาทีก่อนกด stop');
       return;
     }
-    _processBlob(blob);
+    _startAsyncPipeline(blob);
   }
+
+  // ── A2v2.1 (2026-08-05): async pipeline — upload then fire-and-forget ──────
+  // Real rep behavior: stop recording, pocket the phone. So the client does ONE
+  // quick upload (seconds) + one tiny keepalive trigger, and the WORKER runs
+  // transcript→analyze server-side. If the live worker doesn't have /process
+  // yet (pre-deploy window) we fall back to the proven local pipeline, on the
+  // same row, transparently.
+  function _getAuthUserId() {
+    try {
+      for (const store of [localStorage, sessionStorage]) {
+        const k = Object.keys(store).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+        if (k) {
+          const s = JSON.parse(store.getItem(k));
+          const id = s?.user?.id || s?.data?.user?.id;
+          if (id) return id;
+        }
+      }
+    } catch(_) {}
+    return null;
+  }
+
+  async function _startAsyncPipeline(blob) {
+    // pin ctx at start — same v951 discipline as _processBlob (globals can be
+    // wiped by open()/picker while we await network)
+    const ctx = {
+      sessionId:    _sessionId || null,
+      checkinCache: _checkinCache || null,
+      accountGuid:  _accountGuid || null,
+      accountName:  _accountName || '',
+      ownerType:    _ownerType,
+      secs:         _secs,
+    };
+    _startProcTimer();
+    _setStep('กำลังบันทึกขึ้นระบบ...', 'อัปโหลดเสียง — ไม่กี่วินาที', 30);
+    try {
+      const userId = _getAuthUserId();
+      const email  = _authEmail();
+      if (!userId || !email) throw new Error('no-auth');
+
+      // 1) upload audio to the rep's own prefix (RLS-scoped)
+      const ext  = (blob.type || '').includes('mp4') ? 'mp4' : 'webm';
+      const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
+      const path = `echo-audio/${userId}/${rand}.${ext}`;
+      const { error: upErr } = await supa.storage.from('ciq-data')
+        .upload(path, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
+      if (upErr) throw upErr;
+
+      // 2) claim/create the session row at stage 'uploaded'
+      await _syncCheckinToDb(ctx.checkinCache).catch(() => {});
+      let rowId = ctx.sessionId || ctx.checkinCache?.session_id || null;
+      const nowIso = new Date().toISOString();
+      if (rowId) {
+        const { error } = await supa.from('ci_sessions')
+          .update({ pipeline_stage: 'uploaded', audio_path: path, duration_secs: ctx.secs })
+          .eq('id', rowId);
+        if (error) throw error;
+      } else {
+        const { data: rowIns, error } = await supa.from('ci_sessions').insert({
+          owner_email:    email,
+          owner_type:     ctx.ownerType,
+          account_id:     ctx.accountGuid || null,
+          account_name:   ctx.accountName || null,
+          visited_at:     ctx.checkinCache?.checked_in_at || nowIso,
+          duration_secs:  ctx.secs,
+          pipeline_stage: 'uploaded',
+          audio_path:     path,
+          rep_lat:        ctx.checkinCache?.rep_lat ?? null,
+          rep_lng:        ctx.checkinCache?.rep_lng ?? null,
+          checked_in_at:  ctx.checkinCache?.checked_in_at || null,
+          status:         'draft'
+        }).select('id').single();
+        if (error || !rowIns) throw error || new Error('insert failed');
+        rowId = rowIns.id;
+        if (ctx.checkinCache) ctx.checkinCache.session_id = rowId;
+      }
+
+      // 3) trigger — keepalive survives the rep closing the app immediately
+      _setStep('ส่งให้ระบบวิเคราะห์...', '', 70);
+      let endpointMissing = false;
+      try {
+        const res = await fetch(`${WORKER_URL}/process`, {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: rowId })
+        });
+        if (res.status === 404 || res.status === 405) endpointMissing = true;
+        else console.log('[CI async] /process trigger status=' + res.status);
+      } catch(_) { /* network blip — the audio+row are durable; sweep retries */ }
+
+      if (endpointMissing) {
+        // old worker without /process — clean up the uploaded file and run the
+        // proven local pipeline against this same row
+        _asyncEndpointMissing = true;
+        try { await supa.storage.from('ciq-data').remove([path]); } catch(_) {}
+        try { await supa.from('ci_sessions').update({ audio_path: null }).eq('id', rowId); } catch(_) {}
+        _sessionId = rowId; // local pipeline's pinned ctx targets this row
+        _stopProcTimer();
+        return _processBlob(blob);
+      }
+
+      // async mode engaged — everything durable server-side, phone can close
+      _idbClear();
+      _stopProcTimer();
+      _phase = 'idle';
+      _sessionId = null;
+      // v951 discipline: only clear the global when it's still THIS visit's cache
+      if (_checkinCache && _checkinCache === ctx.checkinCache) {
+        _checkinCache = null;
+        try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+      }
+      _setStep('บันทึกเรียบร้อย ✓', 'ระบบวิเคราะห์ต่อเองเบื้องหลัง — ปิดหน้าจอได้เลย ผลจะขึ้นในประวัติ', 100);
+      setTimeout(() => {
+        _unmount();
+        _toast('ส่งให้ระบบวิเคราะห์แล้ว — ผลจะขึ้นในประวัติ');
+      }, 2400);
+    } catch (err) {
+      // upload path failed (offline / storage / auth) — the blob is still in
+      // memory + IDB; behave exactly like before this feature existed
+      console.warn('[CI async] upload path failed, falling back to local pipeline:', err?.message || err);
+      try { window.SenseSentinel?.report('ci_async_upload_fail', String(err?.message || err).slice(0, 200)); } catch(_) {}
+      _stopProcTimer();
+      _processBlob(blob);
+    }
+  }
+
+  // A2v2.1: safety net — on app boot / resume, re-trigger my own rows stuck in
+  // an async stage (worker died mid-stage, or the trigger call never landed).
+  // Mirrors the v952 checkin retry pattern; /process stage claims are
+  // idempotent so over-triggering is harmless.
+  let _asyncSweepLast = 0;
+  let _asyncEndpointMissing = false;
+  async function _sweepStuckAsyncRows(force) {
+    if (_asyncEndpointMissing) return;      // old worker — nothing to sweep to
+    if (_phase !== 'idle') return;          // never race a live local pipeline
+    const now = Date.now();
+    if (!force && now - _asyncSweepLast < 5 * 60 * 1000) return;
+    _asyncSweepLast = now;
+    try {
+      const email = _authEmail();
+      if (!email) return;
+      const staleIso = new Date(now - 3 * 60 * 1000).toISOString();
+      const { data: rows } = await supa.from('ci_sessions')
+        .select('id,pipeline_stage,processing_since')
+        .eq('owner_email', email)
+        .in('pipeline_stage', ['uploaded', 'transcribed'])
+        .eq('status', 'draft')
+        .order('visited_at', { ascending: false })
+        .limit(10);
+      const stuck = (rows || []).filter(r => !r.processing_since || r.processing_since < staleIso);
+      for (const r of stuck) {
+        try {
+          const res = await fetch(`${WORKER_URL}/process`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: r.id })
+          });
+          if (res.status === 404 || res.status === 405) { _asyncEndpointMissing = true; return; }
+        } catch(_) { return; } // offline — try again next resume
+      }
+    } catch(_) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') setTimeout(_sweepStuckAsyncRows, 4000);
+  });
+  setTimeout(_sweepStuckAsyncRows, 9000);
 
   // v709: pipeline — 3 calls แยก task แทน 1 call ทำทุกอย่าง
   // transcript (ground truth) → summary → skills+OCPB
@@ -1575,7 +1757,10 @@ body:not(.echo-active) { background:unset; }
       // UPDATE แถวเดิม ไม่ INSERT ซ้ำ — 1 visit ต้องเป็น 1 แถวเสมอ
       // retry เช็คอินของ visit นี้ก่อนหนึ่งรอบ เผื่อ insert ตอนกดพลาดเพราะเน็ต
       await _syncCheckinToDb(ctx.checkinCache).catch(() => {});
-      const _ciSessionId = ctx.checkinCache?.session_id || null;
+      // A2v2.1: prefer ctx.sessionId — the async-upload fallback path creates
+      // the row BEFORE the local pipeline runs, so this update must land on
+      // that row (not INSERT a duplicate below)
+      const _ciSessionId = ctx.sessionId || ctx.checkinCache?.session_id || null;
 
       if (_ciSessionId) {
         // visited_at ไม่ทับ — วันที่ไปคือเวลาที่เช็คอิน ไม่ใช่เวลาถอดเสียงเสร็จ
@@ -3423,6 +3608,30 @@ body:not(.echo-active) { background:unset; }
       </div>`;
     }
 
+    // ── A2v2.1: async pipeline กำลังทำงาน / ไม่พบเสียง — สถานะตรงๆ แทนแท็บว่าง
+    if (s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'no_speech') {
+      const _isProcessing = s.pipeline_stage === 'uploaded';
+      body.innerHTML = `
+<div class="sd2-name">${repName}</div>
+<div class="sd2-meta">${acctLabel} · ${date}${dur !== '—' ? ' · ' + dur : ''}</div>
+${checkinBar}
+<div class="sd2-chips">${cvChip}</div>
+<div style="text-align:center;padding:40px 16px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">
+  ${_isProcessing
+    ? `<div style="display:flex;gap:5px;align-items:center;justify-content:center;margin-bottom:12px">
+        <span style="width:6px;height:6px;border-radius:50%;background:#534AB7;animation:ci-dot-pulse 1.2s ease-in-out infinite"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:#534AB7;animation:ci-dot-pulse 1.2s ease-in-out .2s infinite"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:#534AB7;animation:ci-dot-pulse 1.2s ease-in-out .4s infinite"></span>
+      </div>
+      <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">ระบบกำลังวิเคราะห์เบื้องหลัง</div>
+      <div style="font-size:var(--text-sm);line-height:1.6">ไม่ต้องเปิดหน้าจอรอ — เสร็จแล้วผลจะขึ้นแทนหน้านี้เอง<br>(ปกติไม่เกิน 2-3 นาที)</div>`
+    : `<div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">ไม่พบเสียงพูดในไฟล์ที่อัด</div>
+      <div style="font-size:var(--text-sm);line-height:1.6">visit นี้ยังนับเช็คอินตามปกติ — ถ้าต้องการผลวิเคราะห์ ลองอัดใหม่ใน visit หน้า</div>`}
+</div>`;
+      if (footer) footer.style.display = 'none';
+      return;
+    }
+
     // ── v_echog1: visit แบบเช็คอินอย่างเดียว — ไม่มีเสียง/วิเคราะห์ให้โชว์
     // แสดงสถานะตรงๆ แทน 3 แท็บว่างที่ดูเหมือนข้อมูลหาย
     if (s.pipeline_stage === 'checked_in') {
@@ -3653,6 +3862,25 @@ ${confBanner}
           </div>
         </div>`;
       }
+      // A2v2.1: async pipeline in flight — server is still working on this row
+      if (s.pipeline_stage === 'uploaded') {
+        return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);border-radius:var(--r-lg);border:0.5px solid rgba(83,74,183,.25);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#534AB7;flex-shrink:0;animation:ci-dot-pulse 1.2s ease-in-out infinite"></span>
+          <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
+          <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#534AB7;background:rgba(83,74,183,.09);padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">กำลังวิเคราะห์เบื้องหลัง</span>
+          <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date}${dur ? ' · ' + dur : ''}</span>
+        </div>`;
+      }
+
+      // A2v2.1: server-side pipeline found no speech in the audio
+      if (s.pipeline_stage === 'no_speech') {
+        return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.55);border-radius:var(--r-lg);border:0.5px dashed rgba(0,0,0,.14);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx2,#636366)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
+          <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#8E8E93;background:rgba(0,0,0,.05);padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">ไม่พบเสียงพูด</span>
+          <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date}</span>
+        </div>`;
+      }
+
       const skills = s.skill_scores?.skills || [];
       // v569 module dot system: hue = module, tint = state — no labels (they never fit)
       const skillDots = skills.slice(0,10).map(sk => {
@@ -4821,7 +5049,7 @@ ${confBanner}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _openVisitDashboard, _closeVisitDashboard, _vdSetPeriod, _resumeAnalysis };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openHistory, _closeHistory, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _openVisitDashboard, _closeVisitDashboard, _vdSetPeriod, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
 
 })();
 

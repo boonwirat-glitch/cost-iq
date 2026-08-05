@@ -5,6 +5,8 @@
 // ไฟล์นี้ deploy แยกจาก proxy เดิม — เปลี่ยน WORKER_URL ใน 09_conv_intel.js เพื่อ test
 //
 // Env secrets: ANTHROPIC_API_KEY, GROQ_API_KEY, GEMINI_API_KEY
+//              SUPABASE_SERVICE_KEY (A2v2.1 — required by /process only; every
+//              other endpoint works without it)
 //
 // v4 (2026-06-15) — Echo v2 architecture per spec
 //   /transcript  — audio → segments[] with segment_id + confidence (ground truth layer)
@@ -52,6 +54,73 @@ async function withRetry(fn, maxAttempts = 3, delays = [0, 2000, 5000]) {
   throw lastErr || new Error('All attempts failed');
 }
 
+// ── Supabase helpers (A2v2.1 async pipeline — service key, server-side only) ──
+// /process runs after the rep has closed the app, so there is no user JWT.
+// Requires worker secret SUPABASE_SERVICE_KEY (set in dashboard → Settings →
+// Variables). All other endpoints work without it, exactly as before.
+const SUPABASE_URL_DEFAULT = 'https://menslbnyyvpxiyvjywcm.supabase.co';
+const AUDIO_BUCKET = 'ciq-data';
+
+function _sbUrl(env)  { return env.SUPABASE_URL || SUPABASE_URL_DEFAULT; }
+function _sbHeaders(env, extra) {
+  return {
+    'apikey': env.SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+    ...extra
+  };
+}
+async function sbSelect(env, pathQuery) {
+  const r = await fetch(`${_sbUrl(env)}/rest/v1/${pathQuery}`, { headers: _sbHeaders(env) });
+  if (!r.ok) throw new Error(`sbSelect ${r.status}: ${await r.text().catch(() => '')}`);
+  return r.json();
+}
+// Returns the updated rows (return=representation) so callers can detect
+// 0-row claims (someone else owns the stage).
+async function sbPatch(env, table, query, body) {
+  const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: _sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`sbPatch ${table} ${r.status}: ${await r.text().catch(() => '')}`);
+  return r.json();
+}
+async function sbInsert(env, table, rows) {
+  const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: _sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+    body: JSON.stringify(rows)
+  });
+  if (!r.ok) throw new Error(`sbInsert ${table} ${r.status}: ${await r.text().catch(() => '')}`);
+}
+async function sbUpsert(env, table, row, onConflict) {
+  const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}?on_conflict=${onConflict}`, {
+    method: 'POST',
+    headers: _sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(row)
+  });
+  if (!r.ok) throw new Error(`sbUpsert ${table} ${r.status}: ${await r.text().catch(() => '')}`);
+}
+async function sbStorageGet(env, path) {
+  const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, { headers: _sbHeaders(env) });
+  if (!r.ok) throw new Error(`sbStorageGet ${r.status}: ${await r.text().catch(() => '')}`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+async function sbStorageDelete(env, path) {
+  const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
+    method: 'DELETE', headers: _sbHeaders(env)
+  });
+  if (!r.ok) throw new Error(`sbStorageDelete ${r.status}`);
+}
+function _bytesToB64(bytes) {
+  let binary = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 
 // ── /transcript (v3 hybrid, 2026-07-21) ──────────────────────────────────────
 // Groq Whisper (ถอดเสียง — หลักวินาที ถอดตรงตัว) + Gemini (ฟังเสียงจริงแต่ตอบ
@@ -89,8 +158,25 @@ async function handleTranscript(request, env) {
   const { audio_b64, mime_type, duration_secs, account_name } = body;
   if (!audio_b64) return json({ error: 'audio_b64 required' }, 400, env);
 
+  try {
+    const result = await runTranscribe(_b64ToBytes(audio_b64), mime_type, duration_secs, account_name, env, audio_b64);
+    return json({ text: JSON.stringify(result) }, 200, env);
+  } catch (e) {
+    return json({ error: e?.message || 'Transcript failed' }, 502, env);
+  }
+}
+
+// A2v2.1: core extracted from handleTranscript so /process (async pipeline) can
+// run the exact same logic server-side. Returns the result OBJECT (not a
+// Response); throws on hard failure. audioB64 is optional — computed from
+// bytes when absent (the async path only has bytes from storage).
+async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64) {
+  const account_name = accountName;
+  const mime_type = mimeType;
+  const duration_secs = durationSecs;
+  const audio_b64 = audioB64 || _bytesToB64(audioBytes);
+
   // ── Step 1: Groq Whisper — verbatim transcription with real timestamps ──
-  const audioBytes = _b64ToBytes(audio_b64);
   const groqForm = new FormData();
   groqForm.append('file', new Blob([audioBytes], { type: mime_type || 'audio/webm' }), 'recording.webm');
   groqForm.append('model', 'whisper-large-v3');
@@ -124,7 +210,7 @@ async function handleTranscript(request, env) {
     }, 3, [0, 2000, 5000]);
     groqData = await groqRes.json();
   } catch (e) {
-    return json({ error: 'Groq transcribe failed: ' + (e?.message || 'unknown') }, 502, env);
+    throw new Error('Groq transcribe failed: ' + (e?.message || 'unknown'));
   }
 
   // Whisper hallucination guard: drop segments Whisper itself flags as
@@ -134,10 +220,10 @@ async function handleTranscript(request, env) {
     (s.text || '').trim() && !((s.no_speech_prob || 0) > 0.9 && (s.avg_logprob || 0) < -1)
   );
   if (!rawSegs.length) {
-    return json({ text: JSON.stringify({
+    return {
       no_speech: true, segments: [], speakers_detected: [],
       duration_mins: 0, source: 'groq_whisper_v3', avg_speaker_confidence: 0, avg_transcript_confidence: 0
-    })}, 200, env);
+    };
   }
 
   const segments = rawSegs.map((s, i) => ({
@@ -218,7 +304,7 @@ ${segLines}
   }
 
   const n = segments.length;
-  return json({ text: JSON.stringify({
+  return {
     no_speech: false,
     segments,
     speakers_detected: speakersDetected.length ? speakersDetected : [...new Set(segments.map(s => s.speaker))],
@@ -226,7 +312,7 @@ ${segLines}
     source: diarized ? 'groq_whisper_gemini_diarize' : 'whisper_fallback',
     avg_speaker_confidence: n ? segments.reduce((a, s) => a + s.speaker_confidence, 0) / n : 0,
     avg_transcript_confidence: n ? segments.reduce((a, s) => a + s.transcript_confidence, 0) / n : 0
-  })}, 200, env);
+  };
 }
 
 // ── /transcript-gemini (v2 path, kept for A/B comparison) ────────────────────
@@ -356,6 +442,18 @@ async function handleSummarize(request, env) {
   const { segments } = body;
   if (!segments || !segments.length) return json({ error: 'segments required' }, 400, env);
 
+  try {
+    const { rawText } = await runSummarize(segments, env);
+    return json({ text: rawText }, 200, env);
+  } catch(e) {
+    return json({ error: 'Summarize failed: ' + (e?.message || 'unknown') }, 502, env);
+  }
+}
+
+// A2v2.1: core extracted so /process can reuse it. Returns { parsed, rawText };
+// parsed is null when the model reply wasn't valid JSON (summary is non-fatal
+// everywhere it's consumed, matching the client's existing graceful handling).
+async function runSummarize(segments, env) {
   const transcriptText = segments.map(s =>
     `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
   ).join('\n');
@@ -403,30 +501,29 @@ ${transcriptText}
   }
 }`;
 
-  try {
-    const geminiRes = await withRetry(async () => {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_lite}:generateContent?key=${env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' }
-          })
-        }
-      );
-      if (r.ok) return r;
-      if (r.status === 503 || r.status === 429) return null;
-      throw new Error(`Gemini summarize ${r.status}`);
-    }, 3, [0, 2000, 5000]);
+  const geminiRes = await withRetry(async () => {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_lite}:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: 'application/json' }
+        })
+      }
+    );
+    if (r.ok) return r;
+    if (r.status === 503 || r.status === 429) return null;
+    throw new Error(`Gemini summarize ${r.status}`);
+  }, 3, [0, 2000, 5000]);
 
-    const data = await geminiRes.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return json({ text }, 200, env);
-  } catch(e) {
-    return json({ error: 'Summarize failed: ' + (e?.message || 'unknown') }, 502, env);
-  }
+  const data = await geminiRes.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let parsed = null;
+  const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
+  if (s !== -1 && e !== -1) { try { parsed = JSON.parse(rawText.slice(s, e + 1)); } catch(_) {} }
+  return { parsed, rawText };
 }
 
 // ── /analyze ──────────────────────────────────────────────────────────────────
@@ -442,6 +539,18 @@ async function handleAnalyze(request, env) {
   const { segments, summary, rubric } = body;
   if (!segments || !segments.length) return json({ error: 'segments required' }, 400, env);
 
+  try {
+    const { rawText } = await runAnalyze(segments, summary, rubric, env);
+    return json({ text: rawText }, 200, env);
+  } catch(e) {
+    return json({ error: e?.message || 'Analyze failed' }, 502, env);
+  }
+}
+
+// A2v2.1: core extracted so /process can reuse it. Returns { parsed, rawText };
+// throws after all retries fail (analyze IS fatal — no result to save without it).
+async function runAnalyze(segments, summary, rubric, env) {
+  if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
   const transcriptText = segments.map(s =>
     `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
   ).join('\n');
@@ -550,8 +659,8 @@ OCPB:
       const s = text.indexOf('{'), e = text.lastIndexOf('}');
       if (s !== -1 && e !== -1) {
         try {
-          JSON.parse(text.slice(s, e + 1)); // validate only
-          return json({ text }, 200, env);
+          const parsed = JSON.parse(text.slice(s, e + 1));
+          return { parsed, rawText: text };
         } catch(_) {
           lastErr = new Error('Analyze: JSON parse failed (partial response)');
           continue; // retry on parse fail
@@ -565,7 +674,7 @@ OCPB:
       lastErr = e;
     }
   }
-  return json({ error: lastErr?.message || 'Analyze failed' }, 502, env);
+  throw lastErr || new Error('Analyze failed');
 }
 
 // ── /eval ─────────────────────────────────────────────────────────────────────
@@ -747,12 +856,188 @@ async function handleAnalyzeAudio(request, env) {
   }
 }
 
+// ── /process (A2v2.1, 2026-08-05) — async pipeline stage machine ─────────────
+// The rep uploads audio to Supabase Storage, updates their ci_sessions row to
+// pipeline_stage='uploaded', fires ONE tiny keepalive call here, and closes
+// the app. Everything below runs server-side with the service key.
+//
+// Design rules:
+// - ONE stage per invocation (uploaded→transcribed→analyzed), each persisted
+//   before moving on. After finishing a stage the worker re-triggers itself
+//   via a subrequest so the next stage gets a fresh execution budget instead
+//   of betting a 3-4 minute chain on a single waitUntil surviving.
+// - Optimistic claim via processing_since: duplicate triggers (keepalive +
+//   client sweep + self-trigger can race) update WHERE pipeline_stage=X AND
+//   processing_since is null-or-stale — 0 rows back means someone else owns
+//   the stage, so just exit. Stale (>3 min) means a previous run died and the
+//   stage is safe to retry. On error the claim is released immediately.
+// - Audio is deleted from storage the moment transcription lands (same
+//   keep-transcript-only policy the client pipeline always had).
+const PROCESS_CLAIM_STALE_MS = 3 * 60 * 1000;
+
+async function handleProcess(request, env, cfCtx) {
+  if (!env.SUPABASE_SERVICE_KEY) return json({ error: 'SUPABASE_SERVICE_KEY not set — add it in worker Settings → Variables' }, 503, env);
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ error: 'Invalid JSON' }, 400, env); }
+  const sessionId = String(body.session_id || '').trim();
+  // uuid only — this id is interpolated into PostgREST query strings
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return json({ error: 'valid session_id required' }, 400, env);
+
+  const origin = new URL(request.url).origin;
+  cfCtx.waitUntil(processSession(sessionId, origin, env).catch(() => {}));
+  return json({ accepted: true, session_id: sessionId }, 202, env);
+}
+
+async function processSession(sessionId, origin, env) {
+  const rows = await sbSelect(env,
+    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since`);
+  const row = rows && rows[0];
+  if (!row) return;
+
+  const staleIso = new Date(Date.now() - PROCESS_CLAIM_STALE_MS).toISOString();
+  const claimQuery = (stage) =>
+    `id=eq.${sessionId}&pipeline_stage=eq.${stage}&or=(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)})`;
+
+  // ── Stage 1: uploaded → transcribed ──────────────────────────────────────
+  if (row.pipeline_stage === 'uploaded' && row.audio_path) {
+    const claimed = await sbPatch(env, 'ci_sessions', claimQuery('uploaded'), { processing_since: new Date().toISOString() });
+    if (!claimed.length) return; // another invocation owns this stage
+    try {
+      const audioBytes = await sbStorageGet(env, row.audio_path);
+      const mime = row.audio_path.endsWith('.mp4') ? 'audio/mp4' : 'audio/webm';
+      const t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env);
+
+      if (t.no_speech || !(t.segments || []).length) {
+        // Nothing to analyze — record the outcome honestly instead of leaving
+        // the row stuck (client history renders unknown stages as plain text).
+        await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
+          { pipeline_stage: 'no_speech', processing_since: null, audio_path: null });
+        await sbStorageDelete(env, row.audio_path).catch(() => {});
+        return;
+      }
+
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+        transcript:            t.segments,
+        transcript_source:     t.source || 'unknown',
+        transcript_confidence: (typeof t.avg_transcript_confidence === 'number') ? t.avg_transcript_confidence : null,
+        speaker_confidence:    (typeof t.avg_speaker_confidence === 'number') ? t.avg_speaker_confidence : null,
+        pipeline_stage:        'transcribed',
+        processing_since:      null,
+        audio_path:            null
+      });
+      await sbStorageDelete(env, row.audio_path).catch(() => {});
+
+      // fresh invocation for the analyze stage
+      await fetch(`${origin}/process`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId })
+      }).catch(() => {});
+    } catch (e) {
+      // release the claim so the client sweep can retry this stage
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+    }
+    return;
+  }
+
+  // ── Stage 2: transcribed → analyzed ──────────────────────────────────────
+  if (row.pipeline_stage === 'transcribed' && row.status !== 'saved') {
+    const claimed = await sbPatch(env, 'ci_sessions', claimQuery('transcribed'), { processing_since: new Date().toISOString() });
+    if (!claimed.length) return;
+    try {
+      const segments = Array.isArray(row.transcript) ? row.transcript : [];
+      if (!segments.length) { // defensive — shouldn't happen past stage 1
+        await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null });
+        return;
+      }
+
+      // Rubric from DB, filtered by this row's role bucket — same semantics as
+      // the client-side Phase R filter (null/empty roles = applies to all).
+      const defs = await sbSelect(env,
+        `skill_definitions?echo_enabled=eq.true&select=skill_code,skill_name_en,skill_name_th,principle_th,pass_test_th,echo_observable,roles&order=skill_code`);
+      const bucket = row.owner_type || 'kam';
+      const rubric = (defs || []).filter(d => !d.roles || !d.roles.length || d.roles.includes(bucket));
+
+      // Summary is non-fatal (matches the client pipeline's behavior)
+      let summary = null;
+      try { summary = (await runSummarize(segments, env)).parsed; } catch (_) {}
+
+      const { parsed } = await runAnalyze(segments, summary, rubric, env);
+
+      // Guard: drop skill codes outside the rubric we sent (mirror of v953 client guard)
+      const sentCodes = new Set(rubric.map(d => d.skill_code));
+      const skills = (parsed.skills || []).filter(s => sentCodes.has(s.code));
+
+      const skillData = {
+        no_speech: false, skills,
+        pipc_stage: parsed.pipc_stage || null, pipc_reached: parsed.pipc_reached || null,
+        overall: parsed.overall || null, session_summary: parsed.session_summary || null
+      };
+      const intelData = {
+        ocpb_status: parsed.ocpb_status || null,
+        ocpb_facts: Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
+        next_actions: parsed.next_actions || []
+      };
+      const nowIso = new Date().toISOString();
+
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+        pipeline_stage: 'analyzed', status: 'saved',
+        skill_scores: skillData, customer_intel: intelData, next_actions: intelData.next_actions,
+        transcript_summary: summary?.transcript_summary || null,
+        tone_signals: summary?.tone || null, summary_data: summary || null,
+        processing_since: null
+      });
+
+      // Side tables — same writes the client pipeline did in
+      // _saveAnalysisToExistingSession; the claim above guarantees single-run
+      // so these inserts can't duplicate.
+      if (skills.length) {
+        const today = nowIso.split('T')[0];
+        await sbInsert(env, 'kam_skill_log', skills.map(s => ({
+          kam_email: row.owner_email, account_id: row.account_id || null,
+          session_date: today, skill_code: s.code, score: s.score,
+          evidence_summary: s.evidence || '', ci_session_id: sessionId
+        }))).catch(() => {});
+
+        try {
+          const prof = await sbSelect(env, `profiles?email=eq.${encodeURIComponent(row.owner_email)}&select=id`);
+          const userId = prof && prof[0] && prof[0].id;
+          if (userId) {
+            const VALID_SCORES = ['pass', 'developing', 'not_observed', 'not_applicable'];
+            await sbInsert(env, 'echo_skill_observations', skills.map(s => ({
+              session_id: sessionId, user_id: userId,
+              skill_code: s.code, echo_code: s.code,
+              ai_score: VALID_SCORES.includes(s.score) ? s.score : 'not_observed',
+              evidence: s.evidence || null, coaching_note: s.coaching_note || null,
+              gap: s.gap || null, observed_at: nowIso
+            })));
+          }
+        } catch (_) {}
+      }
+
+      if (row.account_id) {
+        await sbUpsert(env, 'kam_visits', {
+          kam_email: row.owner_email, account_id: row.account_id,
+          ci_skill_scores: skillData, ci_customer_signals: intelData,
+          ci_next_actions: intelData.next_actions, ci_mode: 'echo',
+          ci_created_at: nowIso, last_seen: nowIso, modes: ['echo']
+        }, 'kam_email,account_id').catch(() => {});
+      }
+    } catch (e) {
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+    }
+    return;
+  }
+  // other stages (checked_in / analyzed / no_speech): nothing to do
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, cfCtx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(env) });
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
     const url = new URL(request.url);
+    if (url.pathname === '/process')           return handleProcess(request, env, cfCtx);
     if (url.pathname === '/transcript')        return handleTranscript(request, env);
     if (url.pathname === '/transcript-gemini') return handleTranscriptGeminiFull(request, env); // v2 path, kept for A/B
     if (url.pathname === '/summarize')     return handleSummarize(request, env);
