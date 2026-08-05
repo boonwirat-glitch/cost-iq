@@ -86,7 +86,7 @@ async function handleTranscript(request, env) {
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400, env); }
 
-  const { audio_b64, mime_type, duration_secs } = body;
+  const { audio_b64, mime_type, duration_secs, account_name } = body;
   if (!audio_b64) return json({ error: 'audio_b64 required' }, 400, env);
 
   // ── Step 1: Groq Whisper — verbatim transcription with real timestamps ──
@@ -95,7 +95,18 @@ async function handleTranscript(request, env) {
   groqForm.append('file', new Blob([audioBytes], { type: mime_type || 'audio/webm' }), 'recording.webm');
   groqForm.append('model', 'whisper-large-v3');
   groqForm.append('language', 'th');
-  groqForm.append('prompt', 'บทสนทนาภาษาไทยระหว่างพนักงานขาย Freshket (วัตถุดิบอาหาร) กับเจ้าของร้านอาหาร อาจมีคำว่า Freshket, SKU, delivery, order, กิโล, ลัง');
+  // Phase A0 (2026-08-05): initial_prompt is Whisper's standard way to bias
+  // spelling of unfamiliar proper nouns — real example that motivated this:
+  // a store's branch name got transcribed 2 different ways in the same
+  // session because it wasn't in the (previously static) prompt vocabulary.
+  // account_name is per-visit and known client-side at record time, so we
+  // fold it into the prompt dynamically instead of a single fixed string.
+  const basePrompt = 'บทสนทนาภาษาไทยระหว่างพนักงานขาย Freshket (วัตถุดิบอาหาร) กับเจ้าของร้านอาหาร อาจมีคำว่า Freshket, SKU, delivery, order, กิโล, ลัง';
+  const safeAccountName = String(account_name || '').trim().slice(0, 80);
+  const dynamicPrompt = safeAccountName
+    ? `${basePrompt} ชื่อร้าน/บริษัทลูกค้าที่กำลังคุยด้วยคือ "${safeAccountName}"`
+    : basePrompt;
+  groqForm.append('prompt', dynamicPrompt);
   groqForm.append('response_format', 'verbose_json');
   groqForm.append('timestamp_granularities[]', 'segment');
 

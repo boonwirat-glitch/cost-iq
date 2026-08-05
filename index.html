@@ -1,4 +1,4 @@
-<!-- Freshket Sense v957: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v958: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1314,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v957',
+      version: 'v958',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -50755,7 +50755,7 @@ body:not(.echo-active) { background:unset; }
         _setStep('กำลัง transcript...', 'Whisper + Gemini · ถอดเสียง + แยกคนพูด', 10); // v3 hybrid pipeline (worker /transcript)
         // Dynamic timeout: at least 6 min, scale with recording length
         const transcriptTimeout = Math.max(360000, _secs * 1000 * 1.5);
-        const transcriptResult = await _callTranscript(blob, transcriptTimeout);
+        const transcriptResult = await _callTranscript(blob, transcriptTimeout, _ctx.accountName);
         if (transcriptResult.no_speech) {
           _phase = 'idle'; _idbClear(); _unmount();
           _toast('ไม่พบเสียงพูดใน audio'); return;
@@ -50765,6 +50765,10 @@ body:not(.echo-active) { background:unset; }
         if (!segments.length) throw new Error('Transcript ไม่ได้ผล — ไม่มี segments');
         _idbSetPipeline({ segments, stage: 'transcribed' });
         console.log('[CI pipeline] transcript done —', segments.length, 'segments, source=' + (transcriptResult.source || 'unknown'));
+        // Phase A0: carry the worker's own quality signal through ctx so it can
+        // be persisted — was computed already, just never read anywhere before
+        _ctx.transcriptConfidence = typeof transcriptResult.avg_transcript_confidence === 'number' ? transcriptResult.avg_transcript_confidence : null;
+        _ctx.speakerConfidence    = typeof transcriptResult.avg_speaker_confidence === 'number' ? transcriptResult.avg_speaker_confidence : null;
 
         // ── Echo v2: Save transcript to Supabase immediately (permanent ground truth) ──
         _setStep('กำลังบันทึก transcript...', '', 20);
@@ -50862,7 +50866,7 @@ body:not(.echo-active) { background:unset; }
 
   // ── Pipeline API calls ────────────────────────────────────────────────────────
 
-  async function _callTranscript(audioBlob, timeoutMs) {
+  async function _callTranscript(audioBlob, timeoutMs, accountName) {
     const arrayBuf = await audioBlob.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuf);
     let binary = '';
@@ -50886,7 +50890,10 @@ body:not(.echo-active) { background:unset; }
         res = await fetch(`${WORKER_URL}/transcript`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs }),
+          // Phase A0: account_name lets the (yet-to-deploy) worker bias Whisper's
+          // spelling of this visit's store/company name — old worker just ignores
+          // the extra field, so this is safe to ship ahead of the worker deploy
+          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs, account_name: accountName || undefined }),
           signal: ctrl.signal,
         });
         if (res.ok) { clearTimeout(tmo); break; }
@@ -51157,7 +51164,10 @@ body:not(.echo-active) { background:unset; }
           duration_secs:  ctx.secs,
           transcript:     segments,
           pipeline_stage: 'transcribed',
-          transcript_source: source || 'unknown'
+          transcript_source: source || 'unknown',
+          // Phase A0: worker-computed quality signal — surfaced in UI as a low-confidence warning
+          transcript_confidence: ctx.transcriptConfidence ?? null,
+          speaker_confidence:    ctx.speakerConfidence ?? null
         }).eq('id', _ciSessionId).select('id').single();
         if (!error && updRow) {
           ctx.sessionId = updRow.id;
@@ -51182,6 +51192,8 @@ body:not(.echo-active) { background:unset; }
         transcript:     segments,
         pipeline_stage: 'transcribed',
         transcript_source: source || 'unknown',
+        transcript_confidence: ctx.transcriptConfidence ?? null,
+        speaker_confidence:    ctx.speakerConfidence ?? null,
         rep_lat:        ctx.checkinCache?.rep_lat ?? null,
         rep_lng:        ctx.checkinCache?.rep_lng ?? null,
         checked_in_at:  ctx.checkinCache?.checked_in_at || null,
@@ -52896,7 +52908,7 @@ body:not(.echo-active) { background:unset; }
       // เปิดจาก history) + pipeline_stage,rep_lat,rep_lng,checked_in_at (แถบเช็คอิน
       // + สถานะเช็คอินอย่างเดียว)
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -52978,6 +52990,20 @@ body:not(.echo-active) { background:unset; }
       </div>`;
     }
 
+    // ── Phase A0: low transcript-confidence warning — worker already computed
+    // this per session, it just was never surfaced before. Threshold is a
+    // starting estimate (Whisper avg_logprob-derived, 0-1), not calibrated
+    // against real data yet — revisit once Phase E has baseline numbers.
+    // Copy deliberately does NOT say "listen to the original audio" — Echo
+    // never stores/replays the recording, only the transcript.
+    let confBanner = '';
+    if (typeof s.transcript_confidence === 'number' && s.transcript_confidence < 0.6) {
+      confBanner = `<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin-top:10px;background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.22);border-radius:var(--r-md);font-size:var(--text-sm);color:#B26A00;line-height:1.5;font-family:'Noto Sans Thai',sans-serif">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>ถอดเสียงไม่ชัดเจน (ความมั่นใจ ${Math.round(s.transcript_confidence*100)}%) — ควรตรวจสอบความถูกต้องก่อนเชื่อผลวิเคราะห์ในหน้านี้</span>
+      </div>`;
+    }
+
     // ── v_echog1: visit แบบเช็คอินอย่างเดียว — ไม่มีเสียง/วิเคราะห์ให้โชว์
     // แสดงสถานะตรงๆ แทน 3 แท็บว่างที่ดูเหมือนข้อมูลหาย
     if (s.pipeline_stage === 'checked_in') {
@@ -53005,6 +53031,7 @@ ${checkinBar}
 <div class="sd2-meta">${acctLabel} · ${date} · ${dur}</div>
 ${checkinBar}
 <div class="sd2-chips">${verdictChip}${cvChip}${revChip}</div>
+${confBanner}
 <div class="sd2-tabs">
   <div class="sd2-tab on" onclick="CI._sdTab(this,'sd2p1')">บทสนทนา</div>
   <div class="sd2-tab" onclick="CI._sdTab(this,'sd2p2')">ทักษะ</div>

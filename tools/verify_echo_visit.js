@@ -22,6 +22,7 @@ const ci    = SRC('09_conv_intel.js');
 const pv    = SRC('06_portview_teamview.js');
 const sk    = SRC('11_skills.js');
 const core  = SRC('01_core.js');
+const worker = fs.readFileSync(path.join(__dirname, '..', 'worker', 'freshket-sense-ai-proxy-v2.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function check(name, ok, detail) {
@@ -222,7 +223,7 @@ check('covisit detail path fetches real row before verifying',
 check('_getTeamEmails: admin branch returns without self-fallback',
   /_isAdmin[\s\S]{0,600}return \[\.\.\.emails\];/.test(ci));
 check('detail select carries transcript + summary_data',
-  /,transcript,summary_data,rep_lat,rep_lng,checked_in_at'/.test(ci));
+  /,transcript,summary_data,rep_lat,rep_lng,checked_in_at/.test(ci));
 check('list select carries pipeline_stage',
   /tl_note,covisit_verified,status,pipeline_stage'/.test(ci));
 check('checked_in renders its own card in TL feed',
@@ -361,6 +362,29 @@ check('thisQuarter counts distinct accounts',
 check('cap is surfaced, not silent', /_hitCap/.test(sk) && /ชนเพดาน/.test(sk));
 check('admin falls back to org-wide roster',
   /role=in\.\(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam\)/.test(sk));
+
+console.log('\n[B] source locks — ECHO GOAL 2 Phase A0 (transcript quality)');
+check('worker: Whisper prompt is built dynamically from account_name',
+  /const \{ audio_b64, mime_type, duration_secs, account_name \} = body;/.test(worker) &&
+  /const dynamicPrompt = safeAccountName/.test(worker) &&
+  /groqForm\.append\('prompt', dynamicPrompt\);/.test(worker));
+check('worker: account_name is length-capped before use',
+  /String\(account_name \|\| ''\)\.trim\(\)\.slice\(0, 80\)/.test(worker));
+check('client: _callTranscript sends account_name from pinned ctx (not live globals)',
+  /await _callTranscript\(blob, transcriptTimeout, _ctx\.accountName\);/.test(ci) &&
+  /async function _callTranscript\(audioBlob, timeoutMs, accountName\)/.test(ci) &&
+  /account_name: accountName \|\| undefined/.test(ci));
+check('client: worker confidence fields captured into ctx after transcript call',
+  /_ctx\.transcriptConfidence = typeof transcriptResult\.avg_transcript_confidence === 'number'/.test(ci) &&
+  /_ctx\.speakerConfidence    = typeof transcriptResult\.avg_speaker_confidence === 'number'/.test(ci));
+check('client: _saveTranscriptOnly persists confidence on both UPDATE and INSERT paths',
+  (ci.match(/transcript_confidence: ctx\.transcriptConfidence \?\? null,?/g) || []).length >= 2 &&
+  (ci.match(/speaker_confidence:\s+ctx\.speakerConfidence \?\? null,?/g) || []).length >= 2);
+check('client: session detail select carries transcript_confidence',
+  /pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence/.test(ci));
+check('client: low-confidence banner renders honest copy (no false claim about replaying audio)',
+  /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < 0\.6\)/.test(ci) &&
+  !/ฟังต้นฉบับ/.test(ci));
 
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
