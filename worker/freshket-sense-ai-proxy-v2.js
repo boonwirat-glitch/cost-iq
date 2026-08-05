@@ -898,7 +898,14 @@ async function callBrainModel(prompt, env) {
           });
         }
         if (!res.ok) {
+          // A2v2.2 hotfix (2026-08-05): live test landed on the chain's floor
+          // model with zero visibility into WHY every stronger model fell
+          // through (including claude-sonnet-4-6, a model already proven
+          // working elsewhere in this same file) — log the real body so the
+          // next run answers it instead of guessing again.
+          const bodyText = await res.text().catch(() => '');
           lastErr = new Error(`${model} ${res.status}`);
+          console.error(`[brain] ${model} attempt ${attempt} failed: ${res.status} — ${bodyText.slice(0, 300)}`);
           // 429/5xx = transient, retry same model once; other 4xx = model not
           // available on this key → break to the next model in the chain
           if (res.status === 429 || res.status >= 500) continue;
@@ -909,10 +916,13 @@ async function callBrainModel(prompt, env) {
           ? (d?.candidates?.[0]?.content?.parts?.[0]?.text || '')
           : (d?.content?.[0]?.text || '');
         const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
-        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); continue; }
+        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); console.error(`[brain] ${model}: response had no JSON — ${rawText.slice(0,200)}`); continue; }
         try { return { parsed: JSON.parse(rawText.slice(s, e + 1)), model }; }
-        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); continue; }
-      } catch (e) { lastErr = e; }
+        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); console.error(`[brain] ${model}: JSON parse failed — ${rawText.slice(0,200)}`); continue; }
+      } catch (e) {
+        lastErr = e;
+        console.error(`[brain] ${model} attempt ${attempt} threw: ${e?.message || e}`);
+      }
     }
   }
   throw lastErr || new Error('all brain models failed');
