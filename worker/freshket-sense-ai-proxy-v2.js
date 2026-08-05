@@ -856,6 +856,162 @@ async function handleAnalyzeAudio(request, env) {
   }
 }
 
+// ── A2v2.2 BRAIN (2026-08-05) — one strong-model call for the whole analysis ──
+// Replaces the summarize(flash-lite)+analyze(sonnet) pair INSIDE /process only
+// (legacy endpoints untouched). Nobody waits on-screen anymore, so latency is
+// free — spend it on the strongest available model and a richer prompt:
+// restaurant-business lens, 3-level evidence discipline, skill decision tree,
+// customer needs with implications, and cross-visit memory.
+
+// Try strongest-first; fall through on 4xx (model not enabled for this key).
+// The winner is stamped into ci_sessions.ai_model — after the first real run
+// the DB itself answers "is gemini-3.5-pro enabled?".
+const BRAIN_MODEL_CHAIN = [
+  { provider: 'gemini',    model: 'gemini-3.5-pro' },
+  { provider: 'anthropic', model: 'claude-sonnet-5' },
+  { provider: 'anthropic', model: 'claude-sonnet-4-6' },   // known-good today (= legacy /analyze)
+  { provider: 'gemini',    model: 'gemini-2.5-flash' }     // absolute floor
+];
+
+async function callBrainModel(prompt, env) {
+  let lastErr;
+  for (const { provider, model } of BRAIN_MODEL_CHAIN) {
+    if (provider === 'gemini' && !env.GEMINI_API_KEY) continue;
+    if (provider === 'anthropic' && !env.ANTHROPIC_API_KEY) continue;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
+      try {
+        let res, rawText = '';
+        if (provider === 'gemini') {
+          res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 32768, responseMimeType: 'application/json' }
+            })
+          });
+        } else {
+          res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({ model, max_tokens: 16384, messages: [{ role: 'user', content: prompt }] })
+          });
+        }
+        if (!res.ok) {
+          lastErr = new Error(`${model} ${res.status}`);
+          // 429/5xx = transient, retry same model once; other 4xx = model not
+          // available on this key → break to the next model in the chain
+          if (res.status === 429 || res.status >= 500) continue;
+          break;
+        }
+        const d = await res.json();
+        rawText = provider === 'gemini'
+          ? (d?.candidates?.[0]?.content?.parts?.[0]?.text || '')
+          : (d?.content?.[0]?.text || '');
+        const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
+        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); continue; }
+        try { return { parsed: JSON.parse(rawText.slice(s, e + 1)), model }; }
+        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); continue; }
+      } catch (e) { lastErr = e; }
+    }
+  }
+  throw lastErr || new Error('all brain models failed');
+}
+
+// บริบทงานจริงต่อ role — โมเดลใช้ตัดสิน "visit นี้เปิดโอกาสให้ใช้ skill นี้มั้ย"
+// และแปลความหมายประโยคเดียวกันให้ถูกทิศ (จาก Sales = ปิดดีลใหม่, จาก KAM =
+// อาจแปลว่าลูกค้ากำลังเทียบเจ้าอื่น)
+const BRAIN_ROLE_CONTEXT = {
+  kam:   'KAM (Key Account Manager) — ดูแลร้านลูกค้าเดิม: รักษายอดสั่งซื้อ ขยายตะกร้า (เพิ่มหมวดสินค้า/SKU) และกันคู่แข่งเข้ามาแย่ง share',
+  sales: 'Sales (Hunter) — ล่าลูกค้าใหม่: สร้างความเชื่อใจครั้งแรก เก็บข้อมูลร้าน เปิดบัญชี และปิดออเดอร์แรกหรือนัดครั้งถัดไป',
+  ad:    'AD (Account Development) — พัฒนาบัญชีที่เพิ่งเปิด: ทำให้ร้านติดนิสัยสั่งประจำ เพิ่มความถี่การสั่งและจำนวนหมวดสินค้า',
+  pm:    'PM (Portfolio Manager) — ดูแลพอร์ต/เชนเชิงโครงการ: ประสานหลายสาขา เงื่อนไขราคา สัญญา และความสัมพันธ์ระดับผู้บริหารร้าน'
+};
+
+async function runBrain(segments, rubric, roleBucket, priorIntel, env) {
+  const transcriptText = segments.map(s =>
+    `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
+  ).join('\n');
+
+  // 3 บรรทัดต่อ skill: ชื่อ+เจตนา / เกณฑ์ผ่าน / ฟังหา — model เห็นครบ ทำไม-อะไร-ยังไง
+  const rubricText = (rubric || []).map(s => {
+    const principle = (s.principle_th || '').slice(0, 200);
+    return `[${s.skill_code}] ${s.skill_name_en}${s.skill_name_th ? ' (' + s.skill_name_th + ')' : ''}` +
+      (principle ? `\n  เจตนา: ${principle}` : '') +
+      `\n  เกณฑ์ผ่าน: ${(s.pass_test_th || '-').replace(/\//g, ' | ')}` +
+      (s.echo_observable ? `\n  ฟังหา: ${s.echo_observable}` : '');
+  }).join('\n');
+
+  // ความจำจาก visit ก่อน (intel ที่เคยสกัดไว้ของ kam×account เดียวกัน) — ตัดขนาด
+  // กันบวม; โมเดลใช้ทำ progress_vs_last เท่านั้น ห้ามลอก fact เก่ามาเป็นของรอบนี้
+  let priorText = '';
+  if (priorIntel && priorIntel.ci_customer_signals) {
+    try {
+      priorText = JSON.stringify({
+        when: priorIntel.ci_created_at || null,
+        intel: priorIntel.ci_customer_signals,
+        next_actions: priorIntel.ci_next_actions || []
+      }).slice(0, 6000);
+    } catch (_) {}
+  }
+
+  const prompt = `คุณคือ Sales Director ของ Freshket (จำหน่ายวัตถุดิบอาหารให้ร้านอาหาร) ผู้เชี่ยวชาญธุรกิจร้านอาหาร
+กำลังฟังบทสนทนา visit จริงระหว่างพนักงานของคุณกับลูกค้าร้านอาหาร เพื่อ (1) สรุป (2) ประเมิน skill พนักงาน (3) วิเคราะห์ลูกค้าเชิงธุรกิจ
+
+ROLE ของพนักงานใน visit นี้: ${BRAIN_ROLE_CONTEXT[roleBucket] || BRAIN_ROLE_CONTEXT.kam}
+
+เลนส์ธุรกิจร้านอาหาร — ฟังทุกประโยคผ่าน 6 มิตินี้ (เจ้าของร้านคิดเรื่องพวกนี้เสมอ):
+1. ยอดขายหน้าร้าน + เมนู — ขายดีมั้ย เมนูไหนเดิน เมนูใหม่/โปรโมชั่น = โอกาส SKU ใหม่
+2. Food cost / margin — คำบ่นเรื่อง "ราคา" ที่แท้คือเรื่อง margin ของร้าน
+3. Supplier mix / share of wallet — ร้านซื้อหลายเจ้าเสมอ ใครถือหมวดไหน เพราะอะไร (ราคา/เครดิต/ความเคยชิน/ความสด)
+4. ปฏิบัติการ — เวลาส่ง (ต้องถึงก่อนเตรียมครัว) คุณภาพต้องนิ่ง ที่เก็บจำกัด
+5. เครดิต / เงินสด — ร้านหมุนเงินกับ credit term ของซัพพลายเออร์
+6. ความเชื่อใจ — ของมีปัญหาแล้วใครแก้เร็ว ความสัมพันธ์กับคนส่ง/เซลส์
+
+TRANSCRIPT (ground truth — อ้าง segment_id ทุกครั้ง):
+${transcriptText}
+
+${priorText ? `ข้อมูลจาก VISIT ครั้งก่อนของลูกค้ารายนี้ (ใช้เทียบความคืบหน้าเท่านั้น ห้ามนับเป็นข้อมูลของรอบนี้):\n${priorText}\n` : ''}
+SKILL RUBRIC (ประเมินครบทุกตัว อย่างละ 1 รายการเป๊ะ ห้ามข้าม ห้ามเพิ่ม):
+${rubricText || 'ไม่มี rubric — ประเมินตาม best practice การขายทั่วไป'}
+
+วิธีให้คะแนน skill (ไล่ทีละขั้น ห้ามข้ามขั้น):
+ขั้น 1: visit นี้เปิดโอกาสให้ใช้ skill นี้มั้ย (ดูจาก ROLE + สถานการณ์จริงในบทสนทนา)? ไม่มีโอกาส → "not_applicable"
+ขั้น 2: มีหลักฐานว่าพนักงานพยายามใช้ skill นี้มั้ย? ไม่มี → "not_observed" และใน gap ต้องระบุว่า "โอกาสอยู่ตรงไหนที่พลาดไป" (ชี้ segment ได้ยิ่งดี — เพื่อให้โค้ชต่อได้)
+ขั้น 3: ทำถึง "เกณฑ์ผ่าน/ฟังหา" มั้ย? ถึง → "pass" · พยายามแต่ไม่ถึง → "developing"
+กติกา: pass/developing ต้องมี quote ตรงตัวจาก transcript เสมอ · coaching_note = "สิ่งที่ทำได้ดี + สิ่งที่ควรทำต่างใน visit หน้า" (ลงมือได้จริง ไม่ใช่คำชมลอยๆ)
+
+วินัยหลักฐาน 3 ระดับ (ใช้กับการวิเคราะห์ลูกค้าทุก section):
+- เห็นชัด: มี quote ตรงตัว + segment_id
+- อนุมาน: ใส่ "intensity":"implied" + "inferred_from" อธิบายว่าอนุมานจากอะไร
+- ยังไม่รู้: ใส่ลง "unknowns" เป็นคำถามภาษาพูดที่พนักงานหยิบไปถามได้จริง visit หน้า
+- ช่วง transcript ที่อ่านไม่รู้เรื่อง (ถอดเสียงเพี้ยน): ห้ามเดา ให้ข้าม — ถ้าประเด็นสำคัญน่าจะอยู่ตรงนั้น ใส่ unknowns แทน
+
+needs (ความต้องการลูกค้า): ทุกข้อต้องมี "implication" (กระทบ share of wallet/การรักษาลูกค้ายังไง) และ "suggested_action" (เกมที่ควรเดิน) — fact เฉยๆ ไม่พอ ต้องบอกว่าแล้วไงต่อ
+
+ตอบ JSON เท่านั้น ไม่มี markdown:
+{
+  "transcript_summary": "สรุปภาพรวม 2-3 ประโยค",
+  "notes": [{ "heading": "หัวข้อ", "bullets": ["..."] }],
+  "customer_said": [{ "point": "...", "quote": "...", "ts": "mm:ss", "segment_id": 0 }],
+  "tone": { "rep_confidence": "high|medium|low", "rep_confidence_note": "...", "customer_engagement": "increasing|stable|decreasing", "customer_engagement_note": "..." },
+  "skills": [{ "code": "", "score": "pass|developing|not_observed|not_applicable", "evidence": "...", "quote": "...", "ts": "mm:ss", "segment_id": 0, "gap": "...", "coaching_note": "..." }],
+  "pipc_stage": "Prepare|Identify|Probe|Close",
+  "pipc_reached": "...",
+  "overall": "strong|developing|needs_work",
+  "session_summary": "...",
+  "ocpb_status": { "O": "answered|asked_no_answer|not_asked", "C": "...", "P": "...", "B": "..." },
+  "ocpb_facts": [{ "dim": "O|C|P|B", "summary": "...", "quote": "...", "ts": "mm:ss", "segment_id": 0, "tag": "pain_high|pain_medium|opportunity|null" }],
+  "needs": [{ "need": "...", "type": "product|price|delivery|credit|quality|service|other", "intensity": "explicit|implied", "inferred_from": "เฉพาะเมื่อ implied", "status": "open|addressed", "quote": "...", "segment_id": 0, "implication": "...", "suggested_action": "..." }],
+  "unknowns": ["คำถามที่ควรถามครั้งหน้า ภาษาพูด", "..."],
+  "next_actions": [{ "action": "...", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "segment_id": 0, "reason": "..." }],
+  "progress_vs_last": [{ "topic": "...", "before": "สถานะครั้งก่อน", "now": "สถานะรอบนี้", "verdict": "คืบหน้า|ถอยหลัง|ค้างที่เดิม" }]
+}
+progress_vs_last: เฉพาะประเด็นที่มีข้อมูลทั้งสองฝั่ง (ครั้งก่อน+รอบนี้) — ไม่มีข้อมูลครั้งก่อน → []`;
+
+  return callBrainModel(prompt, env);
+}
+
 // ── /process (A2v2.1, 2026-08-05) — async pipeline stage machine ─────────────
 // The rep uploads audio to Supabase Storage, updates their ci_sessions row to
 // pipeline_stage='uploaded', fires ONE tiny keepalive call here, and closes
@@ -958,11 +1114,27 @@ async function processSession(sessionId, origin, env) {
       const bucket = row.owner_type || 'kam';
       const rubric = (defs || []).filter(d => !d.roles || !d.roles.length || d.roles.includes(bucket));
 
-      // Summary is non-fatal (matches the client pipeline's behavior)
-      let summary = null;
-      try { summary = (await runSummarize(segments, env)).parsed; } catch (_) {}
+      // A2v2.2: cross-visit memory — the intel this kam extracted at this
+      // account last time (kam_visits is upserted per kam×account below, so
+      // this read IS last visit's snapshot). Non-fatal if missing.
+      let priorIntel = null;
+      if (row.account_id) {
+        try {
+          const pv = await sbSelect(env,
+            `kam_visits?kam_email=eq.${encodeURIComponent(row.owner_email)}&account_id=eq.${row.account_id}&select=ci_customer_signals,ci_next_actions,ci_created_at`);
+          if (pv && pv[0]) priorIntel = pv[0];
+        } catch (_) {}
+      }
 
-      const { parsed } = await runAnalyze(segments, summary, rubric, env);
+      // A2v2.2: one strong-model call replaces summarize+analyze — the model
+      // sees everything at once (summary/skills/customer stay coherent)
+      const { parsed, model: aiModel } = await runBrain(segments, rubric, bucket, priorIntel, env);
+      const summary = {
+        transcript_summary: parsed.transcript_summary || null,
+        notes:              Array.isArray(parsed.notes) ? parsed.notes : [],
+        customer_said:      Array.isArray(parsed.customer_said) ? parsed.customer_said : [],
+        tone:               parsed.tone || null
+      };
 
       // Guard: drop skill codes outside the rubric we sent (mirror of v953 client guard)
       const sentCodes = new Set(rubric.map(d => d.skill_code));
@@ -976,7 +1148,11 @@ async function processSession(sessionId, origin, env) {
       const intelData = {
         ocpb_status: parsed.ocpb_status || null,
         ocpb_facts: Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
-        next_actions: parsed.next_actions || []
+        next_actions: parsed.next_actions || [],
+        // A2v2.2: restaurant-lens customer intelligence
+        needs:            Array.isArray(parsed.needs) ? parsed.needs : [],
+        unknowns:         Array.isArray(parsed.unknowns) ? parsed.unknowns : [],
+        progress_vs_last: Array.isArray(parsed.progress_vs_last) ? parsed.progress_vs_last : []
       };
       const nowIso = new Date().toISOString();
 
@@ -985,6 +1161,7 @@ async function processSession(sessionId, origin, env) {
         skill_scores: skillData, customer_intel: intelData, next_actions: intelData.next_actions,
         transcript_summary: summary?.transcript_summary || null,
         tone_signals: summary?.tone || null, summary_data: summary || null,
+        ai_model: aiModel || null,
         processing_since: null
       });
 

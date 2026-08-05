@@ -1,4 +1,4 @@
-<!-- Freshket Sense v959: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v960: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1314,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v959',
+      version: 'v960',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51801,6 +51801,63 @@ body:not(.echo-active) { background:unset; }
     const facts  = Array.isArray(d?.ocpb_facts) ? d.ocpb_facts : [];
     const status = d?.ocpb_status || {};
 
+    // ── A2v2.2: restaurant-lens sections (needs / unknowns / progress) ───────
+    // Rows analyzed by the async brain carry these; legacy rows simply don't
+    // have the fields and every section below collapses to '' — backward safe.
+    const NEED_TYPE = {
+      product:'สินค้า', price:'ราคา', delivery:'การส่ง', credit:'เครดิต',
+      quality:'คุณภาพ', service:'บริการ', other:'อื่นๆ'
+    };
+    const needs = Array.isArray(d?.needs) ? d.needs : [];
+    const needsHtml = needs.length ? `<div class="sd2-lbl">ความต้องการลูกค้า · ${needs.length} ข้อ</div>` +
+      needs.map(n => {
+        const typeChip = `<span class="sd2-sstate dev" style="color:#534AB7;background:rgba(83,74,183,.08)">${NEED_TYPE[n.type] || n.type || '—'}</span>`;
+        const stChip = n.status === 'addressed'
+          ? `<span class="sd2-sstate ok">ตอบสนองแล้ว</span>`
+          : `<span class="sd2-sstate dev">ค้างอยู่</span>`;
+        const srcChip = n.intensity === 'implied'
+          ? `<span class="sd2-sstate no" title="${(n.inferred_from||'').replace(/"/g,'&quot;')}">อ่านระหว่างบรรทัด</span>`
+          : `<span class="sd2-sstate no">ลูกค้าพูดเอง</span>`;
+        const quote = (n.quote && String(n.quote).trim())
+          ? `<div class="sd2-sev">&ldquo;${n.quote}&rdquo;</div>` : '';
+        const imp = n.implication
+          ? `<div style="font-size:13.5px;color:#48484A;line-height:1.65;margin-top:5px">${n.implication}</div>` : '';
+        const act = n.suggested_action
+          ? `<div style="font-size:var(--text-base);color:#534AB7;line-height:1.65;margin-top:5px;padding-left:10px;border-left:2px solid rgba(83,74,183,.3)">เกมที่ควรเดิน: ${n.suggested_action}</div>` : '';
+        return `<div style="padding:12px 0;border-bottom:0.5px solid #ECECF0">
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <div style="flex:1;font-size:var(--text-lg);font-weight:var(--fw-semi);color:#1C1C1E;line-height:1.6">${n.need || '-'}</div>
+            <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">${typeChip}${stChip}</div>
+          </div>
+          <div style="margin-top:3px">${srcChip}</div>
+          ${quote}${imp}${act}
+        </div>`;
+      }).join('') : '';
+
+    const unknowns = Array.isArray(d?.unknowns) ? d.unknowns : [];
+    const unknownsHtml = unknowns.length ? `<div class="sd2-lbl">สิ่งที่ควรถามครั้งหน้า</div>` +
+      unknowns.map((q, i) =>
+        `<div class="sd2-next"><span class="num">${String(i+1).padStart(2,'0')}</span><div>${q}</div></div>`
+      ).join('') : '';
+
+    const prog = Array.isArray(d?.progress_vs_last) ? d.progress_vs_last : [];
+    const PROG_V = {
+      'คืบหน้า':   ['คืบหน้า','ok'],
+      'ถอยหลัง':   ['ถอยหลัง','no'],
+      'ค้างที่เดิม': ['ค้างที่เดิม','dev'],
+    };
+    const progHtml = prog.length ? `<div class="sd2-lbl">ความคืบหน้าจากครั้งก่อน</div>` +
+      prog.map(p => {
+        const v = PROG_V[p.verdict] || [p.verdict || '—', 'dev'];
+        return `<div style="padding:10px 0;border-bottom:0.5px solid #ECECF0">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span style="font-size:var(--text-lg);font-weight:var(--fw-semi);color:#1C1C1E">${p.topic || '-'}</span>
+            <span class="sd2-sstate ${v[1]}">${v[0]}</span>
+          </div>
+          <div style="font-size:13.5px;color:#48484A;line-height:1.65;margin-top:4px">ครั้งก่อน: ${p.before || '—'}<br>รอบนี้: ${p.now || '—'}</div>
+        </div>`;
+      }).join('') : '';
+
     const blocks = DIMS.map(([dim, label]) => {
       const fs = facts.filter(f => f && f.dim === dim);
       const stKey = status[dim] || (fs.length ? 'answered' : 'not_asked');
@@ -51840,10 +51897,12 @@ body:not(.echo-active) { background:unset; }
     const nextsHtml = nexts ? `<div class="sd2-lbl">Next Steps</div>${nexts}` : '';
 
     const hasIntel = facts.length || Object.keys(status).length;
+    const hasNew   = needsHtml || unknownsHtml || progHtml;
     const intelHtml = hasIntel
       ? `<div class="sd2-lbl">ข้อมูลลูกค้า (OCPB)</div>${blocks}`
-      : (nextsHtml ? '' : `<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
-    return intelHtml + nextsHtml;
+      : ((nextsHtml || hasNew) ? '' : `<div style="padding:24px;text-align:center;font-size:var(--text-base);color:#AEAEB2">ยังไม่มีข้อมูลลูกค้าจาก session นี้</div>`);
+    // A2v2.2 order: needs → unknowns → progress → OCPB → next steps
+    return needsHtml + unknownsHtml + progHtml + intelHtml + nextsHtml;
   }
 
   function _transcriptPanel(tone, transcriptSummary) {

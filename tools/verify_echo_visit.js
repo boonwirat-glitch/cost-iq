@@ -447,6 +447,47 @@ check('client: session detail handles uploaded/no_speech without empty tabs',
 check('client: _saveTranscriptOnly prefers ctx.sessionId (fallback path targets the pre-created row)',
   /const _ciSessionId = ctx\.sessionId \|\| ctx\.checkinCache\?\.session_id \|\| null;/.test(ci));
 
+console.log('\n[B] source locks — ECHO GOAL 2 Phase A2v2.2 (brain)');
+check('worker: brain model chain strongest-first with known-good floor',
+  (() => {
+    const chain = worker.slice(worker.indexOf('BRAIN_MODEL_CHAIN'), worker.indexOf('async function callBrainModel'));
+    return chain.includes("'gemini-3.5-pro'") && chain.includes("'claude-sonnet-5'") &&
+      chain.includes("'claude-sonnet-4-6'") && chain.includes("'gemini-2.5-flash'") &&
+      chain.indexOf("'gemini-3.5-pro'") < chain.indexOf("'claude-sonnet-4-6'");
+  })());
+check('worker: 4xx model-missing breaks to next model, 429/5xx retries same model',
+  /if \(res\.status === 429 \|\| res\.status >= 500\) continue;\s*\n\s*break;/.test(worker));
+check('worker: runBrain replaces summarize+analyze inside /process',
+  /await runBrain\(segments, rubric, bucket, priorIntel, env\)/.test(worker) &&
+  !/await runSummarize\(segments, env\)\)\.parsed/.test(worker.slice(worker.indexOf('async function processSession'))));
+check('worker: brain prompt carries restaurant lens + decision tree + evidence discipline',
+  /เลนส์ธุรกิจร้านอาหาร/.test(worker) &&
+  /share of wallet/.test(worker) &&
+  /not_applicable/.test(worker) &&
+  /วินัยหลักฐาน 3 ระดับ/.test(worker) &&
+  /ห้ามเดา ให้ข้าม/.test(worker));
+check('worker: needs require implication + suggested_action',
+  /"implication"/.test(worker) && /"suggested_action"/.test(worker) &&
+  /ต้องบอกว่าแล้วไงต่อ/.test(worker));
+check('worker: cross-visit memory read from kam_visits + no-copy rule',
+  /kam_visits\?kam_email=eq\.[\s\S]{0,120}ci_customer_signals,ci_next_actions,ci_created_at/.test(worker) &&
+  /ห้ามนับเป็นข้อมูลของรอบนี้/.test(worker));
+check('worker: ai_model stamped into ci_sessions',
+  /ai_model: aiModel \|\| null,/.test(worker));
+check('worker: customer_intel gains needs/unknowns/progress_vs_last',
+  /needs:\s+Array\.isArray\(parsed\.needs\)/.test(worker) &&
+  /unknowns:\s+Array\.isArray\(parsed\.unknowns\)/.test(worker) &&
+  /progress_vs_last: Array\.isArray\(parsed\.progress_vs_last\)/.test(worker));
+check('worker: ROLE_CONTEXT covers all 4 buckets',
+  /BRAIN_ROLE_CONTEXT = \{[\s\S]{0,800}kam:[\s\S]{0,800}sales:[\s\S]{0,800}ad:[\s\S]{0,800}pm:/.test(worker));
+check('client: customer panel renders needs/unknowns/progress ahead of OCPB',
+  /return needsHtml \+ unknownsHtml \+ progHtml \+ intelHtml \+ nextsHtml;/.test(ci));
+check('client: needs card shows source chip (explicit vs implied) + suggested move',
+  /อ่านระหว่างบรรทัด/.test(ci) && /ลูกค้าพูดเอง/.test(ci) && /เกมที่ควรเดิน:/.test(ci));
+check('client: legacy rows without new fields collapse silently (backward compat)',
+  /const needs = Array\.isArray\(d\?\.needs\) \? d\.needs : \[\];/.test(ci) &&
+  /needsHtml = needs\.length \?/.test(ci));
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
