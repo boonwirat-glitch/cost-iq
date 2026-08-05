@@ -948,7 +948,7 @@ body:not(.echo-active) { background:unset; }
     if (_phase === 'recording' || _phase === 'processing') { _toast('มี session กำลังทำงานอยู่ — รอให้เสร็จก่อน'); return; }
     try {
       const { data: row, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,duration_secs,transcript,pipeline_stage')
+        .select('id,owner_email,account_id,account_name,duration_secs,transcript,pipeline_stage,owner_type')
         .eq('id', sessionId).single();
       if (error || !row) throw error || new Error('ไม่พบ session');
       const segments = Array.isArray(row.transcript) ? row.transcript : [];
@@ -960,6 +960,9 @@ body:not(.echo-active) { background:unset; }
       _sessionId   = row.id;
       _accountGuid = row.account_id || null;
       _accountName = row.account_name || '';
+      // ECHO GOAL 2: use the REAL row's owner_type for rubric bucketing — not
+      // whatever _ownerType last happened to be from a previous open()/picker
+      _ownerType = row.owner_type || _ownerType;
       _secs = row.duration_secs || 0; _durText = _fmt(_secs);
       _isOwnRecording = true;
       _phase = 'processing';
@@ -1210,7 +1213,7 @@ body:not(.echo-active) { background:unset; }
 
       // ── Step 3: Skills + OCPB ────────────────────────────────────────────────
       _setStep('กำลังวิเคราะห์ทักษะ...', 'Claude · ประเมิน skills + OCPB', 70);
-      const analysisResult = await _callAnalyze(segments, summaryResult);
+      const analysisResult = await _callAnalyze(segments, summaryResult, _ctx);
       console.log('[CI pipeline] analysis done');
 
       // Update Tab 2 + 3 (guard: user may have cancelled/unmounted)
@@ -1349,8 +1352,14 @@ body:not(.echo-active) { background:unset; }
     catch(_) { return _ciRepairJson(raw.slice(s, e+1)) || {}; }
   }
 
-  async function _callAnalyze(segments, summary) {
+  async function _callAnalyze(segments, summary, ctx) {
     const FETCH_TIMEOUT_MS = 180000; // 3 นาที
+    // ECHO GOAL 2 / Phase R: filter the rubric to the visit owner's role bucket
+    // before it ever leaves the client — worker only sees skills that apply
+    // to this role. skillRoleBucket(ctx.ownerType) is an identity op today
+    // (ownerType is already a bucket value) but stays correct if that ever changes.
+    const _bucket = (typeof skillRoleBucket === 'function') ? skillRoleBucket(ctx?.ownerType) : 'kam';
+    const _rubricForSend = _rubricForBucket(_bucket);
     let res, lastErr;
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (attempt > 1) {
@@ -1362,7 +1371,7 @@ body:not(.echo-active) { background:unset; }
         res = await fetch(`${WORKER_URL}/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ segments, summary, rubric: _rubricCache || [] }),
+          body: JSON.stringify({ segments, summary, rubric: _rubricForSend, role: _bucket }),
           signal: ctrl.signal,
         });
         if (res.ok) { clearTimeout(tmo); break; }
@@ -1384,10 +1393,23 @@ body:not(.echo-active) { background:unset; }
     try { parsed = JSON.parse(raw.slice(s, e+1)); }
     catch(_) { parsed = _ciRepairJson(raw.slice(s, e+1)); }
     if (!parsed) throw new Error('Analyze: JSON parse failed');
+    // ECHO GOAL 2 / Phase R: guard against the model returning a skill_code that
+    // wasn't in the rubric subset we sent for this role bucket — drop + warn
+    // instead of trusting it (out-of-role skill shouldn't reach skill_scores/logs)
+    let _skills = Array.isArray(parsed.skills) ? parsed.skills : [];
+    if (_skills.length) {
+      const _sentCodes = new Set(_rubricForSend.map(d => d.skill_code));
+      const _kept = _skills.filter(s => _sentCodes.has(s.code));
+      if (_kept.length !== _skills.length) {
+        const _dropped = _skills.filter(s => !_sentCodes.has(s.code)).map(s => s.code);
+        console.warn('[CI] analyze returned out-of-role skill code(s), dropped:', _dropped, 'bucket=' + _bucket);
+      }
+      _skills = _kept;
+    }
     return {
       skillData: {
         no_speech: false,
-        skills:          parsed.skills || [],
+        skills:          _skills,
         pipc_stage:      parsed.pipc_stage || null,
         pipc_reached:    parsed.pipc_reached || null,
         overall:         parsed.overall || null,
@@ -1454,16 +1476,25 @@ body:not(.echo-active) { background:unset; }
     try {
       const { data, error } = await supa
         .from('skill_definitions')
-        .select('skill_code,skill_name_en,skill_name_th,principle_th,pass_test_th,echo_observable,echo_enabled') // v_echofix: +skill_name_th for the worker's richer rubric text
+        .select('skill_code,skill_name_en,skill_name_th,principle_th,pass_test_th,echo_observable,echo_enabled,roles') // v_echofix: +skill_name_th for the worker's richer rubric text · ECHO GOAL 2: +roles
         .eq('echo_enabled', true)
         .order('skill_code');
       if (error) throw error;
-      _rubricCache = data || [];
+      _rubricCache = data || []; // v_goal2: cache stays the FULL set always — filtering happens per-use via _rubricForBucket
       console.log('[CI] rubric loaded from DB:', _rubricCache.length, 'skills');
     } catch(e) {
       console.warn('[CI] rubric DB load failed, using empty fallback:', e.message);
       _rubricCache = [];
     }
+  }
+
+  // ECHO GOAL 2 / Phase R: rubric subset actually sent to the worker for a given
+  // role bucket. _rubricCache itself is never filtered/mutated — every def-lookup
+  // site (pending queue, name lookups, etc.) keeps seeing the full set, which is
+  // what prevents silent-drop bugs.
+  function _rubricForBucket(bucket) {
+    return (_rubricCache || []).filter(def =>
+      (typeof skillDefMatchesBucket === 'function') ? skillDefMatchesBucket(def, bucket) : true);
   }
 
   // v_echofix (2026-07-21): deleted the dead audio-native Gemini path
@@ -3894,7 +3925,9 @@ ${checkinBar}
     if (_canDebrief()) {
       _accountGuid = null; _accountName = ''; _accountSeg = '';
       _showPicker = false;
-      _ownerType = 'kam';
+      // ECHO GOAL 2: bucket by the debriefing TL's own flavor (sales_tl→sales,
+      // ad_tl→ad) instead of hardcoding 'kam' for every _canDebrief() role
+      _ownerType = (typeof skillRoleBucket === 'function') ? skillRoleBucket(getCurrentRole()) : 'kam';
       setTimeout(_mount, 50);
       return;
     }
@@ -3902,7 +3935,10 @@ ${checkinBar}
     const role = (typeof getCurrentRole === 'function') ? getCurrentRole() : 'rep';
     // v498: AD uses KAM picker (existing accounts) not Sales name-input
     // PM also uses KAM picker; tagged its own owner_type for tracking, no pm_tl variant
-    _ownerType = (role === 'sales') ? 'sales' : (role === 'ad' || role === 'ad_tl') ? 'ad' : (role === 'pm') ? 'pm' : 'kam';
+    // ECHO GOAL 2: central skillRoleBucket mapper (identical output to the old
+    // inline ternary for rep/sales/ad/pm — this branch never sees *_tl roles,
+    // those are intercepted by _canDebrief() above)
+    _ownerType = (typeof skillRoleBucket === 'function') ? skillRoleBucket(role) : ((role === 'sales') ? 'sales' : (role === 'ad' || role === 'ad_tl') ? 'ad' : (role === 'pm') ? 'pm' : 'kam');
 
     if (_ownerType === 'sales') {
       // Sales always sees name input first
@@ -4803,6 +4839,18 @@ function echoExpand() {
   let _admSkills = [];
   let _admEditing = null; // id of skill being edited, null = new
   let _admLoaded  = false;
+  // ECHO GOAL 2 / Phase M: role chips — Set of currently-selected buckets in the modal
+  let _admSelectedRoles = new Set();
+  const ADM_ROLE_LABEL = { kam:'KAM', sales:'Sales', ad:'AD', pm:'PM' };
+  const ADM_ROLE_ABBR  = { kam:'K', sales:'S', ad:'A', pm:'P' };
+  const ADM_ROLE_ORDER = ['kam','sales','ad','pm'];
+
+  function _admRoleBadges(roles) {
+    if (!roles || !roles.length) return '';
+    return roles.map(r =>
+      `<span style="display:inline-block;font-size:9px;font-weight:var(--fw-bold);letter-spacing:.04em;padding:2px 5px;border-radius:4px;background:rgba(83,74,183,.1);color:#534AB7;flex-shrink:0">${ADM_ROLE_ABBR[r]||r}</span>`
+    ).join('');
+  }
 
   // ── Supabase helper (reuses global `supa`) ────────────────────────────────
   async function _supaReq(table, opts = {}) {
@@ -4859,7 +4907,7 @@ function echoExpand() {
       <div onclick="admOpenModal('${s.id}')" style="display:grid;grid-template-columns:80px 1fr 56px;gap:8px;align-items:center;padding:10px 12px;background:#fff;cursor:pointer;border-bottom:0.5px solid var(--n100,#E5E5EA);transition:background .12s" onmouseover="this.style.background='#F7F7F7'" onmouseout="this.style.background='#fff'">
         <div style="font-family:'IBM Plex Mono','Noto Sans Thai',monospace;font-size:var(--text-sm);font-weight:var(--fw-semi);color:#FF385C">${s.skill_code||'—'}</div>
         <div>
-          <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n900,#1C1C1E);margin-bottom:1px">${s.skill_name_en||'—'}</div>
+          <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--n900,#1C1C1E);margin-bottom:1px;display:flex;align-items:center;gap:5px;flex-wrap:wrap">${s.skill_name_en||'—'}${_admRoleBadges(s.roles)}</div>
           <div style="font-size:var(--text-xs);color:var(--n400,#AEAEB2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.echo_observable?s.echo_observable.slice(0,60)+(s.echo_observable.length>60?'…':''):'ไม่มี hint'}</div>
         </div>
         <div style="display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:100px;font-size:var(--text-xs);font-weight:var(--fw-semi);${s.echo_enabled?'background:rgba(52,199,89,.1);color:#1a8a3a':'background:var(--n100,#E5E5EA);color:var(--n400,#AEAEB2)'}">${s.echo_enabled?'ON':'OFF'}</div>
@@ -4908,6 +4956,12 @@ function echoExpand() {
           <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:#FF385C;margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">Echo Observable Hint <span style="font-weight:var(--fw-normal);color:var(--n400,#AEAEB2);text-transform:none;letter-spacing:0">— Gemini ฟังอะไรใน audio</span></div>
           <textarea id="adm-f-obs" rows="3" placeholder="ฟัง: rep หยุดก่อนตอบไหม? น้ำเสียง defensive หรือ acknowledge ก่อน? ลูกค้า engage มากขึ้นหลังจาก rep ตอบไหม?" style="width:100%;padding:8px 11px;border:0.5px solid #FFB3BF;border-radius:var(--r-9);font-size:var(--text-base);color:#1C1C1E;outline:none;resize:vertical;font-family:inherit;line-height:1.5;background:rgba(255,56,92,.03)" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#FFB3BF'"></textarea>
         </div>
+        <!-- ECHO GOAL 2 / Phase M: role chips — which positions this skill is evaluated for -->
+        <div style="margin-bottom:13px">
+          <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);text-transform:uppercase;letter-spacing:.05em;color:var(--n900,#1C1C1E);margin-bottom:5px;font-family:'IBM Plex Mono','Noto Sans Thai',monospace">ประเมินสำหรับ Role</div>
+          <div id="adm-f-roles" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+          <div style="font-size:var(--text-xs);color:var(--n400,#AEAEB2);margin-top:6px">ไม่เลือกเลย = ประเมินทุกตำแหน่ง</div>
+        </div>
         <!-- Echo toggle -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;background:#F7F7F7;border-radius:var(--r-md);border:0.5px solid #E5E5EA;margin-bottom:18px">
           <div>
@@ -4941,10 +4995,31 @@ function echoExpand() {
     sl.style.background = '#34C759'; kn.style.transform = 'translateX(18px)';
   }
 
+  // ECHO GOAL 2 / Phase M: role chips — render active/inactive states from _admSelectedRoles
+  function _admRenderRoleChips() {
+    const box = document.getElementById('adm-f-roles');
+    if (!box) return;
+    box.innerHTML = ADM_ROLE_ORDER.map(r => {
+      const active = _admSelectedRoles.has(r);
+      return `<button type="button" data-role="${r}" onclick="admToggleRoleChip('${r}')" style="padding:6px 13px;border-radius:100px;font-size:var(--text-sm);font-weight:var(--fw-semi);cursor:pointer;font-family:'Noto Sans Thai',sans-serif;transition:background .12s,border-color .12s,color .12s;${
+        active ? 'border:0.5px solid #534AB7;background:rgba(83,74,183,.1);color:#534AB7'
+               : 'border:0.5px solid #E5E5EA;background:transparent;color:#636366'
+      }">${ADM_ROLE_LABEL[r]}</button>`;
+    }).join('');
+  }
+
+  window.admToggleRoleChip = function(role) {
+    if (_admSelectedRoles.has(role)) _admSelectedRoles.delete(role);
+    else _admSelectedRoles.add(role);
+    _admRenderRoleChips();
+  };
+
   window.admOpenModal = function(id) {
     _injectModal();
     _admEditing = id || null;
     const s = id ? _admSkills.find(x => String(x.id) === String(id)) : null;
+    _admSelectedRoles = new Set(Array.isArray(s?.roles) ? s.roles : []);
+    _admRenderRoleChips();
     document.getElementById('adm-m-title').textContent = s ? 'แก้ไข Skill' : 'เพิ่ม Skill ใหม่';
     document.getElementById('adm-m-sub').textContent = s ? s.skill_code : 'กรอกข้อมูล แล้วกด บันทึก';
     const codeEl = document.getElementById('adm-f-code');
@@ -4990,6 +5065,10 @@ function echoExpand() {
       pass_test_th:   document.getElementById('adm-f-pass').value.trim(),
       echo_observable:document.getElementById('adm-f-obs').value.trim(),
       echo_enabled:   document.getElementById('adm-f-echo').checked,
+      // ECHO GOAL 2 / Phase M: none selected OR all 4 selected both mean "all roles" —
+      // store NULL for both so it matches the column's own default semantics
+      roles: (_admSelectedRoles.size === 0 || _admSelectedRoles.size >= ADM_ROLE_ORDER.length)
+        ? null : Array.from(_admSelectedRoles),
     };
     if (!payload.skill_name_en) { _admToast('กรุณากรอกชื่อ Skill (EN)','warn'); btn.disabled=false; btn.textContent='บันทึก'; return; }
     try {

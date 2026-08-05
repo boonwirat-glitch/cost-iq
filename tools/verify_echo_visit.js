@@ -18,9 +18,10 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
-const ci  = SRC('09_conv_intel.js');
-const pv  = SRC('06_portview_teamview.js');
-const sk  = SRC('11_skills.js');
+const ci    = SRC('09_conv_intel.js');
+const pv    = SRC('06_portview_teamview.js');
+const sk    = SRC('11_skills.js');
+const core  = SRC('01_core.js');
 
 let pass = 0, fail = 0;
 function check(name, ok, detail) {
@@ -255,6 +256,46 @@ check('echo local map uses quarter window',
   /v\.ts>=qStart/.test(pv));
 check('server fetches widened to min(quarterStart, now-TTL)',
   (pv.match(/_visitFetchSinceIso\(\)/g) || []).length >= 3);
+
+console.log('\n[B] source locks — ECHO GOAL 2 Phase R (role-scoped rubric)');
+check('skillRoleBucket exists + covers all 4 buckets',
+  /function skillRoleBucket\(role\)\{/.test(core) &&
+  /sales_tl'\) return 'sales'/.test(core) &&
+  /ad_tl'\) return 'ad'/.test(core) &&
+  /r === 'pm'\) return 'pm'/.test(core));
+check('skillDefMatchesBucket treats null/empty roles as match-all',
+  /function skillDefMatchesBucket\(def, bucket\)\{[\s\S]{0,120}if\(!roles \|\| !roles\.length\) return true/.test(core));
+check('both new helpers exported to window', /window\.skillRoleBucket = skillRoleBucket/.test(core) && /window\.skillDefMatchesBucket = skillDefMatchesBucket/.test(core));
+check('sales_tl/ad_tl debrief branch uses skillRoleBucket (not hardcoded kam)',
+  /_ownerType = \(typeof skillRoleBucket === 'function'\) \? skillRoleBucket\(getCurrentRole\(\)\) : 'kam';/.test(ci));
+check('own-recording branch uses skillRoleBucket',
+  /_ownerType = \(typeof skillRoleBucket === 'function'\) \? skillRoleBucket\(role\)/.test(ci));
+check('rubric select carries roles column', /skill_code,skill_name_en,skill_name_th,principle_th,pass_test_th,echo_observable,echo_enabled,roles/.test(ci));
+check('_rubricCache is never filtered at load time (stays full set)',
+  /_rubricCache = data \|\| \[\];/.test(ci));
+check('_rubricForBucket helper filters via skillDefMatchesBucket',
+  /function _rubricForBucket\(bucket\) \{[\s\S]{0,200}skillDefMatchesBucket\(def, bucket\)/.test(ci));
+check('_callAnalyze filters rubric by ctx.ownerType bucket before sending',
+  /const _bucket = \(typeof skillRoleBucket === 'function'\) \? skillRoleBucket\(ctx\?\.ownerType\) : 'kam';/.test(ci) &&
+  /rubric: _rubricForSend, role: _bucket/.test(ci));
+check('_processBlob passes pinned _ctx into _callAnalyze',
+  /_callAnalyze\(segments, summaryResult, _ctx\)/.test(ci));
+check('_resumeAnalysis selects owner_type and re-buckets from the real row',
+  /pipeline_stage,owner_type/.test(ci) && /_ownerType = row\.owner_type \|\| _ownerType;/.test(ci));
+check('analyze response drops skill codes outside the sent rubric',
+  /const _sentCodes = new Set\(_rubricForSend\.map\(d => d\.skill_code\)\);/.test(ci) &&
+  /const _kept = _skills\.filter\(s => _sentCodes\.has\(s\.code\)\);/.test(ci));
+
+console.log('\n[B] source locks — ECHO GOAL 2 Phase M (Admin Rubric Manager role chips)');
+check('list row renders role badges via _admRoleBadges(s.roles)',
+  /\$\{s\.skill_name_en\|\|'—'\}\$\{_admRoleBadges\(s\.roles\)\}/.test(ci));
+check('modal has adm-f-roles chip container', /id="adm-f-roles"/.test(ci));
+check('admToggleRoleChip toggles Set membership + re-renders',
+  /window\.admToggleRoleChip = function\(role\) \{[\s\S]{0,150}_admRenderRoleChips\(\);/.test(ci));
+check('admOpenModal seeds _admSelectedRoles from the real row (not stale from a prior edit)',
+  /_admSelectedRoles = new Set\(Array\.isArray\(s\?\.roles\) \? s\.roles : \[\]\);/.test(ci));
+check('admSaveSkill: empty or all-4 selected both collapse to NULL',
+  /_admSelectedRoles\.size === 0 \|\| _admSelectedRoles\.size >= ADM_ROLE_ORDER\.length\)\s*\n?\s*\? null : Array\.from\(_admSelectedRoles\)/.test(ci));
 
 console.log('\n[B] source locks — 11_skills.js');
 check('visits fetch window = quarter start (35d hardcode gone)',

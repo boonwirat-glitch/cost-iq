@@ -49,6 +49,22 @@ function isADTLRole(role){ return normalizeRole(role) === 'ad_tl'; }
 function isADAny(role){ const r=normalizeRole(role); return r==='ad'||r==='ad_tl'; }
 // PM role helper (no pm_tl variant — see plan)
 function isPMRole(role){ return normalizeRole(role) === 'pm'; }
+// ECHO GOAL 2 / Phase R: collapses the 8 auth roles down to the 4 buckets
+// skill_definitions.roles is authored against. TL/admin bucket as 'kam' —
+// they coach/view the KAM-stack visit feed by default.
+function skillRoleBucket(role){
+  const r = normalizeRole(role);
+  if(r === 'sales' || r === 'sales_tl') return 'sales';
+  if(r === 'ad' || r === 'ad_tl') return 'ad';
+  if(r === 'pm') return 'pm';
+  return 'kam'; // rep, tl, admin
+}
+// skill_definitions.roles is NULL/empty = applies to every bucket (no filtering)
+function skillDefMatchesBucket(def, bucket){
+  const roles = def && def.roles;
+  if(!roles || !roles.length) return true;
+  return roles.indexOf(bucket) !== -1;
+}
 // v_echofix (2026-07-21): deleted isEchoUser — it was never called anywhere
 // and its role list (excluding tl/admin) contradicted the REAL gate,
 // NAV_CONFIG in 12_nav_config.js, which deliberately shows Echo to
@@ -102,6 +118,8 @@ try{
   window.isPMRole = isPMRole;
   window.isEchoUser = isEchoUser;
   window.roleLabel = roleLabel;
+  window.skillRoleBucket = skillRoleBucket;
+  window.skillDefMatchesBucket = skillDefMatchesBucket;
 }catch(e){}
 
 // v149: guarded splash transition + relogin runtime cleanup
