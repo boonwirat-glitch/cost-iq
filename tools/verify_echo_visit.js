@@ -239,6 +239,14 @@ check('dead _saveToSupabase removed', !/function _saveToSupabase/.test(ci));
 check('dead _mountPicker removed', !/function _mountPicker/.test(ci));
 check('dead _pickerSearch removed from exports', !/_pickerSearch,/.test(ci));
 
+console.log('\n[B] source locks — RECORD-HANG-DIAG (startRecording telemetry)');
+check('startRecording arms an 8s watchdog before getUserMedia',
+  /const _gumWatchdog = setTimeout\(\(\) => \{[\s\S]{0,150}ci_record_start_timeout/.test(ci));
+check('watchdog is cleared on both settle paths (success + catch)',
+  (ci.match(/_gumSettled = true; clearTimeout\(_gumWatchdog\);/g) || []).length >= 2);
+check('catch block reports ci_record_start_fail with err name+message',
+  /SenseSentinel\?\.report\('ci_record_start_fail', \(err\?\.name \|\| 'Error'\) \+ ':' \+ \(err\?\.message \|\| 'unknown'\)\)/.test(ci));
+
 console.log('\n[B] source locks — 06_portview_teamview.js');
 check('homework label carries (ไตรมาสนี้) on all 3 cards',
   (pv.match(/ทำการบ้าน \$\{visited\}\/\$\{g\.total\} \(ไตรมาสนี้\)/g) || []).length === 3);

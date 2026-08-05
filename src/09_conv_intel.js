@@ -984,8 +984,18 @@ body:not(.echo-active) { background:unset; }
   async function startRecording() {
     document.body.classList.add('echo-active');
     if (_phase !== 'idle') return;
+    // RECORD-HANG-DIAG: getUserMedia() has zero telemetry today — if it truly
+    // hangs (mic held by another process, browser deadlock) the promise never
+    // settles and the catch block below never runs, leaving no trace at all.
+    // This watchdog fires once even if getUserMedia eventually resolves late.
+    let _gumSettled = false;
+    const _gumWatchdog = setTimeout(() => {
+      if (_gumSettled) return;
+      try { window.SenseSentinel?.report('ci_record_start_timeout', 'getUserMedia not settled after 8s'); } catch(_) {}
+    }, 8000);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _gumSettled = true; clearTimeout(_gumWatchdog);
       const mime   = _bestMime();
       // audioBitsPerSecond:24000 — opus speech quality balanced with Gemini recognition accuracy
       _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 });
@@ -1026,7 +1036,11 @@ body:not(.echo-active) { background:unset; }
       }, 1000);
 
     } catch (err) {
+      _gumSettled = true; clearTimeout(_gumWatchdog);
       _phase = 'idle';
+      // RECORD-HANG-DIAG: this catch never wrote to app_errors before — only a
+      // toast the rep could dismiss/miss, leaving zero trace for diagnosis later
+      try { window.SenseSentinel?.report('ci_record_start_fail', (err?.name || 'Error') + ':' + (err?.message || 'unknown')); } catch(_) {}
       _toast(err.name === 'NotAllowedError' ? 'กรุณาอนุญาตไมโครโฟน' : 'เปิดไมค์ไม่ได้: ' + err.message);
     }
   }
