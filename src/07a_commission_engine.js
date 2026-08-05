@@ -982,7 +982,7 @@ function _commGetHandoverGmvTiers() {
 // in /nrr's nrrComputeHandoverForKam (nrr_commission.js) — keep both in sync,
 // this is the SECOND place these two functions must match exactly (see the
 // divergence-bug note there).
-function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
+function _commComputeHandoverRetention(kamEmail, planCode, previewResolver, periodOverride) {
   // V3 Tactic B:
   // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
   // - Filter: prevOwner === 'SALE' เท่านั้น (PM/ADMIN/KAM ไม่นับ)
@@ -990,7 +990,8 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
   // - Current: perf_gmv (GMV เดือน M+1) normalize ÷ perfDays × 30
   // - Window: transfer_month = เดือนก่อน (M-1) เท่านั้น
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
-                  tier:0, payout:0, detail:[], gmv_tier_label:null, gmv_bucket_gmv:0 };
+                  tier:0, payout:0, detail:[], gmv_tier_label:null, gmv_bucket_gmv:0,
+                  data_missing:false };
   try {
     const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
               ? bulkHandoverData : { byNewKamName:{} };
@@ -1000,11 +1001,29 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
     const kamName = pvAccounts.length ? (pvAccounts[0].kamName || '') : '';
     if (!kamName) return EMPTY;
 
-    // current month label เพื่อระบุ transfer_month = เดือนก่อน
-    const now = new Date();
-    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonthLabel = prevMonth.getFullYear() + '-' +
-                           String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
+    // v_hofix: transfer_month ต้องอิง "งวดที่กำลังคิด" ไม่ใช่นาฬิกาเครื่อง
+    // ก.ค. ถูกล็อกตอน 1 ส.ค. → นาฬิกาให้ prevMonthLabel='2026-07' แต่ไฟล์ตอนนั้น
+    // ยังเป็นรอบที่มี '2026-06' → filter ได้ 0 แถว → KAM ทั้ง 14 คนล็อกที่ ฿0
+    // (ยืนยันจาก snapshot จริง: payout 0 + detail [] ทุกแถว)
+    // ไม่ส่ง periodOverride มา = เดินทางเดิมด้วยนาฬิกาเครื่องเป๊ะ (เดือนสดไม่เปลี่ยนพฤติกรรม)
+    let prevMonthLabel;
+    if (periodOverride && /^\d{4}-\d{2}$/.test(periodOverride)) {
+      const _pp = String(periodOverride).split('-');
+      const _pd = new Date(Number(_pp[0]), Number(_pp[1]) - 1 - 1, 1); // -1 index, -1 เดือนก่อน
+      prevMonthLabel = _pd.getFullYear() + '-' + String(_pd.getMonth() + 1).padStart(2, '0');
+    } else {
+      const now = new Date();
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      prevMonthLabel = prevMonth.getFullYear() + '-' +
+                       String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
+    }
+
+    // v_hofix: เช็คระดับไฟล์ว่าเดือนเป้าหมายมีอยู่ในไฟล์มั้ย — "ไฟล์ไม่มีเดือนนี้เลย"
+    // (ข้อมูลขาด) ต้องแยกออกจาก "มีข้อมูลแต่ retention ไม่ถึงเกณฑ์" (฿0 จริง)
+    // ไม่งั้นพอล็อกงวดไปแล้วจะแยกสองกรณีนี้ไม่ออกตลอดกาล — ซึ่งคือสิ่งที่เกิดกับ ก.ค.
+    const _allHoRows = (hd.rows && hd.rows.length) ? hd.rows : [];
+    const _monthPresent = _allHoRows.some(r => (r.transferMonth || '') === prevMonthLabel);
+    const MISSING = Object.assign({}, EMPTY, { data_missing: true });
 
     // ดึงร้านที่โอนมาหา KAM นี้ จาก Q10 V3
     const hoRows = (hd.byNewKamName && hd.byNewKamName[kamName]) || [];
@@ -1015,7 +1034,7 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       r.transferMonth === prevMonthLabel
     );
 
-    if (!handoverRows.length) return EMPTY;
+    if (!handoverRows.length) return _monthPresent ? EMPTY : MISSING;
 
     // Normalize: daily rate × 30 เพื่อให้จำนวนวันแฟร์ทั้งสองฝั่ง
     let baselineNorm = 0, perfNorm = 0;
@@ -1095,7 +1114,8 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       retention_pct:  retentionPct,
       tier, payout, detail,
       gmv_tier_label: gmvTierLabel,
-      gmv_bucket_gmv: Math.round(baselineNorm)
+      gmv_bucket_gmv: Math.round(baselineNorm),
+      data_missing:   false   // v_hofix: มีข้อมูลจริงถึงมาถึงบรรทัดนี้ได้
     };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
@@ -1407,7 +1427,10 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
                handover: { payout: 0 }, gate: { cap_multiplier: 1, gate_active: false },
                subtotal: 0, gate_cap: 1, final_payout: 0 };
     }
-    const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver); // MoM always — do not touch
+    // v_hofix: ส่ง periodOverride เข้าไปด้วย — เดิมเป็น component เดียวที่ตกหล่น
+    // (บรรทัดเหนือขึ้นไป upsell ได้รับอยู่แล้ว) ทำให้คิดงวดย้อนหลังด้วยนาฬิกาเครื่อง
+    // เจตนาเดิม "MoM always" ยังอยู่ครบ: ไม่มี periodOverride = ใช้นาฬิกาเหมือนเดิม
+    const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver, periodOverride);
     const gate     = _commComputeGmvGate(kamEmail, pct, planCode, previewResolver);
 
     const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
@@ -3149,7 +3172,10 @@ function _commBuildSnapshotRows(periodOverride) {
                     payout: kamPayout.handover.payout,
                     detail: kamPayout.handover.detail,
                     gmv_tier_label: kamPayout.handover.gmv_tier_label,
-                    gmv_bucket_gmv: kamPayout.handover.gmv_bucket_gmv },
+                    gmv_bucket_gmv: kamPayout.handover.gmv_bucket_gmv,
+                    // v_hofix: ติดธงไว้ในตัว snapshot ว่า ฿0 นี้มาจาก "ไฟล์ไม่มีเดือนนี้"
+                    // หรือ "มีข้อมูลแต่ไม่ถึงเกณฑ์" — พอล็อกแล้วย้อนดูทีหลังจะแยกออก
+                    data_missing: !!kamPayout.handover.data_missing },
         components_subtotal: kamPayout.subtotal,
         gmv_gate: kamPayout.gate,
         final_payout: kamPayout.final_payout,
@@ -3280,7 +3306,8 @@ function _commBuildSnapshotRows(periodOverride) {
                     payout: personPayout.handover.payout,
                     detail: personPayout.handover.detail,
                     gmv_tier_label: personPayout.handover.gmv_tier_label,
-                    gmv_bucket_gmv: personPayout.handover.gmv_bucket_gmv },
+                    gmv_bucket_gmv: personPayout.handover.gmv_bucket_gmv,
+                    data_missing: !!personPayout.handover.data_missing },
         components_subtotal: personPayout.subtotal,
         gmv_gate: personPayout.gate,
         final_payout: personPayout.final_payout,

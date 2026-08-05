@@ -14,30 +14,38 @@
 
 WITH
 
+-- v_hofix (2026-08-06): เดิม CTE นี้คืน "แถวเดียว" = เดือนก่อนวันที่รัน ทำให้ไฟล์
+-- portview_handover.csv เก็บได้ครั้งละเดือนเดียวและถูกเขียนทับทุกครั้งที่รันใหม่
+-- ผลคือ: ตอนล็อกค่าคอมฯ ก.ค. (1 ส.ค.) engine ขอ transfer_month='2026-07' แต่ไฟล์
+-- ยังเป็นรอบเก่าที่มี '2026-06' → match 0 แถว → KAM ทั้ง 14 คนล็อกที่ handover ฿0
+-- ทั้งที่มีร้าน handover จริง 12 KAM · ตอนนี้คืนหลายแถว (เดือนละแถว) ทุก CTE ที่
+-- CROSS JOIN params อยู่แล้วจะ fan out ตามเดือนเอง → ไฟล์เดียวเก็บครบทุกเดือน
+-- ย้อนหลังได้ reconcile ได้ และไม่มีเดือนไหนหายอีก
 params AS (
   SELECT
-    -- lag_date: day-1 anchor (data pipeline lag = 1 day always)
-    -- ensures month boundary (e.g. Jun 1) sees May as perf_month, not empty June
-    DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)                                AS lag_date,
-    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH)             AS perf_month_start,
-    DATE_SUB(DATE_TRUNC(DATE_ADD(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH), INTERVAL 1 DAY)
-                                                                             AS perf_month_end,
-    FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY))          AS perf_month_label,
-    DATE_DIFF(
-      DATE_TRUNC(DATE_ADD(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH),
-      DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), DAY
-    )                                                                        AS perf_days_in_month,
+    lag.d                                                                    AS lag_date,
+    m                                                                        AS perf_month_start,
+    LAST_DAY(m, MONTH)                                                       AS perf_month_end,
+    FORMAT_DATE('%Y-%m', m)                                                  AS perf_month_label,
+    -- v_hofix: เดือนที่ยังไม่จบต้องหารด้วย "จำนวนวันที่ผ่านมาแล้ว" ไม่ใช่วันเต็มเดือน
+    -- ของเดิมใช้วันเต็มทุกกรณี → ไฟล์ที่รันวันที่ 6 ได้ retention แค่ ~1/5 ของจริง
+    -- ตกทุก tier กลายเป็น ฿0 ทั้งที่ร้านยังซื้อปกติ
+    CASE
+      WHEN m = DATE_TRUNC(lag.d, MONTH) THEN DATE_DIFF(lag.d, m, DAY) + 1
+      ELSE DATE_DIFF(DATE_ADD(m, INTERVAL 1 MONTH), m, DAY)
+    END                                                                      AS perf_days_in_month,
 
-    DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH)
-                                                                             AS prev_month_start,
-    DATE_SUB(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH), INTERVAL 1 DAY)
-                                                                             AS prev_month_end,
-    FORMAT_DATE('%Y-%m', DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH))
-                                                                             AS prev_month_label,
-    DATE_DIFF(
-      DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH),
-      DATE_TRUNC(DATE_SUB(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), INTERVAL 1 MONTH), MONTH), DAY
-    )                                                                        AS prev_days_in_month
+    DATE_SUB(m, INTERVAL 1 MONTH)                                            AS prev_month_start,
+    LAST_DAY(DATE_SUB(m, INTERVAL 1 MONTH), MONTH)                           AS prev_month_end,
+    FORMAT_DATE('%Y-%m', DATE_SUB(m, INTERVAL 1 MONTH))                      AS prev_month_label,
+    DATE_DIFF(m, DATE_SUB(m, INTERVAL 1 MONTH), DAY)                         AS prev_days_in_month
+  -- lag_date: day-1 anchor (data pipeline lag = 1 day always)
+  FROM (SELECT DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY) AS d) lag
+  CROSS JOIN UNNEST(GENERATE_DATE_ARRAY(
+    DATE '2026-05-01',                                   -- ไตรมาสที่ระบบเริ่มใช้จริง
+    DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY), MONTH),
+    INTERVAL 1 MONTH
+  )) AS m
 ),
 
 kam_name_list AS (
@@ -122,9 +130,13 @@ order_base AS (
     AND delivery_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH), MONTH)
 ),
 
+-- v_hofix: params เป็นหลายแถวแล้ว → ต้อง GROUP BY เดือนด้วย ไม่งั้นหน้าต่าง
+-- prev_month ของทุกเดือนจะถูกยุบรวมเป็นค่าเดียว (sale_order_count_prev_month
+-- และ prev_month_order_sales_owner จะผิดทันที)
 sale_evidence AS (
   SELECT
     ob.user_id,
+    p.perf_month_label,
     COUNTIF(ob.commercial_owner = 'SALE')                                   AS sale_order_count_all,
     COUNTIF(
       ob.commercial_owner = 'SALE'
@@ -147,7 +159,7 @@ sale_evidence AS (
 
   FROM order_base ob
   CROSS JOIN params p
-  GROUP BY 1
+  GROUP BY 1, 2
 ),
 
 gmv_by_user_month AS (
@@ -187,13 +199,17 @@ candidate AS (
       ELSE FALSE
     END                                                                      AS is_admin_freshket_owner,
     FORMAT_DATE('%Y-%m', p.prev_month_start)                                 AS transfer_month,
+    -- v_hofix: งวดที่แถวนี้เป็นของ (= เดือนที่วัด retention) พกไปให้ final join ต่อ
+    p.perf_month_label                                                       AS period_month,
     CASE
       WHEN umk.new_user_exp_date IS NOT NULL THEN umk.new_user_exp_date
       ELSE se.last_sale_order_date
     END                                                                      AS transfer_date
   FROM user_master_kam umk
   CROSS JOIN params p
-  LEFT JOIN sale_evidence se ON se.user_id = umk.user_id
+  -- v_hofix: join เดือนด้วย ไม่งั้นหยิบ sale_evidence ของเดือนอื่นมาปน
+  LEFT JOIN sale_evidence se
+    ON se.user_id = umk.user_id AND se.perf_month_label = p.perf_month_label
   WHERE
     (
       umk.new_user_exp_date IS NOT NULL
@@ -238,9 +254,12 @@ final AS (
     c.raw_kam_owner,
     c.raw_ka_owner,
     p.perf_days_in_month,
-    p.prev_days_in_month
+    p.prev_days_in_month,
+    c.period_month
   FROM candidate c
-  CROSS JOIN params p
+  -- v_hofix: เดิมเป็น CROSS JOIN ได้เพราะ params มีแถวเดียว · ตอนนี้หลายแถวแล้ว
+  -- ถ้ายัง CROSS JOIN อยู่จะได้ (แถว × จำนวนเดือน) ซ้ำทั้งหมด — ต้อง join ตรงเดือน
+  JOIN params p ON p.perf_month_label = c.period_month
   LEFT JOIN gmv_by_user_month base
     ON base.user_id = c.user_id AND base.month_label = c.transfer_month
   LEFT JOIN gmv_by_user_month perf
@@ -299,11 +318,17 @@ SELECT
   f.raw_kam_owner                                       AS kam_owner,
   f.raw_ka_owner                                        AS ka_owner,
   f.is_admin_freshket_owner,
-  'KEEP'                                                AS exclude_reason
+  'KEEP'                                                AS exclude_reason,
+  -- v_hofix: งวดที่แถวนี้เป็นของ (= เดือนที่วัด retention = transfer_month + 1)
+  -- ต่อท้ายเป็นคอลัมน์สุดท้ายเสมอ เพราะ parser ฝั่ง Sense อ่านด้วยตำแหน่ง p[0..16]
+  -- การแทรกกลางจะทำให้ทุกคอลัมน์เลื่อนและพังเงียบๆ · ฝั่ง /nrr อ่านด้วยชื่อหัวคอลัมน์
+  -- จึงรับตัวนี้ได้ฟรี · ตัว filter จริงยังใช้ transfer_month เหมือนเดิม ไม่เปลี่ยนความหมาย
+  f.period_month
 
 FROM final f
 
 ORDER BY
+  f.period_month,
   f.new_kam_name,
   f.baseline_gmv DESC,
   f.account_name;

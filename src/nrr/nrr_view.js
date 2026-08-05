@@ -4527,7 +4527,10 @@ function nrrExportCommissionDetailCsv() {
     var sku = bd.upsell_sku || {};
 
     rows.push([email, name, role, 'SUMMARY_NRR', '', '', '', '', '', '', '', bd.nrr_pct, bd.nrr_payout || 0]);
-    rows.push([email, name, role, 'SUMMARY_HANDOVER', '', '', '', '', '', (ho.accounts || 0) + ' ร้าน', '', ho.retention_pct, ho.payout || 0]);
+    // v_hofix: ธง data_missing ทำให้ ฿0 ที่มาจากข้อมูลขาด แยกออกจาก ฿0 จริงในไฟล์ export
+    rows.push([email, name, role, 'SUMMARY_HANDOVER', '', '', '', '', '',
+      ho.data_missing ? 'ไม่มีข้อมูลเดือนนี้ในไฟล์ (ไม่ใช่ ฿0 จริง)' : (ho.accounts || 0) + ' ร้าน',
+      '', ho.retention_pct, ho.payout || 0]);
     rows.push([email, name, role, 'SUMMARY_EXPANSION', '', '', '', '', '', '', outlet.outlet_gmv || 0, '', outlet.commission || 0]);
     rows.push([email, name, role, 'SUMMARY_P1', '', '', '', '', '', '', (sku.p1 && sku.p1.gmv) || 0, '', (sku.p1 && sku.p1.comm) || 0]);
     rows.push([email, name, role, 'SUMMARY_P3', '', '', '', '', '', '', (sku.p3 && sku.p3.gmv_incremental) || 0, '', (sku.p3 && sku.p3.comm) || 0]);
@@ -4865,6 +4868,14 @@ function nrrCommHandoverListHtml(ho) {
   } else if (gmvTiers.length && ho && ho.gmv_bucket_gmv != null) {
     headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
       '<span class="ds-row-meta">ยอด handover ' + nrrFmtGMVExact(ho.gmv_bucket_gmv) + ' ต่ำกว่า tier ต่ำสุด → ฿0</span></div>';
+  }
+  // v_hofix: "ไฟล์ไม่มีข้อมูลเดือนนี้" ≠ "เดือนนี้ไม่มีร้าน handover" — ข้อความเดิม
+  // อันเดียวพูดแทนทั้งสองกรณี ทำให้ ก.ค. ที่ข้อมูลขาดอ่านดูเหมือนไม่มีใคร handover เลย
+  // ทั้งที่จริงมี 12 KAM · ต้นเหตุ: portview_handover.csv เก็บได้เดือนเดียว เขียนทับทุกรอบ
+  if (ho && ho.data_missing) {
+    return headerHtml + '<div class="ds-empty" style="padding:8px 0">' +
+      '<div class="ds-empty-title">ไม่มีข้อมูล handover ของเดือนนี้ในไฟล์</div>' +
+      '<div class="ds-empty-desc">portview_handover.csv เก็บได้ครั้งละเดือนเดียว — ต้องรัน Q10 ใหม่ให้ครอบเดือนนี้ก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
   }
   if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
   return headerHtml + detail.map(function (d) {

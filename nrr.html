@@ -6143,19 +6143,28 @@ function _nrrPrevMonthOf(period) {
 // SECOND place these two functions must match exactly (see the divergence-
 // bug note in nrrEstimateKamCommission below, from the first one).
 function nrrComputeHandoverForKam(kamEmail, period) {
-  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [], gmv_tier_label: null, gmv_bucket_gmv: 0 };
+  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [], gmv_tier_label: null, gmv_bucket_gmv: 0, data_missing: false };
   var qd = window.bulkQnrrData;
   var kamRows = (qd && qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
   var kamName = kamRows.length ? (kamRows[0].latest_staff_owner || '') : '';
-  if (!kamName || !nrrHandoverCsvCache.loaded) return EMPTY;
+  // v_hofix: ไฟล์โหลดไม่ได้ = ไม่มีข้อมูล ไม่ใช่ ฿0 จริง
+  if (!nrrHandoverCsvCache.loaded) return Object.assign({}, EMPTY, { data_missing: true });
+  if (!kamName) return EMPTY;
 
   var prevMonth = _nrrPrevMonthOf(period);
+  // v_hofix: เช็คระดับไฟล์ก่อน — portview_handover.csv เก็บได้เดือนเดียวและถูกเขียนทับ
+  // ทุกครั้งที่รัน Q10 ใหม่ ถ้าเดือนที่ขอไม่อยู่ในไฟล์เลย นั่นคือ "ข้อมูลขาด"
+  // ต้องบอกให้ชัด ไม่ใช่โชว์ ฿0 ซึ่งอ่านแล้วเข้าใจว่า "เดือนนี้ไม่มีใครได้"
+  var monthPresent = nrrHandoverCsvCache.rows.some(function (r) {
+    return (r.transfer_month || '') === prevMonth;
+  });
+
   var rows = nrrHandoverCsvCache.rows.filter(function (r) {
     return (r.new_kam_name || '').trim() === kamName &&
       (r.prev_owner || '').toUpperCase() === 'SALE' &&
       (r.transfer_month || '') === prevMonth;
   });
-  if (!rows.length) return EMPTY;
+  if (!rows.length) return monthPresent ? EMPTY : Object.assign({}, EMPTY, { data_missing: true });
 
   var baselineNorm = 0, perfNorm = 0, baselineGmv = 0, currentGmv = 0;
   var detail = rows.map(function (r) {
@@ -6201,7 +6210,8 @@ function nrrComputeHandoverForKam(kamEmail, period) {
   }
 
   return { accounts: rows.length, baseline_gmv: baselineGmv, current_gmv: currentGmv, retention_pct: retentionPct,
-           payout: payout, detail: detail, gmv_tier_label: gmvTierLabel, gmv_bucket_gmv: Math.round(baselineNorm) };
+           payout: payout, detail: detail, gmv_tier_label: gmvTierLabel, gmv_bucket_gmv: Math.round(baselineNorm),
+           data_missing: false };  // v_hofix: มีข้อมูลจริงถึงมาถึงบรรทัดนี้ได้
 }
 window.nrrComputeHandoverForKam = nrrComputeHandoverForKam;
 
@@ -15501,7 +15511,10 @@ function nrrExportCommissionDetailCsv() {
     var sku = bd.upsell_sku || {};
 
     rows.push([email, name, role, 'SUMMARY_NRR', '', '', '', '', '', '', '', bd.nrr_pct, bd.nrr_payout || 0]);
-    rows.push([email, name, role, 'SUMMARY_HANDOVER', '', '', '', '', '', (ho.accounts || 0) + ' ร้าน', '', ho.retention_pct, ho.payout || 0]);
+    // v_hofix: ธง data_missing ทำให้ ฿0 ที่มาจากข้อมูลขาด แยกออกจาก ฿0 จริงในไฟล์ export
+    rows.push([email, name, role, 'SUMMARY_HANDOVER', '', '', '', '', '',
+      ho.data_missing ? 'ไม่มีข้อมูลเดือนนี้ในไฟล์ (ไม่ใช่ ฿0 จริง)' : (ho.accounts || 0) + ' ร้าน',
+      '', ho.retention_pct, ho.payout || 0]);
     rows.push([email, name, role, 'SUMMARY_EXPANSION', '', '', '', '', '', '', outlet.outlet_gmv || 0, '', outlet.commission || 0]);
     rows.push([email, name, role, 'SUMMARY_P1', '', '', '', '', '', '', (sku.p1 && sku.p1.gmv) || 0, '', (sku.p1 && sku.p1.comm) || 0]);
     rows.push([email, name, role, 'SUMMARY_P3', '', '', '', '', '', '', (sku.p3 && sku.p3.gmv_incremental) || 0, '', (sku.p3 && sku.p3.comm) || 0]);
@@ -15839,6 +15852,14 @@ function nrrCommHandoverListHtml(ho) {
   } else if (gmvTiers.length && ho && ho.gmv_bucket_gmv != null) {
     headerHtml = '<div class="ds-row" style="border-bottom:1px solid rgba(188,215,255,.10);padding-bottom:8px;margin-bottom:6px">' +
       '<span class="ds-row-meta">ยอด handover ' + nrrFmtGMVExact(ho.gmv_bucket_gmv) + ' ต่ำกว่า tier ต่ำสุด → ฿0</span></div>';
+  }
+  // v_hofix: "ไฟล์ไม่มีข้อมูลเดือนนี้" ≠ "เดือนนี้ไม่มีร้าน handover" — ข้อความเดิม
+  // อันเดียวพูดแทนทั้งสองกรณี ทำให้ ก.ค. ที่ข้อมูลขาดอ่านดูเหมือนไม่มีใคร handover เลย
+  // ทั้งที่จริงมี 12 KAM · ต้นเหตุ: portview_handover.csv เก็บได้เดือนเดียว เขียนทับทุกรอบ
+  if (ho && ho.data_missing) {
+    return headerHtml + '<div class="ds-empty" style="padding:8px 0">' +
+      '<div class="ds-empty-title">ไม่มีข้อมูล handover ของเดือนนี้ในไฟล์</div>' +
+      '<div class="ds-empty-desc">portview_handover.csv เก็บได้ครั้งละเดือนเดียว — ต้องรัน Q10 ใหม่ให้ครอบเดือนนี้ก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
   }
   if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
   return headerHtml + detail.map(function (d) {

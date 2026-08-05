@@ -54,17 +54,25 @@ function setGlobal(ctx, name, value) {
 // One row = one handover account. baselineGmv/perfGmv already daily-rate-
 // normalizable (baselineDays/perfDays default 30 so norm === raw here,
 // keeping the arithmetic in each test case easy to reason about).
-function makeSenseCtx(rows) {
+function makeSenseCtx(rows, opts) {
+  opts = opts || {};
   const ctx = { window: {}, document: domStub(), navigator: {}, localStorage: { getItem: () => null, setItem: () => {} }, console, setTimeout, clearTimeout };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/07a_commission_engine.js'), 'utf8'), ctx);
   setGlobal(ctx, '_tgtSettings', { handover_params: TARGET_CONFIG });
   setGlobal(ctx, 'portviewBulkData', [{ kamEmail: 'kam@test.co', kamName: 'TestKam' }]);
-  setGlobal(ctx, 'bulkHandoverData', { byNewKamName: { TestKam: rows.map(r => ({
+  // v_hofix: fixtureMonth lets a test put the file on a DIFFERENT month than the
+  // one being asked for — that is the exact real-world shape that silently zeroed
+  // July (file held June's export while the engine asked for July's transfers).
+  const fixtureMonth = opts.fixtureMonth || PREV_MONTH_LABEL;
+  const hoRows = rows.map(r => ({
     accountId: r.id, accountName: r.id, kamName: 'PrevKam', prevOwner: 'SALE',
-    transferMonth: PREV_MONTH_LABEL, baselineDays: 30, perfDays: 30,
+    transferMonth: fixtureMonth, baselineDays: 30, perfDays: 30,
     baselineGmv: r.baselineGmv, perfGmv: r.perfGmv
-  })) } });
+  }));
+  // `rows` (the flat file-level array) is what the data-gap check reads — the real
+  // parser in 07b_commission_history.js returns it alongside the byNewKamName index.
+  setGlobal(ctx, 'bulkHandoverData', { byNewKamName: { TestKam: hoRows }, rows: hoRows });
   // _commComputeHandoverRetention reads `new Date()` to derive prevMonthLabel —
   // override the context's Date so it always resolves to PREV_MONTH_LABEL,
   // matching the fixture's transferMonth regardless of when this runs.
@@ -72,7 +80,9 @@ function makeSenseCtx(rows) {
   return ctx;
 }
 
-function makeNrrCtx(rows) {
+function makeNrrCtx(rows, opts) {
+  opts = opts || {};
+  const fixtureMonth = opts.fixtureMonth || PREV_MONTH_LABEL;
   const ctx = { window: {}, console };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/nrr/nrr_commission.js'), 'utf8'), ctx);
@@ -80,7 +90,7 @@ function makeNrrCtx(rows) {
   ctx.window.bulkQnrrData = { byKamEmail: { 'kam@test.co': [{ latest_staff_owner: 'TestKam' }] } };
   setGlobal(ctx, 'nrrHandoverCsvCache', { loaded: true, rows: rows.map(r => ({
     account_id: r.id, account_name: r.id, new_kam_name: 'TestKam', prev_owner: 'SALE',
-    transfer_month: PREV_MONTH_LABEL, baseline_days_in_month: '30', perf_days_in_month: '30',
+    transfer_month: fixtureMonth, baseline_days_in_month: '30', perf_days_in_month: '30',
     baseline_gmv: String(r.baselineGmv), perf_gmv: String(r.perfGmv)
   })) });
   return ctx;
@@ -169,6 +179,77 @@ console.log('\nLegacy fallback (gmv_tiers empty/absent) → old flat 2-tier beha
   setGlobal(nrrCtx, 'nrrCommRatesCache', { loaded: true, byKey: {} }); // no handover_params at all -> nrrCommRateGet falls back to defaults
   const r2 = vm.runInContext('nrrComputeHandoverForKam("kam@test.co", "2026-07")', nrrCtx);
   check('  /nrr  legacy flat payout (retention 120% → t2+t3)', r2.payout, 5000);
+})();
+
+// ── v_hofix (2026-08-06) — period-awareness + data-gap flag ──────────────
+// Regression cover for the bug that made every KAM's July handover ฿0:
+// portview_handover.csv holds ONE transfer_month and is overwritten on every
+// Q10 run, and Sense derived that month from the WALL CLOCK rather than from
+// the period being computed. Locking July on 1 Aug therefore asked for July's
+// transfers while the file still held June's → 0 rows matched → silent ฿0.
+console.log('\n── v_hofix: period-aware transfer_month + data-gap flag ──');
+
+// FIXED_TODAY is 2026-07-16, so the wall-clock path resolves to 2026-06.
+// Asking for period 2026-08 must instead resolve to 2026-07 — a month the
+// fixture below deliberately holds, and which the wall clock would never pick.
+(function () {
+  const rows = oneAccountRows(50000, 120);
+  const ctx = makeSenseCtx(rows, { fixtureMonth: '2026-07' });
+  const withOverride = vm.runInContext('_commComputeHandoverRetention("kam@test.co", null, null, "2026-08")', ctx);
+  check('  Sense periodOverride 2026-08 → matches file month 2026-07, pays ฿5,000',
+    [withOverride.payout, withOverride.data_missing], [5000, false]);
+
+  // Same fixture, NO override: wall clock wants 2026-06, file has 2026-07 →
+  // no match. This is byte-for-byte the July production failure.
+  const noOverride = vm.runInContext('_commComputeHandoverRetention("kam@test.co")', ctx);
+  check('  Sense no override → wall-clock month, file has none → ฿0 + data_missing',
+    [noOverride.payout, noOverride.data_missing], [0, true]);
+})();
+
+// The live-month path must stay byte-identical to before this change: fixture
+// on the wall-clock month, no override passed → same payout as it always gave.
+(function () {
+  const ctx = makeSenseCtx(oneAccountRows(50000, 120));
+  const r = vm.runInContext('_commComputeHandoverRetention("kam@test.co")', ctx);
+  check('  Sense live month unchanged (no override, file on wall-clock month) → ฿5,000',
+    [r.payout, r.data_missing], [5000, false]);
+})();
+
+// data_missing must NOT fire when the month IS present but retention simply
+// misses every tier — that is a real ฿0 and has to stay distinguishable.
+(function () {
+  const ctx = makeSenseCtx(oneAccountRows(50000, 80));
+  const r = vm.runInContext('_commComputeHandoverRetention("kam@test.co")', ctx);
+  check('  Sense real ฿0 (retention 80%, month present) → data_missing stays false',
+    [r.payout, r.data_missing], [0, false]);
+
+  const nrrCtx = makeNrrCtx(oneAccountRows(50000, 80));
+  const r2 = vm.runInContext('nrrComputeHandoverForKam("kam@test.co", "2026-07")', nrrCtx);
+  check('  /nrr  real ฿0 (retention 80%, month present) → data_missing stays false',
+    [r2.payout, r2.data_missing], [0, false]);
+})();
+
+// /nrr asks for prevMonthOf(period); a file on any other month is a data gap.
+(function () {
+  const ctx = makeNrrCtx(oneAccountRows(50000, 120), { fixtureMonth: '2026-07' });
+  const r = vm.runInContext('nrrComputeHandoverForKam("kam@test.co", "2026-07")', ctx);
+  check('  /nrr  period 2026-07 wants 2026-06, file has 2026-07 → ฿0 + data_missing',
+    [r.payout, r.data_missing], [0, true]);
+
+  const r2 = vm.runInContext('nrrComputeHandoverForKam("kam@test.co", "2026-08")', ctx);
+  check('  /nrr  period 2026-08 wants 2026-07 → matches, pays ฿5,000',
+    [r2.payout, r2.data_missing], [5000, false]);
+})();
+
+// Both engines must agree on the same (period, file) pair — they are twins and
+// have silently diverged here before (Sense wall-clock vs /nrr period-relative).
+(function () {
+  const senseCtx = makeSenseCtx(oneAccountRows(50000, 120), { fixtureMonth: '2026-07' });
+  const s = vm.runInContext('_commComputeHandoverRetention("kam@test.co", null, null, "2026-08")', senseCtx);
+  const nrrCtx = makeNrrCtx(oneAccountRows(50000, 120), { fixtureMonth: '2026-07' });
+  const n = vm.runInContext('nrrComputeHandoverForKam("kam@test.co", "2026-08")', nrrCtx);
+  check('  cross-app same period 2026-08 → identical payout', s.payout, n.payout);
+  check('  cross-app same period 2026-08 → identical data_missing', !!s.data_missing, !!n.data_missing);
 })();
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

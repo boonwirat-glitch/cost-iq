@@ -510,19 +510,28 @@ function _nrrPrevMonthOf(period) {
 // SECOND place these two functions must match exactly (see the divergence-
 // bug note in nrrEstimateKamCommission below, from the first one).
 function nrrComputeHandoverForKam(kamEmail, period) {
-  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [], gmv_tier_label: null, gmv_bucket_gmv: 0 };
+  var EMPTY = { accounts: 0, baseline_gmv: 0, current_gmv: 0, retention_pct: 0, payout: 0, detail: [], gmv_tier_label: null, gmv_bucket_gmv: 0, data_missing: false };
   var qd = window.bulkQnrrData;
   var kamRows = (qd && qd.byKamEmail && qd.byKamEmail[kamEmail]) || [];
   var kamName = kamRows.length ? (kamRows[0].latest_staff_owner || '') : '';
-  if (!kamName || !nrrHandoverCsvCache.loaded) return EMPTY;
+  // v_hofix: ไฟล์โหลดไม่ได้ = ไม่มีข้อมูล ไม่ใช่ ฿0 จริง
+  if (!nrrHandoverCsvCache.loaded) return Object.assign({}, EMPTY, { data_missing: true });
+  if (!kamName) return EMPTY;
 
   var prevMonth = _nrrPrevMonthOf(period);
+  // v_hofix: เช็คระดับไฟล์ก่อน — portview_handover.csv เก็บได้เดือนเดียวและถูกเขียนทับ
+  // ทุกครั้งที่รัน Q10 ใหม่ ถ้าเดือนที่ขอไม่อยู่ในไฟล์เลย นั่นคือ "ข้อมูลขาด"
+  // ต้องบอกให้ชัด ไม่ใช่โชว์ ฿0 ซึ่งอ่านแล้วเข้าใจว่า "เดือนนี้ไม่มีใครได้"
+  var monthPresent = nrrHandoverCsvCache.rows.some(function (r) {
+    return (r.transfer_month || '') === prevMonth;
+  });
+
   var rows = nrrHandoverCsvCache.rows.filter(function (r) {
     return (r.new_kam_name || '').trim() === kamName &&
       (r.prev_owner || '').toUpperCase() === 'SALE' &&
       (r.transfer_month || '') === prevMonth;
   });
-  if (!rows.length) return EMPTY;
+  if (!rows.length) return monthPresent ? EMPTY : Object.assign({}, EMPTY, { data_missing: true });
 
   var baselineNorm = 0, perfNorm = 0, baselineGmv = 0, currentGmv = 0;
   var detail = rows.map(function (r) {
@@ -568,7 +577,8 @@ function nrrComputeHandoverForKam(kamEmail, period) {
   }
 
   return { accounts: rows.length, baseline_gmv: baselineGmv, current_gmv: currentGmv, retention_pct: retentionPct,
-           payout: payout, detail: detail, gmv_tier_label: gmvTierLabel, gmv_bucket_gmv: Math.round(baselineNorm) };
+           payout: payout, detail: detail, gmv_tier_label: gmvTierLabel, gmv_bucket_gmv: Math.round(baselineNorm),
+           data_missing: false };  // v_hofix: มีข้อมูลจริงถึงมาถึงบรรทัดนี้ได้
 }
 window.nrrComputeHandoverForKam = nrrComputeHandoverForKam;
 
