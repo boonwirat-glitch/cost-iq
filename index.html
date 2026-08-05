@@ -1,4 +1,4 @@
-<!-- Freshket Sense v953: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v956: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1314,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v953',
+      version: 'v956',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -56206,6 +56206,8 @@ let _skillViewMode = 'pending';  // TL: 'pending' | 'overview' | 'visits'
 let _ovToggle     = 'rep';     // TL overview: 'rep' | 'skill'
 let _tlSquad      = null;      // squad name of current TL (e.g. 'Tao', 'Yun')
 let _tlSquadEmails = [];       // emails of reps in TL's squad
+let _tlSquadRoles = {};        // ECHO GOAL 2 / Phase S: email(lowercase) -> raw role, roster-sourced
+let _tlSquadById  = {};        // ECHO GOAL 2 / Phase S: profiles.id -> {email,role,name}, roster-sourced
 let _tlBrowseMode = false;     // TL: true เมื่ออยู่ใน skill-card browse mode
 
 // ── Supabase helper ────────────────────────────────────────
@@ -56399,6 +56401,8 @@ async function _loadSkillProgress() {
 async function _loadTLSquad() {
   _tlSquad = null;
   _tlSquadEmails = [];
+  _tlSquadRoles = {};
+  _tlSquadById = {}; // ECHO GOAL 2 / Phase S: id -> {email,role,name} — roster-sourced, independent of progress rows
   try {
     // Get TL email — try multiple sources
     let tlEmail = '';
@@ -56408,8 +56412,10 @@ async function _loadTLSquad() {
       tlEmail = (data?.session?.user?.email || '').toLowerCase();
       if (data?.session?.access_token) window._skCachedJWT = data.session.access_token;
     }
-    // 2. window.currentUserProfile (may not be set)
-    if (!tlEmail) tlEmail = (window.currentUserProfile?.email || '').toLowerCase();
+    // 2. currentUserProfile (01_core.js `let` — never attached to window, so
+    // `window.currentUserProfile` here was always undefined; this step used to
+    // silently no-op and fall through to the localStorage/sessionStorage scan)
+    if (!tlEmail && typeof currentUserProfile !== 'undefined') tlEmail = (currentUserProfile?.email || '').toLowerCase();
     // 3. localStorage/sessionStorage fallback
     if (!tlEmail) {
       for (const storage of [localStorage, sessionStorage]) {
@@ -56428,10 +56434,15 @@ async function _loadTLSquad() {
     if (!squadName) {
       // v_echog1: admin ไม่มี squad — เดิมจบที่ "ไม่พบข้อมูลทีม" → ใช้ roster ทั้งบริษัทแทน
       if ((tlRow?.role || '').toLowerCase() === 'admin') {
-        const allRows = await _skFetch(`profiles?select=email&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam)`);
+        const allRows = await _skFetch(`profiles?select=id,email,role,full_name,kam_name&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam)`);
         _tlSquadEmails = (allRows || [])
           .map(r => (r.email || '').toLowerCase())
           .filter(e => e && e !== tlEmail);
+        (allRows || []).forEach(r => {
+          if (!r.email) return;
+          _tlSquadRoles[r.email.toLowerCase()] = r.role;
+          if (r.id) _tlSquadById[r.id] = { email: r.email.toLowerCase(), role: r.role, name: r.kam_name || r.full_name || '' };
+        });
         _tlSquad = 'ทั้งบริษัท';
         console.log('[Skills] admin org-wide roster:', _tlSquadEmails.length, 'reps');
         return;
@@ -56443,10 +56454,17 @@ async function _loadTLSquad() {
     // 2. Get all reps in same squad
     // v498: include ad/ad_tl in squad member query
     // pm also included, same squad-member treatment
-    const repRows = await _skFetch(`profiles?select=email&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm)`);
+    // ECHO GOAL 2 / Phase S: +id/name so the roster (not just progress rows) can
+    // seed the "By Rep" list — a rep with zero progress used to never appear
+    const repRows = await _skFetch(`profiles?select=id,email,role,full_name,kam_name&squad=eq.${encodeURIComponent(squadName)}&role=in.(sales,rep,sales_tl,tl,ad,ad_tl,pm)`);
     _tlSquadEmails = (repRows || [])
       .map(r => (r.email || '').toLowerCase())
       .filter(e => e && e !== tlEmail);
+    (repRows || []).forEach(r => {
+      if (!r.email) return;
+      _tlSquadRoles[r.email.toLowerCase()] = r.role;
+      if (r.id) _tlSquadById[r.id] = { email: r.email.toLowerCase(), role: r.role, name: r.kam_name || r.full_name || '' };
+    });
     console.log('[Skills] TL squad:', squadName, '| members:', _tlSquadEmails);
   } catch(e) {
     console.warn('[Skills] _loadTLSquad failed:', e.message);
@@ -56521,14 +56539,17 @@ async function _loadSkillUsers() {
   try {
     const uids = [...new Set(Object.values(_skillProg).map(p => p.user_id).filter(Boolean))];
     if (uids.length === 0) return;
-    const rows = await _skFetch(`profiles?select=id,email,full_name,kam_name&id=in.(${uids.join(',')})`);
+    // ECHO GOAL 2 / Phase S: +role so _skUserBucket() can resolve each rep's bucket by userId
+    const rows = await _skFetch(`profiles?select=id,email,full_name,kam_name,role&id=in.(${uids.join(',')})`);
     (rows || []).forEach(r => {
       if (!r.id) return;
       _skillUsers[r.id] = {
         full_name: r.kam_name || r.full_name || r.email || '',
         kam_name:  r.kam_name || r.full_name || '',
         email:     r.email || '',
+        role:      r.role || '',
       };
+      if (r.email && r.role) _tlSquadRoles[r.email.toLowerCase()] = r.role;
     });
     const bulk = (typeof portviewBulkData !== 'undefined' && portviewBulkData) || [];
     if (bulk.length > 0) {
@@ -56542,6 +56563,42 @@ async function _loadSkillUsers() {
   } catch(e) { console.error('[Skills] loadUsers:', e); }
 }
 
+// ── ECHO GOAL 2 / Phase S: role-bucket helpers ──────────────
+// _skillDefs itself is NEVER filtered — every helper below filters at the
+// point of use, matching the same "keep the full set, filter on read" rule
+// used for _rubricCache in 09_conv_intel.js (prevents silent-drop bugs).
+function _skBucketForEmail(email) {
+  const role = _tlSquadRoles[(email || '').toLowerCase()];
+  return (typeof skillRoleBucket === 'function') ? skillRoleBucket(role) : 'kam';
+}
+// Bucket for a specific rep being viewed by userId (TL contexts). _skillUsers
+// is progress-row-sourced (may not have a zero-progress rep yet) — _tlSquadById
+// is roster-sourced and covers everyone, so check it first.
+function _skUserBucket(userId) {
+  const email = _tlSquadById[userId]?.email || (_skillUsers[userId] && _skillUsers[userId].email) || '';
+  if (email) return _skBucketForEmail(email);
+  return (typeof skillRoleBucket === 'function') ? skillRoleBucket(_skillsRole) : 'kam';
+}
+// This viewer's own bucket (rep's own home screen)
+function _skOwnBucket() {
+  return (typeof skillRoleBucket === 'function') ? skillRoleBucket(_skillsRole) : 'kam';
+}
+function _skDefsForBucket(bucket) {
+  return _skillDefs.filter(d => (typeof skillDefMatchesBucket === 'function') ? skillDefMatchesBucket(d, bucket) : true);
+}
+// Rep's own scoped catalogue for home/module-grid/detail — TL "อ่าน Skills"
+// browse mode deliberately sees the FULL catalogue (they coach every role).
+function _skOwnScopedDefs() {
+  if (_tlBrowseMode) return _skillDefs;
+  return _skDefsForBucket(_skOwnBucket());
+}
+// Real role label for a rep being viewed (TL contexts) — replaces hardcoded "Sales"
+function _skUserRoleLabel(userId) {
+  const email = _tlSquadById[userId]?.email || (_skillUsers[userId] && _skillUsers[userId].email) || '';
+  const role = _tlSquadRoles[email.toLowerCase()];
+  if (role && typeof roleLabel === 'function') return roleLabel(role);
+  return 'KAM';
+}
 
 function _skUserName(userId) {
   if (!userId) return '?';
@@ -56551,7 +56608,12 @@ function _skUserName(userId) {
   // 2. fallback: _skillUsers (ถ้า profiles query สำเร็จ)
   const u = _skillUsers[userId];
   if (u) return u.kam_name || u.full_name || (u.email ? u.email.split('@')[0] : userId.slice(0,8));
-  // 3. last resort: UUID 8 chars
+  // 3. ECHO GOAL 2 / Phase S: roster fallback — a zero-progress rep has no
+  // _skillProg row and no _skillUsers entry (that map is progress-seeded), but
+  // still has a name via the squad roster query
+  const ru = _tlSquadById[userId];
+  if (ru) return ru.name || (ru.email ? ru.email.split('@')[0] : userId.slice(0,8));
+  // 4. last resort: UUID 8 chars
   return userId.slice(0,8);
 }
 
@@ -56574,7 +56636,10 @@ function _updateSkillsNavBadge() {
   if (!badge) return;
   const isTL = _skillsRole === 'sales_tl' || _skillsRole === 'tl' || _skillsRole === 'admin' || _skillsRole === 'ad_tl';
   if (!isTL) { badge.style.display = 'none'; return; }
-  const pending = Object.values(_skillProg).filter(p => p.state === 'training').length;
+  // ECHO GOAL 2 / Phase S: same squad-scoped base as _renderTLShell/_renderTLPendingContent
+  // — raw _skillProg can be the WHOLE org's rows when the squad-roster fetch fell back
+  // to loading everything, which used to make this badge overcount vs the tab it labels
+  const pending = Object.values(window._tlProgFiltered || _skillProg).filter(p => p.state === 'training').length;
   badge.style.display = pending > 0 ? 'block' : 'none';
 }
 
@@ -56634,7 +56699,7 @@ function _renderTLShell(scr) {
   const heroColor = pendCount === 0 ? 'var(--sk-ok)' : 'var(--sk-ac)';
   const heroLabel = pendCount === 0 ? 'ALL CLEAR' : 'PENDING';
   const repCount  = new Set(Object.values(_progFiltered).map(p => p.user_id).filter(Boolean)).size;
-  const squadName = _tlSquad || (window.currentUserProfile && window.currentUserProfile.squad) || 'Squad';
+  const squadName = _tlSquad || (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.squad) || 'Squad';
 
   window._tlProgFiltered = _progFiltered;
 
@@ -56851,22 +56916,31 @@ function _markLoadedImages(scr) {
 // ══════════════════════════════════════════════════════════
 
 function _renderRepHome() {
-  // Count unlocked+mastered
-  const unlocked = Object.values(_skillProg).filter(p => p.state === 'unlocked' || p.state === 'mastered').length;
-  const total    = _skillDefs.length;
+  // ECHO GOAL 2 / Phase S: own-scoped catalogue — a rep only sees skills that
+  // apply to their own role bucket. TL "อ่าน Skills" browse mode (_tlBrowseMode)
+  // is the one exception and sees the full catalogue via the same helper.
+  const scopedDefs = _skOwnScopedDefs();
+  const scopedIds  = new Set(scopedDefs.map(d => String(d.id)));
+
+  // Count unlocked+mastered — intersect with scope so a stray progress row for
+  // a skill outside this rep's current bucket (e.g. role re-scoped later by
+  // admin) can never inflate the count past scopedDefs.length
+  const unlocked = Object.entries(_skillProg)
+    .filter(([sid, p]) => scopedIds.has(sid) && (p.state === 'unlocked' || p.state === 'mastered')).length;
+  const total    = scopedDefs.length;
 
   // Find next skill in training
-  const trainingSkill = _skillDefs.find(d => {
+  const trainingSkill = scopedDefs.find(d => {
     const p = _skillProg[String(d.id)];
     return p && p.state === 'training';
   });
   const nextLabel = trainingSkill ? `${trainingSkill.skill_code.split('_')[0]} · ${trainingSkill.skill_name_en}` : '—';
   const pct = total > 0 ? Math.round(unlocked / total * 100) : 0;
 
-  // Group by module
-  const modules = ['A','B','C','D'];
+  // Group by module — skip modules with zero skills in scope (closes the 0/0 green-ring case)
+  const modules = ['A','B','C','D'].filter(m => scopedDefs.some(d => d.module === m));
   const moduleRows = modules.map(m => {
-    const defs = _skillDefs.filter(d => d.module === m);
+    const defs = scopedDefs.filter(d => d.module === m);
     const uCount = defs.filter(d => {
       const p = _skillProg[String(d.id)];
       return p && (p.state === 'unlocked' || p.state === 'mastered');
@@ -56875,7 +56949,7 @@ function _renderRepHome() {
       const p = _skillProg[String(d.id)];
       return p && p.state === 'training';
     }).length;
-    const meta = MODULE_META[m];
+    const meta = MODULE_META[m] || { name: m, sub: '', color: '#8E8E93' }; // guard: module outside A-D
     const ringPct = defs.length > 0 ? uCount / defs.length : 0;
     const ringOffset = 94.25 * (1 - ringPct);
     const ringColor = uCount === defs.length ? 'var(--sk-ok)' : tCount > 0 ? 'var(--sk-info)' : '#EBEBEB';
@@ -56957,9 +57031,19 @@ function skillsOpenModule(module) {
   _markLoadedImages(scr);
 }
 
+// ECHO GOAL 2 / Phase S: role badge — only rendered in TL browse mode (own-scoped
+// rep view has already filtered to a single bucket, so the badge is redundant there)
+const SK_ROLE_LABEL = { kam:'KAM', sales:'Sales', ad:'AD', pm:'PM' };
+function _skRoleBadgeHtml(def) {
+  if (!_tlBrowseMode) return '';
+  const roles = def && def.roles;
+  const label = (roles && roles.length) ? roles.map(r => SK_ROLE_LABEL[r] || r).join('/') : 'ALL';
+  return `<span class="sk-tl-role-chip" style="margin-left:auto">${label}</span>`;
+}
+
 function _renderModuleGrid(module) {
-  const meta = MODULE_META[module];
-  const defs = _skillDefs.filter(d => d.module === module);
+  const meta = MODULE_META[module] || { name: module, sub: '', color: '#8E8E93' }; // guard: module outside A-D
+  const defs = _skOwnScopedDefs().filter(d => d.module === module);
 
   const cards = defs.map(d => {
     const p     = _skillProg[String(d.id)];
@@ -56978,7 +57062,7 @@ function _renderModuleGrid(module) {
   </div>
   ${lockIco}${starIco}
   <div class="sk-card-body">
-    <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span></div>
+    <div class="sk-state-row"><div class="sk-dot"></div><span class="sk-state-label">${label}</span>${_skRoleBadgeHtml(d)}</div>
     <div class="sk-card-name">${d.skill_name_en}</div>
   </div>
 </div>`;
@@ -57037,8 +57121,11 @@ async function _doOpenDetail(skillId) {
   const scr = _switchSkillsScreen('detail');
   if (!scr) return;
 
-  const def   = _skillDefs.find(d => d.id === skillId);
-  if (!def) return;
+  // ECHO GOAL 2 / Phase S: own-scoped lookup — a deep link to a skill outside
+  // this rep's role bucket must not open (defense in depth; the card that would
+  // link here is already hidden by _renderRepHome/_renderModuleGrid)
+  const def   = _skOwnScopedDefs().find(d => d.id === skillId);
+  if (!def) { _renderSkillsScreen(); return; }
   const p     = _skillProg[String(skillId)];
   const state = p ? p.state : 'locked';
 
@@ -57210,7 +57297,8 @@ function _s3ToggleSheet() {
 // ── Rep self-mark training ─────────────────────────────────
 async function skillsStartTraining(skillId) {
   if (!_skillsUserId) return;
-  const def = _skillDefs.find(d => d.id === skillId);
+  // ECHO GOAL 2 / Phase S: block starting training on a skill outside this rep's bucket
+  const def = _skOwnScopedDefs().find(d => d.id === skillId);
   if (!def) return;
   // guard: ถ้า state ไม่ใช่ locked แล้ว ไม่ต้อง write ซ้ำ
   const existing = _skillProg[String(skillId)];
@@ -57349,6 +57437,10 @@ function _renderTLOverviewContent() {
   const bySkillToggle = _ovToggle === 'skill' ? 'sk-tab-on' : '';
 
   const userMap = {};
+  // ECHO GOAL 2 / Phase S: seed from the roster FIRST — a rep with zero progress
+  // rows (brand new, or hasn't self-marked anything yet) used to be silently
+  // absent from "By Rep" entirely since userMap was built purely from progress rows
+  Object.keys(_tlSquadById).forEach(uid => { userMap[uid] = []; });
   allProg.forEach(p => {
     if (!userMap[p.user_id]) userMap[p.user_id] = [];
     userMap[p.user_id].push(p);
@@ -57357,9 +57449,14 @@ function _renderTLOverviewContent() {
   let viewContent = '';
   if (_ovToggle === 'rep') {
     const repRows = Object.entries(userMap).map(([uid, progs]) => {
-      const uCount  = progs.filter(p => p.state==='unlocked'||p.state==='mastered').length;
-      const tCount  = progs.filter(p => p.state==='training').length;
-      const uTotal  = _skillDefs.length;
+      // ECHO GOAL 2 / Phase S: denominator is THIS rep's own role bucket, not
+      // the global skill count — a sales rep's ring is out of their ~4 sales
+      // skills, not all 15 (which used to make every non-KAM rep's % look low)
+      const scopedDefs = _skDefsForBucket(_skUserBucket(uid));
+      const scopedIds  = new Set(scopedDefs.map(d => d.id));
+      const uCount  = progs.filter(p => scopedIds.has(p.skill_id) && (p.state==='unlocked'||p.state==='mastered')).length;
+      const tCount  = progs.filter(p => scopedIds.has(p.skill_id) && p.state==='training').length;
+      const uTotal  = scopedDefs.length;
       const pct2    = uTotal > 0 ? Math.round(uCount/uTotal*100) : 0;
       const fillCls = pct2 >= 50 ? 'sk-rep-fill-ok' : pct2 >= 25 ? 'sk-rep-fill-mid' : 'sk-rep-fill-low';
       const pendDot = tCount > 0 ? '<div class="sk-rep-pend-dot"></div>' : '';
@@ -57381,11 +57478,20 @@ function _renderTLOverviewContent() {
     const skillRows = ['A','B','C','D'].map(m => {
       const defs = _skillDefs.filter(d => d.module === m);
       if (!defs.length) return '';
-      // userCount = จำนวน reps จริงในทีม ไม่ใช่จำนวนที่มี progress rows
-      const userCount = _tlSquadEmails.length > 0 ? _tlSquadEmails.length : (Object.keys(userMap).length || 1);
-      const hd = `<div class="sk-skill-mod-hd">Module ${m} — ${MODULE_META[m].sub}</div>`;
+      const hd = `<div class="sk-skill-mod-hd">Module ${m} — ${(MODULE_META[m]||{sub:''}).sub}</div>`;
       const rows = defs.map(d => {
-        const progs     = allProg.filter(p => p.skill_id === d.id);
+        // ECHO GOAL 2 / Phase S: denominator = squad members whose bucket this
+        // skill actually applies to, not the whole squad — a sales-only skill
+        // in a mostly-KAM squad used to read "0/8 คน" when only 2 were sales.
+        // No squad roster loaded (rare fallback) → keep the old unfiltered count.
+        const haveRoster = _tlSquadEmails.length > 0;
+        const eligibleEmails = haveRoster
+          ? _tlSquadEmails.filter(e => (typeof skillDefMatchesBucket === 'function') ? skillDefMatchesBucket(d, _skBucketForEmail(e)) : true)
+          : null;
+        if (haveRoster && eligibleEmails.length === 0) return ''; // no one in this squad is eligible — skip the row
+        const userCount = haveRoster ? eligibleEmails.length : (Object.keys(userMap).length || 1);
+        const progs     = allProg.filter(p => p.skill_id === d.id &&
+          (!haveRoster || eligibleEmails.includes((p.owner_email||'').toLowerCase())));
         const passCount = progs.filter(p => p.state==='unlocked'||p.state==='mastered').length;
         const pct3      = Math.round(passCount/userCount*100);
         const fillCls   = pct3 === 0 ? 'sk-skill-fill-zero' : pct3 < 40 ? 'sk-skill-fill-low' : 'sk-skill-fill-ok';
@@ -57443,8 +57549,15 @@ ${viewContent}`;
 async function skillsTLOpenEval(userId, skillId) {
   const scr = document.getElementById('scr-skills');
   if (!scr) return;
+  // Full-list lookup (not _skOwnScopedDefs) — TL evaluates any rep, any role
   const def   = _skillDefs.find(d => d.id === skillId);
   if (!def) return;
+  // ECHO GOAL 2 / Phase S: block evaluating a skill outside the VIEWED rep's
+  // bucket (can happen via a stale progress row from before a role change)
+  if (typeof skillDefMatchesBucket === 'function' && !skillDefMatchesBucket(def, _skUserBucket(userId))) {
+    _skToast(`${def.skill_code.split('_')[0]} ไม่ได้ประเมินสำหรับตำแหน่งของ ${_skUserName(userId)}`);
+    return;
+  }
   const key   = `${userId}:${skillId}`;
   const p     = _skillProg[key];
   const state = p ? p.state : 'locked';
@@ -57530,7 +57643,7 @@ async function skillsTLOpenEval(userId, skillId) {
       <div class="sk-tl-avatar">${_skUserInitials(userId)}</div>
       <div>
         <div class="sk-tl-rep-name">${_skUserName(userId)}</div>
-        <div class="sk-tl-rep-meta">Sales · self-marked ${p&&p.updated_at?new Date(p.updated_at).toLocaleDateString('th-TH'):''}</div>
+        <div class="sk-tl-rep-meta">${_skUserRoleLabel(userId)} · self-marked ${p&&p.updated_at?new Date(p.updated_at).toLocaleDateString('th-TH'):''}</div>
       </div>
     </div>
     <div class="sk-tl-state-label">Mark as</div>
@@ -57633,28 +57746,23 @@ async function skillsTLSave(userId, skillId) {
 }
 
 // ── TL rep detail ──────────────────────────────────────────
-function skillsTLOpenRepDetail(userId) {
-  const scr = document.getElementById('scr-skills');
-  if (!scr) return;
-  const progs    = Object.values(_skillProg).filter(p => p.user_id === userId);
-  const uCount   = progs.filter(p => p.state==='unlocked'||p.state==='mastered').length;
-  const uTotal   = _skillDefs.length;
-  const ringPct  = uTotal > 0 ? uCount/uTotal : 0;
-  const ringOff  = 94.25*(1-ringPct);
-  let   showAll  = false;
-
-  const renderList = (all) => {
-    const filtered = all
-      ? _skillDefs
-      : _skillDefs.filter(d => {
-          const p = progs.find(p => p.skill_id === d.id);
-          return !p || p.state === 'locked' || p.state === 'training';
-        });
-    return filtered.map(d => {
-      const p = progs.find(p => p.skill_id === d.id);
-      const s = p ? p.state : 'locked';
-      const code = d.skill_code.split('_')[0];
-      return `
+// ECHO GOAL 2 / Phase S: single shared row-list builder — scoped to the VIEWED
+// rep's own bucket. Replaces two near-identical copies (skillsTLOpenRepDetail's
+// inline renderList + _skRepFilter) that had drifted into subtle duplication.
+function _skRepDetailRows(userId, showAll) {
+  const progs  = Object.values(_skillProg).filter(p => p.user_id === userId);
+  const scoped = _skDefsForBucket(_skUserBucket(userId));
+  const filtered = showAll
+    ? scoped
+    : scoped.filter(d => {
+        const p = progs.find(p => p.skill_id === d.id);
+        return !p || p.state === 'locked' || p.state === 'training';
+      });
+  return filtered.map(d => {
+    const p = progs.find(p => p.skill_id === d.id);
+    const s = p ? p.state : 'locked';
+    const code = d.skill_code.split('_')[0];
+    return `
 <div class="sk-det-skill-row" onclick="skillsTLOpenEval('${userId}',${d.id})">
   <span class="sk-det-skill-mod">${code}</span>
   <span class="sk-det-skill-name">${d.skill_name_en}</span>
@@ -57663,8 +57771,22 @@ function skillsTLOpenRepDetail(userId) {
   </div>
   <svg style="width:12px;height:12px;opacity:.5;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
 </div>`;
-    }).join('');
-  };
+  }).join('');
+}
+
+function skillsTLOpenRepDetail(userId) {
+  const scr = document.getElementById('scr-skills');
+  if (!scr) return;
+  const progs    = Object.values(_skillProg).filter(p => p.user_id === userId);
+  // ECHO GOAL 2 / Phase S: ring denominator is THIS rep's own bucket, not the
+  // global skill count, and uCount intersects scope (guards stray progress
+  // rows left over from before a role change)
+  const scopedDefs = _skDefsForBucket(_skUserBucket(userId));
+  const scopedIds  = new Set(scopedDefs.map(d => d.id));
+  const uCount   = progs.filter(p => scopedIds.has(p.skill_id) && (p.state==='unlocked'||p.state==='mastered')).length;
+  const uTotal   = scopedDefs.length;
+  const ringPct  = uTotal > 0 ? uCount/uTotal : 0;
+  const ringOff  = 94.25*(1-ringPct);
 
   scr.innerHTML = `
 <div class="sk-cg-topbar">
@@ -57679,7 +57801,7 @@ function skillsTLOpenRepDetail(userId) {
     <div class="sk-rep-det-avatar">${_skUserInitials(userId)}</div>
     <div>
       <div class="sk-rep-det-name">${_skUserName(userId)}</div>
-      <div class="sk-rep-det-meta">Sales · ${uCount}/${uTotal} unlocked</div>
+      <div class="sk-rep-det-meta">${_skUserRoleLabel(userId)} · ${uCount}/${uTotal} unlocked</div>
     </div>
     <div style="position:relative;width:36px;height:36px;margin-left:auto;">
       <svg viewBox="0 0 36 36" style="width:36px;height:36px;transform:rotate(-90deg);">
@@ -57694,35 +57816,15 @@ function skillsTLOpenRepDetail(userId) {
     <span class="sk-fpill" id="fp-notyet" onclick="_skRepFilter(false,'${userId}')">ยังไม่ผ่าน</span>
     <span class="sk-fpill sk-fpill-on" id="fp-all" onclick="_skRepFilter(true,'${userId}')">ดูทั้งหมด</span>
   </div>
-  <div class="sk-det-skill-list" id="rep-det-list">${renderList(true)}</div>
+  <div class="sk-det-skill-list" id="rep-det-list">${_skRepDetailRows(userId, true)}</div>
   ${_buildEchoSparkSection(userId)}
 </div>`;
 }
 
 function _skRepFilter(all, userId) {
-  const progs = Object.values(_skillProg).filter(p => p.user_id === userId);
-  const filtered = all
-    ? _skillDefs
-    : _skillDefs.filter(d => {
-        const p = progs.find(p => p.skill_id === d.id);
-        return !p || p.state === 'locked' || p.state === 'training';
-      });
   const list = document.getElementById('rep-det-list');
   if (!list) return;
-  list.innerHTML = filtered.map(d => {
-    const p = progs.find(p => p.skill_id === d.id);
-    const s = p ? p.state : 'locked';
-    const code = d.skill_code.split('_')[0];
-    return `
-<div class="sk-det-skill-row" onclick="skillsTLOpenEval('${userId}',${d.id})">
-  <span class="sk-det-skill-mod">${code}</span>
-  <span class="sk-det-skill-name">${d.skill_name_en}</span>
-  <div class="sk-det-state" style="color:var(--sk-state-${s});">
-    <div class="sk-det-dot" style="background:${window._skStateDotColor ? window._skStateDotColor(d.skill_code, s) : `var(--sk-state-${s})`};"></div>${SKILL_STATE_LABEL_TH[s]}
-  </div>
-  <svg style="width:12px;height:12px;opacity:.5;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;margin-left:4px;" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-</div>`;
-  }).join('');
+  list.innerHTML = _skRepDetailRows(userId, all);
   document.querySelectorAll('.sk-fpill').forEach(el => el.classList.remove('sk-fpill-on'));
   const target = all ? document.getElementById('fp-all') : document.getElementById('fp-notyet');
   if (target) target.classList.add('sk-fpill-on');
@@ -57850,7 +57952,7 @@ function _buildEchoSparkSection(userId) {
   </div>
   ${sparkRows}
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;padding-top:6px;border-top:0.5px solid var(--sk-hairline,#EBEBEB);">
-    ${['A','B','C','D'].map(m => `<span style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:${MODULE_META[m].color};display:inline-block"></span>${MODULE_META[m].name.replace('The ','')}</span>`).join('')}
+    ${['A','B','C','D'].map(m => { const _mm = MODULE_META[m] || { name: m, color: '#8E8E93' }; return `<span style="display:flex;align-items:center;gap:4px;font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif"><span style="width:7px;height:7px;border-radius:50%;background:${_mm.color};display:inline-block"></span>${_mm.name.replace('The ','')}</span>`; }).join('')}
     <span style="font-size:var(--text-xs);color:var(--sk-muted,#6A6A6A);font-family:'Noto Sans Thai',sans-serif;margin-left:auto">สีเต็ม = ผ่าน · สีจาง = ยังไม่ผ่าน</span>
   </div>
 </div>`;

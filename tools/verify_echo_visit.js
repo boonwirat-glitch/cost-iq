@@ -297,6 +297,53 @@ check('admOpenModal seeds _admSelectedRoles from the real row (not stale from a 
 check('admSaveSkill: empty or all-4 selected both collapse to NULL',
   /_admSelectedRoles\.size === 0 \|\| _admSelectedRoles\.size >= ADM_ROLE_ORDER\.length\)\s*\n?\s*\? null : Array\.from\(_admSelectedRoles\)/.test(ci));
 
+console.log('\n[B] source locks — ECHO GOAL 2 Phase S (role-scoped Skills tab)');
+check('profiles selects carry role (+id/name for roster-seeding) in all 3 sites',
+  /profiles\?select=id,email,role,full_name,kam_name&role=in\.\(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam\)/.test(sk) &&
+  /profiles\?select=id,email,role,full_name,kam_name&squad=eq\./.test(sk) &&
+  /profiles\?select=id,email,full_name,kam_name,role&id=in\./.test(sk));
+check('_tlSquadById (roster id->email/role/name) populated at both squad-load sites',
+  /_tlSquadById\[r\.id\] = \{ email: r\.email\.toLowerCase\(\), role: r\.role, name: r\.kam_name \|\| r\.full_name \|\| '' \};/g.test(sk) &&
+  (sk.match(/_tlSquadById\[r\.id\] = /g) || []).length >= 2);
+check('_skUserBucket/_skUserRoleLabel/_skUserName check roster (_tlSquadById) before progress-sourced _skillUsers',
+  /const email = _tlSquadById\[userId\]\?\.email \|\| \(_skillUsers\[userId\]/.test(sk) &&
+  (sk.match(/_tlSquadById\[userId\]/g) || []).length >= 3);
+check('TL Overview "By Rep" seeds userMap from the roster before overlaying progress rows',
+  /Object\.keys\(_tlSquadById\)\.forEach\(uid => \{ userMap\[uid\] = \[\]; \}\);/.test(sk));
+check('bucket helpers present (_skBucketForEmail/_skUserBucket/_skOwnBucket/_skDefsForBucket/_skOwnScopedDefs/_skUserRoleLabel)',
+  /function _skBucketForEmail\(email\)/.test(sk) && /function _skUserBucket\(userId\)/.test(sk) &&
+  /function _skOwnBucket\(\)/.test(sk) && /function _skDefsForBucket\(bucket\)/.test(sk) &&
+  /function _skOwnScopedDefs\(\)/.test(sk) && /function _skUserRoleLabel\(userId\)/.test(sk));
+check('_skOwnScopedDefs returns full catalogue in TL browse mode',
+  /function _skOwnScopedDefs\(\) \{\s*\n\s*if \(_tlBrowseMode\) return _skillDefs;/.test(sk));
+check('_renderRepHome uses own-scoped defs (not raw _skillDefs) + skips empty modules',
+  /const scopedDefs = _skOwnScopedDefs\(\);/.test(sk) &&
+  /const modules = \['A','B','C','D'\]\.filter\(m => scopedDefs\.some/.test(sk));
+check('_renderModuleGrid + _doOpenDetail + skillsStartTraining all use own-scoped defs',
+  /const defs = _skOwnScopedDefs\(\)\.filter\(d => d\.module === module\);/.test(sk) &&
+  /const def   = _skOwnScopedDefs\(\)\.find\(d => d\.id === skillId\);/.test(sk) &&
+  /const def = _skOwnScopedDefs\(\)\.find\(d => d\.id === skillId\);/.test(sk));
+check('TL browse mode renders a role badge per card',
+  /function _skRoleBadgeHtml\(def\) \{\s*\n\s*if \(!_tlBrowseMode\) return '';/.test(sk));
+check('TL Overview by-rep uses per-rep bucket for denominator (not global skill count)',
+  /const scopedDefs = _skDefsForBucket\(_skUserBucket\(uid\)\);/.test(sk));
+check('TL Overview by-skill uses eligible-rep count, skips skills with zero eligible reps',
+  /const haveRoster = _tlSquadEmails\.length > 0;/.test(sk) &&
+  /if \(haveRoster && eligibleEmails\.length === 0\) return '';/.test(sk));
+check('skillsTLOpenEval blocks evaluating a skill outside the viewed rep\'s bucket',
+  /if \(typeof skillDefMatchesBucket === 'function' && !skillDefMatchesBucket\(def, _skUserBucket\(userId\)\)\)/.test(sk));
+check('rep-detail row builder deduped into one function used by both open + filter',
+  /function _skRepDetailRows\(userId, showAll\)/.test(sk) &&
+  /list\.innerHTML = _skRepDetailRows\(userId, all\);/.test(sk) &&
+  (sk.match(/_skRepDetailRows\(userId, (true|all)\)/g) || []).length >= 2);
+check('hardcoded "Sales ·" label replaced with real role label at both sites',
+  !/>Sales · /.test(sk) &&
+  (sk.match(/_skUserRoleLabel\(userId\)/g) || []).length >= 2);
+check('nav pending badge uses the same squad-scoped base as the pending tab',
+  /const pending = Object\.values\(window\._tlProgFiltered \|\| _skillProg\)\.filter\(p => p\.state === 'training'\)\.length;/.test(sk));
+check('MODULE_META lookups guarded against a module outside A-D',
+  (sk.match(/MODULE_META\[(m|module)\] \|\| \{/g) || []).length >= 3);
+
 console.log('\n[B] source locks — 11_skills.js');
 check('visits fetch window = quarter start (35d hardcode gone)',
   !/35 \* 86400000/.test(sk) && /const since = qStart.toISOString\(\)/.test(sk));
