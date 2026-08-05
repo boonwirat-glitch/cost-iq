@@ -487,6 +487,13 @@ check('client: needs card shows source chip (explicit vs implied) + suggested mo
 check('client: legacy rows without new fields collapse silently (backward compat)',
   /const needs = Array\.isArray\(d\?\.needs\) \? d\.needs : \[\];/.test(ci) &&
   /needsHtml = needs\.length \?/.test(ci));
+check('worker: cron sweep is the real engine (waitUntil ~30s kill found in live test)',
+  /async scheduled\(event, env, cfCtx\)/.test(worker) &&
+  /cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(worker) &&
+  /and\(pipeline_stage\.eq\.transcribed,status\.eq\.draft\)/.test(worker) &&
+  /limit=3/.test(worker));
+check('worker: cron path chains stages in-process (origin=null), HTTP path self-triggers',
+  /if \(origin\) \{[\s\S]{0,250}\} else \{\s*\n\s*await processSession\(sessionId, null, env\);/.test(worker));
 
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -1084,11 +1084,17 @@ async function processSession(sessionId, origin, env) {
       });
       await sbStorageDelete(env, row.audio_path).catch(() => {});
 
-      // fresh invocation for the analyze stage
-      await fetch(`${origin}/process`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId })
-      }).catch(() => {});
+      // continue to the analyze stage: from cron (origin=null) we have a full
+      // time budget, so just keep going in-process; from an HTTP trigger,
+      // self-trigger a fresh invocation instead
+      if (origin) {
+        await fetch(`${origin}/process`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        }).catch(() => {});
+      } else {
+        await processSession(sessionId, null, env);
+      }
     } catch (e) {
       // release the claim so the client sweep can retry this stage
       await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
@@ -1208,8 +1214,35 @@ async function processSession(sessionId, origin, env) {
   // other stages (checked_in / analyzed / no_speech): nothing to do
 }
 
+// ── Cron sweep (A2v2.2 hotfix, 2026-08-05) ───────────────────────────────────
+// Live test proved the HTTP-triggered waitUntil path gets hard-killed ~30s
+// after the 202 response — before the brain call (30-120s) can finish; the
+// claim stayed set and the catch never ran (kill, not exception). Cron
+// invocations get a full multi-minute budget, so the cron is the real engine
+// and /process (HTTP) is just a best-effort fast path for short jobs.
+// Requires a Cron Trigger on the worker: Settings → Triggers → "*/2 * * * *".
+async function sweepPending(env) {
+  const staleIso = new Date(Date.now() - PROCESS_CLAIM_STALE_MS).toISOString();
+  let rows = [];
+  try {
+    rows = await sbSelect(env,
+      `ci_sessions?select=id,pipeline_stage,status,processing_since` +
+      `&and=(or(pipeline_stage.eq.uploaded,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
+      `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}))` +
+      `&order=visited_at.asc&limit=3`);
+  } catch (_) { return; }
+  for (const r of rows) {
+    // sequential on purpose — bounded per tick; the next tick picks up the rest
+    try { await processSession(r.id, null, env); } catch (_) {}
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export default {
+  async scheduled(event, env, cfCtx) {
+    if (!env.SUPABASE_SERVICE_KEY) return;
+    cfCtx.waitUntil(sweepPending(env));
+  },
   async fetch(request, env, cfCtx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(env) });
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
