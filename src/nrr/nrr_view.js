@@ -63,6 +63,7 @@ async function nrrInitApp() {
     if (drillBtn) { nrrOpenCommissionDrawer(drillBtn.dataset.email, drillBtn.dataset.name, drillBtn.dataset.period); return; }
     var tabBtn = e.target.closest('.nrr-comm-tab');
     if (tabBtn) { nrrCommViewMode = tabBtn.dataset.mode; nrrRenderCommissionSection(); return; }
+    if (e.target.id === 'nrr-comm-export') { nrrExportCommissionDetailCsv(); return; }
   });
   document.getElementById('nrr-comm-strip').addEventListener('change', function (e) {
     if (e.target.id !== 'nrr-comm-period-select') return;
@@ -2949,6 +2950,7 @@ function nrrRenderCommissionSection() {
   if (nrrCommViewMode === 'full') {
     document.getElementById('nrr-comm-strip').innerHTML = '<div class="nrr-comm-ds">' + tabsHtml +
       '<select class="nrr-comm-period-select" id="nrr-comm-period-select"><option>กำลังโหลดเดือน...</option></select>' +
+      '<button type="button" class="btn-secondary" id="nrr-comm-export" style="margin-left:8px">Export CSV (รายละเอียดทุกคน)</button>' +
       '<div id="nrr-comm-fulltable-body"><div class="ds-skel" style="height:160px"></div></div>' +
       '</div>';
     nrrFetchAvailablePeriods().then(function (periods) {
@@ -4493,6 +4495,72 @@ function _nrrCommMoneyCell(comm, metaText) {
   var metaHtml = metaText ? '<div class="nrr-comm-cell-meta">' + metaText + '</div>' : '';
   return '<td>' + commHtml + metaHtml + '</td>';
 }
+
+// ── Full detail export (every beneficiary, this period) ──────────────────
+// One CSV with a SUMMARY row per beneficiary (any role) plus, for role=kam
+// only, exploded outlet/category-level rows underneath — reusing the exact
+// same sources the drawer now reads: nrrOutletsForKam() for NRR/Expansion
+// (has both account_id/account_name AND outlet_id/outlet_name — the branch
+// split the drawer can't show), bd.handover.detail for Handover (this data
+// model only ever carries account_id/name — no outlet split exists in what
+// the engine stored, so this export can't invent one either), and
+// bd.upsell_sku.{p1,p3}.groups for P1/P3 (category/SKU-group grain — the
+// locked snapshot never stored a per-outlet split for upsell either, so
+// this is the finest grain actually available for those two rows).
+function nrrExportCommissionDetailCsv() {
+  var period = nrrCommSelectedPeriod;
+  var cached = nrrCommPeriodCache[period];
+  if (!period || !cached || !cached.loaded || !cached.rows.length) return;
+
+  var headers = ['beneficiary_email', 'beneficiary_name', 'role', 'row_type',
+    'account_id', 'account_name', 'outlet_id', 'outlet_name', 'account_type',
+    'detail', 'gmv', 'applied_rate_or_retention_pct', 'amount'];
+  var rows = [];
+
+  cached.rows.forEach(function (r) {
+    var bd = r.breakdown || {};
+    var email = r.beneficiary_email;
+    var name = bd.kam_name || bd.team_lead_name || email;
+    var role = r.beneficiary_role;
+    var ho = bd.handover || {};
+    var outlet = bd.upsell_outlet || {};
+    var sku = bd.upsell_sku || {};
+
+    rows.push([email, name, role, 'SUMMARY_NRR', '', '', '', '', '', '', '', bd.nrr_pct, bd.nrr_payout || 0]);
+    rows.push([email, name, role, 'SUMMARY_HANDOVER', '', '', '', '', '', (ho.accounts || 0) + ' ร้าน', '', ho.retention_pct, ho.payout || 0]);
+    rows.push([email, name, role, 'SUMMARY_EXPANSION', '', '', '', '', '', '', outlet.outlet_gmv || 0, '', outlet.commission || 0]);
+    rows.push([email, name, role, 'SUMMARY_P1', '', '', '', '', '', '', (sku.p1 && sku.p1.gmv) || 0, '', (sku.p1 && sku.p1.comm) || 0]);
+    rows.push([email, name, role, 'SUMMARY_P3', '', '', '', '', '', '', (sku.p3 && sku.p3.gmv_incremental) || 0, '', (sku.p3 && sku.p3.comm) || 0]);
+    rows.push([email, name, role, 'SUMMARY_FINAL_PAYOUT', '', '', '', '', '', '', '', '', r.payout_amount || 0]);
+
+    if (role !== 'kam') return; // outlet-level split only meaningful per-KAM
+
+    var outlets = (typeof nrrOutletsForKam === 'function') ? nrrOutletsForKam(email, period) : [];
+    outlets.filter(function (o) { return ['core_nrr', 'core_nrr_churn', 'comeback', 'transfer_in'].indexOf(o.movement) > -1; })
+      .forEach(function (o) {
+        var row = o.row;
+        rows.push([email, name, role, 'NRR_OUTLET', row.account_id, row.account_name, row.outlet_id, row.res_name, row.account_type, o.movement, row.curr_gmv || 0, '', '']);
+      });
+    outlets.filter(function (o) { return o.movement === 'expansion'; })
+      .forEach(function (o) {
+        var row = o.row;
+        var gmv = parseFloat(row.curr_gmv) || 0;
+        rows.push([email, name, role, 'EXPANSION_OUTLET', row.account_id, row.account_name, row.outlet_id, row.res_name, row.account_type, 'expansion', gmv, 0.005, Math.round(gmv * 0.005)]);
+      });
+    (ho.detail || []).forEach(function (d) {
+      rows.push([email, name, role, 'HANDOVER_ACCOUNT(no_outlet_split)', d.account_id || '', d.name || '', '', '', '', d.transfer_month || '', d.current || 0, ho.retention_pct, '']);
+    });
+    ((sku.p1 && sku.p1.groups) || []).forEach(function (g) {
+      rows.push([email, name, role, 'P1_CATEGORY(no_outlet_split)', '', '', '', '', '', g.category + ' / ' + g.groupKey, g.total_gmv || 0, g.applied_rate, g.commission || 0]);
+    });
+    ((sku.p3 && sku.p3.groups) || []).forEach(function (g) {
+      rows.push([email, name, role, 'P3_CATEGORY(no_outlet_split)', '', '', '', '', '', g.category + ' / ' + g.groupKey, g.incremental || 0, g.applied_rate, g.commission || 0]);
+    });
+  });
+
+  nrrExportCsv('nrr-commission-detail-' + period + '.csv', headers, rows);
+}
+window.nrrExportCommissionDetailCsv = nrrExportCommissionDetailCsv;
 
 function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
   if (!kamRows.length) return '';
