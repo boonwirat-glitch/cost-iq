@@ -23,6 +23,7 @@ var nrrSlideoverOutlets = [];
 var nrrLastComparison = null;
 var nrrLastKamRows = null;
 var nrrLastTeamName = '';
+var nrrLastMovementVm = null;
 
 async function nrrInitApp() {
   var app = document.getElementById('nrr-app');
@@ -2059,7 +2060,8 @@ function nrrShellHtml() {
     '  <div class="nrr-section" id="nrr-sec-teams" style="animation-delay:.06s"><div class="nrr-takeaway micro" id="nrr-teams-takeaway"></div><div class="nrr-team-cards" id="nrr-team-cards"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-movement" style="animation-delay:.10s"><div class="nrr-panel-body">' +
     '    <div class="nrr-panel-head"><div class="h2" id="nrr-movement-title">Outlet Movement</div>' +
-    '    <div class="nrr-mv-switch"><div class="seg" id="nrr-mv-portfolio-seg"></div><span id="nrr-mv-secondary"></span></div></div>' +
+    '    <div class="nrr-mv-switch"><div class="seg" id="nrr-mv-portfolio-seg"></div><span id="nrr-mv-secondary"></span>' +
+    '    <button class="btn-secondary" id="nrr-mv-export" style="margin-left:8px;display:none">Export CSV</button></div></div>' +
     '    <div class="nrr-takeaway micro" id="nrr-movement-takeaway"></div>' +
     // v_segfilter: BOTH candidate homes for the segment tile strip exist as
     // stable, permanent containers; NRR_SEG_STRIP_PLACEMENT decides which one
@@ -2459,8 +2461,16 @@ function nrrRenderMovementSection() {
   // Resolve the view model FIRST — it normalizes null/invalid mvView state
   // (role defaults, vp fallback) that the switcher rendering depends on.
   var vm = nrrMovementViewModel();
+  nrrLastMovementVm = vm;
   nrrRenderMovementSwitcher();
   document.getElementById('nrr-movement-title').textContent = vm.title;
+  // Export is only wired for the KAM tab (org/team/individual) — that's the
+  // scope+row shape nrrMovementExportRows understands (rep_view columns +
+  // nrrClassifyRow). pm/admin/vp draw from a different CSV shape untested
+  // against this export, so the button stays hidden there rather than risk
+  // a silently-wrong file.
+  var exportBtn = document.getElementById('nrr-mv-export');
+  exportBtn.style.display = (nrrState.mvView.portfolio === 'kam' && vm.result) ? '' : 'none';
 
   var takeaway = document.getElementById('nrr-movement-takeaway');
   var bm = vm.result && vm.result.by_month[nrrState.period];
@@ -2644,6 +2654,7 @@ function nrrBindLeaderboardControls() {
     document.getElementById('nrr-copy-summary').addEventListener('click', function (e) {
       nrrCopyText(nrrBuildCopySummary(), e.target);
     });
+    document.getElementById('nrr-mv-export').addEventListener('click', nrrExportMovementOutlets);
   }
 }
 
@@ -2667,6 +2678,92 @@ function nrrExportKamsCsv() {
     ['KAM', '%NRR', 'Base GMV', 'ร้านค้า'],
     nrrLastKamRows.map(function (k) { return [k.kam_name, k.nrr_pct, k.base_gmv, k.outlet_count]; }));
 }
+
+// ── Movement panel export (Outlet Movement CSV) ──────────────────────────
+// Groups the SAME rows the on-screen table is built from (vm.result.by_month
+// [month].rows — already scope+segment filtered upstream in _qnrrCompute) by
+// outlet_id, across every quarter month, and classifies each cell with
+// nrrClassifyRow — the exact function the drill-down slide-over uses — so a
+// row in this file reconciles with what's on screen by construction rather
+// than by a second, parallel definition of "movement".
+function nrrMovementExportRows() {
+  var vm = nrrLastMovementVm;
+  if (!vm || !vm.result || nrrState.mvView.portfolio !== 'kam') return null;
+
+  var scope = vm.scopeCtx.scope;         // 'admin' | 'tl' | 'kam' — matches nrrClassifyRow's scope param
+  var myTlEmail = vm.scopeCtx.tlEmail || '';
+  var months = QNRR_CFG.q_months.filter(function (m) { return vm.result.by_month[m]; });
+  if (!months.length) return null;
+
+  var byOutlet = {};
+  months.forEach(function (month) {
+    var bm = vm.result.by_month[month];
+    (bm.rows || []).forEach(function (r) {
+      var oid = r.outlet_id;
+      if (!byOutlet[oid]) {
+        byOutlet[oid] = {
+          account_id: r.account_id, account_name: r.account_name || '',
+          outlet_id: oid, outlet_name: r.res_name || '', account_type: r.account_type || '',
+          cohort_month: r.cohort_month || '', current_owner: r.latest_staff_owner || '',
+          base_gmv: 0, perMonth: {}
+        };
+      }
+      byOutlet[oid].current_owner = r.latest_staff_owner || byOutlet[oid].current_owner;
+      byOutlet[oid].perMonth[month] = { row: r, movement: nrrClassifyRow(r, scope, myTlEmail) };
+    });
+  });
+
+  // Base-month GMV lives on the FIRST quarter-month's row (base_gmv/base_days
+  // fields), same convention _qnrrCompute's baseMap uses — see its comment on
+  // baseMonthRows. Later months' base_gmv can be stale/absent for the same
+  // outlet, so only the first month is trusted for this figure.
+  var baseMonthKey = months[0];
+  Object.keys(byOutlet).forEach(function (oid) {
+    var baseEntry = byOutlet[oid].perMonth[baseMonthKey];
+    if (baseEntry) byOutlet[oid].base_gmv = parseFloat(baseEntry.row.base_gmv) || 0;
+  });
+
+  return { months: months, outlets: byOutlet };
+}
+window.nrrMovementExportRows = nrrMovementExportRows;
+
+function nrrExportMovementOutlets() {
+  var built = nrrMovementExportRows();
+  if (!built) return;
+  var vm = nrrLastMovementVm;
+
+  var baseLabel = QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month;
+  var headers = ['account_id', 'account_name', 'outlet_id', 'outlet_name', 'account_type',
+    'cohort_month', 'KAM ปัจจุบัน', 'ฐาน (' + baseLabel + ') GMV'];
+  built.months.forEach(function (m) {
+    var label = QNRR_CFG.months_th[m] || m;
+    if (vm.result.by_month[m].is_partial) label += ' (MTD)';
+    headers.push(label + ' GMV', label + ' Movement');
+  });
+
+  var rows = Object.keys(built.outlets).map(function (oid) {
+    var o = built.outlets[oid];
+    var row = [o.account_id, o.account_name, o.outlet_id, o.outlet_name, o.account_type,
+      o.cohort_month, o.current_owner, o.base_gmv];
+    built.months.forEach(function (m) {
+      var pm = o.perMonth[m];
+      if (!pm) { row.push('', ''); return; }
+      // A null movement here means nrrClassifyRow neutralized this row for the
+      // current scope (e.g. a same-team KAM<->KAM transfer) — the on-screen
+      // drill-down drops it from the outlet list entirely, so the export
+      // shows it as excluded rather than printing a raw movement_type that
+      // never appears on screen.
+      row.push(pm.movement ? (parseFloat(pm.row.curr_gmv) || 0) : '',
+        pm.movement ? (MV_LABEL[pm.movement] || pm.movement) : 'ไม่นับ (ไม่กระทบ %NRR ขอบเขตนี้)');
+    });
+    return row;
+  });
+
+  var mv = nrrState.mvView;
+  var scopeTag = mv.kamKey === 'org' ? 'org' : mv.kamKey.replace(/[^a-zA-Z0-9]+/g, '-');
+  nrrExportCsv('nrr-movement-' + QNRR_CFG.quarter + '-' + scopeTag + '.csv', headers, rows);
+}
+window.nrrExportMovementOutlets = nrrExportMovementOutlets;
 
 function nrrBuildCopySummary() {
   var lines = ['NRR ' + QNRR_CFG.quarter.toUpperCase() + ' · ' + (QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ' — ' + (nrrProfile.role === 'admin' ? 'องค์กร' : nrrLastTeamName) +
