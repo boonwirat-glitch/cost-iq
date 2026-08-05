@@ -4663,8 +4663,57 @@ function nrrRenderCommissionDrawerBody(kamEmail, period) {
   if (!el) return;
   var bundle = nrrCommReceiptBundle(kamEmail, period, 'nrr-comm-drawer-p1-body', 'nrr-comm-drawer-p3-body');
   el.innerHTML = bundle.html;
-  nrrLoadCommissionUpsellSection(kamEmail, bundle.expansionOutletIds, bundle.bd);
+  if (bundle.bd) {
+    // v_periodfix: a locked period's P1/P3 groups are already frozen in
+    // bundle.bd.upsell_sku — render them directly (synchronous, no fetch).
+    // The live path below (nrrLoadCommissionUpsellSection) always pulls
+    // CURRENT-quarter live rates + a month-by-month pace timeline, which is
+    // wrong for a closed past period (e.g. it would show ก.ค.'s numbers with
+    // an "ส.ค. MTD" in-progress timeline glued on) — that machinery only
+    // makes sense for the live, still-open month, which has no bd yet.
+    var lists = nrrCommSnapshotUpsellListsHtml(bundle.bd);
+    var p1El = document.getElementById('nrr-comm-drawer-p1-body');
+    var p3El = document.getElementById('nrr-comm-drawer-p3-body');
+    if (p1El) p1El.innerHTML = lists.p1;
+    if (p3El) p3El.innerHTML = lists.p3;
+  } else {
+    nrrLoadCommissionUpsellSection(kamEmail, bundle.expansionOutletIds, bundle.bd);
+  }
 }
+
+// Locked-period P1/P3 group list — reads directly from the frozen
+// breakdown.upsell_sku.{p1,p3}.groups[] (category/groupKey/GMV/commission/
+// applied_rate, captured at lock time). No live fetch, no month-by-month
+// timeline — that concept (MTD/pace/projection) only applies to an open,
+// still-in-progress month; a locked month is one settled total.
+function nrrCommSnapshotUpsellListsHtml(bd) {
+  var sku = (bd && bd.upsell_sku) || {};
+  var p1 = (sku.p1 && sku.p1.groups) || [];
+  var p3 = (sku.p3 && sku.p3.groups) || [];
+  function rateTag(g) {
+    return g.applied_rate != null ? ' <span class="ds-row-meta">(' + (Number(g.applied_rate) * 100).toFixed(1) + '%)</span>' : '';
+  }
+  var p1Html = p1.length
+    ? p1.map(function (g) {
+        return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + rateTag(g) + '</span>' +
+          '<span class="ds-row-meta">' + nrrFmtGMVExact(g.total_gmv) + '</span>' +
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+      }).join('')
+    : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าใหม่ (P1) เดือนนี้</div></div>';
+  var p3Html = p3.length
+    ? p3.map(function (g) {
+        return '<div class="ds-row"><span class="ds-row-name">' + nrrEsc(g.groupKey) + rateTag(g) + '</span>' +
+          '<span class="ds-row-meta">โต +' + nrrFmtGMVExact(g.incremental) + '</span>' +
+          '<span class="ds-row-value">' + nrrFmtGMVExact(g.commission) + '</span></div>';
+      }).join('')
+    : '<div class="ds-empty"><div class="ds-empty-title">ไม่มีสินค้าที่เติบโต (P3) เดือนนี้</div></div>';
+  if (p1.length || p3.length) {
+    var noteHtml = '<div class="micro" style="padding:0 0 8px;color:var(--ink2)">ยอดที่ล็อกไว้จริงของเดือนนี้ ณ ตอนคำนวณ — ไม่ใช่ค่าประมาณ</div>';
+    p1Html = noteHtml + p1Html;
+  }
+  return { p1: p1Html, p3: p3Html };
+}
+window.nrrCommSnapshotUpsellListsHtml = nrrCommSnapshotUpsellListsHtml;
 
 // guardFn(email) -> bool: is this fetch still relevant to render? Defaults
 // to the drawer's own stale-guard (nrrCommDrawerState) — callers rendering
