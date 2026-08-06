@@ -194,6 +194,12 @@ function _qnrrCompute(kamEmail, scope, opts) {
 
   // ── Build baseMap from first period-month rows ──────────────────────────
   var baseMap = {};
+  // v_recon: หลักฐานการนับฐาน — บันทึกว่าแต่ละ outlet เข้า/ไม่เข้าฐาน "เพราะอะไร"
+  // เขียนคู่ไปกับการตัดสินจริงในลูปเดียวกัน จึงโกหกไม่ได้ (ถ้า logic เปลี่ยน
+  // audit เปลี่ยนตาม) · เป็น field เพิ่มล้วน ไม่แตะการคำนวณเดิมแม้แต่บรรทัดเดียว
+  // เหตุผลที่ต้องมี: ก่อนหน้านี้ไม่มีทางรู้เลยว่าเลขฐานบนจอประกอบด้วย outlet ไหนบ้าง
+  // ต้องมานั่งเดา/เขียนสูตรซ้ำข้างนอก ซึ่งคือต้นตอที่ทำให้เลขไม่ตรงกันหลายรอบ
+  var base_audit = [];
   var baseMonthRows = scopedRows.filter(function (r) { return r.period_month === months[0]; });
   baseMonthRows.forEach(function (r) {
     // transfer_in excluded (like handover): its base_gmv belongs to the
@@ -201,10 +207,25 @@ function _qnrrCompute(kamEmail, scope, opts) {
     // adjustment below. Effective (not raw) movement, so a same-team
     // KAM↔KAM move reclassified to core_nrr at tl/admin scope stays in the
     // base — it was this scope's outlet in the base month already.
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
-        && _effectiveMovement(r) !== 'transfer_in') {
+    var _eff = _effectiveMovement(r);
+    var _reason = '';
+    if (!(r.base_gmv > 0))                  _reason = 'base_gmv=0';
+    else if (baseMap[r.outlet_id])          _reason = 'duplicate_outlet';
+    else if (r.movement_type === 'handover') _reason = 'handover';
+    else if (_eff === 'transfer_in')        _reason = 'transfer_in (บวกกลับแยกด้านล่าง)';
+    if (!_reason) {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
+    base_audit.push({
+      outlet_id: r.outlet_id, account_id: r.account_id,
+      account_name: r.account_name || '', outlet_name: r.res_name || '',
+      account_type: r.account_type || '', cohort_month: r.cohort_month || '',
+      kam_email: r.latest_kam_email || '', kam_name: r.latest_staff_owner || '',
+      movement_type: r.movement_type, movement_effective: _eff || '(neutralized)',
+      base_gmv: parseFloat(r.base_gmv) || 0, base_days: parseFloat(r.base_days) || 31,
+      base_norm_30d: (parseFloat(r.base_gmv) || 0) / (parseFloat(r.base_days) || 31) * 30,
+      included: !_reason, exclude_reason: _reason
+    });
   });
 
   var base_gmv_original = 0;
@@ -287,10 +308,23 @@ function _qnrrCompute(kamEmail, scope, opts) {
     var seenOutlets = {};
     var nrr_curr_norm = 0;
     var core_nrr_base_sum = 0;
+    // v_recon: หลักฐานฝั่งตัวตั้ง — คู่กับ base_audit ด้านบน ทำให้เห็นเคสสำคัญที่สุด
+    // คือ outlet ที่ "อยู่ในตัวหารแต่ไม่อยู่ในตัวตั้ง" ซึ่งกด %NRR ลงโดยไม่มีใครเห็น
+    var numerator_audit = [];
 
     monthRows.forEach(function (r) {
       var mv = _effectiveMovement(r);
-      if (!mv) return;
+      if (!mv) {
+        numerator_audit.push({
+          outlet_id: r.outlet_id, account_id: r.account_id,
+          account_name: r.account_name || '', outlet_name: r.res_name || '',
+          movement_type: r.movement_type, movement_effective: '(neutralized)',
+          curr_gmv: parseFloat(r.curr_gmv) || 0, curr_days: parseFloat(r.curr_days) || 30,
+          curr_norm_30d: 0, counted: false, waived: false,
+          reason: 'neutralized (transfer ในทีมเดียวกัน ไม่นับทั้งสองฝั่ง)'
+        });
+        return;
+      }
       var base_d = parseFloat(r.base_days) || 31;
       var curr_d = parseFloat(r.curr_days) || 30;
       var gmvVal = (mv === 'core_nrr_churn' || mv === 'transfer_out')
@@ -310,12 +344,14 @@ function _qnrrCompute(kamEmail, scope, opts) {
       var waived = typeof nrrAccountWaivedForPeriod === 'function' &&
         nrrAccountWaivedForPeriod(r.account_id, month, r.outlet_id);
 
+      var _counted = false, _why = '';
       if (!waived && (mv === 'core_nrr' || mv === 'core_nrr_churn' || mv === 'transfer_in') && r.base_gmv > 0) {
         if (!seenOutlets[r.outlet_id]) {
           seenOutlets[r.outlet_id] = true;
           var curr_days = r.curr_days || 30;
           nrr_curr_norm += curr_days > 0 ? r.curr_gmv / curr_days : 0;
-        }
+          _counted = true; _why = mv;
+        } else { _why = 'duplicate_outlet'; }
       }
 
       // Comeback: pure upside added only to the numerator against an
@@ -327,8 +363,26 @@ function _qnrrCompute(kamEmail, scope, opts) {
           seenOutlets[r.outlet_id] = true;
           var curr_days_cb = r.curr_days || 30;
           nrr_curr_norm += curr_days_cb > 0 ? r.curr_gmv / curr_days_cb : 0;
-        }
+          _counted = true; _why = 'comeback';
+        } else { _why = 'duplicate_outlet'; }
       }
+      if (!_counted && !_why) {
+        _why = waived ? 'waived (ยกเว้นตามคำขอ)'
+             : (r.base_gmv > 0 ? 'ไม่อยู่ในนิยามตัวตั้ง: ' + mv
+                               : 'ไม่อยู่ในนิยามตัวตั้ง: ' + mv + ' + ไม่มียอดฐาน');
+      }
+      var _cd = parseFloat(r.curr_days) || 30;
+      numerator_audit.push({
+        outlet_id: r.outlet_id, account_id: r.account_id,
+        account_name: r.account_name || '', outlet_name: r.res_name || '',
+        account_type: r.account_type || '', cohort_month: r.cohort_month || '',
+        kam_email: r.latest_kam_email || '', kam_name: r.latest_staff_owner || '',
+        movement_type: r.movement_type, movement_effective: mv,
+        base_gmv: parseFloat(r.base_gmv) || 0,
+        curr_gmv: parseFloat(r.curr_gmv) || 0, curr_days: _cd,
+        curr_norm_30d: _cd > 0 ? (parseFloat(r.curr_gmv) || 0) / _cd * 30 : 0,
+        counted: _counted, waived: !!waived, reason: _why
+      });
     });
 
     // Waived-account base contribution removed per-month (unlike
@@ -366,7 +420,9 @@ function _qnrrCompute(kamEmail, scope, opts) {
     by_month[month] = {
       nrr_pct: nrr_pct, effective_base_norm: effectiveBaseNorm, total_gmv: total_gmv, segments: segments, outlets: outlets,
       rows: monthRows, curr_days: curr_days, days_in_month: daysInMonth,
-      is_partial: isPartial, core_nrr_base: core_nrr_base_sum, contraction: contraction
+      is_partial: isPartial, core_nrr_base: core_nrr_base_sum, contraction: contraction,
+      // v_recon: ตัวตั้งดิบ (ยังไม่หาร) เก็บไว้ให้ export กระทบยอดได้ตรงๆ
+      nrr_curr_norm: nrr_curr_norm, numerator_audit: numerator_audit
     };
   });
 
@@ -383,6 +439,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
     transfer_in_outlets: transfer_in_outlets,
     handover_base_norm: handover_base_norm,
     cohort_outlets: cohort_outlets,
+    // v_recon: หลักฐานว่าฐานประกอบด้วย outlet ไหนบ้าง + ตัวไหนถูกตัดเพราะอะไร
+    base_audit: base_audit,
     by_month: by_month
   };
 }
