@@ -7156,7 +7156,13 @@ function nrrWaiversPageHtml() {
     '<div class="nrr-waivers-kpi"><div class="num">' + revoked.length + '</div><div class="micro">เพิกถอนแล้ว</div></div>' +
     '</div>' +
     (rows.length
-      ? rows.map(function (r) { return nrrWaiverRowHtml(r, isAdmin); }).join('')
+      // v_waiverrow: ตารางแทน card — 1 คำขอ = 1 แถว + audit ครบ (ขอ/ตัดสิน โดยใคร เมื่อไหร่)
+      ? '<div style="overflow-x:auto;margin-top:12px"><table class="nrr-table"><thead><tr>' +
+        '<th>บริษัท</th><th>ขอบเขต</th><th>เดือน</th><th>สถานะ</th><th>เหตุผล</th>' +
+        '<th>ขอโดย</th><th>ตัดสินโดย</th><th></th>' +
+        '</tr></thead><tbody>' +
+        rows.map(function (r) { return nrrWaiverRowHtml(r, isAdmin); }).join('') +
+        '</tbody></table></div>'
       : '<div class="ds-empty" style="margin-top:12px"><div class="ds-empty-title">ยังไม่มีคำขอยกเว้น NRR</div></div>');
 }
 
@@ -7183,38 +7189,43 @@ function nrrWaiverRowHtml(r, isAdmin) {
   // ที่ Sense อีกทีเสมอ จึงต้องเตือนตรงนี้ให้ชัด ไม่งั้นจะเข้าใจว่าอนุมัติแล้วจบ
   // inline style ตามแบบเดิมของไฟล์นี้ — ไม่แตะ nrr_components.css เพื่อไม่ให้
   // การแก้เล็กๆ นี้ไปพันกับงานอื่นที่ยังค้างอยู่ในไฟล์ CSS นั้น
-  var lockedNote = '<div class="micro" style="color:var(--warn-text);background:var(--warn-dim);' +
-    'border:1px solid var(--warn-border);border-radius:8px;padding:6px 9px;margin-top:6px;line-height:1.45">' +
-    'เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — ตัดสินได้ แต่<b>ยอดที่ล็อกไว้จะยังไม่เปลี่ยน</b> ' +
-    'จนกว่าจะไปกด “คำนวณ %NRR ใหม่” ที่ Sense › Commission Cockpit › Lock</div>';
+  // v_waiverrow (backlog ข้อ 3+4): card → row ตาราง — การ์ดเดิมกินที่แนวตั้ง
+  // เยอะมาก (บุชชี้เอง) และไม่โชว์ audit trail ทั้งที่ DB มีครบ (requested_by/
+  // requested_at/reviewed_by/reviewed_at/review_note เขียนถูกอยู่แล้วทุก action)
+  // แถวล็อกแล้ว: เตือนย่อเป็น ⚠ + title แทน banner เต็ม (สาระเดิมครบ)
   var actions = '';
+  var lockWarn = locked
+    ? '<span class="tag muted" style="cursor:help" title="เดือน ' + nrrEsc(monthLabel) +
+      ' Lock แล้ว — ตัดสินได้ แต่ยอดที่ล็อกไว้จะยังไม่เปลี่ยน จนกว่าจะไปกด คำนวณ %NRR ใหม่ ที่ Sense › Commission Cockpit › Lock">⚠ lock</span> '
+    : '';
   if (isAdmin && r.status === 'submitted') {
-    actions = (locked ? lockedNote : '') +
-      '<div class="nrr-waiver-actions">' +
-      '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button>' +
-      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>' +
-      '</div>';
+    actions = lockWarn +
+      '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button> ' +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>';
   } else if (isAdmin && r.status === 'approved') {
     // เพิกถอนก็เข้าเส้นทางเดียวกัน — recompute จัดการได้เหมือนกันทุกประการ
-    actions = (locked ? lockedNote : '') +
-      '<div class="nrr-waiver-actions">' +
-      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>' +
-      '</div>';
+    actions = lockWarn +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>';
   }
-  return '<div class="nrr-waiver-card ' + r.status + '">' +
-    '<div class="nrr-waiver-top">' +
-    '<a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a>' +
-    '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
-    scopeTag +
-    '<span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span>' +
-    '</span>' +
-    '</div>' +
-    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
-    (r.target_tl_email ? ' · TL ' + nrrEsc(r.target_tl_email) : '') +
-    (r.target_kam_email ? ' · KAM ' + nrrEsc(r.target_kam_email) : '') + '</div>' +
-    (r.reason_text ? '<div class="micro" style="margin-top:4px;color:var(--ink2)">' + nrrEsc(r.reason_text) + '</div>' : '') +
-    actions +
-    '</div>';
+  // audit trail: ใครขอ/เมื่อไหร่ · ใครตัดสิน/เมื่อไหร่ — ตัด @domain ทิ้งให้อ่านสั้น
+  function _who(email) { return email ? nrrEsc(String(email).split('@')[0]) : '—'; }
+  function _when(ts) { return ts ? String(ts).slice(0, 10) : ''; }
+  var reviewedCell = r.reviewed_at
+    ? _who(r.reviewed_by) + '<div class="micro" style="color:var(--ink3)">' + _when(r.reviewed_at) + '</div>'
+    : '<span style="color:var(--ink3)">—</span>';
+  var reasonCell = nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
+    (r.reason_text ? '<div class="micro" style="color:var(--ink3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + nrrEsc(r.reason_text) + '">' + nrrEsc(r.reason_text) + '</div>' : '') +
+    (r.review_note ? '<div class="micro" style="color:var(--ink3)" title="หมายเหตุผู้ตัดสิน">✎ ' + nrrEsc(r.review_note) + '</div>' : '');
+  return '<tr>' +
+    '<td><a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a></td>' +
+    '<td>' + scopeTag + '</td>' +
+    '<td>' + nrrEsc(monthLabel) + '</td>' +
+    '<td><span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span></td>' +
+    '<td>' + reasonCell + '</td>' +
+    '<td>' + _who(r.requested_by) + '<div class="micro" style="color:var(--ink3)">' + _when(r.requested_at) + '</div></td>' +
+    '<td>' + reviewedCell + '</td>' +
+    '<td style="white-space:nowrap">' + actions + '</td>' +
+    '</tr>';
 }
 
 function nrrHandleWaiversClick(e) {
@@ -7274,16 +7285,22 @@ function nrrCloseWaiverExportMenu() {
 }
 
 function nrrWaiverExportRows(rows) {
-  var headers = ['บริษัท', 'ขอบเขต', 'เดือน', 'สถานะ', 'เหตุผล', 'หมายเหตุ', 'TL', 'KAM', 'วันที่ขอ'];
+  // v_waiverrow: audit trail ครบในไฟล์ (ขอโดย/เมื่อไหร่ · ตัดสินโดย/เมื่อไหร่ ·
+  // หมายเหตุผู้ตัดสิน) + outlet_id (res_id) สำหรับเอาไป mapping ต่อ — DB มีครบ
+  // อยู่แล้ว แค่ไม่เคยถูกพ่นออกมา
+  var headers = ['บริษัท', 'account_id', 'ขอบเขต', 'outlet_id', 'เดือน', 'สถานะ', 'เหตุผล', 'หมายเหตุ',
+    'TL', 'KAM', 'ขอโดย', 'วันที่ขอ', 'ตัดสินโดย', 'วันที่ตัดสิน', 'หมายเหตุผู้ตัดสิน'];
   var data = rows.map(function (r) {
     var acctName = _nrrAccountNameFor(r.account_id);
     var scope = r.outlet_id ? ('เฉพาะสาขา ' + _nrrOutletNameFor(r.account_id, r.outlet_id)) : 'ทั้ง account';
     var monthLabel = QNRR_CFG.months_th[r.period_month] || r.period_month;
     return [
-      acctName, scope, monthLabel, nrrExclusionStatusLabel(r.status),
+      acctName, r.account_id || '', scope, r.outlet_id || '', monthLabel, nrrExclusionStatusLabel(r.status),
       nrrExclusionReasonLabel(r.reason_code), r.reason_text || '',
       r.target_tl_email || '', r.target_kam_email || '',
-      r.requested_at ? String(r.requested_at).slice(0, 10) : ''
+      r.requested_by || '', r.requested_at ? String(r.requested_at).slice(0, 10) : '',
+      r.reviewed_by || '', r.reviewed_at ? String(r.reviewed_at).slice(0, 10) : '',
+      r.review_note || ''
     ];
   });
   return { headers: headers, data: data };
