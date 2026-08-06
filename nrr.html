@@ -10864,8 +10864,44 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return '<td class="num-cell">' + (bm ? nrrFmtGMV(bm.total_gmv) : '—') + '</td>';
   }).join('') + '</tr>';
 
+  // v_basenote (backlog ข้อ 10): สูตรฐานเต็มๆ อ่านจาก base_audit ที่ engine คาย
+  // ออกมาเอง (nrr_logic.js) — บุชขอให้บอกชัดว่าฐานมาจากปัจจัยอะไร หัก churn/
+  // waived แล้วหรือยัง · ตัวเลขชุดเดียวกับที่ engine ใช้หารจริง ไม่ใช่คำนวณซ้ำ
+  // result จาก nrrComputeRowsPool (PM/Admin/VP) ไม่มี base_audit → ตกไปใช้
+  // โน้ตแบบเดิม (เฉพาะ transfer) เหมือนก่อนหน้า ไม่พังอะไร
   var adjNote = '';
-  if (hasAdjustment) {
+  if (result.base_audit && result.base_audit.length) {
+    var _bd = nrrBaseDays();
+    var _sum = { core: 0, coreN: 0, churn: 0, churnN: 0 };
+    var _excl = {};
+    result.base_audit.forEach(function (a) {
+      var amt = (a.base_norm_30d / 30) * _bd;
+      if (a.included) {
+        if (a.movement_effective === 'core_nrr_churn') { _sum.churn += amt; _sum.churnN++; }
+        else { _sum.core += amt; _sum.coreN++; }
+      } else if (a.exclude_reason && a.exclude_reason !== 'base_gmv=0' && a.exclude_reason !== 'duplicate_outlet') {
+        var key = a.exclude_reason.split(' ')[0]; // 'new_sales (ไม่ใช่ฐาน NRR)' -> 'new_sales'
+        // transfer_in ถูกกันออกจาก baseMap ก็จริง แต่ถูกบวกกลับเต็มจำนวนใน
+        // "+ ย้ายเข้า" อยู่แล้ว — โชว์ซ้ำใน "ไม่นับเข้าฐาน" จะอ่านเหมือนเงินหาย
+        if (key === 'transfer_in') return;
+        if (!_excl[key]) _excl[key] = { amt: 0, n: 0 };
+        _excl[key].amt += amt; _excl[key].n++;
+      }
+    });
+    var parts = ['Core NRR ' + nrrFmtGMV(Math.round(_sum.core)) + ' (' + _sum.coreN + ' ร้าน)'];
+    if (_sum.churnN) parts.push('Churn ' + nrrFmtGMV(Math.round(_sum.churn)) + ' (' + _sum.churnN + ' ร้าน — นับในฐาน ไม่ได้หักออก)');
+    if (result.transfer_out_base_norm > 0) parts.push('− ย้ายออก ' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * _bd)) + ' (' + result.transfer_out_outlets.length + ')');
+    if (result.transfer_in_base_norm > 0) parts.push('+ ย้ายเข้า ' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * _bd)) + ' (' + result.transfer_in_outlets.length + ')');
+    var exclKeys = Object.keys(_excl);
+    var exclTxt = exclKeys.length
+      ? ' · ไม่นับเข้าฐาน: ' + exclKeys.map(function (k) {
+          return k + ' ' + nrrFmtGMV(Math.round(_excl[k].amt)) + ' (' + _excl[k].n + ')';
+        }).join(', ')
+      : '';
+    adjNote = '<div class="micro" style="margin-top:8px"><b>ฐาน ' + nrrFmtGMV(baseAdjusted) + '</b> = ' +
+      parts.join(' + ').replace(/\+ −/g, '−').replace(/\+ \+/g, '+') + exclTxt +
+      ' · ยังไม่หัก waiver — waiver หักรายเดือนตอนคิด %NRR (ดูหมายเหตุ ⚠️ ด้านล่างถ้ามี)</div>';
+  } else if (hasAdjustment) {
     adjNote = '<div class="micro" style="margin-top:8px">ฐานปรับจาก ' + nrrFmtGMV(baseOriginal) + ' → ' + nrrFmtGMV(baseAdjusted) +
       (result.transfer_out_base_norm > 0 ? ' (หัก ' + result.transfer_out_outlets.length + ' outlet ย้ายออก −' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * nrrBaseDays())) + ')' : '') +
       (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ')' : '') +
