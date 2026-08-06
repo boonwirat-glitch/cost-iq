@@ -233,8 +233,17 @@ function _qnrrCompute(kamEmail, scope, opts) {
     // ใช้ _effectiveMovement (ไม่ใช่ raw movement_type) เพื่อให้การย้าย KAM↔KAM
     // ทีมเดียวกันที่ tl/admin scope (ซึ่ง reclassify เป็น core_nrr) ยังอยู่ใน
     // baseMap ถูกต้อง — ร้านนั้นเป็นของ scope นั้นตั้งแต่เดือนฐานจริงๆ
+    // v_basefix: ฐาน = NRR + Churn + Comeback + Transfer In เท่านั้น
+    // ของเดิมพึ่งสมมติว่า new_sales/expansion มี base_gmv=0 เสมอ (ลูกค้าใหม่ย่อมไม่มี
+    // ยอดเดือนฐาน) — ข้อมูลจริงหักล้างแล้ว: 16 outlet ทั่วองค์กร ฿790,891 ถูกตีตรา
+    // cohort เดือนปัจจุบันทั้งที่มียอดเดือนฐานติดมา จึงเข้าตัวหารแต่ไม่เข้าตัวตั้ง
+    // (ตัวตั้งรับแค่ core_nrr/churn/transfer_in/comeback) = กด %NRR ลงทั้งไตรมาส
+    // ★ ไฟล์นี้คือตัวที่คิดเงินจริง (_qnrrComputeForCommission) — ต้องแก้คู่กับ
+    //   src/nrr/nrr_logic.js เป๊ะ ไม่งั้นหน้าจอกับยอดจ่ายจะคนละกติกากันอีก
+    var _effMv = _effectiveMovement(r);
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
-        && _effectiveMovement(r) !== 'transfer_in') {
+        && _effMv !== 'transfer_in'
+        && _effMv !== 'new_sales' && _effMv !== 'expansion') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });

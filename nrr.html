@@ -2461,6 +2461,14 @@ function _qnrrCompute(kamEmail, scope, opts) {
     else if (baseMap[r.outlet_id])          _reason = 'duplicate_outlet';
     else if (r.movement_type === 'handover') _reason = 'handover';
     else if (_eff === 'transfer_in')        _reason = 'transfer_in (บวกกลับแยกด้านล่าง)';
+    // v_basefix: กฎฐานคือ NRR + Churn + Comeback + Transfer In เท่านั้น
+    // ของเดิมพึ่งสมมติว่า new_sales/expansion จะมี base_gmv=0 เสมอ (ลูกค้าใหม่ย่อม
+    // ไม่มียอดเดือนฐาน) แต่ข้อมูลจริงหักล้างไปแล้ว: 16 outlet ทั่วองค์กร ฿790,891
+    // ถูกตีตรา cohort เดือนปัจจุบันทั้งที่มียอดเดือนฐานติดมา → เข้าตัวหาร แต่ไม่เข้า
+    // ตัวตั้ง (numerator รับแค่ core_nrr/churn/transfer_in/comeback) = กด %NRR ลง
+    // ทำให้ Tape 99.69% กับ Monet 99.89% พลาดเกณฑ์ 100% ทั้งที่ควรได้คนละ ฿5,000
+    else if (_eff === 'new_sales')          _reason = 'new_sales (ไม่ใช่ฐาน NRR)';
+    else if (_eff === 'expansion')          _reason = 'expansion (ไม่ใช่ฐาน NRR)';
     if (!_reason) {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
@@ -2750,8 +2758,12 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     // Same month-1 transfer_in exclusion as _qnrrCompute's baseMap (see the
     // divergence note in the file header) — pm_view.csv carries inbound
     // transfer_in rows too, so the pool base double-counts identically.
+    // v_basefix: ตัด new_sales/expansion ออกจากฐานเหมือน _qnrrCompute ด้านบน
+    // (ฐาน = NRR + Churn + Comeback + Transfer In) — พูลนี้เป็นของ PM/Admin/VP
+    // ถ้าไม่แก้คู่กัน หน้าพอร์ตจะโชว์ %NRR คนละกติกากับหน้า KAM
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
-        && effMv(r) !== 'transfer_in') {
+        && effMv(r) !== 'transfer_in'
+        && effMv(r) !== 'new_sales' && effMv(r) !== 'expansion') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });
