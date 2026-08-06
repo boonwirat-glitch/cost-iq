@@ -724,7 +724,9 @@ function nrrComputeUpsellSkuWithParams(expansionOutletIds, bundle, baseMonthIso,
 
         // v880-fix: only the current (last evaluated) month is tested/used
         // now — no more streak/gap tracking. See header comment above.
-        var lbl = evalLabels[evalLabels.length - 1];
+        // v_recon2: overrides.evalLabel ตรึงเดือนที่ประเมินได้ (export ย้อนหลัง
+        // ต้องดูเดือนของงวดนั้น ไม่ใช่เดือนปัจจุบัน — ไม่ส่งมา = พฤติกรรมเดิมเป๊ะ)
+        var lbl = (overrides && overrides.evalLabel) || evalLabels[evalLabels.length - 1];
         var row = monthData[lbl];
         if (!row) return;
         var rawTotalGmv = row.totalGmv || 0;
