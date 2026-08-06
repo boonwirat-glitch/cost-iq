@@ -2097,7 +2097,7 @@ function nrrShellHtml() {
     '  <div class="nrr-section" id="nrr-sec-pm" style="animation-delay:.18s"><div class="nrr-panel-body" id="nrr-pm-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-admin" style="animation-delay:.22s"><div class="nrr-panel-body" id="nrr-admin-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-footnote" style="animation-delay:.30s"><div class="nrr-panel-body nrr-footnote">' +
-    '    <b>%NRR</b> = GMV เดือนปัจจุบัน หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' ของร้านค้าที่ยัง active หรือกลับมาซื้อ (ปรับด้วย transfer เข้า/ออก) — เฉพาะ %NRR normalize เป็น 30 วันทั้งสองฝั่งเพื่อเทียบข้ามเดือนอย่างยุติธรรม · <b>ตัวเลขเงินทุกจุด</b>แสดงเป็นยอดจริงตามจำนวนวันของเดือนนั้น: เดือนที่จบแล้ว = ยอดจริง, เดือนที่ยังไม่จบ (มี <span class="nrr-rr-proj">~</span>) = คาดการณ์เต็มเดือนจาก MTD ÷ วันที่ผ่านมา × จำนวนวันของเดือน · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time' +
+    '    <b>%NRR</b> = GMV เดือนปัจจุบัน หารด้วยฐาน GMV เดือน ' + nrrEsc(QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month) + ' ของร้านค้าที่ยัง active หรือกลับมาซื้อ (ปรับด้วย transfer เข้า/ออก) — เฉพาะ %NRR normalize เป็น 30 วันทั้งสองฝั่งเพื่อเทียบข้ามเดือนอย่างยุติธรรม · <b>ตัวเลขเงินทุกจุด</b>แสดงเป็นยอดจริงตามจำนวนวันของเดือนนั้น: เดือนที่จบแล้ว = ยอดจริง, เดือนที่ยังไม่จบ (มี <span class="nrr-rr-proj">~</span>) = คาดการณ์เต็มเดือนจาก MTD ÷ วันที่ผ่านมา × จำนวนวันของเดือน · ข้อมูลอัปเดตรายวัน (ช้ากว่าจริง 1 วัน) ไม่ใช่ real-time · <b>หน้านี้คำนวณสดจากไฟล์ล่าสุดเสมอ</b> — หน้า Commission ที่ล็อกแล้วเป็นตัวเลขแช่แข็ง ณ วันล็อก สองหน้าจึงต่างกันได้ถ้ายอดขยับหลังล็อก (ดูเวลาล็อกที่หัวตาราง Commission)' +
     '  </div></div>' +
     '</div>' +
     '</div>' +
@@ -4392,14 +4392,28 @@ function nrrCommissionFullTableHtml(rows) {
   // 15 identical per-row ESTIMATE chips don't shout the same thing twice.
   var allFinal = rows.every(function (r) { return r.snapshot_status === 'final'; });
   var allEstimate = rows.every(function (r) { return r.snapshot_status === 'estimate'; });
+  // v_livelock (backlog ข้อ 6): บอกตรงๆ ว่าตัวเลขชุดนี้แช่แข็ง ณ เวลาไหน และ
+  // ทำไมถึงต่างจากหน้า NRR ได้ — บุชเจอเอง (Kwang 107.4 หน้ากราฟ vs 107.29
+  // ในไฟล์) แล้วต้องมาไล่ถามว่าตัวไหนผิด ทั้งที่ไม่มีตัวไหนผิด แค่คนละเวลา
+  var _lockedAtIso = rows.reduce(function (acc, r) {
+    var t = (r.breakdown && (r.breakdown.recomputed_at || r.breakdown.computed_at)) || '';
+    return t > acc ? t : acc;
+  }, '');
+  var _lockedAtTxt = '';
+  if (_lockedAtIso) {
+    var _ld = new Date(_lockedAtIso);
+    _lockedAtTxt = ' · ล็อกเมื่อ ' + _ld.getDate() + ' ' + (QNRR_CFG.months_th[_lockedAtIso.slice(0, 7)] || _lockedAtIso.slice(5, 7)) +
+      ' ' + String(_ld.getHours()).padStart(2, '0') + ':' + String(_ld.getMinutes()).padStart(2, '0') +
+      ' — ตัวเลขแช่แข็ง ณ เวลานั้น อาจต่างจากหน้า NRR ที่คำนวณสดจากไฟล์ล่าสุด ถ้ายอดขยับหลังล็อก';
+  }
   var headStamp = allFinal
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('final') +
-      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')</span></div>'
+      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')' + _lockedAtTxt + '</span></div>'
     : allEstimate
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('estimate') +
-      '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้</span></div>'
+      '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้ · ตัวเลขสด ตรงกับหน้า NRR</span></div>'
     : '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('draft') +
-      '<span class="micro">บางรายการยังไม่ล็อก — แถวที่ไม่ใช่ final มีตรากำกับ</span></div>';
+      '<span class="micro">บางรายการยังไม่ล็อก — แถวที่ไม่ใช่ final มีตรากำกับ' + _lockedAtTxt + '</span></div>';
 
   // tl_full breakdown only stores the upsell MULTIPLIER, not the raw GMV
   // behind it — sum it client-side from the KAM rows under each TL instead
