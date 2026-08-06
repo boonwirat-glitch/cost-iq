@@ -214,6 +214,37 @@ sep_gmv AS (
   GROUP BY 1
 ),
 
+-- ── v_tinfull (2026-08-07): ยอด "เต็มเดือน" ไม่กรอง owner — ใช้เฉพาะแถว transfer_in ─
+-- ปัญหาเดิม: jul/aug/sep_gmv ข้างบนกรอง commercial_owner='KAM' → ร้านที่ย้ายเข้ามา
+-- เป็น KAM "กลางเดือน" ได้ curr_gmv แค่ส่วนหลังวันย้าย แต่ฐาน (base_gmv ไม่กรอง owner)
+-- เข้าเต็มเดือน → อสมมาตร กด %NRR ของคนรับโอนลงทั้งที่ร้านโตจริง (ตัวอย่างจริง:
+-- ratio ร้านโชว์ 53% ทั้งที่ร้านซื้อ 103% ของฐาน) — กติกาที่บุชเคาะ 2026-08-07:
+-- "นับเต็มเดือนเฉพาะร้าน transfer_in" · ร้าน movement อื่นใช้ยอดกรอง KAM เหมือนเดิมเป๊ะ
+-- trade-off ที่ยอมรับแล้ว: เดือนที่ย้าย ยอดครึ่งก่อนย้ายโผล่ทั้งพอร์ตต้นทาง+ปลายทาง
+-- (ผลรวมรายพอร์ตเกินยอดบริษัทเฉพาะเดือนย้าย เฉพาะร้านที่ย้าย — ยอดบริษัทรวมไม่เพี้ยน)
+gmv_full_by_month AS (
+  SELECT v_m1_str AS period_month, CAST(o.user_id AS STRING) AS outlet_id, ROUND(SUM(o.gmv_ex_vat),0) AS gmv
+  FROM `freshket-rn.dwh.order` o CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.jul_start AND p.jul_end
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  GROUP BY 1, 2
+  UNION ALL
+  SELECT v_m2_str, CAST(o.user_id AS STRING), ROUND(SUM(o.gmv_ex_vat),0)
+  FROM `freshket-rn.dwh.order` o CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.aug_start AND p.aug_end
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  GROUP BY 1, 2
+  UNION ALL
+  SELECT v_m3_str, CAST(o.user_id AS STRING), ROUND(SUM(o.gmv_ex_vat),0)
+  FROM `freshket-rn.dwh.order` o CROSS JOIN params p
+  WHERE o.delivery_date BETWEEN p.sep_start AND p.sep_end
+    AND o.gmv_ex_vat > 0
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+  GROUP BY 1, 2
+),
+
 -- ── 8. Ownership snapshots per month ─────────────────────────────────────────
 mar_own AS (
   SELECT CAST(o.user_id AS STRING) AS outlet_id, CAST(o.account_id AS STRING) AS account_id,
@@ -689,7 +720,13 @@ SELECT
   r.res_name,
   COALESCE(um.account_type, r.account_type) AS account_type,
   r.cohort_month,
-  ROUND(r.curr_gmv, 0)              AS curr_gmv,
+  -- v_tinfull: transfer_in ใช้ยอดเต็มเดือน (gmv_full_by_month) แทนยอดกรอง KAM
+  -- ตัดสินที่ชั้นนอกนี้ชั้นเดียว เพราะ movement_type เพิ่งครบทุก branch ตรงนี้ —
+  -- การไปแก้ในแต่ละบล็อกเดือน (7+ branch, union ด้วย SELECT *) เสี่ยงคอลัมน์เลื่อน
+  -- COALESCE กันเคสไม่มีแถว full (เป็นไปไม่ได้ตามนิยาม full ⊇ filtered แต่กันไว้)
+  ROUND(CASE WHEN r.movement_type = 'transfer_in'
+             THEN COALESCE(gf.gmv, r.curr_gmv)
+             ELSE r.curr_gmv END, 0) AS curr_gmv,
   ROUND(r.base_gmv, 0)              AS base_gmv,
   p.base_days,
   CASE r.period_month
@@ -719,6 +756,9 @@ LEFT JOIN staff_email_map em_base   ON r.base_staff_owner     = em_base.kam_name
 LEFT JOIN outlet_first_dollar ofd2  ON r.outlet_id            = ofd2.outlet_id
 LEFT JOIN outlet_exp_date oed2      ON r.outlet_id            = oed2.outlet_id
 LEFT JOIN user_account_type um       ON r.outlet_id            = um.outlet_id
+-- v_tinfull: ยอดเต็มเดือนของ outlet เดียวกัน งวดเดียวกัน (ใช้เฉพาะแถว transfer_in)
+LEFT JOIN gmv_full_by_month gf       ON r.outlet_id            = gf.outlet_id
+                                    AND r.period_month         = gf.period_month
 -- filter เฉพาะ outlet ที่ latest owner เป็น KAM
 -- (ออก PM/ADMIN/SALE/resigned ออกจาก output อัตโนมัติ)
 WHERE lo.latest_commercial_owner = 'KAM'
