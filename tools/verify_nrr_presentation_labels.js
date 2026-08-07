@@ -123,5 +123,24 @@ t('โน้ตมี "ฐานก่อนยกเว้น" + สูตร C
 t('transfer-in ในโน้ตระบุ "มูลค่าฐาน ณ เดือนมิ.ย."', tableHtml.indexOf('มูลค่าฐาน ณ เดือนมิ.ย.') !== -1,
   (tableHtml.match(/ย้ายเข้า[^<]*/) || [''])[0]);
 
+console.log('\n(6) v_qgrid-fix: pool scope (PM/Admin/Chain/SA/MC) ไม่มี nrr_curr_norm — ห้ามพิมพ์ "ตัวตั้ง ฿0" หลอก');
+// nrrComputeRowsPool ไม่คาย nrr_curr_norm เข้า by_month เลย (ต่างจาก
+// _qnrrCompute ที่ KAM/TL ใช้) — จำลองแถวเดียวกับ pool จริงแล้วเช็คว่า
+// nrrRenderMovementChart ไม่พิมพ์แถว .nrr-qcol-pair ออกมาสำหรับ scope นี้
+const poolRows = rows().map(r => Object.assign({}, r)); // reuse fixture rows, any scope shape works
+const poolResult = vm.runInContext(
+  'nrrComputeRowsPool(' + JSON.stringify(poolRows) + ', "ทดสอบ")', ctx);
+const poolBm = poolResult.by_month[PERIOD];
+t('nrrComputeRowsPool ไม่มี nrr_curr_norm ใน by_month (ยืนยันสมมติฐาน)', poolBm && poolBm.nrr_curr_norm === undefined,
+  poolBm && JSON.stringify(Object.keys(poolBm)));
+captured.chart = ''; captured.table = '';
+vm.runInContext('nrrRenderMovementChart("chart", "table", ' + JSON.stringify(poolResult) + ', {})', ctx);
+const poolChartHtml = captured.chart || '';
+t('pool scope: ไม่มี .nrr-qcol-pair (ไม่โชว์ "ตัวตั้ง ฿0" หลอก)', poolChartHtml.indexOf('nrr-qcol-pair') === -1,
+  poolChartHtml.slice(poolChartHtml.indexOf('nrr-qcol-nrr'), poolChartHtml.indexOf('nrr-qcol-nrr') + 200));
+t('pool scope: กราฟยังเรนเดอร์แท่งได้ปกติ (.nrr-qcol-stack มีอยู่)', poolChartHtml.indexOf('nrr-qcol-stack') !== -1);
+t('base column title ย้ายไปอยู่ที่ .nrr-qcol-cap แล้ว (wrapper เป็น display:contents ไม่มี hit-area)',
+  /class="nrr-qcol-cap num" title="/.test(poolChartHtml), poolChartHtml.slice(0, 160));
+
 console.log('\n' + (fail ? '❌' : '✅') + ' verify_nrr_presentation_labels: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

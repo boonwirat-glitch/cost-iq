@@ -229,8 +229,11 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
       // v_onemeaning: เลขนี้คือ "ฐานก่อนยกเว้น" (base_norm ทั้งไตรมาส ยังไม่หัก
       // waiver) — ตั้งใจคงไว้ให้ตรงกับคอลัมน์ฐานในตาราง movement ข้างล่าง
       // ส่วนฐาน NRR ที่ใช้หาร % จริงพิมพ์เป็นคู่เลขใต้ % ของทุกเดือนแล้ว
-      return '<div class="nrr-qcol" title="' + nrrEsc('ฐานก่อนยกเว้น (ยังไม่หัก waiver) — ฐาน NRR ที่ใช้คิด % ของแต่ละเดือนดูคู่เลขใต้ % หรือหมายเหตุฐานด้านล่าง') + '">' +
-        '<div class="nrr-qcol-cap num">' + nrrFmtGMV(baseAdjusted + handoverBase) + (hasAdjustment ? '<span class="tag muted" style="margin-left:4px">adj</span>' : '') + '</div>' +
+      // v_qgrid: title ย้ายมาไว้ที่ cap แทน wrapper — wrapper เปลี่ยนเป็น
+      // display:contents แล้ว (ไม่มี box ของตัวเอง) tooltip บน wrapper เดิม
+      // จะไม่มี hit-area ให้ hover เลย
+      return '<div class="nrr-qcol">' +
+        '<div class="nrr-qcol-cap num" title="' + nrrEsc('ฐานก่อนยกเว้น (ยังไม่หัก waiver) — ฐาน NRR ที่ใช้คิด % ของแต่ละเดือนดูคู่เลขใต้ % หรือหมายเหตุฐานด้านล่าง') + '">' + nrrFmtGMV(baseAdjusted + handoverBase) + (hasAdjustment ? '<span class="tag muted" style="margin-left:4px">adj</span>' : '') + '</div>' +
         '<div class="nrr-qcol-stack">' + segs + '</div>' +
         '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
         '<div class="nrr-qcol-nrr">&nbsp;</div></div>';
@@ -272,10 +275,16 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
     // ที่บุชเจอ: แท่ง/ยอดบนแท่งคือยอดรวมทุกประเภท ส่วน % มาจากคู่เลขนี้
     // สเกลด้วย nrrBaseDays() ทั้งคู่ (convention เดียวกับ triple.base) —
     // อัตราส่วนไม่เพี้ยนเพราะคูณตัวเดียวกัน
+    // v_qgrid-fix: nrrComputeRowsPool (PM/Admin/Chain/SA/MC) ไม่คาย
+    // nrr_curr_norm ใน by_month เลย (ดู nrr_logic.js) — เดิมเช็คแค่
+    // effective_base_norm>0 แล้ว `(bm.nrr_curr_norm || 0)` เงียบๆ กลาย
+    // เป็น "ตัวตั้ง ฿0" ทั้งที่ตัวตั้งไม่เคยถูกคำนวณเลย (ไม่ใช่ ฿0 จริง)
+    // ต้องเช็ค != null ตรงๆ เหมือนที่ triple.numer ทำไว้แล้ว — ไม่มีข้อมูล
+    // ก็ไม่พิมพ์ ดีกว่าพิมพ์เลขหลอก
     var pairHtml = '';
-    if (bm && pct != null && bm.effective_base_norm > 0) {
+    if (bm && bm.nrr_curr_norm != null && pct != null && bm.effective_base_norm > 0) {
       pairHtml = '<div class="micro nrr-qcol-pair" style="margin-top:2px">' +
-        'ตัวตั้ง ' + nrrFmtGMV(Math.round((bm.nrr_curr_norm || 0) * nrrBaseDays())) +
+        'ตัวตั้ง ' + nrrFmtGMV(Math.round(bm.nrr_curr_norm * nrrBaseDays())) +
         ' ÷ ฐาน ' + nrrFmtGMV(Math.round(bm.effective_base_norm * nrrBaseDays())) + '</div>';
     }
     return '<div class="nrr-qcol">' +

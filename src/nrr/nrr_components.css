@@ -590,12 +590,37 @@
    totals bar that subtracts losses would read taller than the real
    number. Columns are flex:1 (fills the section width == "centered",
    never hugs the left edge). ────────────────────────────────────────── */
-.nrr-qchart { display: flex; align-items: flex-end; gap: 24px; padding: 8px 4px 0; }
-.nrr-qcol { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 90px; }
-.nrr-qcol-cap { font-size: 15px; font-weight: 700; white-space: nowrap; }
+/* v_qgrid: was flex-row + align-items:flex-end, which bottom-anchors each
+   WHOLE column (cap+bar+label+% packed as one block). The % row's height
+   varies per column (waived tag adds a line, the ตัวตั้ง÷ฐาน pair adds
+   another) — so columns with more text below the bar were simply TALLER,
+   and bottom-anchoring a taller column pushes its entire contents (bar
+   included) upward relative to a shorter column. That's the "bars float
+   up" bug: the bar's position was riding on how much text happened to sit
+   below it, not on a shared baseline.
+   Grid fixes this at the root: cap/bar/label/% each get their OWN track
+   shared across every column, so the bar track's height depends only on
+   bar heights, never on the % text underneath. Bars anchor to that track's
+   end edge like a real chart axis; the %-row can grow as tall as it wants
+   without ever touching the bars above it. */
+.nrr-qchart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(90px, 1fr);
+  grid-template-rows: auto auto auto auto;
+  align-items: end;
+  column-gap: 24px; row-gap: 6px;
+  padding: 8px 4px 0;
+}
+/* each column contributes exactly 4 children (cap/stack/label/nrr) in DOM
+   order — display:contents dissolves the wrapper's own box so they join
+   the grid directly as 4 independent cells instead of being trapped
+   together inside one column box (which is what let heights diverge). */
+.nrr-qcol { display: contents; }
+.nrr-qcol-cap { font-size: 15px; font-weight: 700; white-space: nowrap; text-align: center; }
 .nrr-qcol-stack {
   display: flex; flex-direction: column; justify-content: flex-end; width: 100%; max-width: 108px;
-  border-radius: 8px 8px 3px 3px; overflow: hidden;
+  justify-self: center; border-radius: 8px 8px 3px 3px; overflow: hidden;
 }
 .nrr-qcol-stack .nrr-qcol-seg:first-child { border-radius: 8px 8px 0 0; }
 .nrr-qcol-seg { width: 100%; }
@@ -606,8 +631,12 @@
   width: 100%; border-radius: 8px 8px 0 0;
   background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.4) 0 3px, rgba(255,255,255,0) 3px 9px), var(--green);
 }
-.nrr-qcol-label { font-size: 13px; font-weight: 600; color: var(--ink2); margin-top: 2px; }
-.nrr-qcol-nrr { font-size: 13px; font-weight: 700; }
+/* label/% sit BELOW the bar row — align to the row's start (top) so they
+   hug the bar immediately above them regardless of how tall the shared
+   bar/% tracks are; the container's align-items:end (for the cap/bar
+   tracks above) stays the default for those two, unaffected by this. */
+.nrr-qcol-label { font-size: 13px; font-weight: 600; color: var(--ink2); margin-top: 2px; text-align: center; align-self: start; }
+.nrr-qcol-nrr { font-size: 13px; font-weight: 700; text-align: center; align-self: start; }
 
 /* ── Movement chart (delta view): above/below zero + hatched projection ── */
 .nrr-col-chart { display: flex; align-items: flex-start; gap: 18px; padding: 8px 4px 0; }
