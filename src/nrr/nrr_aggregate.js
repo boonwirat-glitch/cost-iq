@@ -328,6 +328,11 @@ function nrrMonthTriple(result, month) {
   });
   return {
     base: Math.round((bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm) * nrrBaseDays()),
+    // v_onemeaning: ตัวตั้ง NRR (เศษของ %NRR) — สเกลด้วย nrrBaseDays() ตัวเดียว
+    // กับ base ข้างบน อัตราส่วน numer/base จึงเท่ากับ bm.nrr_pct เป๊ะ
+    // pool results (PM/Admin/VP) ไม่มี nrr_curr_norm → null แล้ว renderer
+    // ตกไปใช้หน้าตาเดิม (run_rate เป็นเลขใหญ่)
+    numer: bm.nrr_curr_norm != null ? Math.round(bm.nrr_curr_norm * nrrBaseDays()) : null,
     mtd: Math.round(mtd),
     run_rate: Math.round(bm.total_gmv || 0),
     curr_days: bm.curr_days,

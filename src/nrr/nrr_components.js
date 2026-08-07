@@ -93,12 +93,19 @@ function nrrTripleHtml(size, triple, opts) {
   var rr = (p ? '~' : '') + nrrFmtGMV(triple.run_rate);
   var rrTitle = p ? ' title="' + nrrEsc(nrrRunRateTooltip(triple)) + '"' : '';
   var rrCls = 'nrr-rr' + (p ? ' nrr-rr-proj' : '');
+  // v_onemeaning: บุชเลือกให้เลขหลักคือ "ตัวตั้ง NRR" (nrr_curr_norm — ยอดที่
+  // เข้าเศษของ %NRR จริง เดิมไม่เคยแสดงที่ไหนเลย) ส่วนยอดรวมทุกประเภท
+  // (run_rate = total_gmv รวม handover/new_sales/expansion ที่ไม่อยู่ใน %)
+  // ยังพิมพ์คู่กันเสมอ · result จาก pool (PM/Admin/VP) ไม่มี numer → ตกไป
+  // แสดงแบบเดิมทั้งก้อน ไม่พังอะไร
+  var hasNumer = triple.numer != null;
 
   if (size === 'lg') {
     return '<div class="nrr-triple-lg">' +
-      '<div class="nrr-triple-cell"><div class="nrr-triple-label">ฐาน</div><div class="num nrr-triple-base">' + nrrFmtGMV(triple.base) + '</div></div>' +
+      '<div class="nrr-triple-cell"><div class="nrr-triple-label">ฐาน NRR</div><div class="num nrr-triple-base">' + nrrFmtGMV(triple.base) + '</div></div>' +
+      (hasNumer ? '<div class="nrr-triple-cell"><div class="nrr-triple-label">ตัวตั้ง NRR' + (p ? ' (คาด)' : '') + '</div><div class="num nrr-triple-rr ' + rrCls + '">' + (p ? '~' : '') + nrrFmtGMV(triple.numer) + '</div></div>' : '') +
       '<div class="nrr-triple-cell"><div class="nrr-triple-label">MTD · ' + triple.curr_days + '/' + triple.days_in_month + ' วัน</div><div class="num nrr-triple-mtd">' + nrrFmtGMV(triple.mtd) + '</div></div>' +
-      '<div class="nrr-triple-cell"><div class="nrr-triple-label">' + (p ? 'คาดการณ์สิ้นเดือน' : 'ทั้งเดือน') + '</div><div class="num nrr-triple-rr ' + rrCls + '"' + rrTitle + '>' + rr + '</div></div>' +
+      '<div class="nrr-triple-cell"><div class="nrr-triple-label">รวมทุกประเภท' + (p ? ' (คาดสิ้นเดือน)' : '') + '</div><div class="num nrr-triple-rr ' + rrCls + '"' + rrTitle + '>' + rr + '</div></div>' +
       '</div>';
   }
   // md / sm — two-line right-aligned stack. Momentum signal applies ONLY at
@@ -111,6 +118,13 @@ function nrrTripleHtml(size, triple, opts) {
     var sig = nrrMomentum(triple.base, triple.run_rate);
     sigCls = sig.cls ? ' ' + sig.cls : '';
     sigHtml = sig.glyph ? '<span class="nrr-sig-glyph">' + sig.glyph + '</span>' : '';
+  }
+  if (hasNumer && size === 'md') {
+    // เลขใหญ่ = ตัวตั้ง NRR (คู่กับ % ที่อยู่ข้างๆ ในแถวเดียวกัน อ่านเทียบได้ทันที)
+    var numerBig = (p ? '~' : '') + nrrFmtGMV(triple.numer);
+    var line2n = 'ฐาน NRR ' + nrrFmtGMV(triple.base) + ' · รวมทุกประเภท ' + rr;
+    return '<div class="' + szCls + '"><div class="num ' + rrCls + '" title="' + nrrEsc('ตัวตั้ง NRR — ยอดที่ใช้คิด %NRR (%NRR = ตัวตั้ง ÷ ฐาน NRR)') + '">' + numerBig + '</div>' +
+      '<div class="nrr-triple-sub">' + line2n + '</div></div>';
   }
   var line2 = p
     ? 'MTD ' + nrrFmtGMV(triple.mtd) + ' · ฐาน ' + nrrFmtGMV(triple.base)
@@ -212,7 +226,10 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
       var hovH = handoverBase > 0 ? Math.max(3, Math.round(handoverBase * pxPer)) : 0;
       var segs = (hovH ? '<div class="nrr-qcol-seg" style="height:' + hovH + 'px;background:var(--mv-slate);opacity:.45"></div>' : '') +
         '<div class="nrr-qcol-seg" style="height:' + coreH + 'px;background:var(--green);opacity:.35"></div>';
-      return '<div class="nrr-qcol">' +
+      // v_onemeaning: เลขนี้คือ "ฐานก่อนยกเว้น" (base_norm ทั้งไตรมาส ยังไม่หัก
+      // waiver) — ตั้งใจคงไว้ให้ตรงกับคอลัมน์ฐานในตาราง movement ข้างล่าง
+      // ส่วนฐาน NRR ที่ใช้หาร % จริงพิมพ์เป็นคู่เลขใต้ % ของทุกเดือนแล้ว
+      return '<div class="nrr-qcol" title="' + nrrEsc('ฐานก่อนยกเว้น (ยังไม่หัก waiver) — ฐาน NRR ที่ใช้คิด % ของแต่ละเดือนดูคู่เลขใต้ % หรือหมายเหตุฐานด้านล่าง') + '">' +
         '<div class="nrr-qcol-cap num">' + nrrFmtGMV(baseAdjusted + handoverBase) + (hasAdjustment ? '<span class="tag muted" style="margin-left:4px">adj</span>' : '') + '</div>' +
         '<div class="nrr-qcol-stack">' + segs + '</div>' +
         '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
@@ -250,14 +267,25 @@ function _nrrQuarterColumnsHtml(result, columns, baseAdjusted, handoverBase, has
     var waivedTag = waivedCount > 0
       ? '<span class="tag muted" title="' + waivedCount + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">ยกเว้น ' + waivedCount + '</span>'
       : '';
+    // v_onemeaning: พิมพ์คู่เลขที่หารกันได้ % ตรงนี้จริงๆ (ตัวตั้ง ÷ ฐาน NRR
+    // หลังยกเว้น) ไว้ใต้ % เสมอ — แก้ปัญหา "แท่งบอก 9.7M แต่ % คิดจาก 9.2M"
+    // ที่บุชเจอ: แท่ง/ยอดบนแท่งคือยอดรวมทุกประเภท ส่วน % มาจากคู่เลขนี้
+    // สเกลด้วย nrrBaseDays() ทั้งคู่ (convention เดียวกับ triple.base) —
+    // อัตราส่วนไม่เพี้ยนเพราะคูณตัวเดียวกัน
+    var pairHtml = '';
+    if (bm && pct != null && bm.effective_base_norm > 0) {
+      pairHtml = '<div class="micro nrr-qcol-pair" style="margin-top:2px">' +
+        'ตัวตั้ง ' + nrrFmtGMV(Math.round((bm.nrr_curr_norm || 0) * nrrBaseDays())) +
+        ' ÷ ฐาน ' + nrrFmtGMV(Math.round(bm.effective_base_norm * nrrBaseDays())) + '</div>';
+    }
     return '<div class="nrr-qcol">' +
       '<div class="nrr-qcol-cap num" style="color:' + (isPartial ? 'var(--green-deep)' : 'var(--ink)') + '">' + (isPartial ? '~' : '') + nrrFmtGMV(runRate) + '</div>' +
       '<div class="nrr-qcol-stack">' + hatchHtml + upSegs + '</div>' +
       '<div class="nrr-qcol-label">' + nrrEsc(c.label) + '</div>' +
-      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + nrrFmtPct(pct)) + (waivedTag ? '<br>' + waivedTag : '') + '</div></div>';
+      '<div class="nrr-qcol-nrr num" style="color:' + nrrThresholdColorVar(pct) + '">' + (pct == null ? '—' : (isPartial ? '~' : '') + nrrFmtPct(pct)) + (waivedTag ? '<br>' + waivedTag : '') + pairHtml + '</div></div>';
   }).join('');
   return '<div class="nrr-qchart">' + colsHtml + '</div>' +
-    '<div class="micro" style="margin-top:10px">ลายเฉียง = ส่วนคาดการณ์ของเดือนที่ยังไม่จบ (run-rate − MTD) · churn ไม่รวมในความสูงแท่ง ดูที่ตารางด้านล่าง</div>';
+    '<div class="micro" style="margin-top:10px">ลายเฉียง = ส่วนคาดการณ์ของเดือนที่ยังไม่จบ (run-rate − MTD) · churn ไม่รวมในความสูงแท่ง ดูที่ตารางด้านล่าง · ความสูงแท่ง = ยอดรวมทุกประเภท ส่วน %NRR = ตัวตั้ง NRR ÷ ฐาน NRR (คู่เลขใต้ %)</div>';
 }
 
 function _nrrDeltaColumnsHtml(result, columns, baseAdjusted, handoverBase, hasAdjustment) {
@@ -383,7 +411,9 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
   var handoverBase = Math.round(result.handover_base_norm || 0);
   var hasAdjustment = (result.transfer_out_base_norm || 0) > 0 || (result.transfer_in_base_norm || 0) > 0;
 
-  var columns = [{ label: 'ฐาน (' + (QNRR_CFG.months_th[result.base_month] || result.base_month) + ')', isBase: true }];
+  // v_onemeaning: ป้ายบอกตรงๆ ว่าคอลัมน์/แท่งนี้คือฐาน "ก่อนยกเว้น" — ฐาน NRR
+  // หลังยกเว้น (ตัวหาร % จริง) พิมพ์เป็นคู่เลขใต้ % และในโน้ตฐานด้านล่าง
+  var columns = [{ label: 'ฐานก่อนยกเว้น (' + (QNRR_CFG.months_th[result.base_month] || result.base_month) + ')', isBase: true }];
   result.months.forEach(function (m) { columns.push({ label: QNRR_CFG.months_th[m] || m, month: m, isBase: false }); });
 
   if (!_nrrMvChartMode[chartContainerId]) _nrrMvChartMode[chartContainerId] = 'quarter';
@@ -441,7 +471,11 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     { key: 'core_nrr_churn', label: '↳ Churn', cls: 'coral', sub: true, negative: true },
     { key: 'expansion', label: 'Expansion', cls: 'mv-green-lt' },
     { key: 'comeback', label: 'Comeback', cls: 'mv-teal' },
-    { key: 'transfer_in', label: 'Transfer in', cls: 'mv-violet' },
+    // v_onemeaning: แถวนี้คือยอดขาย "เดือนนั้นๆ" ของร้านที่ย้ายเข้า — คนละมิติ
+    // กับ "+ ย้ายเข้า" ในโน้ตฐาน (มูลค่า ณ เดือนฐาน, นับทั้งไตรมาส) บุชเคยงง
+    // 196K(2) vs 65K(1) เพราะสองเลขนี้ไม่มีป้ายแยกกัน
+    { key: 'transfer_in', label: 'Transfer in (ยอดเดือนนั้นๆ)', cls: 'mv-violet',
+      title: 'ยอดขายของเดือนนั้นเอง ของร้านที่ย้ายเข้าในเดือนนั้น — คนละเลขกับ "+ ย้ายเข้า" ในหมายเหตุฐานด้านล่าง ซึ่งเป็นมูลค่า ณ เดือนฐานของร้านย้ายเข้าทั้งไตรมาส' },
     { key: 'transfer_out', label: 'Transfer out', cls: 'mv-clay', negative: true }
   ];
   var colCount = columns.length + 1;
@@ -460,7 +494,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       var display = row.negative ? '−' + nrrFmtGMV(v) : nrrFmtGMV(v);
       return cellBtn(row.key, '', c.month, row.cls, display, n);
     }).join('');
-    return '<tr data-mv-row="' + row.key + '"' + (row.sub ? ' class="nrr-table-subrow"' : '') + '><td>' + row.label + '</td>' + cells + '</tr>';
+    return '<tr data-mv-row="' + row.key + '"' + (row.sub ? ' class="nrr-table-subrow"' : '') + '><td' + (row.title ? ' style="cursor:help" title="' + nrrEsc(row.title) + '"' : '') + '>' + row.label + '</td>' + cells + '</tr>';
   }
 
   function handoverBlockHtml() {
@@ -570,20 +604,37 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     var parts = ['Core NRR ' + nrrFmtGMV(Math.round(_sum.core)) + ' (' + _sum.coreN + ' ร้าน)'];
     if (_sum.churnN) parts.push('Churn ' + nrrFmtGMV(Math.round(_sum.churn)) + ' (' + _sum.churnN + ' ร้าน — นับในฐาน ไม่ได้หักออก)');
     if (result.transfer_out_base_norm > 0) parts.push('− ย้ายออก ' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * _bd)) + ' (' + result.transfer_out_outlets.length + ')');
-    if (result.transfer_in_base_norm > 0) parts.push('+ ย้ายเข้า ' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * _bd)) + ' (' + result.transfer_in_outlets.length + ')');
+    if (result.transfer_in_base_norm > 0) parts.push('+ ย้ายเข้า (มูลค่าฐาน ณ เดือน' + (QNRR_CFG.months_th[result.base_month] || result.base_month) + ' นับทั้งไตรมาส) ' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * _bd)) + ' (' + result.transfer_in_outlets.length + ' ร้าน)');
     var exclKeys = Object.keys(_excl);
     var exclTxt = exclKeys.length
       ? ' · ไม่นับเข้าฐาน: ' + exclKeys.map(function (k) {
           return k + ' ' + nrrFmtGMV(Math.round(_excl[k].amt)) + ' (' + _excl[k].n + ')';
         }).join(', ')
       : '';
-    adjNote = '<div class="micro" style="margin-top:8px"><b>ฐาน ' + nrrFmtGMV(baseAdjusted) + '</b> = ' +
+    // v_onemeaning: นำด้วย "ฐาน NRR" (ตัวหาร % จริง หลังยกเว้นรายเดือน) คู่กับ
+    // "ฐานก่อนยกเว้น" เสมอ — บุชเลือกให้โชว์คู่กันทุกจุดพร้อมป้ายกำกับ
+    // (เดิมนำด้วยฐานดิบแล้วซ่อนตัวหารจริงไว้ใน ⚠️ ท้ายสุด — ต้นเหตุ "9.7 vs 9.2")
+    var _effLead = '';
+    if (typeof nrrWaivedAccountCountForRows === 'function') {
+      var _effParts = result.months.map(function (m) {
+        var _bm = result.by_month[m];
+        var _n = nrrWaivedAccountCountForRows(_bm && _bm.rows, m);
+        if (!_n || !_bm || _bm.effective_base_norm == null) return null;
+        var _eff = Math.round(_bm.effective_base_norm * _bd);
+        return (QNRR_CFG.months_th[m] || m) + ' ' + nrrFmtGMV(_eff) + ' (ยกเว้น ' + _n + ' ร้าน −' + nrrFmtGMV(baseAdjusted - _eff) + ')';
+      }).filter(Boolean);
+      _effLead = _effParts.length
+        ? '<b>ฐาน NRR (ตัวหาร %NRR จริง รายเดือน):</b> ' + _effParts.join(' · ') + '<br>'
+        : '<b>ฐาน NRR = ฐานก่อนยกเว้น</b> (งวดนี้ไม่มีร้านถูกยกเว้น)<br>';
+    }
+    adjNote = '<div class="micro" style="margin-top:8px">' + _effLead +
+      '<b>ฐานก่อนยกเว้น ' + nrrFmtGMV(baseAdjusted) + '</b> = ' +
       parts.join(' + ').replace(/\+ −/g, '−').replace(/\+ \+/g, '+') + exclTxt +
-      ' · ยังไม่หัก waiver — waiver หักรายเดือนตอนคิด %NRR (ดูหมายเหตุ ⚠️ ด้านล่างถ้ามี)</div>';
+      ' · waiver หักรายเดือนตอนคิด %NRR (ดูหมายเหตุ ⚠️ ด้านล่างถ้ามี)</div>';
   } else if (hasAdjustment) {
     adjNote = '<div class="micro" style="margin-top:8px">ฐานปรับจาก ' + nrrFmtGMV(baseOriginal) + ' → ' + nrrFmtGMV(baseAdjusted) +
       (result.transfer_out_base_norm > 0 ? ' (หัก ' + result.transfer_out_outlets.length + ' outlet ย้ายออก −' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * nrrBaseDays())) + ')' : '') +
-      (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ')' : '') +
+      (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ' — มูลค่า ณ เดือนฐาน)' : '') +
       '</div>';
   }
   // Waived-account (NRR Exclusion) note -- structurally parallel to adjNote
@@ -727,9 +778,11 @@ function nrrCompositionBarHtml(result, period) {
       (n ? '<span class="nrr-compo-k-n">' + n.toLocaleString() + ' ร้าน</span>' : '') +
       '</span>';
   }).join('');
-  var baseLabel = nrrFmtGMV(Math.round((result.base_norm || 0) * nrrBaseDays()));
+  // v_onemeaning: ป้ายเดิมเขียน "องค์ประกอบของฐาน 9.7M" แต่ชิ้นส่วนในแถบคือ
+  // segments ของเดือนที่เลือก (รวม ≈ ยอดรวมทุกประเภท ~10.5M) — ป้ายกับเนื้อ
+  // คนละจำนวนกัน ป้ายใหม่บอกตามที่แถบเป็นจริง ใช้ total ที่รวมไว้แล้วข้างบน
   return '<div class="nrr-compo">' +
-    '<div class="nrr-compo-lbl">องค์ประกอบของฐาน ' + baseLabel + '</div>' +
+    '<div class="nrr-compo-lbl">องค์ประกอบยอดรวมทุกประเภทเดือนนี้ ' + nrrFmtGMV(Math.round(total)) + '</div>' +
     '<div class="nrr-compo-bar">' + barHtml + '</div>' +
     '<div class="nrr-compo-key">' + keyHtml + '</div>' +
     '</div>';

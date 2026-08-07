@@ -565,10 +565,13 @@ function nrrPortfolioWaterfallHtml(email, period) {
     kpi('ร้านใหม่', '+' + nrrFmtGMV(w.newStores), w.counts.newStores + ' สาขา', 'var(--green-deep)');
   // Row order mirrors the exact identity: base − churn + contraction +
   // comeback + new + inflow = curr (nrrPortfolioWaterfall's contract).
-  return '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ยอดพอร์ตไหลจากไหนไปไหน</div></div>' +
+  // v_onemeaning: "ฐาน" ของ waterfall นี้คือ core_nrr_base + churn (เลนส์ดูแล
+  // พอร์ต) — จงใจไม่ใช่ฐาน NRR ที่ใช้คิดคอมมิชชั่น ป้ายบอกตรงๆ กันคนเทียบข้ามจอ
+  return '<div class="nrr-panel-head" style="margin-top:22px"><div class="h2" style="font-size:18px">ยอดพอร์ตไหลจากไหนไปไหน</div>' +
+    '<div class="micro" style="margin-top:2px">เลนส์ PM: ฐานในตารางนี้ = Core NRR + Churn ของพอร์ต — ไม่ใช่ "ฐาน NRR" ที่ใช้คิด %NRR/คอมมิชชั่น</div></div>' +
     '<div class="nrr-pm-kpi-strip">' + kpisHtml + '</div>' +
     '<div class="nrr-pm-flow">' +
-    row('ฐานเดือน ' + nrrBaseMonthThLabel(), w.base, 'anchor', totalCohort) +
+    row('ฐานเดือน ' + nrrBaseMonthThLabel() + ' (เลนส์ PM)', w.base, 'anchor', totalCohort) +
     row('หยุดสั่ง (churn)', -w.churn, 'flow', w.counts.churned) +
     row(w.contraction >= 0 ? 'ร้านเดิมซื้อเพิ่ม' : 'ร้านเดิมซื้อลด', w.contraction, 'flow', w.counts.active) +
     row('ร้านกลับมา', w.comeback, 'flow', w.counts.comeback) +
@@ -4622,7 +4625,9 @@ function nrrCommFullTlTableHtml(tlRows, teamUpsellGmv, allFinal, allEstimate) {
     var rowStamp = (!allFinal && !allEstimate && r.snapshot_status !== 'final')
       ? ' ' + nrrCommStampHtml(r.snapshot_status, true) : '';
     return '<tr><td>' + nrrEsc(bd.team_lead_name || r.beneficiary_email) + rowStamp + '</td>' +
-      '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
+      // v_onemeaning: แหล่งเดียวกับแท็บสรุป (governed_nrr_pct) — เดิมอ่าน
+      // breakdown.nrr_pct ซึ่งเป็นคนละ column ใน DB และ drift กันได้
+      '<td>' + nrrFmtPct(r.governed_nrr_pct != null ? r.governed_nrr_pct : bd.nrr_pct) + '</td>' +
       '<td>' + nrrFmtGMVExact(bd.nrr_payout || 0) + '</td>' +
       '<td>' + nrrFmtGMVExact(upsellGmv) + '</td>' +
       '<td>' + multHtml + '</td>' +
@@ -4871,7 +4876,9 @@ function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
     return '<tr>' +
       '<td><button type="button" class="nrr-comm-drill-btn" style="all:unset;cursor:pointer;text-decoration:underline;text-underline-offset:2px" title="ดูรายละเอียดใบเสร็จ" data-email="' + nrrEsc(r.beneficiary_email) + '" data-name="' + kamLabel + '" data-period="' + nrrEsc(r.period_month) + '"><b>' + kamLabel + '</b></button>' + noteHtml + rowStamp +
       '<div class="nrr-comm-cell-meta">' + nrrEsc((r.beneficiary_email || '').split('@')[0]) + '</div></td>' +
-      '<td>' + nrrFmtPct(bd.nrr_pct) + '</td>' +
+      // v_onemeaning: แหล่งเดียวกับแท็บสรุป (governed_nrr_pct) — เดิมอ่าน
+      // breakdown.nrr_pct ซึ่งเป็นคนละ column ใน DB และ drift กันได้
+      '<td>' + nrrFmtPct(r.governed_nrr_pct != null ? r.governed_nrr_pct : bd.nrr_pct) + '</td>' +
       _nrrCommMoneyCell(bd.nrr_payout, null) +
       _nrrCommMoneyCell(ho.payout, ho.retention_pct ? 'retention ' + nrrFmtPct(ho.retention_pct) : null) +
       _nrrCommMoneyCell(outlet.commission, outlet.outlet_gmv ? 'จาก ' + nrrFmtGMVExact(outlet.outlet_gmv) : null) +
