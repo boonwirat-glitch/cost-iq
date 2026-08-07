@@ -1962,3 +1962,17 @@ body.nrr-pulse-on { background: #0E2A21; }
 .nrr-recompute-skips li { margin-bottom: 3px; }
 .nrr-recompute-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .nrr-recompute-actions .nrr-recompute-reason { flex: 1; min-width: 220px; }
+
+/* ── v_waivercard2: waivers กลับเป็น cards + ของใหม่ ───────────────────── */
+/* สถานะ revoked ไม่เคยมี style (pill ล่องหนบนการ์ดเปล่า) — เติมให้ครบชุด */
+.nrr-waiver-card.revoked { border-left: 3px solid var(--ink3); opacity: .78; }
+.nrr-waiver-status.revoked { background: var(--fill-deep, rgba(22,26,22,0.06)); color: var(--ink2); }
+/* คุมความสูงการ์ด: free-text (เหตุผล/หมายเหตุผู้ตัดสิน) ตัดบรรทัดเดียว
+   ข้อความเต็มอยู่ใน title — pattern เดียวกับ .nrr-acct-row-name */
+.nrr-waiver-freetext {
+  margin-top: 4px; color: var(--ink2); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help;
+}
+.nrr-waiver-gmv { margin-top: 6px; }
+.nrr-waiver-gmv .num { color: var(--ink); }
+.nrr-waiver-audit { margin-top: 6px; color: var(--ink3); }

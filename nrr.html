@@ -2243,6 +2243,20 @@ body.nrr-pulse-on { background: #0E2A21; }
 .nrr-recompute-skips li { margin-bottom: 3px; }
 .nrr-recompute-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .nrr-recompute-actions .nrr-recompute-reason { flex: 1; min-width: 220px; }
+
+/* ── v_waivercard2: waivers กลับเป็น cards + ของใหม่ ───────────────────── */
+/* สถานะ revoked ไม่เคยมี style (pill ล่องหนบนการ์ดเปล่า) — เติมให้ครบชุด */
+.nrr-waiver-card.revoked { border-left: 3px solid var(--ink3); opacity: .78; }
+.nrr-waiver-status.revoked { background: var(--fill-deep, rgba(22,26,22,0.06)); color: var(--ink2); }
+/* คุมความสูงการ์ด: free-text (เหตุผล/หมายเหตุผู้ตัดสิน) ตัดบรรทัดเดียว
+   ข้อความเต็มอยู่ใน title — pattern เดียวกับ .nrr-acct-row-name */
+.nrr-waiver-freetext {
+  margin-top: 4px; color: var(--ink2); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help;
+}
+.nrr-waiver-gmv { margin-top: 6px; }
+.nrr-waiver-gmv .num { color: var(--ink); }
+.nrr-waiver-audit { margin-top: 6px; color: var(--ink3); }
 </style>
 </head>
 <body>
@@ -7375,6 +7389,44 @@ window.nrrReviewExclusion = nrrReviewExclusion;
 // rows currently on screen (post role-filter) — read by the export menu.
 var nrrLastWaiverRows = null;
 
+// v_waivercard2: filter state ของหน้านี้ — per-page module object ตาม precedent
+// nrrPortfolioState (nrr_view.js) ไม่ปนกับ nrrState ที่เป็นของ dashboard ทั้งหน้า
+var nrrWaiversState = { monthFilter: '' }; // '' = ทุกเดือน
+
+// GMV คู่ประกอบการตัดสิน waiver: ฐาน (เดือนฐานไตรมาส) + ยอดเดือนที่ขอ
+// - ฐานอ่านจากแถว "เดือนแรกของไตรมาส" เท่านั้น (convention เดียวกับ engine —
+//   base_gmv บนแถวเดือนหลังๆ เชื่อถือไม่ได้ ดู nrr_logic.js baseMonthRows)
+// - ยอดเดือนที่ขอ = curr_gmv ของแถว period_month นั้น · waiver ระดับ outlet
+//   จับ outlet เดียว, ระดับ account รวมทุกสาขาของ account
+// - คนละแหล่งกับ nrr_exclusions.base_gmv ใน DB (ค่า freeze จาก bulkHistoryData
+//   ระดับ account) — จงใจไม่ใช้ตัวนั้น เพื่อให้เลขบนการ์ดกระทบยอดกับหน้า NRR ได้
+function _nrrWaiverGmvFor(r) {
+  var qd = window.bulkQnrrData;
+  if (!qd || !qd.loaded) return null;
+  var firstMonth = QNRR_CFG.q_months[0];
+  var base = 0, curr = 0, baseSeen = false, currSeen = false, currDays = null, daysInMonth = 30;
+  (qd.allRows || []).forEach(function (row) {
+    if (row.account_id !== r.account_id) return;
+    if (r.outlet_id && String(row.outlet_id) !== String(r.outlet_id)) return;
+    if (row.period_month === firstMonth) { base += parseFloat(row.base_gmv) || 0; baseSeen = true; }
+    if (row.period_month === r.period_month) {
+      curr += parseFloat(row.curr_gmv) || 0; currSeen = true;
+      if (currDays == null) { currDays = row.curr_days; daysInMonth = row.days_in_month || 30; }
+    }
+  });
+  if (currDays != null && !daysInMonth) daysInMonth = 30;
+  var partial = currSeen && currDays != null && (function () {
+    var p = String(r.period_month || '').split('-');
+    var dim = p.length === 2 ? new Date(parseInt(p[0], 10), parseInt(p[1], 10), 0).getDate() : 30;
+    return currDays < dim - 2 ? dim : null;
+  })();
+  return {
+    base: baseSeen ? Math.round(base) : null,
+    curr: currSeen ? Math.round(curr) : null,
+    currDays: currDays, partialDim: partial || null
+  };
+}
+
 function nrrRenderWaiversView(route) {
   var body = document.getElementById('nrr-waivers-body');
   if (!body) return;
@@ -7433,6 +7485,11 @@ function nrrWaiversPageHtml() {
   if (!isAdmin) {
     rows = rows.filter(function (x) { return x.target_tl_email === (nrrProfile && nrrProfile.email); });
   }
+  // v_waivercard2: month filter — กรอง "ก่อน" KPI + nrrLastWaiverRows เสมอ
+  // เพื่อคงกติกาของไฟล์นี้: จอ = KPI = export ชุดเดียวกันตลอด
+  if (nrrWaiversState.monthFilter) {
+    rows = rows.filter(function (x) { return x.period_month === nrrWaiversState.monthFilter; });
+  }
   rows.sort(function (a, b) { return (a.requested_at || '') < (b.requested_at || '') ? 1 : -1; });
 
   // cached for the export functions below — mirrors nrrLastKamRows pattern
@@ -7466,82 +7523,99 @@ function nrrWaiversPageHtml() {
     '<div class="nrr-waivers-kpi"><div class="num">' + rejected.length + '</div><div class="micro">ปฏิเสธ</div></div>' +
     '<div class="nrr-waivers-kpi"><div class="num">' + revoked.length + '</div><div class="micro">เพิกถอนแล้ว</div></div>' +
     '</div>' +
+    // v_waivercard2: chips เลือกเดือน (ค่าที่มีได้แค่ q_months — select เกินจำเป็น)
+    '<div class="nrr-chip-row" style="margin-top:4px">' +
+    [{ v: '', l: 'ทั้งหมด' }].concat(QNRR_CFG.q_months.map(function (m) { return { v: m, l: QNRR_CFG.months_th[m] || m }; }))
+      .map(function (c) {
+        return '<button class="nrr-chip' + (nrrWaiversState.monthFilter === c.v ? ' on' : '') +
+          '" data-action="waiver-month-filter" data-month="' + nrrEsc(c.v) + '">' + nrrEsc(c.l) + '</button>';
+      }).join('') +
+    '</div>' +
     (rows.length
-      // v_waiverrow: ตารางแทน card — 1 คำขอ = 1 แถว + audit ครบ (ขอ/ตัดสิน โดยใคร เมื่อไหร่)
-      ? '<div style="overflow-x:auto;margin-top:12px"><table class="nrr-table"><thead><tr>' +
-        '<th>บริษัท</th><th>ขอบเขต</th><th>เดือน</th><th>สถานะ</th><th>เหตุผล</th>' +
-        '<th>ขอโดย</th><th>ตัดสินโดย</th><th></th>' +
-        '</tr></thead><tbody>' +
-        rows.map(function (r) { return nrrWaiverRowHtml(r, isAdmin); }).join('') +
-        '</tbody></table></div>'
-      : '<div class="ds-empty" style="margin-top:12px"><div class="ds-empty-title">ยังไม่มีคำขอยกเว้น NRR</div></div>');
+      // v_waivercard2: กลับมาใช้ cards — เวอร์ชันตาราง (v_waiverrow) กว้างเกิน
+      // container (~1290px ใน 1020px) จนคอลัมน์ปุ่ม approve ตกขอบขวาแบบไร้
+      // สัญญาณ (บุชเจอบน production: "ไม่มีปุ่มให้กดอนุมัติ") · ของที่ตาราง
+      // เพิ่มมาเก็บไว้ครบใน card: audit trail + review_note (ฝั่ง export ไม่แตะ)
+      ? '<div style="margin-top:12px">' + rows.map(function (r) { return nrrWaiverRowHtml(r, isAdmin); }).join('') + '</div>'
+      : '<div class="ds-empty" style="margin-top:12px"><div class="ds-empty-title">ยังไม่มีคำขอยกเว้น NRR' + (nrrWaiversState.monthFilter ? ' ในเดือนที่เลือก' : '') + '</div></div>');
 }
 
+// v_waivercard2: card ต่อ 1 คำขอ — กู้โครงจากเวอร์ชันก่อน v_waiverrow แล้วเก็บ
+// ของที่ตารางเพิ่มมาไว้ครบ (audit trail + review_note) + ของใหม่ตามที่บุชขอ:
+// GMV ฐาน/เดือนที่ขอ · ความสูงคุมด้วย ellipsis บน free-text (title มีข้อความเต็ม)
 function nrrWaiverRowHtml(r, isAdmin) {
   var monthLabel = QNRR_CFG.months_th[r.period_month] || r.period_month;
   var acctName = _nrrAccountNameFor(r.account_id);
-  // v_scopepill (2026-07-15): whole-account vs. outlet-only used to be
-  // plain text ("ระดับ: ทั้ง account") -- easy to skim past when scanning a
-  // list of cards. A distinct pill per scope (muted = whole account, violet
-  // = one outlet only) reads at a glance, same convention as every other
-  // status pill on this page (.nrr-waiver-status) and elsewhere in /nrr.
   var scopeTag = r.outlet_id
     ? '<span class="tag mv-violet">เฉพาะสาขา ' + nrrEsc(_nrrOutletNameFor(r.account_id, r.outlet_id)) + '</span>'
     : '<span class="tag muted">ทั้ง account</span>';
   var locked = nrrIsPeriodLocked(r.period_month);
-  // v_clock: เดือนที่ Lock แล้ว "ตัดสินต่อได้" ไม่ใช่ตันเหมือนเดิม
-  //
-  // ของเดิมปิดปุ่มทิ้งเพราะตอนนั้นแก้ตัวเลขย้อนหลังไม่ได้ — กด lock = จบ
-  // ตอนนี้ Sense มี "คำนวณ %NRR ใหม่" ที่คำนวณเฉพาะ %NRR จาก waiver ล่าสุด
-  // โดยไม่แตะ upsell/handover ที่แช่แข็งไว้ การปิดปุ่มไว้จึงขัดกับความสามารถใหม่
-  // และทำให้จุดประสงค์ทั้งหมด (lock วันที่ 1 แล้วค่อยตรวจ waiver) ใช้ไม่ได้จริง
-  //
-  // แต่การอนุมัติหลัง lock **ไม่ได้** ทำให้ยอดที่จ่ายเปลี่ยนเอง — ต้องไปกดคำนวณใหม่
-  // ที่ Sense อีกทีเสมอ จึงต้องเตือนตรงนี้ให้ชัด ไม่งั้นจะเข้าใจว่าอนุมัติแล้วจบ
-  // inline style ตามแบบเดิมของไฟล์นี้ — ไม่แตะ nrr_components.css เพื่อไม่ให้
-  // การแก้เล็กๆ นี้ไปพันกับงานอื่นที่ยังค้างอยู่ในไฟล์ CSS นั้น
-  // v_waiverrow (backlog ข้อ 3+4): card → row ตาราง — การ์ดเดิมกินที่แนวตั้ง
-  // เยอะมาก (บุชชี้เอง) และไม่โชว์ audit trail ทั้งที่ DB มีครบ (requested_by/
-  // requested_at/reviewed_by/reviewed_at/review_note เขียนถูกอยู่แล้วทุก action)
-  // แถวล็อกแล้ว: เตือนย่อเป็น ⚠ + title แทน banner เต็ม (สาระเดิมครบ)
+  // banner เตือนงวดล็อกแบบเต็มความ (เวอร์ชันตารางย่อเหลือ ⚠ ใน title ซึ่งมองไม่เห็น
+  // บนจอสัมผัสและถูกดันตกขอบ) — เดี๋ยวนี้คำนวณใหม่ทำจาก /nrr เองได้ด้วย (ป้ายส้ม
+  // ด้านบนหน้านี้) เลยชี้ทางทั้งสองที่
+  var lockedNote = '<div class="micro" style="color:var(--sun-deep);background:var(--sun-soft);' +
+    'border-radius:8px;padding:6px 9px;margin-top:8px;line-height:1.45">' +
+    'เดือน ' + nrrEsc(monthLabel) + ' Lock แล้ว — ตัดสินได้ แต่<b>ยอดที่ล็อกไว้จะยังไม่เปลี่ยน</b> ' +
+    'จนกว่าจะกด "คำนวณใหม่" (ป้ายเตือนด้านบนหน้านี้ หรือ Sense › Commission Cockpit › Lock)</div>';
   var actions = '';
-  var lockWarn = locked
-    ? '<span class="tag muted" style="cursor:help" title="เดือน ' + nrrEsc(monthLabel) +
-      ' Lock แล้ว — ตัดสินได้ แต่ยอดที่ล็อกไว้จะยังไม่เปลี่ยน จนกว่าจะไปกด คำนวณ %NRR ใหม่ ที่ Sense › Commission Cockpit › Lock">⚠ lock</span> '
-    : '';
   if (isAdmin && r.status === 'submitted') {
-    actions = lockWarn +
-      '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button> ' +
-      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>';
+    actions = (locked ? lockedNote : '') +
+      '<div class="nrr-waiver-actions">' +
+      '<button class="nrr-exclusion-submit-btn" data-action="waiver-approve" data-id="' + nrrEsc(r.id) + '">Approve</button>' +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-reject" data-id="' + nrrEsc(r.id) + '">Reject</button>' +
+      '</div>';
   } else if (isAdmin && r.status === 'approved') {
-    // เพิกถอนก็เข้าเส้นทางเดียวกัน — recompute จัดการได้เหมือนกันทุกประการ
-    actions = lockWarn +
-      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>';
+    actions = (locked ? lockedNote : '') +
+      '<div class="nrr-waiver-actions">' +
+      '<button class="nrr-exclusion-cancel-btn" data-action="waiver-revoke" data-id="' + nrrEsc(r.id) + '">เพิกถอน</button>' +
+      '</div>';
   }
-  // audit trail: ใครขอ/เมื่อไหร่ · ใครตัดสิน/เมื่อไหร่ — ตัด @domain ทิ้งให้อ่านสั้น
   function _who(email) { return email ? nrrEsc(String(email).split('@')[0]) : '—'; }
   function _when(ts) { return ts ? String(ts).slice(0, 10) : ''; }
-  var reviewedCell = r.reviewed_at
-    ? _who(r.reviewed_by) + '<div class="micro" style="color:var(--ink3)">' + _when(r.reviewed_at) + '</div>'
-    : '<span style="color:var(--ink3)">—</span>';
-  var reasonCell = nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
-    (r.reason_text ? '<div class="micro" style="color:var(--ink3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + nrrEsc(r.reason_text) + '">' + nrrEsc(r.reason_text) + '</div>' : '') +
-    (r.review_note ? '<div class="micro" style="color:var(--ink3)" title="หมายเหตุผู้ตัดสิน">✎ ' + nrrEsc(r.review_note) + '</div>' : '');
-  return '<tr>' +
-    '<td><a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a></td>' +
-    '<td>' + scopeTag + '</td>' +
-    '<td>' + nrrEsc(monthLabel) + '</td>' +
-    '<td><span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span></td>' +
-    '<td>' + reasonCell + '</td>' +
-    '<td>' + _who(r.requested_by) + '<div class="micro" style="color:var(--ink3)">' + _when(r.requested_at) + '</div></td>' +
-    '<td>' + reviewedCell + '</td>' +
-    '<td style="white-space:nowrap">' + actions + '</td>' +
-    '</tr>';
+  // GMV คู่: ฐาน (เดือนฐานไตรมาส) + ยอดเดือนที่ขอ — ให้ admin เห็นน้ำหนักเงิน
+  // ของคำขอโดยไม่ต้องเปิดหน้าร้าน · เดือนกำลังวิ่งติดป้าย MTD กันอ่านเป็นเดือนเต็ม
+  var gmv = _nrrWaiverGmvFor(r);
+  var baseMonthTh = QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month;
+  var gmvLine = '<div class="micro nrr-waiver-gmv">' +
+    'GMV ฐาน (' + nrrEsc(baseMonthTh) + ') <b class="num">' + (gmv && gmv.base != null ? nrrFmtGMVExact(gmv.base) : '—') + '</b>' +
+    ' · เดือนที่ขอ (' + nrrEsc(monthLabel) + ') <b class="num">' + (gmv && gmv.curr != null ? nrrFmtGMVExact(gmv.curr) : '—') + '</b>' +
+    (gmv && gmv.curr != null && gmv.partialDim ? ' <span class="tag muted">MTD ' + gmv.currDays + '/' + gmv.partialDim + ' วัน</span>' : '') +
+    '</div>';
+  var auditLine = '<div class="micro nrr-waiver-audit">ขอโดย ' + _who(r.requested_by) +
+    (r.requested_at ? ' · ' + _when(r.requested_at) : '') +
+    (r.reviewed_at ? ' — ตัดสินโดย ' + _who(r.reviewed_by) + ' · ' + _when(r.reviewed_at) : ' — ยังไม่ตัดสิน') +
+    '</div>';
+  return '<div class="nrr-waiver-card ' + r.status + '">' +
+    '<div class="nrr-waiver-top">' +
+    '<a href="#/account/' + encodeURIComponent(r.account_id) + '" class="nrr-waiver-acct">' + nrrEsc(acctName) + '</a>' +
+    '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+    scopeTag +
+    '<span class="nrr-waiver-status ' + r.status + '">' + nrrExclusionStatusLabel(r.status) + '</span>' +
+    '</span>' +
+    '</div>' +
+    '<div class="micro">เดือน ' + nrrEsc(monthLabel) + ' · เหตุผล: ' + nrrEsc(nrrExclusionReasonLabel(r.reason_code)) +
+    (r.target_tl_email ? ' · TL ' + nrrEsc(String(r.target_tl_email).split('@')[0]) : '') +
+    (r.target_kam_email ? ' · KAM ' + nrrEsc(String(r.target_kam_email).split('@')[0]) : '') + '</div>' +
+    gmvLine +
+    (r.reason_text ? '<div class="micro nrr-waiver-freetext" title="' + nrrEsc(r.reason_text) + '">' + nrrEsc(r.reason_text) + '</div>' : '') +
+    (r.review_note ? '<div class="micro nrr-waiver-freetext" title="หมายเหตุผู้ตัดสิน: ' + nrrEsc(r.review_note) + '">✎ ' + nrrEsc(r.review_note) + '</div>' : '') +
+    auditLine +
+    actions +
+    '</div>';
 }
 
 function nrrHandleWaiversClick(e) {
   // v_waiverecompute: ป้าย/พรีวิว/ยืนยันคำนวณใหม่ — logic เดียวกับหน้า Commission
   if (typeof nrrHandleRecomputeClick === 'function' && nrrHandleRecomputeClick(e)) return;
+  // v_waivercard2: chips เลือกเดือน — วาดทั้งหน้าใหม่ (KPI + list + export ตามกันหมด)
+  var mBtn = e.target.closest('[data-action="waiver-month-filter"]');
+  if (mBtn) {
+    nrrWaiversState.monthFilter = mBtn.dataset.month || '';
+    var mBody = document.getElementById('nrr-waivers-body');
+    if (mBody) mBody.innerHTML = nrrWaiversPageHtml();
+    if (typeof nrrRenderStaleLockPill === 'function') nrrRenderStaleLockPill('nrr-waivers-stale-pill');
+    return;
+  }
   var exportBtn = e.target.closest('[data-action^="waivers-export"]');
   if (exportBtn) { nrrHandleWaiverExportClick(exportBtn); return; }
 
