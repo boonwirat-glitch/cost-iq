@@ -13,8 +13,10 @@
 --
 -- ★ v_expfix (2026-08-07): new_user_exp_date ต้องอ่านจาก dwh.order (MAX) เหมือน
 --   q3_2026_movement_rep_view.sql ไม่ใช่จาก dim.user_master — ดูเหตุผลเต็มที่ CTE
---   outlet_exp_date_from_orders ด้านล่าง (ไฟล์นี้กับไฟล์ NRR ต้องนิยาม "เดือนที่
+--   outlet_exp_date_by_period ด้านล่าง (ไฟล์นี้กับไฟล์ NRR ต้องนิยาม "เดือนที่
 --   รับโอน" ตรงกันเสมอ ไม่งั้นหน้าจอกับค่าคอมฯ พูดคนละเรื่อง)
+-- ★ v_expfix2: MAX นั้นผูกรายงวด (≤ สิ้นเดือนก่อนงวด) ไม่ใช่เทียบวันนี้ —
+--   งวดที่จบไปแล้วจะได้ผลเท่าเดิมเสมอไม่ว่ารันไฟล์ใหม่กี่ครั้ง
 -- ============================================================
 
 WITH
@@ -88,17 +90,27 @@ kam_name_list AS (
 --     (พ.ค./มิ.ย./ก.ค./ส.ค. คนละชุดสาขา) ทั้งที่ raw บอกว่ารับโอนครั้งเดียว 30 มิ.ย.
 -- MAX() ตรงกับ rep_view และแก้ทั้งสองอาการ · ใช้เป็นค่าหลัก ถ้าออเดอร์ไม่มีค่าเลย
 -- ค่อยถอยไปใช้ของ user_master (พฤติกรรมเดิม ไม่ทำให้เคสที่เคยถูกอยู่แล้วหาย)
-outlet_exp_date_from_orders AS (
+--
+-- ★ v_expfix2 (2026-08-07, บุชถามเอง "ดู exp date ล่าสุดอันเดียวใช่มั้ย"):
+-- MAX ต้องเทียบกับ "สิ้นเดือนก่อนงวดที่กำลังคิด" ไม่ใช่ "วันนี้" — ไม่งั้นร้านที่
+-- โอนสองครั้ง (เช่น มิ.ย. แล้วโอนอีกที ก.ย.) พอรันไฟล์เดือน ต.ค. ระบบจะเห็นแค่
+-- ก.ย. แล้วแถวของงวด ก.ค. หายไปทั้งที่ตอนล็อกเคยมี = งวดที่จบแล้วขยับได้ทุกครั้ง
+-- ที่รันไฟล์ · หลักเดียวกับที่บุชเคาะเรื่อง transfer เช้าวันเดียวกัน ("เดือนที่จบ
+-- แล้วห้ามขยับเพราะเหตุการณ์ในอนาคต") · ร้านที่มี exp date ค่าเดียว (เกือบทั้งหมด)
+-- ได้ผลเท่าเดิมเป๊ะ ไม่มีอะไรเปลี่ยน
+outlet_exp_date_by_period AS (
   SELECT
+    p.perf_month_label,
     CAST(o.user_id AS STRING)      AS user_id,
     DATE(MAX(o.new_user_exp_date)) AS new_user_exp_date
   FROM `freshket-rn.dwh.order` o
+  CROSS JOIN params p
   WHERE o.new_user_exp_date IS NOT NULL
     AND o.user_id IS NOT NULL
     AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
-    -- วันที่ยังไม่ถึง = ยังเป็นลูกค้าใหม่อยู่ ยังไม่ถือว่าโอน (ตรงกับ rep_view)
-    AND DATE(o.new_user_exp_date) <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)
-  GROUP BY 1
+    -- รู้ได้แค่ถึงสิ้นเดือนก่อนงวดนี้: วันที่หลังจากนั้น = ยังไม่เกิด ณ ตอนประเมิน
+    AND DATE(o.new_user_exp_date) <= p.prev_month_end
+  GROUP BY 1, 2
 ),
 
 -- QUALIFY ก่อน filter commercial_owner (ตรงกับ my_sql)
@@ -117,19 +129,16 @@ user_master_latest AS (
       ''
     ))                                             AS new_kam_name,
     DATE(um.first_dollar_date)       AS first_dollar_date,
-    -- v_expfix: ออเดอร์เป็นแหล่งหลัก (ตรงกับ rep_view) · master เป็น fallback
-    COALESCE(oed.new_user_exp_date, DATE(um.new_user_exp_date))       AS new_user_exp_date,
+    -- v_expfix2: ค่าจาก master เป็น "ตัวสำรอง" เท่านั้น — ตัวจริงผูกรายงวดที่
+    -- CTE umk_by_period ด้านล่าง (ที่นี่ไม่มี params ให้อ้างอิงเดือน)
+    DATE(um.new_user_exp_date)       AS new_user_exp_date,
     DATE(um.lasted_order_date)       AS lasted_order_date,
-    FORMAT_DATE('%Y-%m',
-      COALESCE(oed.new_user_exp_date, DATE(um.new_user_exp_date)))    AS exp_month,
+    FORMAT_DATE('%Y-%m', DATE(um.new_user_exp_date)) AS exp_month,
     um.sales_owner                   AS raw_sales_owner,
     um.staff_owner                   AS raw_staff_owner,
     um.kam_owner                     AS raw_kam_owner,
     um.ka_owner                      AS raw_ka_owner
   FROM `freshket-rn.dim.user_master` um
-  -- 1:1 ต่อ res_id → จำนวนแถวไม่เปลี่ยน QUALIFY ด้านล่างทำงานเหมือนเดิม
-  LEFT JOIN outlet_exp_date_from_orders oed
-    ON CAST(um.res_id AS STRING) = oed.user_id
   WHERE um.res_id IS NOT NULL
     AND um.account_guid IS NOT NULL
     AND um.account_type IN ('SA', 'MC', 'Chain', 'Unknown')
@@ -148,6 +157,25 @@ user_master_kam AS (
     AND uml.sales_owner != ''
     AND uml.new_kam_name IS NOT NULL
     AND uml.new_kam_name != ''
+),
+
+-- v_expfix2: ผูก exp date "เท่าที่รู้ได้ ณ สิ้นเดือนก่อนงวดนั้น" เข้ากับทุกงวด
+-- ตั้งแต่ตรงนี้ new_user_exp_date / exp_month = ค่ารายงวด (ไม่ใช่ค่าเดียวจาก
+-- master อีกต่อไป) · CTE candidate ด้านล่างใช้ชื่อคอลัมน์เดิมทุกจุด ไม่ต้องแก้
+-- EXCEPT() ตัดเฉพาะตอนกาง * เท่านั้น — ยังอ้าง umk.new_user_exp_date เป็น
+-- ตัวสำรองในนิพจน์ได้ตามปกติ
+umk_by_period AS (
+  SELECT
+    umk.* EXCEPT (new_user_exp_date, exp_month),
+    p.perf_month_label,
+    COALESCE(oed.new_user_exp_date, umk.new_user_exp_date)                   AS new_user_exp_date,
+    FORMAT_DATE('%Y-%m',
+      COALESCE(oed.new_user_exp_date, umk.new_user_exp_date))                AS exp_month
+  FROM user_master_kam umk
+  CROSS JOIN params p
+  LEFT JOIN outlet_exp_date_by_period oed
+    ON oed.user_id = umk.user_id
+   AND oed.perf_month_label = p.perf_month_label
 ),
 
 order_base AS (
@@ -243,8 +271,10 @@ candidate AS (
       WHEN umk.new_user_exp_date IS NOT NULL THEN umk.new_user_exp_date
       ELSE se.last_sale_order_date
     END                                                                      AS transfer_date
-  FROM user_master_kam umk
-  CROSS JOIN params p
+  -- v_expfix2: umk_by_period fan out ตามงวดไปแล้ว (มี exp date รายงวดติดมาด้วย)
+  -- จึง JOIN params ด้วยเดือนแทน CROSS JOIN เดิม — จำนวนแถวเท่าเดิมเป๊ะ
+  FROM umk_by_period umk
+  JOIN params p ON p.perf_month_label = umk.perf_month_label
   -- v_hofix: join เดือนด้วย ไม่งั้นหยิบ sale_evidence ของเดือนอื่นมาปน
   LEFT JOIN sale_evidence se
     ON se.user_id = umk.user_id AND se.perf_month_label = p.perf_month_label
