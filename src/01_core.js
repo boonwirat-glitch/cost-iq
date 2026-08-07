@@ -1773,6 +1773,40 @@ let heroLockedToCurrent=false; // true when D.current_month is shown in hero (re
 //   - GP ติดลบเป็นเรื่องปกติ (สินค้าล่อลูกค้า) ห้ามตัดทิ้งหรือ clamp เป็น 0
 const SENSE_GP_MIN_COVERAGE = 0.70;   // ต่ำกว่านี้ = ไม่พอให้เชื่อ (บุชเคาะได้ แก้ที่นี่ที่เดียว)
 
+// ── v_echonick: ชื่อเล่นคนใน Sense — helper กลางตัวเดียว ───────────────────
+// ชื่อในระบบมีรูปแบบ "Siriprapa (Pop) Piapeng" อยู่แล้ว ดึงในวงเล็บออกมาใช้
+// เลื่อนขึ้นมาไว้ที่นี่ตามแพตเทิร์นเดียวกับที่ nrrPersonNick ถูกเลื่อนไป
+// nrr_core.js — เดิมมีสำเนาอยู่ใน 11_skills.js (_skNickname) ที่ Echo เรียกไม่ถึง
+function senseNickname(fullName){
+  if(!fullName)return '';
+  const m=String(fullName).match(/\(([^)]+)\)/);
+  if(m)return m[1].trim();
+  return String(fullName).split(/\s+/)[0]||String(fullName);
+}
+
+// อีเมล → ชื่อเล่น · Echo มีแต่ owner_email จึงต้องหาชื่อเต็มก่อน
+// ลำดับแหล่ง: โปรไฟล์ตัวเอง → portviewBulkData (kamEmail→kamName) → prefix อีเมล
+// คืน prefix อีเมลเมื่อหาไม่เจอ (พฤติกรรมเดิม ไม่มีอะไรหายไปจากจอ)
+function senseRepLabel(email){
+  const e=String(email||'').trim().toLowerCase();
+  if(!e)return '';
+  try{
+    if(currentUserProfile&&String(currentUserProfile.email||'').toLowerCase()===e){
+      const own=currentUserProfile.kam_name||currentUserProfile.full_name;
+      if(own)return senseNickname(own);
+    }
+  }catch(_){}
+  try{
+    const rows=(typeof portviewBulkData!=='undefined'&&portviewBulkData)||[];
+    for(let i=0;i<rows.length;i++){
+      if(String(rows[i].kamEmail||'').toLowerCase()===e&&rows[i].kamName)return senseNickname(rows[i].kamName);
+    }
+  }catch(_){}
+  return e.split('@')[0];
+}
+window.senseNickname=senseNickname;
+window.senseRepLabel=senseRepLabel;
+
 // รวม GP จาก array ของแถว SKU (รูปแบบที่ _parseSKULine คืนมา)
 // ใช้ได้ทั้งระดับร้าน (ทั้งเดือน), ระดับหมวด (กรองมาก่อน) และ SKU เดียว ([row])
 function senseGpFromSkuRows(rows){

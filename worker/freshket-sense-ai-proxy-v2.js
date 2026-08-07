@@ -938,10 +938,40 @@ const BRAIN_ROLE_CONTEXT = {
   pm:    'PM (Portfolio Manager) — ดูแลพอร์ต/เชนเชิงโครงการ: ประสานหลายสาขา เงื่อนไขราคา สัญญา และความสัมพันธ์ระดับผู้บริหารร้าน'
 };
 
+// v_echor2: ทำให้ next_actions อยู่ในรูปเดียวเสมอก่อนเก็บลง DB — โมเดลบางตัวคืน
+// priority เป็น string, ใส่ "null" เป็นข้อความ, หรือคายมา 12 ข้อ · หน้าจอฝั่ง
+// client ต้องเชื่อได้ว่า index 0 คือข้อสำคัญที่สุดเสมอ
+function _normalizeActions(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(a => a && typeof a.action === 'string' && a.action.trim())
+    .map((a, i) => {
+      const p = Number(a.priority);
+      const nid = a.need_id;
+      return {
+        ...a,
+        priority: Number.isFinite(p) && p > 0 ? p : i + 1,
+        need_id: (typeof nid === 'string' && nid && nid !== 'null') ? nid : null
+      };
+    })
+    .sort((a, b) => a.priority - b.priority)
+    .slice(0, 5)
+    .map((a, i) => ({ ...a, priority: i + 1 }));
+}
+
 async function runBrain(segments, rubric, roleBucket, priorIntel, env) {
-  const transcriptText = segments.map(s =>
-    `[seg:${s.segment_id}][${s.ts}] ${s.speaker}: ${s.text}`
-  ).join('\n');
+  // v_echor2: ติดธง "ฟังไม่ชัด" รายท่อน — transcript_confidence คำนวณไว้ตั้งแต่ขั้น
+  // ถอดเสียงแล้ว (exp ของ avg_logprob) แต่เดิมไม่เคยส่งถึงสมองเลย สมองจึงมองทุก
+  // ท่อนน่าเชื่อถือเท่ากันแล้วเดาทับท่อนที่เพี้ยน · ค่านี้เทียบกันได้เฉพาะ "ภายใน
+  // คลิปเดียวกัน" ห้ามเอาไปเทียบข้ามคลิปหรือตั้งเป็นเป้า KPI
+  const LOW_CONF = 0.40;
+  const transcriptText = segments.map(s => {
+    const flag = (typeof s.transcript_confidence === 'number' && s.transcript_confidence < LOW_CONF)
+      ? '[ฟังไม่ชัด]' : '';
+    return `[seg:${s.segment_id}][${s.ts}]${flag} ${s.speaker}: ${s.text}`;
+  }).join('\n');
+  const lowConfCount = segments.filter(s =>
+    typeof s.transcript_confidence === 'number' && s.transcript_confidence < LOW_CONF).length;
 
   // 3 บรรทัดต่อ skill: ชื่อ+เจตนา / เกณฑ์ผ่าน / ฟังหา — model เห็นครบ ทำไม-อะไร-ยังไง
   const rubricText = (rubric || []).map(s => {
@@ -996,8 +1026,11 @@ ${rubricText || 'ไม่มี rubric — ประเมินตาม best 
 - อนุมาน: ใส่ "intensity":"implied" + "inferred_from" อธิบายว่าอนุมานจากอะไร
 - ยังไม่รู้: ใส่ลง "unknowns" เป็นคำถามภาษาพูดที่พนักงานหยิบไปถามได้จริง visit หน้า
 - ช่วง transcript ที่อ่านไม่รู้เรื่อง (ถอดเสียงเพี้ยน): ห้ามเดา ให้ข้าม — ถ้าประเด็นสำคัญน่าจะอยู่ตรงนั้น ใส่ unknowns แทน
+- ท่อนที่ติดป้าย [ฟังไม่ชัด] = ระบบถอดเสียงเองก็ไม่มั่นใจ${lowConfCount ? ` (รอบนี้มี ${lowConfCount} ท่อน)` : ''} ห้ามใช้เป็นหลักฐานเดี่ยวๆ ห้ามยกเป็น quote และห้ามเดาคำที่หายไป · ใช้ได้แค่ประกอบบริบทเมื่อมีท่อนชัดยืนยันเรื่องเดียวกัน · ถ้าประเด็นสำคัญตกอยู่ในท่อนพวกนี้ ให้ยกเป็นคำถามใน unknowns
 
-needs (ความต้องการลูกค้า): ทุกข้อต้องมี "implication" (กระทบ share of wallet/การรักษาลูกค้ายังไง) และ "suggested_action" (เกมที่ควรเดิน) — fact เฉยๆ ไม่พอ ต้องบอกว่าแล้วไงต่อ
+needs (ความต้องการลูกค้า): ทุกข้อต้องมี "id" (n1, n2, ...) และ "implication" (กระทบ share of wallet/การรักษาลูกค้ายังไง) — fact เฉยๆ ไม่พอ ต้องบอกว่าแล้วไงต่อ
+สิ่งที่ต้องลงมือทำ เขียนที่ "next_actions" ที่เดียวเท่านั้น (ห้ามเขียนซ้ำใน needs) · action ที่มาจาก need ให้ผูกกลับด้วย "need_id" · action ที่ไม่ได้มาจาก need ใดใส่ need_id เป็น null
+headline: หนึ่งประโยคที่ตอบว่า "ลูกค้ารายนี้ติดอะไรอยู่ และโอกาสที่ใหญ่ที่สุดคืออะไร" — เขียนแบบพูดกับหัวหน้าทีมขาย ไม่ใช่สรุปเหตุการณ์
 
 ตอบ JSON เท่านั้น ไม่มี markdown:
 {
@@ -1012,12 +1045,14 @@ needs (ความต้องการลูกค้า): ทุกข้อ�
   "session_summary": "...",
   "ocpb_status": { "O": "answered|asked_no_answer|not_asked", "C": "...", "P": "...", "B": "..." },
   "ocpb_facts": [{ "dim": "O|C|P|B", "summary": "...", "quote": "...", "ts": "mm:ss", "segment_id": 0, "tag": "pain_high|pain_medium|opportunity|null" }],
-  "needs": [{ "need": "...", "type": "product|price|delivery|credit|quality|service|other", "intensity": "explicit|implied", "inferred_from": "เฉพาะเมื่อ implied", "status": "open|addressed", "quote": "...", "segment_id": 0, "implication": "...", "suggested_action": "..." }],
+  "headline": "หนึ่งประโยค: ลูกค้าติดอะไร + โอกาสที่ใหญ่ที่สุด",
+  "needs": [{ "id": "n1", "need": "...", "type": "product|price|delivery|credit|quality|service|other", "intensity": "explicit|implied", "inferred_from": "เฉพาะเมื่อ implied", "status": "open|addressed", "quote": "...", "segment_id": 0, "implication": "..." }],
   "unknowns": ["คำถามที่ควรถามครั้งหน้า ภาษาพูด", "..."],
-  "next_actions": [{ "action": "...", "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "segment_id": 0, "reason": "..." }],
+  "next_actions": [{ "action": "...", "need_id": "n1|null", "priority": 1, "owner": "Sales|TL", "urgency": "3_days|this_week|next_visit", "segment_id": 0, "reason": "..." }],
   "progress_vs_last": [{ "topic": "...", "before": "สถานะครั้งก่อน", "now": "สถานะรอบนี้", "verdict": "คืบหน้า|ถอยหลัง|ค้างที่เดิม" }]
 }
-progress_vs_last: เฉพาะประเด็นที่มีข้อมูลทั้งสองฝั่ง (ครั้งก่อน+รอบนี้) — ไม่มีข้อมูลครั้งก่อน → []`;
+progress_vs_last: เฉพาะประเด็นที่มีข้อมูลทั้งสองฝั่ง (ครั้งก่อน+รอบนี้) — ไม่มีข้อมูลครั้งก่อน → []
+next_actions: เรียง priority 1 = สำคัญที่สุด ไล่ลงไป · ไม่เกิน 5 ข้อ ถ้าคิดได้มากกว่านั้นให้ตัดที่ผลกระทบน้อยทิ้ง`;
 
   return callBrainModel(prompt, env);
 }
@@ -1164,7 +1199,9 @@ async function processSession(sessionId, origin, env) {
       const intelData = {
         ocpb_status: parsed.ocpb_status || null,
         ocpb_facts: Array.isArray(parsed.ocpb_facts) ? parsed.ocpb_facts : [],
-        next_actions: parsed.next_actions || [],
+        next_actions: _normalizeActions(parsed.next_actions),
+        // v_echor2: สรุปหนึ่งประโยคที่หน้าลูกค้าเอาไปขึ้นหัว
+        headline:         typeof parsed.headline === 'string' ? parsed.headline.trim() : null,
         // A2v2.2: restaurant-lens customer intelligence
         needs:            Array.isArray(parsed.needs) ? parsed.needs : [],
         unknowns:         Array.isArray(parsed.unknowns) ? parsed.unknowns : [],

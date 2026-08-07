@@ -89,11 +89,11 @@ for (let m = 0; m < 12; m++) {
     new Date(fn()).getTime() <= qfn(), fn());
 }
 
-console.log('\n[A] 09 _vdSince — dashboard periods');
-const vdSrc = extractFn(ci, '_vdSince');
+console.log('\n[A] 09 _histSince — ช่วงเวลาแท็บประวัติ (เดิมชื่อ _vdSince ของหน้า dashboard ที่ถูกยุบ)');
+const vdSrc = extractFn(ci, '_histSince');
 {
   // Wednesday 2026-08-05 (local): week starts Monday 2026-08-03
-  const fn = withFakeNow(vdSrc, '_vdSince', '2026-08-05T10:00:00+07:00');
+  const fn = withFakeNow(vdSrc, '_histSince', '2026-08-05T10:00:00+07:00');
   const wk = fn('week');
   check('week starts Monday', wk.getDay() === 1 && wk.getHours() === 0, wk.toString());
   const today = fn('today');
@@ -105,7 +105,7 @@ const vdSrc = extractFn(ci, '_vdSince');
 }
 {
   // Sunday: Monday-of-week must be 6 days back, not tomorrow
-  const fn = withFakeNow(vdSrc, '_vdSince', '2026-08-09T10:00:00+07:00'); // Sunday
+  const fn = withFakeNow(vdSrc, '_histSince', '2026-08-09T10:00:00+07:00'); // Sunday
   const wk = fn('week');
   check('week on Sunday goes back to previous Monday', wk.getDay() === 1 && wk.getDate() === 3, wk.toString());
 }
@@ -191,8 +191,11 @@ check('v951: admin history query has no giant .in()',
   /isAdminRole\(getCurrentRole\(\)\)[\s\S]{0,300}_getTeamEmails\(\);[\s\S]{0,120}q = q\.in\('owner_email', teamEmails\)/.test(ci));
 check('v951: covisit list skips .in() for admin',
   /teamEmails\.length && !_adminScope\) cvQ = cvQ\.in/.test(ci));
-check('v951: dashboard skips .in() for admin',
-  /teamEmails\.length && !_adminScope\) q = q\.in/.test(ci));
+// v_echor2: หน้า dashboard ถูกยุบเข้าแท็บประวัติแล้ว — การกัน .in() ของ admin
+// เหลือจุดเดียวใน _loadInlineHistory (เช็คไปแล้วบรรทัดบน) ที่นี่จึงล็อกแค่ว่า
+// ไม่มีใครแอบเปิด query ก้อนที่สองกลับมา
+check('v_echor2: ไม่มี query ผลการ visit ก้อนที่สองแล้ว',
+  !/_loadVisitDashboard/.test(ci));
 check('v951: TL/admin history error shown, not masked as empty',
   /โหลดประวัติไม่สำเร็จ/.test(ci));
 check('v951: resume awaits pipeline then refreshes history',
@@ -228,8 +231,8 @@ check('list select carries pipeline_stage',
   /tl_note,covisit_verified,status,pipeline_stage'/.test(ci));
 check('checked_in renders its own card in TL feed',
   /_renderTLTeamFeed[\s\S]{0,900}pipeline_stage === 'checked_in'/.test(ci));
-check('visit dashboard exported on CI',
-  /_openVisitDashboard, _closeVisitDashboard, _vdSetPeriod/.test(ci));
+check('v_echor2: สรุปผลการ visit อยู่ในแท็บประวัติ คิดจากชุดเดียวกับรายการ',
+  /_histSummaryHtml\(data,/.test(ci) && /HIST_PERIODS\.map/.test(ci));
 check('_resumeAnalysis exists and is exported',
   /async function _resumeAnalysis/.test(ci) && /, _resumeAnalysis,/.test(ci));
 check('resume guards owner (RLS would zero-row silently otherwise)',
@@ -466,8 +469,11 @@ check('worker: brain prompt carries restaurant lens + decision tree + evidence d
   /not_applicable/.test(worker) &&
   /วินัยหลักฐาน 3 ระดับ/.test(worker) &&
   /ห้ามเดา ให้ข้าม/.test(worker));
-check('worker: needs require implication + suggested_action',
-  /"implication"/.test(worker) && /"suggested_action"/.test(worker) &&
+// v_echor2: needs ยังต้องมี implication เหมือนเดิม แต่ "สิ่งที่ต้องทำ" ย้ายออก
+// ไปอยู่ที่ next_actions ที่เดียว (เดิมเขียนซ้ำสองที่ หน้าจอเลยโชว์ซ้ำ)
+check('worker: needs require implication + id, ไม่มี action ซ้อนใน needs',
+  /"implication"/.test(worker) && /"id": "n1"/.test(worker) &&
+  !/"suggested_action"/.test(worker) &&
   /ต้องบอกว่าแล้วไงต่อ/.test(worker));
 check('worker: cross-visit memory read from kam_visits + no-copy rule',
   /kam_visits\?kam_email=eq\.[\s\S]{0,120}ci_customer_signals,ci_next_actions,ci_created_at/.test(worker) &&
@@ -480,13 +486,15 @@ check('worker: customer_intel gains needs/unknowns/progress_vs_last',
   /progress_vs_last: Array\.isArray\(parsed\.progress_vs_last\)/.test(worker));
 check('worker: ROLE_CONTEXT covers all 4 buckets',
   /BRAIN_ROLE_CONTEXT = \{[\s\S]{0,800}kam:[\s\S]{0,800}sales:[\s\S]{0,800}ad:[\s\S]{0,800}pm:/.test(worker));
-check('client: customer panel renders needs/unknowns/progress ahead of OCPB',
-  /return needsHtml \+ unknownsHtml \+ progHtml \+ intelHtml \+ nextsHtml;/.test(ci));
-check('client: needs card shows source chip (explicit vs implied) + suggested move',
-  /อ่านระหว่างบรรทัด/.test(ci) && /ลูกค้าพูดเอง/.test(ci) && /เกมที่ควรเดิน:/.test(ci));
+// v_echor2: ลำดับใหม่ = สรุป → ทำอะไรต่อ → แถบ OCPB → รายละเอียดพับเก็บ
+check('client: customer panel เรียง headline → actions → OCPB → รายละเอียด',
+  /return headlineHtml \+ actsHtml \+ stripHtml \+ details;/.test(ci));
+check('client: needs card shows source chip (explicit vs implied)',
+  /อ่านระหว่างบรรทัด/.test(ci) && /ลูกค้าพูดเอง/.test(ci));
 check('client: legacy rows without new fields collapse silently (backward compat)',
-  /const needs = Array\.isArray\(d\?\.needs\) \? d\.needs : \[\];/.test(ci) &&
-  /needsHtml = needs\.length \?/.test(ci));
+  /const arr\s+= v => \(Array\.isArray\(v\) \? v\.filter\(Boolean\) : \[\]\);/.test(ci) &&
+  /const fold = \(title, count, inner\) => inner/.test(ci) &&
+  /เกมที่ควรเดิน/.test(ci));
 check('worker: cron sweep is the real engine (waitUntil ~30s kill found in live test)',
   /async scheduled\(event, env, cfCtx\)/.test(worker) &&
   /cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(worker) &&
