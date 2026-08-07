@@ -302,7 +302,93 @@ section('[8] ★ คนที่ไม่มีร้านของตัวเ
 }
 
 // ═════════════════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v_brkperiod (RECON-GRADE v2 งาน B) — ฝั่ง /nrr: nrrEnumerateUpsellGroups
+// รับ overrides.evalLabel + gate nrrUpsellBundleCoversPeriod
+// ═══════════════════════════════════════════════════════════════════════════
+
+function makeNrrCtx(nowISO) {
+  const FROZEN = new Date(nowISO).getTime();
+  class FrozenDate extends Date {
+    constructor(...a) { if (!a.length) super(FROZEN); else super(...a); }
+    static now() { return FROZEN; }
+  }
+  const ctx = {
+    window: { addEventListener() {}, location: { hash: '' } },
+    document: { getElementById: () => null, addEventListener() {}, querySelectorAll: () => [] },
+    navigator: {}, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    console: { log() {}, info() {}, warn() {}, error() {} },
+    setTimeout: () => 0, clearTimeout() {},
+    Date: FrozenDate, JSON, Math, Object, Array, String, Number, Boolean, isNaN,
+    parseFloat, parseInt, Set, Map, Promise, RegExp, Error,
+    QNRR_CFG: { quarter: '2026q3', base_month: '2026-06', q_months: ['2026-07', '2026-08', '2026-09'],
+                months_th: { '2026-06': 'มิ.ย.', '2026-07': 'ก.ค.', '2026-08': 'ส.ค.' } },
+    supa: null
+  };
+  ctx.window.QNRR_CFG = ctx.QNRR_CFG;
+  vm.createContext(ctx);
+  ['src/nrr/nrr_data.js', 'src/nrr/nrr_commission.js']
+    .forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx));
+  // ให้ rate getters ใช้ default (cache ว่างแบบ loaded)
+  vm.runInContext('nrrCommRatesCache = { byKey: {}, loaded: true };', ctx);
+  return ctx;
+}
+
+// bundle จำลอง: กลุ่มเดียว มีทั้ง ก.ค. (lookback: existingGmv=0, totalGmv ใหญ่)
+// และ ส.ค. (เดือนปัจจุบันของไฟล์: มี existing split จริง) — เหมือนไฟล์จริงเป๊ะ
+function nrrBundle(julExisting) {
+  return {
+    loaded: true,
+    data: { 'acct-1': { 'outlet-1': { 'ผักสด': {
+      'ก.ค. 2569': { existingGmv: julExisting, totalGmv: 900000 },
+      'ส.ค. 2569': { existingGmv: 40000, totalGmv: 50000 }
+    } } } },
+    baselineGroups: {}, groupCategory: {}
+  };
+}
+
+section('[nrr-1] enumerate default = เดือนล่าสุดตามนาฬิกา (พฤติกรรมเดิมเป๊ะ)');
+{
+  const ctx = makeNrrCtx('2026-08-07T03:00:00Z'); // นาฬิกา ส.ค. → currLabel ส.ค.
+  setGlobal(ctx, '__bundle', nrrBundle(0));
+  const rows = vm.runInContext(
+    'nrrEnumerateUpsellGroups({email:"k@f.co"}, __bundle, QNRR_CFG.base_month, null, new Set())', ctx);
+  t('ได้ 1 แถว จากเดือน ส.ค. (totalGmv 50,000)', rows.length === 1 && rows[0].current === 50000,
+    JSON.stringify(rows.map(r => r.current)));
+  t('เดือนปัจจุบัน projection ทำงานตามเดิม (วันที่ 7 ≥ 5)', rows[0].projectionReady === true && rows[0].projected != null);
+}
+
+section('[nrr-2] ★ evalLabel ก.ค. → แถวเป็นของ ก.ค. + ไม่มี "คาดสิ้นเดือน"');
+{
+  const ctx = makeNrrCtx('2026-08-07T03:00:00Z');
+  setGlobal(ctx, '__bundle', nrrBundle(0));
+  const rows = vm.runInContext(
+    'nrrEnumerateUpsellGroups({email:"k@f.co"}, __bundle, QNRR_CFG.base_month, {evalLabel:"ก.ค. 2569"}, new Set())', ctx);
+  t('ได้แถวของ ก.ค. (totalGmv 900,000) ไม่ใช่ ส.ค.', rows.length === 1 && rows[0].current === 900000,
+    JSON.stringify(rows.map(r => r.current)));
+  t('เดือนจบแล้ว → projected เป็น null (ห้าม project เดือนเก่าด้วยนาฬิกาวันนี้)',
+    rows[0].projectionReady === false && rows[0].projected === null,
+    'projReady=' + rows[0].projectionReady + ' projected=' + rows[0].projected);
+}
+
+section('[nrr-3] gate nrrUpsellBundleCoversPeriod — ห้ามโชว์ P3=0 หลอกๆ');
+{
+  const ctx = makeNrrCtx('2026-08-07T03:00:00Z');
+  setGlobal(ctx, '__b0', nrrBundle(0));
+  setGlobal(ctx, '__b1', nrrBundle(123456)); // = ไฟล์ที่ rerun ด้วย SQL split-ทุกเดือนแล้ว
+  t('เดือนปัจจุบัน (ส.ค.) → ผ่านเสมอ',
+    vm.runInContext('nrrUpsellBundleCoversPeriod(__b0, "ส.ค. 2569")', ctx) === true);
+  t('ก.ค. บนไฟล์ปัจจุบัน (existing=0 ทุกแถว) → ไม่ผ่าน',
+    vm.runInContext('nrrUpsellBundleCoversPeriod(__b0, "ก.ค. 2569")', ctx) === false);
+  t('ก.ค. หลัง rerun SQL (มี existing จริง) → ผ่านเอง ไม่ต้องแก้โค้ด',
+    vm.runInContext('nrrUpsellBundleCoversPeriod(__b1, "ก.ค. 2569")', ctx) === true);
+  t('bundle โหลดไม่สำเร็จ → ไม่ผ่าน (ไม่เดา)',
+    vm.runInContext('nrrUpsellBundleCoversPeriod({loaded:false}, "ก.ค. 2569")', ctx) === false);
+}
+
 console.log('\n' + '─'.repeat(66));
-console.log(`  ผ่าน ${pass} · ตก ${fail}`);
+console.log('  ผ่าน ' + pass + ' · ตก ' + fail);
 console.log('─'.repeat(66));
 process.exit(fail ? 1 : 0);

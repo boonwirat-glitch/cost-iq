@@ -880,14 +880,20 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   var currLabel = nrrCommCurrentMonthLabel();
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
   var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
-  var lbl = evalLabels[evalLabels.length - 1];
+  // v_brkperiod: pin เดือนที่ประเมินได้ — ทางเดียวกับ nrrComputeUpsellSkuWithParams
+  // (:729) เดิมตาราง BREAKDOWN ใช้เดือนนาฬิกาเครื่องเสมอ ทั้งที่หัวข้อพิมพ์เดือน
+  // ที่เลือกไว้ (บุชเจอ: หัวบอก ก.ค. แถวเป็น ส.ค.) · additive — ไม่ส่ง = เดิมเป๊ะ
+  var lbl = (overrides && overrides.evalLabel) || evalLabels[evalLabels.length - 1];
+  var isPastMonth = lbl !== currLabel;
 
   // Same linear run-rate convention as nrrUpsellQuarterTimeline (MTD ÷ days
   // elapsed × days in month) — held back before day 5 for the same reason
   // (too early to extrapolate off 1-2 days of data).
+  // v_brkperiod: เดือนที่จบแล้วไม่มี "คาดสิ้นเดือน" — ตัวเลขคือ actual ทั้งเดือน
+  // daysElapsed มาจากนาฬิกาวันนี้ ใช้ project เดือนเก่าไม่ได้
   var daysElapsed = new Date().getDate();
   var daysInCurr = nrrDaysInLabel(currLabel);
-  var projectionReady = daysElapsed >= 5;
+  var projectionReady = !isPastMonth && daysElapsed >= 5;
 
   Object.keys(data).forEach(function (accountId) {
     var outletMap = data[accountId];
@@ -964,6 +970,32 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   return out;
 }
 window.nrrEnumerateUpsellGroups = nrrEnumerateUpsellGroups;
+
+// v_brkperiod gate — ไฟล์ upsell บน R2 มี existing/new split จริงแค่ "เดือน
+// ปัจจุบันของไฟล์" (เดือนย้อนหลัง SQL q3c ใส่ 0.0 AS existing_gmv ไว้) →
+// P3 สดของเดือนย้อนหลังเป็น ฿0 เชิงโครงสร้าง ห้ามเอาไปโชว์เหมือนเป็นเลขจริง
+// (หลักเดียวกับ handover data_missing) · precedent ฝั่ง Sense:
+// _commTeamCsvCoversPeriod (07a:341)
+// เช็ค 2 ทาง: (1) label คือเดือนปัจจุบัน → ผ่านทันที (เดือนเดียวที่มี split
+// เสมอ) (2) ไฟล์มีแถวเดือนนั้นที่ existingGmv > 0 → ผ่าน (แปลว่าไฟล์ถูก rerun
+// ด้วย SQL ตัวใหม่ที่ split ทุกเดือนแล้ว — gate นี้จะเปิดเองไม่ต้องแก้โค้ด)
+function nrrUpsellBundleCoversPeriod(bundle, evalLabel) {
+  if (!evalLabel || evalLabel === nrrCommCurrentMonthLabel()) return true;
+  if (!bundle || !bundle.loaded || !bundle.data) return false;
+  var accs = Object.keys(bundle.data);
+  for (var i = 0; i < accs.length; i++) {
+    var outletMap = bundle.data[accs[i]];
+    for (var outletId in outletMap) {
+      var groups = outletMap[outletId];
+      for (var gk in groups) {
+        var row = groups[gk][evalLabel];
+        if (row && row.existingGmv > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+window.nrrUpsellBundleCoversPeriod = nrrUpsellBundleCoversPeriod;
 
 // ── v_brkgrowth: how far is this row from qualifying? ─────────────────────
 // ONE definition, consumed by both the status badge and the breakdown filter,

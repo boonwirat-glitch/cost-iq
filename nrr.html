@@ -6631,14 +6631,20 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   var currLabel = nrrCommCurrentMonthLabel();
   var p3Labels = nrrP3WindowLabels(baseMonthIso, 3);
   var evalLabels = baseMonthIso ? _nrrCommElapsedQuarterLabels(baseMonthIso) : [currLabel];
-  var lbl = evalLabels[evalLabels.length - 1];
+  // v_brkperiod: pin เดือนที่ประเมินได้ — ทางเดียวกับ nrrComputeUpsellSkuWithParams
+  // (:729) เดิมตาราง BREAKDOWN ใช้เดือนนาฬิกาเครื่องเสมอ ทั้งที่หัวข้อพิมพ์เดือน
+  // ที่เลือกไว้ (บุชเจอ: หัวบอก ก.ค. แถวเป็น ส.ค.) · additive — ไม่ส่ง = เดิมเป๊ะ
+  var lbl = (overrides && overrides.evalLabel) || evalLabels[evalLabels.length - 1];
+  var isPastMonth = lbl !== currLabel;
 
   // Same linear run-rate convention as nrrUpsellQuarterTimeline (MTD ÷ days
   // elapsed × days in month) — held back before day 5 for the same reason
   // (too early to extrapolate off 1-2 days of data).
+  // v_brkperiod: เดือนที่จบแล้วไม่มี "คาดสิ้นเดือน" — ตัวเลขคือ actual ทั้งเดือน
+  // daysElapsed มาจากนาฬิกาวันนี้ ใช้ project เดือนเก่าไม่ได้
   var daysElapsed = new Date().getDate();
   var daysInCurr = nrrDaysInLabel(currLabel);
-  var projectionReady = daysElapsed >= 5;
+  var projectionReady = !isPastMonth && daysElapsed >= 5;
 
   Object.keys(data).forEach(function (accountId) {
     var outletMap = data[accountId];
@@ -6715,6 +6721,32 @@ function nrrEnumerateUpsellGroups(person, bundle, baseMonthIso, overrides, expan
   return out;
 }
 window.nrrEnumerateUpsellGroups = nrrEnumerateUpsellGroups;
+
+// v_brkperiod gate — ไฟล์ upsell บน R2 มี existing/new split จริงแค่ "เดือน
+// ปัจจุบันของไฟล์" (เดือนย้อนหลัง SQL q3c ใส่ 0.0 AS existing_gmv ไว้) →
+// P3 สดของเดือนย้อนหลังเป็น ฿0 เชิงโครงสร้าง ห้ามเอาไปโชว์เหมือนเป็นเลขจริง
+// (หลักเดียวกับ handover data_missing) · precedent ฝั่ง Sense:
+// _commTeamCsvCoversPeriod (07a:341)
+// เช็ค 2 ทาง: (1) label คือเดือนปัจจุบัน → ผ่านทันที (เดือนเดียวที่มี split
+// เสมอ) (2) ไฟล์มีแถวเดือนนั้นที่ existingGmv > 0 → ผ่าน (แปลว่าไฟล์ถูก rerun
+// ด้วย SQL ตัวใหม่ที่ split ทุกเดือนแล้ว — gate นี้จะเปิดเองไม่ต้องแก้โค้ด)
+function nrrUpsellBundleCoversPeriod(bundle, evalLabel) {
+  if (!evalLabel || evalLabel === nrrCommCurrentMonthLabel()) return true;
+  if (!bundle || !bundle.loaded || !bundle.data) return false;
+  var accs = Object.keys(bundle.data);
+  for (var i = 0; i < accs.length; i++) {
+    var outletMap = bundle.data[accs[i]];
+    for (var outletId in outletMap) {
+      var groups = outletMap[outletId];
+      for (var gk in groups) {
+        var row = groups[gk][evalLabel];
+        if (row && row.existingGmv > 0) return true;
+      }
+    }
+  }
+  return false;
+}
+window.nrrUpsellBundleCoversPeriod = nrrUpsellBundleCoversPeriod;
 
 // ── v_brkgrowth: how far is this row from qualifying? ─────────────────────
 // ONE definition, consumed by both the status badge and the breakdown filter,
@@ -11621,6 +11653,13 @@ async function nrrInitApp() {
     if (e.target.id !== 'nrr-comm-period-select') return;
     nrrCommSelectedPeriod = e.target.value;
     nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
+    // v_brkperiod: BREAKDOWN/simulator ข้างล่างต้องตามเดือน dropdown เสมอ —
+    // เดิม handler นี้ไม่เคยสั่ง sim วาดใหม่ = ที่มาของ "หัวบอก ก.ค. แถวเป็น ส.ค."
+    if (typeof nrrRenderCommSimShell === 'function' && nrrCommSimState &&
+        nrrCommSimState.roster && nrrCommSimState.roster.length &&
+        document.getElementById('nrr-comm-sim-body')) {
+      nrrRenderCommSimShell();
+    }
   });
   // v_segfilter: ONE delegated listener per permanent host section, bound once.
   // Both #nrr-sec-kams and #nrr-sec-movement come from nrrShellHtml and are
@@ -15145,8 +15184,11 @@ function nrrRenderCommSimShell() {
   var ov = nrrCommSimState.overrides;
   body.innerHTML =
     '<div class="ds-section-hd"><span class="ds-eyebrow">Simulator เกณฑ์ P1/P3</span></div>' +
-    '<div class="micro" style="margin-bottom:14px;color:var(--ink2)">ประมาณการเพื่อดูภาพเท่านั้น — ไม่มีผลต่อการตั้งค่าจริงใน Supabase · ใช้ข้อมูลเดือนปัจจุบัน (' +
-    nrrEsc(QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ') เท่านั้น</div>' +
+    // v_brkperiod: หัวเรื่องพิมพ์เดือนเดียวกับที่แถวใช้จริง (จาก dropdown ตารางเต็ม)
+    // — เดิมอ่าน nrrState.period (ตัวแปรของหน้า NRR) ซึ่งไม่เกี่ยวกับแถวเลย
+    '<div class="micro" style="margin-bottom:14px;color:var(--ink2)">ประมาณการเพื่อดูภาพเท่านั้น — ไม่มีผลต่อการตั้งค่าจริงใน Supabase · ใช้ข้อมูลเดือน ' +
+    nrrEsc((function () { var _p = _nrrCommSimPeriod(); return _p ? _p.label : (typeof nrrCommCurrentMonthLabel === 'function' ? nrrCommCurrentMonthLabel() : ''); })()) +
+    ' (ตามเดือนที่เลือกในตารางเต็มด้านบน)</div>' +
     '<div class="nrr-comm-sim-params">' +
     '<label class="nrr-comm-sim-field">P1 · ขั้นต่ำ GMV (฿)<input type="number" class="nrr-search nrr-sim-param" id="nrr-sim-p1min" data-param="p1MinGmv" min="0" step="500" value="' +
     (ov.p1MinGmv != null ? ov.p1MinGmv : p1Default) + '"></label>' +
@@ -15175,12 +15217,39 @@ function nrrRenderCommSimShell() {
 // Σ rows.commission === compute().total_comm for the same params. That is
 // checked at load in _nrrCommSimBaseline below and locked by
 // tools/verify_nrrcomm_simulator.js — not merely asserted in a comment.
+// v_brkperiod: เดือนเดียวทั้งแท็บ Commission — dropdown ตารางเต็ม
+// (nrrCommSelectedPeriod) เป็น source of truth ตัวเดียว · คืน null = เดือน live
+// (ทุกอย่างเดินทางเดิมเป๊ะ) — แก้บั๊ก "หัวข้อบอก ก.ค. แต่แถวเป็น ส.ค." ที่เกิดจาก
+// หน้าเดียวมีตัวแปรเดือน 3 ตัวอิสระ (dropdown / nrrState.period / นาฬิกาเครื่อง)
+function _nrrCommSimPeriod() {
+  var p = nrrCommSelectedPeriod;
+  if (!p) return null;
+  var parts = String(p).split('-');
+  if (parts.length !== 2) return null;
+  var lbl = nrrThMonthLabel(new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1));
+  if (typeof nrrCommCurrentMonthLabel === 'function' && lbl === nrrCommCurrentMonthLabel()) return null;
+  return { period: p, label: lbl };
+}
+
 function _nrrCommSimEnumerateAll(overrides) {
+  var pin = _nrrCommSimPeriod();
+  var ov = pin ? Object.assign({}, overrides || {}, { evalLabel: pin.label }) : overrides;
+  // gate P3 ย้อนเดือน: ถ้าไม่มี bundle ของใครเลยที่มี existing/new split ของ
+  // เดือนนั้น → ตัดแถว P3 ทิ้งทั้งชุด + ตั้งธงให้ section ขึ้นแถบเตือน
+  // (ห้ามโชว์ P3=0 หลอกๆ — หลักเดียวกับ handover data_missing)
+  var gated = false;
+  if (pin && typeof nrrUpsellBundleCoversPeriod === 'function') {
+    gated = !nrrCommSimState.roster.some(function (person) {
+      return nrrUpsellBundleCoversPeriod(nrrCommSimState.bundles[person.email], pin.label);
+    });
+  }
+  nrrCommSimState.p3Gated = gated;
   var out = [];
   nrrCommSimState.roster.forEach(function (person) {
     out = out.concat(nrrEnumerateUpsellGroups(person, nrrCommSimState.bundles[person.email],
-      QNRR_CFG.base_month, overrides, nrrCommSimState.expIds[person.email] || new Set()));
+      QNRR_CFG.base_month, ov, nrrCommSimState.expIds[person.email] || new Set()));
   });
+  if (gated) out = out.filter(function (r) { return r.kind !== 'p3'; });
   return out;
 }
 
@@ -15224,19 +15293,26 @@ function _nrrCommSimAggregate(rows) {
 // mirror still runs: its total must equal the enumeration-derived total, and
 // a drift gets logged rather than silently trusted.
 function _nrrCommSimBaseline() {
-  if (nrrCommSimState.baseline) return nrrCommSimState.baseline;
+  // v_brkperiod: baseline ผูกกับเดือนที่เลือก — cache ตาม key ไม่ใช่ตัวเดียวถาวร
+  var _pin = _nrrCommSimPeriod();
+  var _key = _pin ? _pin.period : 'live';
+  if (nrrCommSimState.baseline && nrrCommSimState.baselineKey === _key) return nrrCommSimState.baseline;
   var agg = _nrrCommSimAggregate(_nrrCommSimEnumerateAll(null));
   var engineComm = 0;
   nrrCommSimState.roster.forEach(function (person) {
     engineComm += nrrComputeUpsellSkuWithParams(nrrCommSimState.expIds[person.email] || new Set(),
-      nrrCommSimState.bundles[person.email], QNRR_CFG.base_month, null).total_comm;
+      nrrCommSimState.bundles[person.email], QNRR_CFG.base_month,
+      _pin ? { evalLabel: _pin.label } : null).total_comm;
   });
+  // เดือนย้อนหลังที่ gate ปิด: enumeration ตัด P3 ทิ้ง ส่วน engine mirror ได้ P3=0
+  // เชิงโครงสร้างอยู่แล้ว (existingGmv=0 ทุกกลุ่ม) — สองข้างจึงยังต้องเท่ากัน
   if (Math.abs(engineComm - agg.comm) > 1) {
     console.warn('[nrr] simulator baseline drift — real-engine mirror ฿' + Math.round(engineComm) +
       ' vs enumerated ฿' + Math.round(agg.comm) + ': the two P1/P3 code paths have diverged, ' +
       'the breakdown table and the payout numbers no longer agree');
   }
   nrrCommSimState.baseline = agg;
+  nrrCommSimState.baselineKey = _key;
   return agg;
 }
 
@@ -15261,6 +15337,8 @@ function _nrrSimHeroCardHtml(label, valueHtml, subHtml, deltaHtml, changed) {
 // threshold without having to read a single table row.
 function nrrCommSimHeroesHtml(baseline, adjusted, adjusting) {
   function projLine(v, isCount) {
+    // v_brkperiod: เดือนที่จบแล้วไม่มี "คาดสิ้นเดือน" — เลขข้างบนคือ actual ทั้งเดือน
+    if (!adjusted.projReady && _nrrCommSimPeriod()) return '<span class="num">เดือนจบแล้ว — ตัวเลขคือยอดจริงทั้งเดือน</span>';
     if (!adjusted.projReady) return 'คาดสิ้นเดือน · <span class="num">รอข้อมูล</span> (ต้นเดือนยังประมาณไม่ได้)';
     return 'คาดสิ้นเดือนตามจังหวะนี้ <span class="num">~' +
       (isCount ? v.toLocaleString('en-US') + ' รายการ' : nrrFmtGMVExact(v)) + '</span>';
@@ -15616,8 +15694,18 @@ function nrrCommBreakdownSectionHtml(allRows) {
       '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
     : '<div class="ds-empty"><div class="ds-empty-title">ไม่พบรายการตามตัวกรองนี้</div></div>';
 
+  // v_brkperiod: หัวข้อ = เดือนเดียวกับที่แถวถูก enumerate จริง (dropdown ตาราง
+  // เต็ม) — เดิมพิมพ์ nrrState.period ทั้งที่แถวมาจากเดือนนาฬิกาเครื่อง
+  var _brkPin = _nrrCommSimPeriod();
+  var _brkMonthLabel = _brkPin ? _brkPin.label : (typeof nrrCommCurrentMonthLabel === 'function' ? nrrCommCurrentMonthLabel() : '');
+  var _brkGateNote = (nrrCommSimState && nrrCommSimState.p3Gated)
+    ? '<div class="nrr-comm-recon-note" style="margin-bottom:8px">⚠ P3 ของเดือน ' + nrrEsc(_brkMonthLabel) +
+      ' คำนวณสดไม่ได้ — ไฟล์ upsell ปัจจุบันมีข้อมูล existing/new แค่เดือนล่าสุด (รอ rerun SQL ชุดใหม่แล้วจะขึ้นเอง) · ' +
+      'แถวด้านล่างจึงแสดงเฉพาะ P1 · ตัวเลข P3 ทางการของงวดนี้ดูจากค่าที่ล็อกไว้ในตารางเต็มด้านบน</div>'
+    : '';
   return '<div class="ds-section-hd" style="margin-top:24px"><span class="ds-eyebrow">Breakdown รายรายการ (เดือน' +
-    nrrEsc(QNRR_CFG.months_th[nrrState.period] || nrrState.period) + ') <span class="ds-section-count">' + matchedCount + '/' + allRows.length + '</span></span></div>' +
+    nrrEsc(_brkMonthLabel) + ') <span class="ds-section-count">' + matchedCount + '/' + allRows.length + '</span></span></div>' +
+    _brkGateNote +
     '<div class="micro" style="margin-bottom:8px;color:var(--ink2)">"กลุ่มสินค้า" คือกลุ่ม/หมวดย่อยของสินค้า ไม่ใช่ SKU รายตัว — ข้อมูล SKU ระดับนั้นยังไม่มีในไปป์ไลน์นี้ · ' +
     '<b>P3</b> ต้องผ่าน 2 เงื่อนไขพร้อมกัน: ยอดเดือนนี้ > ' + nrrEsc(String(nrrCommRateGet('upsell_sku', 'p3_threshold_pct', 2.00))) + '× ของฐาน <b>และ</b> ส่วนที่โต ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p3_min_incremental', 8000)) +
     ' · <b>P1</b> (กลุ่มสินค้าใหม่) ต้องมียอด ≥ ' + nrrFmtGMVExact(nrrCommRateGet('upsell_sku', 'p1_min_gmv', 5000)) +
