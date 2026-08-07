@@ -225,7 +225,14 @@ lookback AS (
     ka.kam_email,
     ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
-    i.category_high_level AS category,  -- v_catbonus: 1:1 with group_key, safe to group by
+    -- v_dupfix (2026-08-08): เดิม category อยู่ใน GROUP BY → ถ้า group_key เดียวกัน
+    -- ถูกตีเป็นคนละ category (ข้อมูลต้นทางไม่นิ่ง เช่น JUICE เป็นทั้ง Beverage
+    -- Non-alcohol และ Processed Food) จะได้ 2 แถวต่อ (ร้าน,เดือน,กลุ่ม) เดียวกัน
+    -- · parser ทั้งสองฝั่งเขียนทับ (data[acc][outlet][group][month] = {...})
+    -- เก็บแค่แถวสุดท้าย → max_baseline ของ P3 ต่ำกว่าความจริง = ผ่านเกณฑ์ง่ายเกิน
+    -- = เสี่ยงจ่ายเกิน (วัดจากไฟล์จริง 847 คีย์ ฐานหายรวม ฿1.8M)
+    -- แก้ให้ตรงกับ current_split ที่ใช้ ANY_VALUE มาตลอด → 1 คีย์ 1 แถวเสมอ
+    ANY_VALUE(i.category_high_level) AS category,
     CASE
       WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
            AND TRIM(COALESCE(i.item_family,'')) != ''
@@ -259,7 +266,9 @@ lookback AS (
     -- v_splitallmonths: เดิมกินถึง current_mo (ทับเดือนในไตรมาส) → ตัดที่ต้นไตรมาส
     AND o.delivery_date <  DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
     AND i.gmv_ex_vat > 0
-  GROUP BY 1,2,3,4,5,6
+  -- v_dupfix: ข้ามตำแหน่ง 4 (category กลายเป็น ANY_VALUE แล้ว) — เหลือ
+  -- kam_email, account_id, outlet_id, group_key, month_label เป็นคีย์จริง
+  GROUP BY 1,2,3,5,6
 )
 
 -- v_catbonus: 8 columns now — `category` appended as the TRAILING column
