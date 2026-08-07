@@ -10,6 +10,11 @@
 -- PATH B: new_user_exp_date = NULL
 --         AND last_sale_order_date (MAX SALE จากทุก 6 เดือน) อยู่ใน Apr
 -- Exclude: fallback ที่ effective_sales_owner = Admin Freshket
+--
+-- ★ v_expfix (2026-08-07): new_user_exp_date ต้องอ่านจาก dwh.order (MAX) เหมือน
+--   q3_2026_movement_rep_view.sql ไม่ใช่จาก dim.user_master — ดูเหตุผลเต็มที่ CTE
+--   outlet_exp_date_from_orders ด้านล่าง (ไฟล์นี้กับไฟล์ NRR ต้องนิยาม "เดือนที่
+--   รับโอน" ตรงกันเสมอ ไม่งั้นหน้าจอกับค่าคอมฯ พูดคนละเรื่อง)
 -- ============================================================
 
 WITH
@@ -68,6 +73,34 @@ kam_name_list AS (
   ]) AS kam_name
 ),
 
+-- ── v_expfix (2026-08-07): แหล่ง new_user_exp_date ที่ถูกต้อง ────────────────
+-- ลอกนิยามมาจาก q3_2026_movement_rep_view.sql (CTE outlet_exp_date) ทุกบรรทัด
+-- เพื่อให้ "เดือนที่รับโอน" ของไฟล์นี้ = ของหน้า NRR เป๊ะ
+--
+-- บั๊กที่แก้ (บุชจับได้จาก raw 2026-08-07): user_master_latest เลือกแถวเดียวต่อ
+-- res_id ด้วย QUALIFY ... ORDER BY lasted_order_date DESC แล้วหยิบ exp date จาก
+-- แถวนั้น — ซึ่งบ่อยครั้งเป็นค่าเก่าหรือ NULL ทั้งที่ตารางออเดอร์มีค่าใหม่กว่า
+-- ผลที่เกิดจริงกับงวด ก.ค.:
+--   · Lake Park (Cream): raw exp = 30 มิ.ย. แต่ master ให้ พ.ค. → ไปโผล่งวด มิ.ย.
+--     แทนที่จะเป็น ก.ค. (หน้า NRR จัดเป็น cohort มิ.ย. ถูกแล้ว)
+--   · ปิโตรเลียมไทย (Ning): master ให้ NULL → ตกไป PATH B ที่เดาเดือนจาก
+--     last_sale_order_date รายสาขา → บัญชีเดียวถูกนับเป็น handover ซ้ำ 4 เดือนติด
+--     (พ.ค./มิ.ย./ก.ค./ส.ค. คนละชุดสาขา) ทั้งที่ raw บอกว่ารับโอนครั้งเดียว 30 มิ.ย.
+-- MAX() ตรงกับ rep_view และแก้ทั้งสองอาการ · ใช้เป็นค่าหลัก ถ้าออเดอร์ไม่มีค่าเลย
+-- ค่อยถอยไปใช้ของ user_master (พฤติกรรมเดิม ไม่ทำให้เคสที่เคยถูกอยู่แล้วหาย)
+outlet_exp_date_from_orders AS (
+  SELECT
+    CAST(o.user_id AS STRING)      AS user_id,
+    DATE(MAX(o.new_user_exp_date)) AS new_user_exp_date
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.new_user_exp_date IS NOT NULL
+    AND o.user_id IS NOT NULL
+    AND o.account_type NOT IN ('Consumer','Enduser','Exclude','TEST')
+    -- วันที่ยังไม่ถึง = ยังเป็นลูกค้าใหม่อยู่ ยังไม่ถือว่าโอน (ตรงกับ rep_view)
+    AND DATE(o.new_user_exp_date) <= DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY)
+  GROUP BY 1
+),
+
 -- QUALIFY ก่อน filter commercial_owner (ตรงกับ my_sql)
 user_master_latest AS (
   SELECT
@@ -84,14 +117,19 @@ user_master_latest AS (
       ''
     ))                                             AS new_kam_name,
     DATE(um.first_dollar_date)       AS first_dollar_date,
-    DATE(um.new_user_exp_date)       AS new_user_exp_date,
+    -- v_expfix: ออเดอร์เป็นแหล่งหลัก (ตรงกับ rep_view) · master เป็น fallback
+    COALESCE(oed.new_user_exp_date, DATE(um.new_user_exp_date))       AS new_user_exp_date,
     DATE(um.lasted_order_date)       AS lasted_order_date,
-    FORMAT_DATE('%Y-%m', DATE(um.new_user_exp_date)) AS exp_month,
+    FORMAT_DATE('%Y-%m',
+      COALESCE(oed.new_user_exp_date, DATE(um.new_user_exp_date)))    AS exp_month,
     um.sales_owner                   AS raw_sales_owner,
     um.staff_owner                   AS raw_staff_owner,
     um.kam_owner                     AS raw_kam_owner,
     um.ka_owner                      AS raw_ka_owner
   FROM `freshket-rn.dim.user_master` um
+  -- 1:1 ต่อ res_id → จำนวนแถวไม่เปลี่ยน QUALIFY ด้านล่างทำงานเหมือนเดิม
+  LEFT JOIN outlet_exp_date_from_orders oed
+    ON CAST(um.res_id AS STRING) = oed.user_id
   WHERE um.res_id IS NOT NULL
     AND um.account_guid IS NOT NULL
     AND um.account_type IN ('SA', 'MC', 'Chain', 'Unknown')

@@ -7327,6 +7327,44 @@ function _nrrCommPrevComponents(row) {
   };
 }
 
+// v_hoparity (2026-08-07): เทียบ "บัญชีที่ได้ handover" ระหว่างสองไฟล์ที่ต้องพูด
+// ตรงกันแต่ดันไม่ตรง — portview_handover.csv (ตัวคิดเงิน) vs kam_rep_view.csv
+// (ตัวขึ้นหน้า NRR) · ต้นเหตุที่เจอ: Q10 อ่าน new_user_exp_date จาก dim.user_master
+// ซึ่งให้ค่าเก่า/NULL ส่วน rep_view อ่าน MAX จาก dwh.order (ค่าถูก) → บัญชีเดียวกัน
+// ถูกจัดคนละเดือน หรือถูกนับซ้ำหลายเดือน (แก้ที่ sql/Q10_commission_handover_final.sql
+// แล้ว รอ data team รันใหม่) · ระหว่างนี้ต้องมีธงเตือนบนพรีวิว ไม่ให้กดยืนยัน
+// เขียนทับเงินตอนสองไฟล์ยังไม่ตรงกันโดยไม่รู้ตัว
+function _nrrHandoverParityFlags(kamEmail, period, hoNew) {
+  try {
+    var qd = window.bulkQnrrData;
+    if (!qd || !qd.loaded || !hoNew) return [];
+    var prevMonth = _nrrPrevMonthOf(period);
+    // ฝั่งหน้า NRR: บัญชีที่ถูกจัดเป็น handover ของ cohort เดือนก่อนงวดนี้
+    var nrrAccs = {};
+    ((qd.byKamEmail && qd.byKamEmail[kamEmail]) || []).forEach(function (r) {
+      if (r.period_month === period && r.movement_type === 'handover' && r.cohort_month === prevMonth) {
+        nrrAccs[r.account_id] = r.account_name || r.account_id;
+      }
+    });
+    // ฝั่งไฟล์คิดเงิน
+    var hoAccs = {};
+    (hoNew.detail || []).forEach(function (d) { hoAccs[d.account_id] = d.name || d.account_id; });
+
+    var missing = Object.keys(nrrAccs).filter(function (a) { return !hoAccs[a]; });
+    var extra   = Object.keys(hoAccs).filter(function (a) { return !nrrAccs[a]; });
+    if (!missing.length && !extra.length) return [];
+
+    var parts = [];
+    if (missing.length) parts.push('ขาด ' + missing.length + ' บัญชี (' + missing.slice(0, 2).map(function (a) { return nrrAccs[a]; }).join(', ') + (missing.length > 2 ? ' ฯลฯ' : '') + ')');
+    if (extra.length)   parts.push('เกิน ' + extra.length + ' บัญชี (' + extra.slice(0, 2).map(function (a) { return hoAccs[a]; }).join(', ') + (extra.length > 2 ? ' ฯลฯ' : '') + ')');
+    return ['handover ไม่ตรงกับหน้า NRR: ' + parts.join(' · ') + ' — ไฟล์ handover จัดเดือนรับโอนคนละแบบกับหน้า NRR (รอ data team รัน Q10 ตัวใหม่) ตรวจก่อนยืนยัน'];
+  } catch (e) {
+    console.warn('[nrr full-rewrite] parity check ไม่สำเร็จ', e);
+    return [];
+  }
+}
+window._nrrHandoverParityFlags = _nrrHandoverParityFlags;
+
 // คำนวณแถวเดียวใหม่ทุก component · ctx = { evalLabel, bundles: {email→bundle} }
 // คืน {skip} เมื่อทำไม่ได้ — ไม่มีทางคืนตัวเลขที่เดามา
 function _nrrRecomputeRowFull(row, period, ctx) {
@@ -7383,6 +7421,9 @@ function _nrrRecomputeRowFull(row, period, ctx) {
       hoNew = bd.handover || { payout: frozen.handover };
       frozenList.push('handover');
       flags.push('handover แช่ค่าล็อกไว้ — ไฟล์ handover ไม่มีข้อมูลเดือนนี้');
+    } else {
+      // คิดสดได้ → เทียบกับหน้า NRR ว่าบัญชีตรงกันไหม (v_hoparity)
+      flags = flags.concat(_nrrHandoverParityFlags(email, period, hoNew));
     }
     var hoPayout = Number(hoNew.payout || 0);
 
