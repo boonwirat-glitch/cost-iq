@@ -64,7 +64,7 @@ async function nrrInitApp() {
     if (drillBtn) { nrrOpenCommissionDrawer(drillBtn.dataset.email, drillBtn.dataset.name, drillBtn.dataset.period); return; }
     var tabBtn = e.target.closest('.nrr-comm-tab');
     if (tabBtn) { nrrCommViewMode = tabBtn.dataset.mode; nrrRenderCommissionSection(); return; }
-    if (e.target.id === 'nrr-comm-export') { nrrExportCommissionDetailCsv(); return; }
+    if (e.target.id === 'nrr-comm-export') { nrrExportCommissionDetailExcel(); return; }
   });
   document.getElementById('nrr-comm-strip').addEventListener('change', function (e) {
     if (e.target.id !== 'nrr-comm-period-select') return;
@@ -3098,7 +3098,7 @@ function nrrRenderCommissionSection() {
     document.getElementById('nrr-comm-strip').innerHTML = '<div class="nrr-comm-ds">' + tabsHtml +
       '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
       '<select class="nrr-comm-period-select" id="nrr-comm-period-select"><option>กำลังโหลดเดือน...</option></select>' +
-      '<button type="button" class="btn-secondary" id="nrr-comm-export" style="margin-left:8px">Export CSV (รายละเอียดทุกคน)</button>' +
+      '<button type="button" class="btn-secondary" id="nrr-comm-export" style="margin-left:8px">Export Excel (รายละเอียดทุกคน)</button>' +
       '<div id="nrr-comm-fulltable-body"><div class="ds-skel" style="height:160px"></div></div>' +
       '</div>';
     nrrFetchAvailablePeriods().then(function (periods) {
@@ -4736,172 +4736,412 @@ function _nrrReconRowsFor(kamEmail, period) {
            num_audit: (bm && bm.numerator_audit) || [] };
 }
 
-// v_recon2 (backlog ข้อ 12): export เป็น async แล้ว — ต้องรอ upsell bundle ต่อ KAM
-// โหลดก่อน ถึงจะแตก P1/P3 เป็นรายร้าน/สาขาได้ (snapshot เก็บแค่ระดับ group แต่
-// bundle มี account_id/outlet_id ครบทุกแถว และ nrrComputeUpsellSku คืน
-// accountId/outletId ติดมาใน groups[] อยู่แล้ว — แค่ไม่เคยถูกพ่นออกไฟล์)
-async function nrrExportCommissionDetailCsv() {
-  var period = nrrCommSelectedPeriod;
-  var cached = nrrCommPeriodCache[period];
-  if (!period || !cached || !cached.loaded || !cached.rows.length) return;
+// ── v_xlsx (RECON-GRADE v2 งาน X): Export = Excel ไฟล์เดียวหลายชีท ─────────
+// แทน CSV แบนตัวเดิมทั้งตัว (บุช: "หลาย format ยัดตารางเดียว อ่านไม่ได้") —
+// ทุก cell ของ CSV เดิมย้ายไปอยู่ในชีทของมันเอง สองไฟล์ = สองความจริงตอน audit
+// จึงเลิก CSV ไปเลย · หลักการ field ตามชีท reconcile จริงของบุช
+// (Commission_May2026_v6): แบน + ตัวเลขจริง (ss:Type Number) + คีย์ ทีม/อีเมล
+// ทุกชีท ให้ SUMIFS/SUMPRODUCT/pivot เกาะได้ทันที · ฐาน↔เดือนปัจจุบันอยู่
+// "แถวเดียวกัน" เสมอ (NRR_OUTLETS รวม BASE+PERF ที่เคยแยก 2 แถว)
 
-  // โหลด bundle ของทุก KAM ในงวดพร้อมกันก่อนเริ่มประกอบไฟล์ — ที่เหลือ synchronous
+// map ความเป็นเจ้าของต่อร้าน จาก kam_rep_view ที่โหลดอยู่แล้ว — ตอบ "transfer
+// มาจาก portfolio/staff ไหน" + new_user_exp_date/first dollar ที่บุชขอ
+// สร้างครั้งเดียวต่อ export (O(rows)) ไม่ใช่ Array.find ต่อแถว
+function _nrrOwnershipMap() {
+  var qd = window.bulkQnrrData;
+  var map = {};
+  if (!qd || !qd.loaded) return map;
+  (qd.allRows || []).forEach(function (r) {
+    var k = r.account_id + '|' + r.outlet_id;
+    // แถวเดือนไหนก็ได้ (ownership fields ซ้ำกันทุกเดือน) — เก็บตัวแรกพอ
+    if (!map[k]) {
+      map[k] = {
+        transfer_scope: r.transfer_scope, base_portfolio: r.base_portfolio,
+        current_portfolio: r.current_portfolio, base_staff: r.base_staff_owner,
+        latest_staff: r.latest_staff_owner, base_kam: r.base_kam_email,
+        latest_kam: r.latest_kam_email, latest_commercial: r.latest_commercial_owner,
+        cohort_month: r.cohort_month, first_dollar_date: r.first_dollar_date,
+        first_dollar_owner: r.first_dollar_owner, new_user_exp_date: r.new_user_exp_date
+      };
+    }
+  });
+  return map;
+}
+
+// ประกอบ workbook object — แยกจากตัวยิงไฟล์เพื่อให้ harness เรียกตรงๆ ได้
+// (tools/verify_commission_workbook.js) · คืน null ถ้างวดยังไม่โหลด
+async function nrrBuildCommissionWorkbook(period) {
+  var cached = nrrCommPeriodCache[period];
+  if (!period || !cached || !cached.loaded || !cached.rows.length) return null;
+
+  // preload: bundle ต่อ KAM (P1/P3 รายร้าน) + portview/outlets (ชื่อ) — ชื่อเคย
+  // หายใน export เก่าเพราะไม่เคย fetch สองไฟล์นี้ก่อน build
   var kamEmails = cached.rows
     .filter(function (r) { return r.beneficiary_role === 'kam'; })
     .map(function (r) { return r.beneficiary_email; });
   var bundleMap = {};
+  var jobs = [];
   if (typeof nrrFetchUpsellBundle === 'function') {
-    var exportBtn = document.getElementById('nrr-comm-export');
-    if (exportBtn) { exportBtn.disabled = true; exportBtn.textContent = 'กำลังโหลดข้อมูล SKU...'; }
-    try {
-      await Promise.all(kamEmails.map(function (em) {
-        return nrrFetchUpsellBundle(em, QNRR_CFG.base_month)
-          .then(function (b) { bundleMap[em] = b; })
-          .catch(function () { bundleMap[em] = null; });
-      }));
-    } finally {
-      if (exportBtn) { exportBtn.disabled = false; exportBtn.textContent = 'Export CSV (รายละเอียดทุกคน)'; }
-    }
+    jobs = kamEmails.map(function (em) {
+      return nrrFetchUpsellBundle(em, QNRR_CFG.base_month)
+        .then(function (b) { bundleMap[em] = b; })
+        .catch(function () { bundleMap[em] = null; });
+    });
+  }
+  if (typeof nrrFetchPortviewCsv === 'function') jobs.push(nrrFetchPortviewCsv().catch(function () {}));
+  if (typeof nrrFetchBulkOutletsCsv === 'function') jobs.push(nrrFetchBulkOutletsCsv().catch(function () {}));
+  await Promise.all(jobs);
+
+  // name lookup map ครั้งเดียว (portview allRows เป็น array — find ต่อแถวแพงเกิน)
+  var acctNames = {};
+  ((window.bulkPortviewData && window.bulkPortviewData.allRows) || []).forEach(function (r) {
+    if (r.account_id && !acctNames[r.account_id]) acctNames[r.account_id] = r.account_name || '';
+  });
+  function _acct(id) { return acctNames[id] || (typeof _nrrAccountNameFor === 'function' ? _nrrAccountNameFor(id) : id) || ''; }
+  function _out(accId, outId) { return (typeof _nrrOutletNameFor === 'function' ? _nrrOutletNameFor(accId, String(outId)) : outId) || ''; }
+  var own = _nrrOwnershipMap();
+  function _own(accId, outId) { return own[accId + '|' + outId] || {}; }
+
+  // ทีม: map อีเมล TL → ชื่อ (จากแถว TL ในงวดเดียวกัน) — คีย์ Squad ของทุกชีท
+  var tlNames = {};
+  cached.rows.forEach(function (r) {
+    if (r.beneficiary_role === 'tl') tlNames[r.beneficiary_email] = (r.breakdown || {}).team_lead_name || String(r.beneficiary_email).split('@')[0];
+  });
+  function _team(r) {
+    if (r.beneficiary_role === 'tl') return tlNames[r.beneficiary_email] || '';
+    return r.team_lead_email ? (tlNames[r.team_lead_email] || String(r.team_lead_email).split('@')[0]) : '';
   }
 
-  var headers = ['period_month', 'row_type', 'beneficiary_email', 'beneficiary_name', 'role',
-    'account_id', 'account_name', 'outlet_id', 'outlet_name', 'account_type', 'cohort_month',
-    'movement_type', 'movement_effective',
-    'base_gmv', 'base_days', 'base_norm_30d', 'in_base', 'exclude_reason',
-    'curr_gmv', 'curr_days', 'curr_norm_30d', 'in_numerator', 'numerator_reason', 'waived',
-    'detail', 'gmv', 'applied_rate_or_retention_pct', 'amount'];
-  var rows = [];
-  // ตัวช่วยประกอบแถวให้คอลัมน์ตรงกันทุกชนิดแถว (แถวไหนไม่มีค่าก็เว้นว่าง)
-  function row(o) {
-    return [period, o.t, o.em || '', o.nm || '', o.role || '',
-      o.acc_id || '', o.acc || '', o.out_id || '', o.out || '', o.atype || '', o.cohort || '',
-      o.mv || '', o.mve || '',
-      o.bg == null ? '' : o.bg, o.bd == null ? '' : o.bd, o.bn == null ? '' : Math.round(o.bn),
-      o.inbase == null ? '' : (o.inbase ? 'Y' : 'N'), o.exr || '',
-      o.cg == null ? '' : o.cg, o.cd == null ? '' : o.cd, o.cn == null ? '' : Math.round(o.cn),
-      o.innum == null ? '' : (o.innum ? 'Y' : 'N'), o.nr || '', o.wv == null ? '' : (o.wv ? 'Y' : 'N'),
-      o.d || '', o.g == null ? '' : o.g, o.rt == null ? '' : o.rt, o.amt == null ? '' : o.amt];
+  var _pp = period.split('-');
+  var evalLabel = nrrThMonthLabel(new Date(parseInt(_pp[0], 10), parseInt(_pp[1], 10) - 1, 1));
+  var isLiveMonth = (typeof nrrCommCurrentMonthLabel === 'function') && evalLabel === nrrCommCurrentMonthLabel();
+  // gate P3 ย้อนเดือน — ตรวจจากทุก bundle: มีใครมี existing split ของเดือนนี้มั้ย
+  var p3Covered = isLiveMonth || kamEmails.some(function (em) {
+    return typeof nrrUpsellBundleCoversPeriod === 'function' && nrrUpsellBundleCoversPeriod(bundleMap[em], evalLabel);
+  });
+
+  var wb = { period: period, sheets: [] };
+  function sheet(name, headers, colTypes) {
+    var s = { name: name, headers: headers, colTypes: colTypes, rows: [] };
+    wb.sheets.push(s);
+    return s;
   }
+
+  var shReadme = sheet('README', ['รายการ', 'ค่า'], ['s', 's']);
+  var shSummary = sheet('SUMMARY',
+    ['ทีม', 'ชื่อ', 'อีเมล', 'role',
+     'ฐาน NRR สด (x30)', 'ตัวตั้ง NRR สด (x30)', '%NRR ล็อก', '%NRR สด', 'ล็อกเมื่อ', 'คอม NRR ฿',
+     'HO ร้าน', 'HO ฐาน ฿', 'HO เดือนนี้ ฿', 'HO retention %', 'HO ฿', 'HO สถานะ',
+     'Expansion GMV ฿', 'Exp rate', 'Expansion ฿',
+     'P1 GMV ฿', 'P1 ฿', 'P3 ส่วนเพิ่ม ฿', 'P3 ฿', 'Upsell รวม ฿',
+     'ร้าน core_nrr', 'ร้าน expansion', 'Subtotal ฿', 'Gate ×', 'จ่ายจริง ฿'],
+    ['s', 's', 's', 's', 'n', 'n', 'n', 'n', 's', 'n', 'n', 'n', 'n', 'n', 'n', 's',
+     'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n']);
+  var shTl = sheet('TL_COMMISSION',
+    ['ทีม', 'ชื่อ', 'อีเมล', 'ฐานทีมสด (x30)', 'ตัวตั้งทีมสด (x30)', '%NRR ล็อก', '%NRR สด (ทีม)',
+     'คอม NRR ฿', 'Team Upsell GMV ฿', 'Upsell %', 'Multiplier ×', 'จ่ายจริง ฿', 'ล็อกเมื่อ'],
+    ['s', 's', 's', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 'n', 's']);
+  var shOutlets = sheet('NRR_OUTLETS',
+    ['ทีม', 'KAM', 'อีเมล', 'account_id', 'ชื่อบัญชี', 'outlet_id', 'ชื่อร้าน', 'ประเภท', 'cohort_month',
+     'สถานะข้อมูล', 'movement (เดือนฐาน)', 'movement (เดือนนี้)',
+     'GMV เดือนฐาน ฿', 'วันขายฐาน', 'ฐาน norm30 ฿', 'นับเข้าฐาน', 'เหตุผลไม่นับ',
+     'GMV เดือนนี้ ฿', 'วันขายเดือนนี้', 'norm30 เดือนนี้ ฿', 'นับเข้าตัวตั้ง', 'เหตุผล', 'ยกเว้น (waived)',
+     'transfer_scope', 'portfolio เดิม', 'portfolio ปัจจุบัน', 'staff เดิม', 'staff ล่าสุด',
+     'KAM เดิม', 'KAM ล่าสุด', 'วันหมดสถานะลูกค้าใหม่', 'first dollar วันที่', 'first dollar เจ้าของ'],
+    ['s', 's', 's', 's', 's', 's', 's', 's', 's', 's', 's', 's',
+     'n', 'n', 'n', 's', 's', 'n', 'n', 'n', 's', 's', 's',
+     's', 's', 's', 's', 's', 's', 's', 's', 's', 's']);
+  var shUpsell = sheet('UPSELL',
+    ['ทีม', 'KAM', 'อีเมล', 'ชนิด', 'แหล่งข้อมูล', 'เดือนที่ประเมิน',
+     'account_id', 'ชื่อบัญชี', 'outlet_id', 'ชื่อร้าน', 'หมวด', 'กลุ่มสินค้า',
+     'GMV เดือนนี้ ฿', 'ฐานสูงสุด ฿ (P3)', 'เดือนฐานสูงสุด', 'ส่วนเพิ่ม ฿', 'rate', 'คอมมิชชั่น ฿', 'สถานะ'],
+    ['s', 's', 's', 's', 's', 's', 's', 's', 's', 's', 's', 's', 'n', 'n', 's', 'n', 'n', 'n', 's']);
+  var shExp = sheet('EXPANSION',
+    ['ทีม', 'KAM', 'อีเมล', 'account_id', 'ชื่อบัญชี', 'outlet_id', 'ชื่อร้าน', 'ประเภท', 'GMV เดือนนี้ ฿', 'rate', 'คอมมิชชั่น ฿'],
+    ['s', 's', 's', 's', 's', 's', 's', 's', 'n', 'n', 'n']);
+  var shHo = sheet('HANDOVER',
+    ['ทีม', 'KAM', 'อีเมล', 'account_id', 'ชื่อบัญชี', 'เดือนที่รับโอน', 'GMV ฐานตอนรับโอน ฿', 'GMV เดือนนี้ ฿',
+     'retention % (รวมทั้งคน)', 'วันหมดสถานะลูกค้าใหม่', 'first dollar วันที่', 'first dollar เจ้าของ', 'สถานะข้อมูล'],
+    ['s', 's', 's', 's', 's', 's', 'n', 'n', 'n', 's', 's', 's', 's']);
+  var shRecon = sheet('RECON',
+    ['ทีม', 'ชื่อ', 'อีเมล', 'รายการ', 'ค่าสด', 'ค่าล็อก', 'ต่าง', 'ฐานสด (x30) ฿', 'ตัวตั้งสด (x30) ฿', 'ล็อกเมื่อ', 'สาเหตุที่ต่างได้'],
+    ['s', 's', 's', 's', 'n', 'n', 'n', 'n', 'n', 's', 's']);
+
+  var lockedAtMax = '';
+  cached.rows.forEach(function (r) {
+    var bd = r.breakdown || {};
+    var ts = bd.recomputed_at || bd.computed_at || r.updated_at || '';
+    if (ts > lockedAtMax) lockedAtMax = ts;
+  });
 
   cached.rows.forEach(function (r) {
     var bd = r.breakdown || {};
     var email = r.beneficiary_email;
     var name = bd.kam_name || bd.team_lead_name || email;
     var role = r.beneficiary_role;
+    var team = _team(r);
     var ho = bd.handover || {};
-    var outlet = bd.upsell_outlet || {};
+    var outletC = bd.upsell_outlet || {};
     var sku = bd.upsell_sku || {};
+    var lockedPct = r.governed_nrr_pct != null ? Number(r.governed_nrr_pct) : (bd.nrr_pct != null ? Number(bd.nrr_pct) : null);
+    var lockedAt = bd.recomputed_at || bd.computed_at || '';
 
-    var C = { em: email, nm: name, role: role };
-    function S(o) { rows.push(row(Object.assign({}, C, o))); }
-
-    S({ t: 'SUMMARY_NRR', d: 'NRR% ที่ล็อกไว้', rt: bd.nrr_pct, amt: bd.nrr_payout || 0 });
-    // v_hofix: ธง data_missing ทำให้ ฿0 ที่มาจากข้อมูลขาด แยกออกจาก ฿0 จริง
-    S({ t: 'SUMMARY_HANDOVER', amt: ho.payout || 0, rt: ho.retention_pct,
-        d: ho.data_missing ? 'ไม่มีข้อมูลเดือนนี้ในไฟล์ (ไม่ใช่ ฿0 จริง)' : (ho.accounts || 0) + ' ร้าน' });
-    S({ t: 'SUMMARY_EXPANSION', g: outlet.outlet_gmv || 0, amt: outlet.commission || 0 });
-    S({ t: 'SUMMARY_P1', g: (sku.p1 && sku.p1.gmv) || 0, amt: (sku.p1 && sku.p1.comm) || 0 });
-    S({ t: 'SUMMARY_P3', g: (sku.p3 && sku.p3.gmv_incremental) || 0, amt: (sku.p3 && sku.p3.comm) || 0 });
-    S({ t: 'SUMMARY_FINAL_PAYOUT', amt: r.payout_amount || 0 });
-
-    if (role !== 'kam') return; // outlet-level split only meaningful per-KAM
-
-    // ── v_recon: หลักฐาน %NRR ระดับรายสาขา ── ดึงจาก audit ที่ engine คายเอง
-    var rec = (typeof _nrrReconRowsFor === 'function') ? _nrrReconRowsFor(email, period) : null;
-    if (rec) {
-      var liveBase = rec.bm ? rec.bm.effective_base_norm : null;
-      var liveNum  = rec.bm ? rec.bm.nrr_curr_norm : null;
-      var livePct  = rec.bm ? rec.bm.nrr_pct : null;
-      // แถวกระทบยอด: อธิบายช่องว่างระหว่างเลขบนจอ (คำนวณสด) กับเลขที่ล็อกไว้ในงวด
-      S({ t: 'RECON_NRR', d: 'ฐาน(x30)=' + Math.round((liveBase || 0) * 30) +
-            ' · ตัวตั้ง(x30)=' + Math.round((liveNum || 0) * 30) +
-            ' · สด=' + (livePct == null ? 'n/a' : livePct) + '%' +
-            ' · ล็อกไว้=' + (bd.nrr_pct == null ? 'n/a' : bd.nrr_pct) + '%' +
-            ' · ต่าง=' + (livePct != null && bd.nrr_pct != null ? (Math.round((livePct - bd.nrr_pct) * 100) / 100) : 'n/a') +
-            ' · ล็อกเมื่อ=' + (bd.computed_at || '-') +
-            ' (ต่างกันได้ถ้ายอดเดือนนั้นขยับหลังล็อก)',
-          bn: liveBase, cn: liveNum, rt: livePct, amt: bd.nrr_pct });
-
-      // ฐาน: ทุก outlet ของเดือนฐาน + บอกว่าเข้า/ไม่เข้า เพราะอะไร
-      rec.base_audit.forEach(function (a) {
-        S({ t: 'BASE_OUTLET', acc_id: a.account_id, acc: a.account_name,
-            out_id: a.outlet_id, out: a.outlet_name, atype: a.account_type, cohort: a.cohort_month,
-            mv: a.movement_type, mve: a.movement_effective,
-            bg: a.base_gmv, bd: a.base_days, bn: a.base_norm_30d,
-            inbase: a.included, exr: a.exclude_reason });
-      });
-      // ผลงานเดือนที่เลือก: บอกว่าเข้าตัวตั้งมั้ย เพราะอะไร (เห็นเคส "อยู่ในตัวหารแต่ไม่อยู่ในตัวตั้ง")
-      rec.num_audit.forEach(function (a) {
-        S({ t: 'PERF_OUTLET', acc_id: a.account_id, acc: a.account_name,
-            out_id: a.outlet_id, out: a.outlet_name, atype: a.account_type, cohort: a.cohort_month,
-            mv: a.movement_type, mve: a.movement_effective, bg: a.base_gmv,
-            cg: a.curr_gmv, cd: a.curr_days, cn: a.curr_norm_30d,
-            innum: a.counted, nr: a.reason, wv: a.waived });
-      });
+    // ── TL: ชีทของตัวเอง (เชนคูณครบเป็นคอลัมน์ ตาม pattern ชีทบุช) ──
+    if (role === 'tl') {
+      var tRes = (typeof nrrTeamResult === 'function') ? nrrTeamResult(email) : null;
+      var tBm = tRes && tRes.by_month ? tRes.by_month[period] : null;
+      var parts = (typeof _nrrCommMultParts === 'function') ? _nrrCommMultParts(bd) : { mult: NaN, upsellPct: null };
+      shTl.rows.push([team || name, name, email,
+        tBm ? Math.round((tBm.effective_base_norm || 0) * 30) : '',
+        tBm ? Math.round((tBm.nrr_curr_norm || 0) * 30) : '',
+        lockedPct == null ? '' : lockedPct,
+        tBm && tBm.nrr_pct != null ? tBm.nrr_pct : '',
+        Number(bd.nrr_payout || 0),
+        bd.team_upsell_gmv != null ? Number(bd.team_upsell_gmv) : '',
+        parts.upsellPct != null ? parts.upsellPct : '',
+        isNaN(parts.mult) ? '' : parts.mult,
+        Number(r.payout_amount || 0), lockedAt]);
+      // RECON ของ TL: %NRR สด vs ล็อก
+      shRecon.rows.push([team || name, name, email, '%NRR (ทีม)',
+        tBm && tBm.nrr_pct != null ? tBm.nrr_pct : '', lockedPct == null ? '' : lockedPct,
+        (tBm && tBm.nrr_pct != null && lockedPct != null) ? Math.round((tBm.nrr_pct - lockedPct) * 100) / 100 : '',
+        tBm ? Math.round((tBm.effective_base_norm || 0) * 30) : '', tBm ? Math.round((tBm.nrr_curr_norm || 0) * 30) : '',
+        lockedAt, 'ยอดเดือนนั้นขยับหลังล็อก / waiver ตัดสินหลังล็อก']);
+      return;
     }
 
-    var outlets = (typeof nrrOutletsForKam === 'function') ? nrrOutletsForKam(email, period) : [];
-    outlets.filter(function (o) { return o.movement === 'expansion'; })
-      .forEach(function (o) {
-        var rr = o.row; var gmv = parseFloat(rr.curr_gmv) || 0;
-        S({ t: 'EXPANSION_OUTLET', acc_id: rr.account_id, acc: rr.account_name,
-            out_id: rr.outlet_id, out: rr.res_name, atype: rr.account_type,
-            mv: 'expansion', cg: gmv, rt: 0.005, amt: Math.round(gmv * 0.005) });
-      });
-    (ho.detail || []).forEach(function (d) {
-      S({ t: 'HANDOVER_ACCOUNT(no_outlet_split)', acc_id: d.account_id || '', acc: d.name || '',
-          d: 'โอนเดือน ' + (d.transfer_month || '-'), bg: d.baseline || 0, cg: d.current || 0,
-          rt: ho.retention_pct });
+    // ── SUMMARY (ทุก role ที่ไม่ใช่ tl — kam เต็มคอลัมน์ role อื่นเท่าที่มี) ──
+    var rec = role === 'kam' && typeof _nrrReconRowsFor === 'function' ? _nrrReconRowsFor(email, period) : null;
+    var liveBm = rec && rec.bm;
+    var hoBase = 0, hoCurr = 0;
+    (ho.detail || []).forEach(function (d) { hoBase += Number(d.baseline || 0); hoCurr += Number(d.current || 0); });
+    shSummary.rows.push([team, name, email, role,
+      liveBm ? Math.round((liveBm.effective_base_norm || 0) * 30) : '',
+      liveBm ? Math.round((liveBm.nrr_curr_norm || 0) * 30) : '',
+      lockedPct == null ? '' : lockedPct,
+      liveBm && liveBm.nrr_pct != null ? liveBm.nrr_pct : '',
+      lockedAt, Number(bd.nrr_payout || 0),
+      ho.accounts || 0, Math.round(hoBase), Math.round(hoCurr),
+      ho.retention_pct != null ? ho.retention_pct : '', Number(ho.payout || 0),
+      ho.data_missing ? 'ไม่มีข้อมูลเดือนนี้ในไฟล์ — ไม่ใช่ ฿0 จริง' : 'ปกติ',
+      Number(outletC.outlet_gmv || 0), outletC.rate != null ? outletC.rate : 0.005, Number(outletC.commission || 0),
+      Number((sku.p1 && sku.p1.gmv) || 0), Number((sku.p1 && sku.p1.comm) || 0),
+      Number((sku.p3 && sku.p3.gmv_incremental) || 0), Number((sku.p3 && sku.p3.comm) || 0),
+      Number((sku.p1 && sku.p1.comm) || 0) + Number((sku.p3 && sku.p3.comm) || 0),
+      liveBm && liveBm.outlets ? (liveBm.outlets.core_nrr || 0) : '',
+      liveBm && liveBm.outlets ? (liveBm.outlets.expansion || 0) : '',
+      bd.components_subtotal != null ? Number(bd.components_subtotal) : '',
+      bd.gmv_gate && bd.gmv_gate.cap_multiplier != null ? Number(bd.gmv_gate.cap_multiplier) : '',
+      Number(r.payout_amount || 0)]);
+
+    if (role !== 'kam') return; // ชีท detail มีความหมายเฉพาะ KAM (สโคปเดิมของ export)
+
+    // ── NRR_OUTLETS: ฐาน ∪ เดือนนี้ — หนึ่งร้านหนึ่งแถว (บุชขอชัดเจน) ──
+    var merged = {};
+    (rec ? rec.base_audit : []).forEach(function (a) {
+      merged[a.account_id + '|' + a.outlet_id] = { b: a, p: null };
     });
-    ((sku.p1 && sku.p1.groups) || []).forEach(function (g) {
-      S({ t: 'P1_CATEGORY(no_outlet_split)', d: g.category + ' / ' + g.groupKey,
-          g: g.total_gmv || 0, rt: g.applied_rate, amt: g.commission || 0 });
+    (rec ? rec.num_audit : []).forEach(function (a) {
+      var k = a.account_id + '|' + a.outlet_id;
+      if (merged[k]) merged[k].p = a; else merged[k] = { b: null, p: a };
     });
-    ((sku.p3 && sku.p3.groups) || []).forEach(function (g) {
-      S({ t: 'P3_CATEGORY(no_outlet_split)', d: g.category + ' / ' + g.groupKey,
-          g: g.incremental || 0, rt: g.applied_rate, amt: g.commission || 0 });
+    Object.keys(merged).forEach(function (k) {
+      var m = merged[k];
+      var a = m.b || m.p;
+      var ow = _own(a.account_id, a.outlet_id);
+      shOutlets.rows.push([team, name, email,
+        a.account_id, a.account_name || _acct(a.account_id), a.outlet_id, a.outlet_name || _out(a.account_id, a.outlet_id),
+        a.account_type || '', a.cohort_month || ow.cohort_month || '',
+        m.b && m.p ? 'ทั้งสองเดือน' : (m.b ? 'เฉพาะเดือนฐาน' : 'เฉพาะเดือนนี้'),
+        m.b ? (m.b.movement_type || '') : '', m.p ? (m.p.movement_effective || m.p.movement_type || '') : '',
+        m.b ? Number(m.b.base_gmv || 0) : '', m.b ? Number(m.b.base_days || 0) : '', m.b ? Math.round(m.b.base_norm_30d || 0) : '',
+        m.b ? (m.b.included ? 'Y' : 'N') : '', m.b ? (m.b.exclude_reason || '') : '',
+        m.p ? Number(m.p.curr_gmv || 0) : '', m.p ? Number(m.p.curr_days || 0) : '', m.p ? Math.round(m.p.curr_norm_30d || 0) : '',
+        m.p ? (m.p.counted ? 'Y' : 'N') : '', m.p ? (m.p.reason || '') : '', m.p ? (m.p.waived ? 'Y' : 'N') : '',
+        ow.transfer_scope || '', ow.base_portfolio || '', ow.current_portfolio || '',
+        ow.base_staff || '', ow.latest_staff || '',
+        ow.base_kam || '', ow.latest_kam || '',
+        ow.new_user_exp_date || '', ow.first_dollar_date || '', ow.first_dollar_owner || '']);
     });
 
-    // ── v_recon2: P1/P3 รายร้าน/สาขา จาก bundle สด ──
-    // แถวพวกนี้มาจากการรัน nrrComputeUpsellSku กับ bundle "วันนี้" + rate ปัจจุบัน
-    // ใน target_settings — ยอดรวมจึงอาจต่างจากแถว P1/P3_CATEGORY ด้านบน (ซึ่ง
-    // แช่แข็ง ณ ตอนล็อก) ได้ 2 ทาง: ยอดขายขยับหลังล็อก หรือ Cockpit แก้ rate
-    // แถว RECON_UPSELL ด้านล่างสรุปส่วนต่างให้เห็นตรงๆ แทนที่จะให้ผู้อ่านงงเอง
+    // ── EXPANSION ──
+    var outlets = (typeof nrrOutletsForKam === 'function') ? nrrOutletsForKam(email, period) : [];
+    outlets.filter(function (o) { return o.movement === 'expansion'; }).forEach(function (o) {
+      var rr = o.row; var gmv = parseFloat(rr.curr_gmv) || 0;
+      shExp.rows.push([team, name, email, rr.account_id, rr.account_name, rr.outlet_id, rr.res_name,
+        rr.account_type || '', gmv, 0.005, Math.round(gmv * 0.005)]);
+    });
+
+    // ── HANDOVER (account-grain ตามที่ engine เก็บ) + ownership join ──
+    (ho.detail || []).forEach(function (d) {
+      // exp date ระดับ account: เอาค่าจากสาขาแรกที่เจอ + บอกเมื่อมีหลายค่า
+      var qd = window.bulkQnrrData;
+      var expDates = {};
+      if (qd && qd.loaded) (qd.allRows || []).forEach(function (row) {
+        if (row.account_id === d.account_id && row.new_user_exp_date) expDates[row.new_user_exp_date] = true;
+      });
+      var expList = Object.keys(expDates).sort();
+      var anyOw = (function () {
+        if (!qd || !qd.loaded) return {};
+        var hit = (qd.allRows || []).find(function (row) { return row.account_id === d.account_id; });
+        return hit || {};
+      })();
+      shHo.rows.push([team, name, email, d.account_id || '', d.name || _acct(d.account_id),
+        d.transfer_month || '', Number(d.baseline || 0), Number(d.current || 0),
+        ho.retention_pct != null ? ho.retention_pct : '',
+        expList.length ? expList[0] + (expList.length > 1 ? ' (หลายสาขา)' : '') : '',
+        anyOw.first_dollar_date || '', anyOw.first_dollar_owner || '',
+        ho.data_missing ? 'ไม่มีข้อมูลเดือนนี้ในไฟล์ — ไม่ใช่ ฿0 จริง' : 'ปกติ']);
+    });
+
+    // ── UPSELL: locked category rows + live per-outlet rows ──
+    ((sku.p1 && sku.p1.groups) || []).forEach(function (g) {
+      shUpsell.rows.push([team, name, email, 'P1', 'ล็อกไว้ (ใช้จ่ายจริง)', evalLabel,
+        g.accountId || '', g.accountId ? _acct(g.accountId) : '', g.outletId || '', g.outletId ? _out(g.accountId, g.outletId) : '',
+        g.category || '', g.groupKey || '', Number(g.total_gmv || 0), '', '', '',
+        g.applied_rate != null ? g.applied_rate : '', Math.round((g.commission || 0) * 100) / 100,
+        g.accountId ? '' : 'snapshot ไม่มีรายสาขา']);
+    });
+    ((sku.p3 && sku.p3.groups) || []).forEach(function (g) {
+      shUpsell.rows.push([team, name, email, 'P3', 'ล็อกไว้ (ใช้จ่ายจริง)', evalLabel,
+        g.accountId || '', g.accountId ? _acct(g.accountId) : '', g.outletId || '', g.outletId ? _out(g.accountId, g.outletId) : '',
+        g.category || '', g.groupKey || '',
+        g.existing_curr != null ? Number(g.existing_curr) : '',
+        g.max_baseline != null ? Math.round(g.max_baseline) : '', g.max_baseline_month || '',
+        Number(g.incremental || 0),
+        g.applied_rate != null ? g.applied_rate : '', Math.round((g.commission || 0) * 100) / 100,
+        g.accountId ? '' : 'snapshot ไม่มีรายสาขา']);
+    });
+
     var bundle = bundleMap[email];
     if (bundle && bundle.loaded && typeof nrrComputeUpsellSkuWithParams === 'function') {
       var expIds = new Set(outlets.filter(function (o) { return o.movement === 'expansion'; })
         .map(function (o) { return String(o.row.outlet_id); }));
-      // ตรึงเดือนที่ประเมิน = งวดของ export ไม่ใช่เดือนปัจจุบัน — ไม่งั้น export
-      // ก.ค. จะได้เลข P1/P3 ของ ส.ค. มาแทน (คลาสบั๊กเดียวกับ drawer ที่บุชเจอ)
-      var _pp = period.split('-');
-      var _evalLabel = nrrThMonthLabel(new Date(parseInt(_pp[0], 10), parseInt(_pp[1], 10) - 1, 1));
-      var live = nrrComputeUpsellSkuWithParams(expIds, bundle, QNRR_CFG.base_month, { evalLabel: _evalLabel });
+      var live = nrrComputeUpsellSkuWithParams(expIds, bundle, QNRR_CFG.base_month, { evalLabel: evalLabel });
       (live.p1.groups || []).forEach(function (g) {
-        S({ t: 'P1_OUTLET', acc_id: g.accountId, out_id: g.outletId,
-            d: (g.category ? g.category + ' / ' : '') + g.groupKey,
-            g: g.total_gmv || 0, rt: g.applied_rate, amt: Math.round((g.commission || 0) * 100) / 100 });
+        shUpsell.rows.push([team, name, email, 'P1', 'สด (rate วันนี้)', evalLabel,
+          g.accountId, _acct(g.accountId), g.outletId, _out(g.accountId, g.outletId),
+          g.category || '', g.groupKey || '', Number(g.total_gmv || 0), '', '', '',
+          g.applied_rate != null ? g.applied_rate : '', Math.round((g.commission || 0) * 100) / 100, '']);
       });
-      (live.p3.groups || []).forEach(function (g) {
-        S({ t: 'P3_OUTLET', acc_id: g.accountId, out_id: g.outletId,
-            d: (g.category ? g.category + ' / ' : '') + g.groupKey +
-               ' · ฐานสูงสุด ' + Math.round(g.max_baseline) + ' (' + (g.max_baseline_month || '-') + ') → ' + Math.round(g.existing_curr),
-            g: g.incremental || 0, rt: g.applied_rate, amt: Math.round((g.commission || 0) * 100) / 100 });
-      });
-      var snapUpsell = (sku.p1 && sku.p1.comm || 0) + (sku.p3 && sku.p3.comm || 0);
-      S({ t: 'RECON_UPSELL',
-          d: 'P1+P3 สด(rate วันนี้)=' + Math.round(live.total_comm) +
-             ' · ที่ล็อกไว้=' + Math.round(snapUpsell) +
-             ' · ต่าง=' + Math.round(live.total_comm - snapUpsell) +
-             ' (ต่างได้ถ้ายอดขยับหลังล็อก หรือ rate ถูกแก้ใน Cockpit)',
-          g: Math.round(live.total_gmv_eligible), amt: Math.round(live.total_comm) });
-    } else if (kamEmails.indexOf(email) !== -1) {
-      S({ t: 'RECON_UPSELL', d: 'โหลด bundle ไม่ได้ — ไม่มีแถว P1/P3 รายร้านสำหรับคนนี้' });
+      if (p3Covered) {
+        (live.p3.groups || []).forEach(function (g) {
+          shUpsell.rows.push([team, name, email, 'P3', 'สด (rate วันนี้)', evalLabel,
+            g.accountId, _acct(g.accountId), g.outletId, _out(g.accountId, g.outletId),
+            g.category || '', g.groupKey || '',
+            Number(g.existing_curr || 0), Math.round(g.max_baseline || 0), g.max_baseline_month || '',
+            Number(g.incremental || 0),
+            g.applied_rate != null ? g.applied_rate : '', Math.round((g.commission || 0) * 100) / 100, '']);
+        });
+      } else {
+        // ห้ามโชว์ P3 สด = 0 หลอกๆ — บอกตรงๆ ว่าไฟล์ยังไม่มีข้อมูลให้คำนวณ
+        shUpsell.rows.push([team, name, email, 'P3', 'สด (rate วันนี้)', evalLabel,
+          '', '', '', '', '', '', '', '', '', '', '', '',
+          'คำนวณสดไม่ได้ — ข้อมูล existing/new ของเดือนย้อนหลังยังไม่มีในไฟล์ (รอ rerun SQL) · ใช้แถว "ล็อกไว้" เป็นตัวเลขอ้างอิง']);
+      }
+
+      var snapUpsell = Number((sku.p1 && sku.p1.comm) || 0) + Number((sku.p3 && sku.p3.comm) || 0);
+      var liveP1 = Math.round(((live.p1 && live.p1.comm) || 0) * 100) / 100;
+      var liveUpsell = p3Covered ? Math.round(live.total_comm) : Math.round(liveP1);
+      shRecon.rows.push([team, name, email, p3Covered ? 'Upsell P1+P3' : 'Upsell (เทียบได้เฉพาะ P1)',
+        liveUpsell, Math.round(snapUpsell),
+        p3Covered ? liveUpsell - Math.round(snapUpsell) : '',
+        '', '', lockedAt,
+        p3Covered ? 'ยอดขยับหลังล็อก หรือ rate ถูกแก้ใน Cockpit'
+                  : 'P3 สดย้อนเดือนคำนวณไม่ได้จากไฟล์ปัจจุบัน — ต่างที่เห็นคือ P3 ที่หายไป ไม่ใช่ความผิดปกติ']);
+    } else {
+      shRecon.rows.push([team, name, email, 'Upsell P1+P3', '', '', '', '', '', lockedAt,
+        'โหลด bundle ไม่ได้ — ไม่มีเลขสดสำหรับคนนี้']);
     }
+
+    // ── RECON %NRR ──
+    shRecon.rows.push([team, name, email, '%NRR',
+      liveBm && liveBm.nrr_pct != null ? liveBm.nrr_pct : '', lockedPct == null ? '' : lockedPct,
+      (liveBm && liveBm.nrr_pct != null && lockedPct != null) ? Math.round((liveBm.nrr_pct - lockedPct) * 100) / 100 : '',
+      liveBm ? Math.round((liveBm.effective_base_norm || 0) * 30) : '',
+      liveBm ? Math.round((liveBm.nrr_curr_norm || 0) * 30) : '',
+      lockedAt, 'ยอดเดือนนั้นขยับหลังล็อก / waiver ตัดสินหลังล็อก (ดูป้ายเตือนบนหน้า Commission)']);
   });
 
-  nrrExportCsv('nrr-commission-detail-' + period + '.csv', headers, rows);
+  // ── README ──
+  var R = shReadme.rows;
+  R.push(['งวด', period + ' (' + evalLabel + ')']);
+  R.push(['เดือนฐานไตรมาส', QNRR_CFG.base_month + ' (' + (QNRR_CFG.months_th[QNRR_CFG.base_month] || '') + ')']);
+  R.push(['สร้างเมื่อ', new Date().toISOString()]);
+  R.push(['ล็อกล่าสุดเมื่อ', lockedAtMax || '-']);
+  R.push(['นิยาม "ล็อกไว้"', 'ตัวเลขที่ใช้จ่ายจริง แช่แข็ง ณ เวลาล็อกงวด — ตัวเลขทางการ']);
+  R.push(['นิยาม "สด"', 'คำนวณใหม่จากข้อมูลวันนี้ ใช้ตรวจสอบ/กระทบยอด — ต่างจากล็อกได้ถ้ายอดขยับหลังล็อก, waiver ตัดสินหลังล็อก, หรือ rate ถูกแก้ใน Cockpit']);
+  R.push(['convention ตัวเลข', 'คอลัมน์ (x30) = normalize 30 วัน (ระบบเดียวกับ engine) · คอลัมน์ ฿ อื่นๆ = ยอดจริงตามไฟล์ข้อมูล']);
+  R.push(['สถานะ P3 สด', p3Covered ? 'คำนวณได้ (ไฟล์ครอบเดือนนี้)' : 'คำนวณไม่ได้ — ไฟล์ upsell มี existing/new แค่เดือนล่าสุด (รอ rerun SQL ชุดใหม่) ชีท UPSELL ใช้แถว "ล็อกไว้" เป็นหลัก']);
+  R.push(['หมายเหตุย้อนหลัง', 'การคำนวณสดย้อนเดือนใช้ผังพอร์ตของ "วันนี้" — ร้านที่ย้ายพอร์ตหลังงวดนั้นจะถูกจัดคนใหม่']);
+  R.push(['ชีท SUMMARY', '1 แถว/คน — reconcile กับตารางเต็มบนจอ (จ่ายจริง ฿ = ตรงคอลัมน์ FINAL)']);
+  R.push(['ชีท TL_COMMISSION', '1 แถว/TL — เชนคูณครบ: ฐาน→ตัวตั้ง→%→คอม NRR→Upsell %→Multiplier→จ่ายจริง']);
+  R.push(['ชีท NRR_OUTLETS', '1 แถว/ร้าน ฐานกับเดือนปัจจุบันอยู่แถวเดียวกัน + เจ้าของเดิม/ปัจจุบัน + วันหมดสถานะลูกค้าใหม่']);
+  R.push(['ชีท UPSELL', 'P1/P3 รายร้าน×กลุ่มสินค้า — คอลัมน์ "แหล่งข้อมูล" แยก ล็อกไว้/สด · P3 มีฐานสูงสุด+เดือนฐานเป็นคอลัมน์']);
+  R.push(['ชีท EXPANSION / HANDOVER', 'รายร้าน/รายบัญชี ตาม grain ที่ engine เก็บจริง']);
+  R.push(['ชีท RECON', 'สด vs ล็อก ต่อคน (%NRR และ Upsell) + สาเหตุที่ต่างได้']);
+
+  return wb;
 }
-window.nrrExportCommissionDetailCsv = nrrExportCommissionDetailCsv;
+window.nrrBuildCommissionWorkbook = nrrBuildCommissionWorkbook;
+
+// SpreadsheetML (XML .xls) หลาย worksheet — generalize จาก nrrExportWaiversExcel
+// เพิ่มจากตัวต้นแบบ: escape/ตัด ss:Name (Excel จำกัด 31 ตัว ห้าม : \ / ? * [ ])
+// + ss:Type="Number" ตาม colTypes เพื่อให้บุชผูกสูตร/SUMIFS ได้ทันที
+function nrrWorkbookToSpreadsheetXml(wb) {
+  function escXml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  var seen = {};
+  function sheetName(n) {
+    var s = String(n).replace(/[:\\\/?*\[\]]/g, ' ').slice(0, 31) || 'Sheet';
+    var base = s, i = 2;
+    while (seen[s]) { s = (base.slice(0, 28) + '_' + i); i++; }
+    seen[s] = true;
+    return s;
+  }
+  function cellXml(v, type) {
+    var isNum = type === 'n' && v !== '' && v != null && isFinite(Number(v));
+    return isNum
+      ? '<Cell><Data ss:Type="Number">' + Number(v) + '</Data></Cell>'
+      : '<Cell><Data ss:Type="String">' + escXml(v) + '</Data></Cell>';
+  }
+  var xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<?mso-application progid="Excel.Sheet"?>' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+  wb.sheets.forEach(function (s) {
+    xml += '<Worksheet ss:Name="' + escXml(sheetName(s.name)) + '"><Table>' +
+      '<Row>' + s.headers.map(function (h) { return '<Cell><Data ss:Type="String">' + escXml(h) + '</Data></Cell>'; }).join('') + '</Row>' +
+      s.rows.map(function (r) {
+        return '<Row>' + r.map(function (v, i) { return cellXml(v, (s.colTypes || [])[i] || 's'); }).join('') + '</Row>';
+      }).join('') +
+      '</Table></Worksheet>';
+  });
+  xml += '</Workbook>';
+  return xml;
+}
+window.nrrWorkbookToSpreadsheetXml = nrrWorkbookToSpreadsheetXml;
+
+async function nrrExportCommissionDetailExcel() {
+  var period = nrrCommSelectedPeriod;
+  var exportBtn = document.getElementById('nrr-comm-export');
+  if (exportBtn) { exportBtn.disabled = true; exportBtn.textContent = 'กำลังประกอบไฟล์...'; }
+  try {
+    var wb = await nrrBuildCommissionWorkbook(period);
+    if (!wb) return;
+    var xml = nrrWorkbookToSpreadsheetXml(wb);
+    var blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'nrr-commission-detail-' + period + '.xls';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } finally {
+    if (exportBtn) { exportBtn.disabled = false; exportBtn.textContent = 'Export Excel (รายละเอียดทุกคน)'; }
+  }
+}
+window.nrrExportCommissionDetailExcel = nrrExportCommissionDetailExcel;
+
 
 function nrrCommFullKamTableHtml(kamRows, allFinal, allEstimate) {
   if (!kamRows.length) return '';
