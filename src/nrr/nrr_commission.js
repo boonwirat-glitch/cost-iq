@@ -1160,3 +1160,274 @@ async function nrrFetchSnapshotsForPeriod(periodMonth) {
   }
 }
 window.nrrFetchSnapshotsForPeriod = nrrFetchSnapshotsForPeriod;
+
+// ── v_waiverecompute (backlog ข้อ 2) — waive หลัง lock แล้วคำนวณใหม่จาก /nrr ──
+//
+// สามชิ้น: detect (read-only) → preview (read-only) → apply (เขียนเงินจริง)
+// ทุกชิ้น mirror มาจาก Sense (07a_commission_engine.js) ไม่คิดสูตรใหม่เอง:
+//   _commWaiversDecidedAfterLock → nrrDetectStaleLockedPeriods
+//   _commRecomputeRowNrrOnly     → _nrrRecomputeRowNrrOnly
+//   recomputeNrrOnlyPreview      → nrrRecomputeNrrOnlyPreview
+//   recomputeNrrOnlyApply        → nrrRecomputeNrrOnlyApply (payload ต้อง
+//                                  หน้าตาเหมือน Sense ทุก field — สองเครื่องมือ
+//                                  เขียนแถวแบบเดียวกัน อ่านสลับกันได้)
+//
+// ต่างจาก Sense จุดเดียวที่ "แหล่ง %NRR สด": Sense ใช้ _qnrrComputeForCommission
+// ซึ่ง**แทนเดือนให้เงียบๆ ได้** (07c:524-550) จึงต้องมีการ์ดกันเดือนสลับ —
+// ฝั่ง /nrr อ่าน result.by_month[period] ตรงๆ จาก twin engine (_qnrrCompute ผ่าน
+// nrrKamResult/nrrTeamResult) ซึ่งไม่มีทางคืนเดือนอื่นใต้ key เดือนที่ขอ:
+// เดือนไม่มีข้อมูล = key ไม่มีอยู่ = skip. การ์ดเดือนสลับจึงเป็น structural
+// ไม่ใช่ runtime check — harness tools/verify_nrr_recompute.js ล็อกไว้
+
+// นโยบายงวด (nrr_policies) — ใช้เช็คโหมด quarterly เท่านั้น cache ต่อ period
+var nrrCommPolicyCache = {}; // { [period]: { commission_mode, loaded } }
+async function nrrFetchPolicyForPeriod(periodMonth) {
+  if (nrrCommPolicyCache[periodMonth] && nrrCommPolicyCache[periodMonth].loaded) return nrrCommPolicyCache[periodMonth];
+  if (!supa) return { commission_mode: null, loaded: false };
+  try {
+    var resp = await supa.from('nrr_policies')
+      .select('period_month,scope_type,scope_key,commission_mode,status')
+      .eq('period_month', periodMonth);
+    if (resp.error) throw resp.error;
+    // Sense fallback ladder: scope ตรง > all|all > default (ไม่มี commission_mode)
+    var rows = resp.data || [];
+    var hit = rows.find(function (p) { return p.scope_type === 'all' && p.scope_key === 'all'; }) || rows[0];
+    var out = { commission_mode: hit ? hit.commission_mode : null, loaded: true };
+    nrrCommPolicyCache[periodMonth] = out;
+    return out;
+  } catch (e) {
+    console.warn('[nrr] nrr_policies fetch failed for ' + periodMonth, e);
+    return { commission_mode: null, loaded: false, error: e.message };
+  }
+}
+window.nrrFetchPolicyForPeriod = nrrFetchPolicyForPeriod;
+
+// twin ของ _commFrozenComponents (07a:4014) — อ่าน component ที่แช่แข็งใน breakdown
+// TL multiplier เก็บได้ 2 รูปแบบ (object หรือ string '1.50x' จาก Excel backfill)
+// hasMultiplier แยก "เก็บไว้ว่า 1.0 จริงๆ" ออกจาก "ไม่มีให้อ่านเลย" — กรณีหลังห้ามเดา
+function _nrrCommFrozenComponents(row) {
+  var bd = (row && row.breakdown) || {};
+  var sku = bd.upsell_sku || {};
+  var outlet = bd.upsell_outlet || {};
+  var handover = bd.handover || {};
+  var mult = bd.upsell_mult || {};
+  return {
+    upsellSku: Number(sku.total_commission != null ? sku.total_commission : (sku.total_comm || 0)) || 0,
+    upsellOutlet: Number(outlet.commission || 0) || 0,
+    handover: Number(handover.payout || 0) || 0,
+    multiplier: (function () {
+      if (mult && typeof mult === 'object' && mult.multiplier != null) return Number(mult.multiplier) || 1;
+      if (typeof mult === 'string') { var m = parseFloat(mult); return isNaN(m) ? 1 : m; }
+      return 1;
+    })(),
+    hasMultiplier: !!((mult && typeof mult === 'object' && mult.multiplier != null)
+                      || (typeof mult === 'string' && !isNaN(parseFloat(mult))))
+  };
+}
+window._nrrCommFrozenComponents = _nrrCommFrozenComponents;
+
+// twin ของ _commRecomputeRowNrrOnly (07a:4041) — แถวเดียว, %NRR สด + component แช่แข็ง
+// คืน {skip: เหตุผล} เมื่อคำนวณไม่ได้ — **ห้ามตีเป็น 0** เพราะเท่ากับตัดเงินคน
+// ทั้งที่ข้อมูลแค่หายชั่วคราว
+function _nrrRecomputeRowNrrOnly(row, period) {
+  try {
+    if (!row) return null;
+    var role = String(row.beneficiary_role || '').toLowerCase();
+    var email = row.beneficiary_email;
+    if (!email) return { skip: 'ไม่มีอีเมลผู้รับ' };
+
+    // /nrr มี twin engine เฉพาะ scope kam/tl — role อื่น (pm/ad/sales/admin)
+    // จ่ายด้วย scheme อื่นที่ /nrr ไม่ได้ mirror ไว้ → ส่งไปทำที่ Sense Cockpit
+    if (role !== 'kam' && role !== 'tl') {
+      return { skip: 'รองรับเฉพาะ kam/tl จาก /nrr — role ' + role + ' ให้คำนวณใหม่จาก Sense Cockpit' };
+    }
+
+    var frozen = _nrrCommFrozenComponents(row);
+    if (role === 'tl' && !frozen.hasMultiplier) {
+      return { skip: 'แถว TL ไม่มีตัวคูณ upsell ที่ล็อกไว้ — ต้องตรวจมือ' };
+    }
+
+    // %NRR สด — waiver ล่าสุดถูกนับเองเพราะ _qnrrCompute อ่าน nrrExclusionsCache สด
+    var result = role === 'tl' ? nrrTeamResult(email) : nrrKamResult(email);
+    var bm = result && result.by_month ? result.by_month[period] : null;
+    if (!bm) return { skip: 'engine ไม่มีข้อมูลเดือน ' + period + ' (CSV ปัจจุบันไม่ครอบเดือนนี้)' };
+
+    // pct ไม่ปัด — twin ของ _nrrGovernedPct (07a:3013 "NO rounding here"):
+    // ค่านี้ไปเข้าการเทียบ tier/gate ซึ่งปัด 1 ตำแหน่งเองที่ขอบ (nrrTierPct)
+    // bm.nrr_pct ถูกปัด 1 ตำแหน่งแล้ว ใช้เป็น fallback เท่านั้น
+    var pct = (bm.nrr_curr_norm != null && bm.effective_base_norm > 0)
+      ? bm.nrr_curr_norm / bm.effective_base_norm * 100
+      : bm.nrr_pct;
+    if (pct === null || pct === undefined || isNaN(pct)) return { skip: 'คำนวณ %NRR ใหม่ไม่ได้ (ฐานเป็นศูนย์)' };
+
+    var nrrPayout = nrrCommTierPayout(role, email, period, pct);
+
+    var finalPayout, gate = null, subtotal;
+    if (role === 'tl') {
+      subtotal = nrrPayout;
+      finalPayout = Math.round(nrrPayout * frozen.multiplier);
+    } else {
+      // gate — twin ของ _commComputeGmvGate (07a:1135): เทียบด้วยค่าปัด 1 ตำแหน่ง
+      // (v_round) แต่ ach_pct เก็บค่าไม่ปัดไว้เป็น audit trail
+      var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
+      var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
+      var cap = 1.0;
+      var gatePct = nrrTierPct(pct);
+      if (gatePct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
+      else if (gatePct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
+      gate = { ach_pct: pct, cap_multiplier: cap, gate_active: cap < 1.0 };
+      subtotal = nrrPayout + frozen.upsellSku + frozen.upsellOutlet + frozen.handover;
+      finalPayout = Math.round(subtotal * cap);
+    }
+
+    return {
+      role: role, email: email, period: period,
+      oldPct: (row.governed_nrr_pct != null ? Number(row.governed_nrr_pct)
+                                            : (row.raw_nrr_pct != null ? Number(row.raw_nrr_pct) : null)),
+      newPct: pct,
+      oldPayout: Number(row.payout_amount || 0),
+      newPayout: finalPayout,
+      diff: finalPayout - Number(row.payout_amount || 0),
+      nrrPayout: nrrPayout, subtotal: subtotal, gate: gate, frozen: frozen,
+      name: ((row.breakdown || {}).kam_name) || ((row.breakdown || {}).team_lead_name) || email,
+      sourceRow: row
+    };
+  } catch (e) {
+    console.error('[nrr recompute] แถว ' + (row && row.beneficiary_email) + ' คำนวณใหม่ไม่ได้', e);
+    return { skip: 'เกิดข้อผิดพลาดระหว่างคำนวณ: ' + (e && e.message) };
+  }
+}
+window._nrrRecomputeRowNrrOnly = _nrrRecomputeRowNrrOnly;
+
+// พรีวิว — twin ของ recomputeNrrOnlyPreview (07a:4124) — **ไม่เขียนอะไร**
+async function nrrRecomputeNrrOnlyPreview(period) {
+  // /nrr engine คำนวณได้เฉพาะเดือนในไตรมาสปัจจุบัน (CSV บน R2 ครอบแค่นั้น)
+  if ((QNRR_CFG.q_months || []).indexOf(period) === -1) {
+    return { ok: false, reason: 'period_outside_quarter', changes: [], skipped: [] };
+  }
+  // โหมดรายเดือน — ฐานคำนวณคนละตัวกับ twin engine → ไม่รองรับ (เหมือน Sense)
+  var policy = await nrrFetchPolicyForPeriod(period);
+  if (!policy.loaded) return { ok: false, reason: 'policy_unreachable', changes: [], skipped: [] };
+  if (policy.commission_mode !== 'quarterly') {
+    return { ok: false, reason: 'not_quarterly_mode', changes: [], skipped: [] };
+  }
+  // ให้ tier/gate/waiver caches พร้อมก่อนคำนวณ
+  await Promise.all([nrrFetchCommissionPlans(), nrrFetchCommissionRates(), nrrFetchExclusions(true)]);
+
+  // ดึงแถว final เต็มคอลัมน์ (frozen component อยู่ใน breakdown)
+  var fullRows = [];
+  try {
+    var resp = await supa.from('commission_payout_snapshots')
+      .select('*').eq('period_month', period).eq('snapshot_status', 'final');
+    if (resp.error) throw resp.error;
+    fullRows = resp.data || [];
+  } catch (e) {
+    console.warn('[nrr recompute] ดึงแถว snapshot ไม่ได้', e);
+    return { ok: false, reason: 'db_unreachable', changes: [], skipped: [] };
+  }
+  if (!fullRows.length) return { ok: false, reason: 'no_final_rows', changes: [], skipped: [] };
+
+  var changes = [], skipped = [];
+  fullRows.forEach(function (r) {
+    var res = _nrrRecomputeRowNrrOnly(r, period);
+    if (!res || res.skip) {
+      skipped.push({ email: r.beneficiary_email, role: r.beneficiary_role,
+                     reason: (res && res.skip) || 'คำนวณ %NRR ใหม่ไม่ได้' });
+      return;
+    }
+    // tolerance เดียวกับ Sense: ค่าเดิมจาก DB เป็น NUMERIC ปัดทศนิยม ค่าใหม่ float เต็ม
+    var pctMoved = res.oldPct === null || res.oldPct === undefined
+      || Math.abs(Number(res.newPct) - Number(res.oldPct)) > 0.005;
+    if (res.diff !== 0 || pctMoved) changes.push(res);
+  });
+  return { ok: true, period: period, changes: changes, skipped: skipped,
+           totalRows: fullRows.length,
+           totalDiff: changes.reduce(function (s, c) { return s + c.diff; }, 0) };
+}
+window.nrrRecomputeNrrOnlyPreview = nrrRecomputeNrrOnlyPreview;
+
+// เขียนผลที่พรีวิวไว้ — twin ของ recomputeNrrOnlyApply (07a:4161)
+// รับ changes ที่ผู้ใช้เห็นแล้วเท่านั้น ไม่คำนวณซ้ำตอนเขียน (สิ่งที่เขียน = สิ่งที่ยืนยัน)
+// payload ทุก field ต้องเหมือน Sense — source-locked โดย tools/verify_nrr_recompute.js
+var _nrrRecomputeInFlight = null;
+async function nrrRecomputeNrrOnlyApply(period, changes, reason) {
+  if (!changes || !changes.length) return { ok: false, error: 'no_changes' };
+  if (!supa || !nrrProfile || nrrProfile.role !== 'admin') return { ok: false, error: 'not_authorized' };
+  if (_nrrRecomputeInFlight === period) return { ok: false, error: 'in_flight' };
+  _nrrRecomputeInFlight = period;
+  try {
+    var actor = nrrProfile.email || '';
+    var now = new Date().toISOString();
+    var payload = changes.map(function (c) {
+      var row = c.sourceRow;
+      var bd = Object.assign({}, row.breakdown || {});
+      bd.revisions = (bd.revisions || []).concat([{
+        at: now, by: actor, kind: 'nrr_only',
+        reason: reason || 'waiver updated after lock',
+        prev_payout: c.oldPayout, prev_nrr_pct: c.oldPct,
+        new_payout: c.newPayout, new_nrr_pct: c.newPct
+      }]);
+      bd.nrr_pct = c.newPct;
+      bd.nrr_payout = c.nrrPayout;
+      bd.components_subtotal = c.subtotal;
+      if (c.gate) bd.gmv_gate = c.gate;
+      bd.final_payout = c.newPayout;
+      bd.frozen_components = ['upsell_sku', 'upsell_outlet', 'handover', 'upsell_mult'];
+      bd.recomputed_at = now;
+      return Object.assign({}, row, {
+        breakdown: bd,
+        raw_nrr_pct: c.newPct,
+        governed_nrr_pct: c.newPct,
+        payout_amount: c.newPayout,
+        snapshot_status: 'final',      // คง final — ไม่ปลดล็อกกลับเป็น draft
+        updated_at: now, updated_by: actor
+      });
+    });
+    var resp = await supa.from('commission_payout_snapshots')
+      .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
+      .select('id');
+    if (resp.error) throw new Error(resp.error.message);
+    // ล้าง cache ทุกชั้นที่ถือแถวงวดนี้ — ให้รอบอ่านถัดไปเห็นตัวเลขใหม่
+    nrrCommSnapshots = null;
+    delete nrrCommPeriodCache[period];
+    return { ok: true, count: payload.length, at: now };
+  } catch (e) {
+    console.error('[nrr recompute] เขียนผลไม่สำเร็จ', e);
+    return { ok: false, error: e.message };
+  } finally {
+    _nrrRecomputeInFlight = null;
+  }
+}
+window.nrrRecomputeNrrOnlyApply = nrrRecomputeNrrOnlyApply;
+
+// detect — งวดที่ล็อกแล้วแต่มี waiver ตัดสิน "หลัง" เวลาล็อก/คำนวณล่าสุด
+// sync ล้วน อ่านจาก cache ที่หน้า waivers/commission โหลดอยู่แล้ว
+// กว้างกว่า Sense (_commWaiversDecidedAfterLock ดูเฉพาะ approved) หนึ่งจุด:
+// นับ revoked ด้วย — เพิกถอน waiver หลังล็อกก็ทำให้ %NRR ที่ล็อกไว้ stale เหมือนกัน
+// (ปลอดภัย: detect แค่ขึ้นป้าย ตัวเลขจริงไปโชว์ในพรีวิวก่อนเขียนเสมอ)
+function nrrDetectStaleLockedPeriods() {
+  if (!nrrCommSnapshots || !nrrCommSnapshots.loaded) return [];
+  var byPeriod = {};
+  (nrrCommSnapshots.rows || []).forEach(function (r) {
+    if (String(r.snapshot_status || '').toLowerCase() !== 'final') return;
+    if (!byPeriod[r.period_month]) byPeriod[r.period_month] = [];
+    byPeriod[r.period_month].push(r);
+  });
+  var out = [];
+  Object.keys(byPeriod).forEach(function (period) {
+    // เวลาอ้างอิง = การคำนวณล่าสุดของงวด (recompute แล้วป้ายต้องหายเอง)
+    var lockedAt = byPeriod[period]
+      .map(function (r) { var bd = r.breakdown || {}; return bd.recomputed_at || bd.computed_at || r.updated_at; })
+      .filter(Boolean).sort().pop();
+    if (!lockedAt) return;
+    var stale = (nrrExclusionsCache || []).filter(function (x) {
+      if (String(x.period_month || '') !== String(period)) return false;
+      var st = String(x.status || '').toLowerCase();
+      if (st !== 'approved' && st !== 'revoked') return false;
+      return x.reviewed_at && x.reviewed_at > lockedAt;
+    });
+    if (stale.length) out.push({ period: period, lockedAt: lockedAt, waivers: stale, count: stale.length });
+  });
+  return out.sort(function (a, b) { return a.period < b.period ? -1 : 1; });
+}
+window.nrrDetectStaleLockedPeriods = nrrDetectStaleLockedPeriods;

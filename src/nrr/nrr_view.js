@@ -59,6 +59,7 @@ async function nrrInitApp() {
     nrrRenderSlideoverBody();
   });
   document.getElementById('nrr-comm-strip').addEventListener('click', function (e) {
+    if (nrrHandleRecomputeClick(e)) return; // v_waiverecompute: pill/พรีวิว/ยืนยัน
     var drillBtn = e.target.closest('.nrr-comm-drill-btn');
     if (drillBtn) { nrrOpenCommissionDrawer(drillBtn.dataset.email, drillBtn.dataset.name, drillBtn.dataset.period); return; }
     var tabBtn = e.target.closest('.nrr-comm-tab');
@@ -2936,6 +2937,142 @@ function nrrCommStampHtml(status, small) {
   return '<span class="nrr-comm-stamp ' + cls + (small ? ' sm' : '') + '">' + label + '</span>';
 }
 
+// ── v_waiverecompute (backlog ข้อ 2): ป้ายเตือน waive-after-lock + คำนวณใหม่ ──
+// Detection/preview/apply อยู่ใน nrr_commission.js (mirror จาก Sense) — ไฟล์นี้
+// มีแต่ presentation ป้ายโผล่ 2 ที่: หน้า Commission (host ในสตริป) + หน้า
+// Waivers (host ใน nrr_waivers.js) ทั้งคู่เรียก nrrRenderStaleLockPill()
+// ตัวเดียวกัน panel พรีวิวใช้ class (ไม่ใช่ id) เพราะสอง host อยู่ใน DOM
+// พร้อมกัน — getElementById จะเจอแค่ตัวแรกเสมอ
+var nrrRecomputeState = null; // { period, changes } — apply เขียนเฉพาะสิ่งที่พรีวิวโชว์
+
+function nrrStaleLockPillHtml(stale) {
+  if (!stale || !stale.length) return '';
+  var isAdmin = nrrProfile.role === 'admin';
+  return '<div class="nrr-stale-wrap">' + stale.map(function (s) {
+    var label = QNRR_CFG.months_th[s.period] || s.period;
+    return '<div class="nrr-stale-pill">' +
+      '<span class="nrr-stale-ic">⚠</span>' +
+      '<span>งวด <b>' + nrrEsc(label) + '</b> ล็อกไปแล้ว แต่มี waiver ถูกตัดสินทีหลัง <b class="num">' + s.count + '</b> รายการ — %NRR/ค่าคอมฯ ที่ล็อกไว้ยังไม่สะท้อน</span>' +
+      (isAdmin
+        ? '<button type="button" class="btn-secondary nrr-recompute-preview" data-period="' + nrrEsc(s.period) + '">คำนวณใหม่…</button>'
+        : '<span class="micro">แจ้ง admin ให้กด "คำนวณใหม่"</span>') +
+      '</div>';
+  }).join('') + '<div class="nrr-recompute-panel"></div></div>';
+}
+
+// เช็ค + วาดป้ายลง host (async — สองแคชที่ใช้อาจยังไม่โหลดตอนหน้า render)
+function nrrRenderStaleLockPill(hostId) {
+  var host = document.getElementById(hostId);
+  if (!host) return;
+  Promise.all([nrrFetchCommissionSnapshots(), nrrFetchExclusions()]).then(function () {
+    var el = document.getElementById(hostId); // host อาจถูก re-render ระหว่างรอ fetch
+    if (el) el.innerHTML = nrrStaleLockPillHtml(nrrDetectStaleLockedPeriods());
+  }).catch(function (e) { console.warn('[nrr] stale-lock check failed', e); });
+}
+window.nrrRenderStaleLockPill = nrrRenderStaleLockPill;
+
+function nrrOpenRecomputePanel(period, panel) {
+  if (!panel) return;
+  panel.innerHTML = '<div class="ds-skel" style="height:90px"></div>';
+  nrrRecomputeNrrOnlyPreview(period).then(function (pre) {
+    if (!document.body.contains(panel)) return;
+    if (!pre.ok) {
+      var msgs = {
+        period_outside_quarter: 'งวดนี้อยู่นอกไตรมาสปัจจุบัน — CSV บน R2 คำนวณย้อนไม่ได้แล้ว ให้คำนวณใหม่จาก Sense Cockpit',
+        not_quarterly_mode: 'งวดนี้ไม่ได้ตั้งเป็นโหมด quarterly — /nrr รองรับเฉพาะ quarterly ให้ทำจาก Sense Cockpit',
+        no_final_rows: 'งวดนี้ไม่มีแถวที่ล็อกไว้ (final) ให้คำนวณใหม่',
+        policy_unreachable: 'อ่านนโยบายงวด (nrr_policies) ไม่ได้ — ลองใหม่อีกครั้ง',
+        db_unreachable: 'อ่านตาราง snapshot ไม่ได้ — ลองใหม่อีกครั้ง'
+      };
+      panel.innerHTML = '<div class="nrr-recompute-box"><div class="micro">' + (msgs[pre.reason] || pre.reason) + '</div></div>';
+      return;
+    }
+    nrrRecomputeState = { period: period, changes: pre.changes };
+    var label = QNRR_CFG.months_th[period] || period;
+    var fmtB = function (v) { return '฿' + Math.round(v || 0).toLocaleString('en-US'); };
+    var fmtP = function (v) { return v == null ? '—' : Number(v).toFixed(2) + '%'; };
+    var html = '<div class="nrr-recompute-box">';
+    if (!pre.changes.length) {
+      html += '<div class="nrr-recompute-title">งวด ' + nrrEsc(label) + ' — ไม่มียอดใครเปลี่ยน</div>' +
+        '<div class="micro">%NRR หลังรวม waiver ล่าสุด ยังให้ payout เท่าที่ล็อกไว้ทุกคน (ป้ายจะหายเมื่อกดบันทึกการคำนวณใหม่ หรือปล่อยไว้เฉยๆ ก็ไม่กระทบเงิน)</div>';
+    } else {
+      html += '<div class="nrr-recompute-title">พรีวิวคำนวณใหม่ งวด ' + nrrEsc(label) + ' (เปลี่ยน ' + pre.changes.length + ' คน จากทั้งหมด ' + pre.totalRows + ' แถว)</div>' +
+        '<div class="nrr-table-scroll"><table class="nrr-table nrr-recompute-table"><thead><tr>' +
+        '<th>คน</th><th>role</th><th>%NRR เดิม → ใหม่</th><th>ค่าคอมฯ เดิม → ใหม่</th><th>Δ</th></tr></thead><tbody>' +
+        pre.changes.map(function (c) {
+          var cls = c.diff > 0 ? 'nrr-recompute-up' : c.diff < 0 ? 'nrr-recompute-down' : '';
+          return '<tr><td>' + nrrEsc(c.name) + '</td><td>' + nrrEsc(c.role.toUpperCase()) + '</td>' +
+            '<td class="num">' + fmtP(c.oldPct) + ' → <b>' + fmtP(c.newPct) + '</b></td>' +
+            '<td class="num">' + fmtB(c.oldPayout) + ' → <b>' + fmtB(c.newPayout) + '</b></td>' +
+            '<td class="num ' + cls + '">' + (c.diff > 0 ? '+' : '') + fmtB(c.diff).replace('฿-', '−฿') + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<div class="nrr-recompute-total">Δ รวมทั้งงวด: <b class="num">' + (pre.totalDiff > 0 ? '+' : '') + fmtB(pre.totalDiff).replace('฿-', '−฿') + '</b></div>';
+    }
+    if (pre.skipped.length) {
+      html += '<details class="nrr-recompute-skips"><summary>ข้าม ' + pre.skipped.length + ' แถว (ต้องไปทำที่ Sense หรือตรวจมือ)</summary><ul>' +
+        pre.skipped.map(function (s) { return '<li>' + nrrEsc(s.email) + ' (' + nrrEsc(s.role || '') + ') — ' + nrrEsc(s.reason) + '</li>'; }).join('') +
+        '</ul></details>';
+    }
+    html += '<div class="nrr-recompute-actions">' +
+      (pre.changes.length
+        ? '<input class="nrr-search nrr-recompute-reason" placeholder="เหตุผล (จะติดไว้ใน revision log)" value="waiver ตัดสินหลังล็อก — คำนวณใหม่จาก /nrr">' +
+          '<button type="button" class="btn-primary nrr-recompute-apply" data-period="' + nrrEsc(period) + '">ยืนยันเขียนทับยอดที่ล็อกไว้</button>'
+        : '') +
+      '<button type="button" class="btn-secondary nrr-recompute-cancel">ปิด</button>' +
+      '</div>' +
+      '<div class="micro" style="margin-top:6px">upsell P1/P3 · outlet · handover · ตัวคูณ TL ใช้ค่าที่แช่แข็งตอนล็อกเดิมทั้งหมด — เปลี่ยนเฉพาะส่วน %NRR (แบบเดียวกับ "คำนวณใหม่" ใน Sense Cockpit)</div></div>';
+    panel.innerHTML = html;
+  });
+}
+
+// delegated-click branch ที่ทั้ง #nrr-comm-strip และ #nrr-waivers-body เรียก —
+// คืน true เมื่อจัดการคลิกนี้ไปแล้ว (caller ต้อง return ทันที)
+function nrrHandleRecomputeClick(e) {
+  var prev = e.target.closest('.nrr-recompute-preview');
+  if (prev) {
+    var wrap = prev.closest('.nrr-stale-wrap');
+    nrrOpenRecomputePanel(prev.dataset.period, wrap ? wrap.querySelector('.nrr-recompute-panel') : null);
+    return true;
+  }
+  var cancel = e.target.closest('.nrr-recompute-cancel');
+  if (cancel) {
+    var p = cancel.closest('.nrr-recompute-panel');
+    if (p) p.innerHTML = '';
+    nrrRecomputeState = null;
+    return true;
+  }
+  var apply = e.target.closest('.nrr-recompute-apply');
+  if (apply) {
+    var st = nrrRecomputeState;
+    if (!st || st.period !== apply.dataset.period || !st.changes.length) return true;
+    var panel = apply.closest('.nrr-recompute-panel');
+    var reasonEl = panel ? panel.querySelector('.nrr-recompute-reason') : null;
+    var reason = (reasonEl && reasonEl.value.trim()) || 'waiver ตัดสินหลังล็อก — คำนวณใหม่จาก /nrr';
+    var label = QNRR_CFG.months_th[st.period] || st.period;
+    var totalDiff = st.changes.reduce(function (s, c) { return s + c.diff; }, 0);
+    if (!confirm('เขียนทับยอดที่ล็อกไว้ของงวด ' + label + ' จำนวน ' + st.changes.length + ' คน (Δ รวม ' +
+                 (totalDiff > 0 ? '+' : '') + '฿' + Math.abs(totalDiff).toLocaleString('en-US') + (totalDiff < 0 ? ' ติดลบ' : '') + ')?\n\nยอดเดิมถูกเก็บใน revision log เสมอ ย้อนดูได้')) return true;
+    apply.disabled = true; apply.textContent = 'กำลังเขียน...';
+    nrrRecomputeNrrOnlyApply(st.period, st.changes, reason).then(function (res) {
+      if (res && res.ok) {
+        nrrRecomputeState = null;
+        if (typeof nrrToast === 'function') nrrToast('คำนวณใหม่ ' + res.count + ' รายการเสร็จแล้ว');
+        // cache ถูกล้างใน apply แล้ว — refetch แล้ววาดใหม่ทุกจุดที่ถือเลขงวดนี้
+        nrrRenderCommissionSection();
+        nrrRenderStaleLockPill('nrr-comm-stale-pill');
+        nrrRenderStaleLockPill('nrr-waivers-stale-pill');
+      } else {
+        alert('เขียนไม่สำเร็จ: ' + ((res && res.error) || 'ไม่ทราบสาเหตุ'));
+        apply.disabled = false; apply.textContent = 'ยืนยันเขียนทับยอดที่ล็อกไว้';
+      }
+    });
+    return true;
+  }
+  return false;
+}
+window.nrrHandleRecomputeClick = nrrHandleRecomputeClick;
+
 function nrrRenderCommissionSection() {
   var isAdmin = nrrProfile.role === 'admin';
   var period = nrrState.period;
@@ -2949,6 +3086,7 @@ function nrrRenderCommissionSection() {
 
   if (nrrCommViewMode === 'full') {
     document.getElementById('nrr-comm-strip').innerHTML = '<div class="nrr-comm-ds">' + tabsHtml +
+      '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
       '<select class="nrr-comm-period-select" id="nrr-comm-period-select"><option>กำลังโหลดเดือน...</option></select>' +
       '<button type="button" class="btn-secondary" id="nrr-comm-export" style="margin-left:8px">Export CSV (รายละเอียดทุกคน)</button>' +
       '<div id="nrr-comm-fulltable-body"><div class="ds-skel" style="height:160px"></div></div>' +
@@ -2977,6 +3115,7 @@ function nrrRenderCommissionSection() {
       }).join('');
       nrrRenderCommissionFullTable(nrrCommSelectedPeriod);
     });
+    nrrRenderStaleLockPill('nrr-comm-stale-pill');
     return;
   }
 
@@ -2986,11 +3125,13 @@ function nrrRenderCommissionSection() {
 
   document.getElementById('nrr-comm-strip').innerHTML =
     '<div class="nrr-comm-ds">' + tabsHtml +
+    '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
     nrrCommissionHeroHtml(isAdmin, period) +
     nrrCommissionTrendHtml(isAdmin) +
     nrrCommissionRowsHtml(isAdmin, rows, period) +
     nrrCommissionFootnoteHtml() +
     '</div>';
+  nrrRenderStaleLockPill('nrr-comm-stale-pill');
 }
 
 // Tier-based estimate for one beneficiary for one quarter month — the SAME

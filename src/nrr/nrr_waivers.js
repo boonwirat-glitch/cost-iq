@@ -20,6 +20,8 @@ function nrrRenderWaiversView(route) {
   // the account-name one above, just missed at the time.
   Promise.all([nrrFetchExclusions(), nrrFetchPortviewCsv(), nrrFetchBulkOutletsCsv()]).then(function () {
     body.innerHTML = nrrWaiversPageHtml();
+    // v_waiverecompute: เติมป้าย waive-after-lock (async — เช็ค snapshot เอง)
+    if (typeof nrrRenderStaleLockPill === 'function') nrrRenderStaleLockPill('nrr-waivers-stale-pill');
   });
 }
 nrrRouterRegister('waivers', nrrRenderWaiversView);
@@ -41,6 +43,9 @@ function _nrrOutletNameFor(accountId, outletId) {
 function nrrWaiversPageHtml() {
   var isAdmin = nrrProfile && nrrProfile.role === 'admin';
   var title = isAdmin ? 'คำขอยกเว้น NRR (ทั้งบริษัท)' : 'คำขอยกเว้น NRR ของทีมฉัน';
+  // v_waiverecompute: ป้ายเตือน "waive หลังล็อก" — เติมเนื้อหาแบบ async โดย
+  // nrrRenderStaleLockPill (เรียกจาก nrrRenderWaiversView + หลัง approve/reject)
+  var stalePillHost = '<div class="nrr-stale-host" id="nrr-waivers-stale-pill"></div>';
   // This page is history/review only -- the actual "request" control lives
   // on each account's own page (#/account/:id), since a waiver is inherently
   // tied to one specific account+month. Say so up front (TL especially) so
@@ -82,7 +87,8 @@ function nrrWaiversPageHtml() {
     '</div></div>'
   ) : '';
 
-  return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+  return stalePillHost +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
     '<div><div class="h2">' + title + '</div>' + howTo + '</div>' +
     exportBtn +
     '</div>' +
@@ -166,6 +172,8 @@ function nrrWaiverRowHtml(r, isAdmin) {
 }
 
 function nrrHandleWaiversClick(e) {
+  // v_waiverecompute: ป้าย/พรีวิว/ยืนยันคำนวณใหม่ — logic เดียวกับหน้า Commission
+  if (typeof nrrHandleRecomputeClick === 'function' && nrrHandleRecomputeClick(e)) return;
   var exportBtn = e.target.closest('[data-action^="waivers-export"]');
   if (exportBtn) { nrrHandleWaiverExportClick(exportBtn); return; }
 
@@ -179,6 +187,8 @@ function nrrHandleWaiversClick(e) {
     if (!res.ok && typeof nrrToast === 'function') nrrToast('อัปเดตไม่สำเร็จ: ' + (res.error || ''));
     var body = document.getElementById('nrr-waivers-body');
     if (body) body.innerHTML = nrrWaiversPageHtml();
+    // v_waiverecompute: การตัดสินเมื่อกี้อาจเพิ่งทำให้งวดที่ล็อกแล้ว stale — เช็คทันที
+    if (typeof nrrRenderStaleLockPill === 'function') nrrRenderStaleLockPill('nrr-waivers-stale-pill');
   });
 }
 window.nrrHandleWaiversClick = nrrHandleWaiversClick;
