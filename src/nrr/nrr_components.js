@@ -564,8 +564,26 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       return bm && nrrWaivedAccountCountForRows(bm.rows, m) > 0;
     });
     if (!anyWaived) return '';
+    var _baseMoTh = QNRR_CFG.months_th[result.base_month] || result.base_month;
     var cells = columns.map(function (c) {
-      if (c.isBase) return DASH;
+      if (c.isBase) {
+        // v_waivedbase (บุชขอ 2026-08-07): คอลัมน์เดือนฐานต้องบอกด้วยว่าร้านที่
+        // ถูกยกเว้นมีมูลค่า ณ เดือนฐานรวมเท่าไหร่ — นับร้านซ้ำครั้งเดียวทั้งไตรมาส
+        // (ร้านเดียวถูกยกเว้นหลายเดือนไม่บวกเบิ้ล) · pool results ไม่มี base_audit → คงขีด
+        if (!result.base_audit || typeof nrrAccountWaivedForPeriod !== 'function') return DASH;
+        var _seen = {}, _totalBase = 0, _nOut = 0;
+        result.base_audit.forEach(function (a) {
+          if (!a.included || _seen[a.outlet_id]) return;
+          var waivedAny = result.months.some(function (m) {
+            return nrrAccountWaivedForPeriod(a.account_id, m, a.outlet_id);
+          });
+          if (waivedAny) { _seen[a.outlet_id] = 1; _totalBase += a.base_norm_30d || 0; _nOut++; }
+        });
+        if (!_nOut) return DASH;
+        return '<td class="num-cell" style="color:var(--ink3)" title="' +
+          nrrEsc('มูลค่า ณ เดือนฐาน (' + _baseMoTh + ') ของร้านที่ถูกยกเว้นในไตรมาสนี้ ' + _nOut + ' ร้าน — นับร้านซ้ำครั้งเดียว') +
+          '">' + nrrFmtGMV(Math.round(_totalBase)) + '</td>';
+      }
       var bm = result.by_month[c.month];
       var count = bm ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
       if (!count) return DASH;
@@ -574,7 +592,18 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       // delta จะรวมผลของย้ายเข้า/ออกที่ยังไม่ถึงเดือนนั้น แล้วแปะป้ายผิดว่าเป็น waiver
       var preWaive = bm.base_norm_m != null ? bm.base_norm_m : result.base_norm;
       var delta = Math.round((preWaive - effBase) * nrrBaseDays());
-      return '<td class="num-cell" style="color:var(--ink3)" title="' + count + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">−' + nrrFmtGMV(delta) + '</td>';
+      // ยอดขายจริงของร้านกลุ่มนี้ในเดือนนั้น — ไว้ใน tooltip กันสับสนว่าเลขในเซลล์
+      // คือยอดเดือนนั้น (จริงๆ คือมูลค่า ณ เดือนฐานที่ถูกหักจากตัวหาร)
+      var currWaived = 0;
+      (bm.rows || []).forEach(function (r) {
+        if (typeof nrrAccountWaivedForPeriod === 'function' &&
+            nrrAccountWaivedForPeriod(r.account_id, c.month, r.outlet_id)) {
+          currWaived += parseFloat(r.curr_gmv) || 0;
+        }
+      });
+      return '<td class="num-cell" style="color:var(--ink3)" title="' +
+        nrrEsc(count + ' บัญชีถูกยกเว้น NRR เดือนนี้ · เลขในเซลล์ = มูลค่า ณ เดือนฐาน (' + _baseMoTh + ') ที่หักออกจากตัวหาร %NRR เดือนนี้ · ยอดขายจริงเดือนนี้ของร้านกลุ่มนี้ ' + nrrFmtGMV(Math.round(currWaived)) + ' — ดู #/waivers') +
+        '">−' + nrrFmtGMV(delta) + '</td>';
     }).join('');
     return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
   }
