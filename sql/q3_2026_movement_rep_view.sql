@@ -660,6 +660,14 @@ jun_classified AS (
 -- outlet ที่ Mar staff = KAM X แต่ latest_staff ≠ KAM X
 -- ขึ้นใน output ของ KAM เดิม (Mar staff) เป็น transfer_out
 -- curr_gmv = 0, base_gmv = Mar GMV → adjust denominator ของ KAM เดิม
+--
+-- MONTH-SCOPED (นโยบายบุช 2026-08-07): เดิม fan-out แถวเหมือนกันทั้ง 3 เดือน
+-- จากผัง "วันนี้" (latest_own) → engine ไม่มีทางรู้เดือนที่ย้ายจริง ฐานเลยถูกหัก
+-- ย้อนหลังทั้งไตรมาส · ตอนนี้ปั๊มแถวเฉพาะเดือนที่ร้าน "ไม่ได้อยู่กับ KAM แล้ว"
+-- ตามผังรายเดือน (jul/aug/sep_own — pattern เดียวกับ pm_view) · เดือนที่ร้าน
+-- เงียบ (ไม่มีออเดอร์ → ไม่มีแถวในผังเดือนนั้น) fallback เป็นผังล่าสุด
+-- Engine (nrr_logic/07c) รองรับไฟล์ทั้งสองรุ่น: ไฟล์เก่า fan-out → min = เดือนแรก
+-- = พฤติกรรมเดิม / ไฟล์ใหม่ → หักตั้งแต่เดือนที่ย้ายจริง
 transfer_out_rows AS (
   SELECT
     period_month,
@@ -686,14 +694,23 @@ transfer_out_rows AS (
     -- A NULL here silently understated company-wide NRR% (base stayed
     -- inflated, current side lost the GMV, no offsetting adjustment)
     -- from the day any KAM first lost an outlet to PM/Admin.
-    CASE WHEN lo.latest_commercial_owner IN ('PM','ADMIN') THEN 'inter' ELSE 'external' END AS transfer_scope,
+    -- (month-scoped: ใช้เจ้าของ "เดือนนั้น" ตัดสิน inter/external, fallback ผังล่าสุด)
+    CASE WHEN COALESCE(jo.commercial_owner, ao.commercial_owner, so.commercial_owner,
+                       lo.latest_commercial_owner) IN ('PM','ADMIN')
+         THEN 'inter' ELSE 'external' END AS transfer_scope,
     CAST(NULL AS STRING)            AS mar_portfolio,
     'transfer_out'         AS movement_type
   FROM mar_cohort mc
   JOIN latest_own lo ON mc.outlet_id = lo.outlet_id
   CROSS JOIN UNNEST([v_m1_str, v_m2_str, v_m3_str]) AS period_month
-  -- เฉพาะ outlet ที่ latest_staff ≠ Mar staff
+  LEFT JOIN jul_own jo ON mc.outlet_id = jo.outlet_id AND period_month = v_m1_str
+  LEFT JOIN aug_own ao ON mc.outlet_id = ao.outlet_id AND period_month = v_m2_str
+  LEFT JOIN sep_own so ON mc.outlet_id = so.outlet_id AND period_month = v_m3_str
+  -- เฉพาะ outlet ที่ออกจากพอร์ต KAM จริง ณ วันนี้ (ขอบเขตเดิม) …
   WHERE lo.latest_commercial_owner != 'KAM'
+    -- … และเฉพาะ "เดือนที่ออกไปแล้ว" — เดือนที่ผังเดือนนั้นยังเป็น KAM ไม่ปั๊มแถว
+    AND COALESCE(jo.commercial_owner, ao.commercial_owner, so.commercial_owner,
+                 lo.latest_commercial_owner) != 'KAM'
 ),
 
 all_classified AS (

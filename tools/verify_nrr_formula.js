@@ -58,12 +58,18 @@ function recompute(scopeRows, month, variant) {
   const K = variant === 'x30' ? 30 : 1;
   const baseMap = {};
   scopeRows.filter(r => r.period_month === month).forEach(r => {
-    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover' && eff(r) !== 'transfer_in')
+    // v_basefix (2026-08-06): ฐาน = NRR + Churn + Comeback + Transfer In เท่านั้น —
+    // new_sales/expansion ที่มี base_gmv ติดมาห้ามเข้าฐาน (replica ต้องตามกติกา engine)
+    if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
+        && eff(r) !== 'transfer_in' && eff(r) !== 'new_sales' && eff(r) !== 'expansion')
       baseMap[r.outlet_id] = r.base_gmv / (r.base_days || 31) * K;
   });
   let baseNorm = Object.values(baseMap).reduce((s, v) => s + v, 0);
+  // MONTH-SCOPED (นโยบาย 2026-08-07): ฐาน transfer_in ของเดือน M นับเฉพาะ outlet
+  // ที่เดือนย้าย (min period_month ของแถว TI) ≤ M — replica นี้ประเมินแค่เดือนแรก
+  // ของไตรมาส จึงเทียบเท่ากับ "มีแถว TI ในเดือน M เอง" พอดี (min ย้อนต่ำกว่านั้นไม่ได้)
   const tin = {};
-  scopeRows.forEach(r => { if (eff(r) === 'transfer_in' && !(r.outlet_id in tin)) tin[r.outlet_id] = (r.base_gmv || 0) / (r.base_days || 31) * K; });
+  scopeRows.forEach(r => { if (eff(r) === 'transfer_in' && r.period_month === month && !(r.outlet_id in tin)) tin[r.outlet_id] = (r.base_gmv || 0) / (r.base_days || 31) * K; });
   baseNorm += Object.values(tin).reduce((s, v) => s + v, 0);
   const seen = {}; let num = 0;
   scopeRows.filter(r => r.period_month === month).forEach(r => {
@@ -76,7 +82,9 @@ function recompute(scopeRows, month, variant) {
       num += cd > 0 ? r.curr_gmv / cd * K : 0;
     }
   });
-  return { pct: Math.round(num / baseNorm * 100), num, baseNorm };
+  // ปัด 1 ตำแหน่งเหมือน engine (nrr_logic.js: Math.round(x*1000)/10) — เดิมปัดเลขเต็ม
+  // ซึ่งเทียบกับ engine ตรงๆ ไม่ได้ตั้งแต่ engine เปลี่ยนเป็น 1 ตำแหน่ง (task #51)
+  return { pct: Math.round(num / baseNorm * 1000) / 10, num, baseNorm };
 }
 
 const months = [...new Set(rows.map(r => r.period_month))].sort();

@@ -7,11 +7,16 @@
 // Usage:
 //   node tools/verify_transfer_in_fix.js <sense_qnrr.csv> <pm_view.csv> <vp_view.csv>
 // CSVs come from the R2 bucket (same files /nrr fetches). Expected values
-// below are Q3-2026 ground truth, cross-validated against an independent
-// Python replica of the algorithm on 2026-07-08 — they are period data, so
-// this script is only meaningful against the 2026-07-08 vintage of the CSVs
-// (kept in the handoff doc); against fresher data, read it as a harness and
-// update the expectations.
+// below are Q3-2026 period data — pinned to a specific CSV vintage; against
+// fresher data, read it as a harness and update the expectations.
+//
+// RE-PIN 2026-08-07 (นโยบาย MONTH-SCOPED TRANSFER): ตัวเลขทั้งชุดถูกปักใหม่
+// กับไฟล์รุ่น 2026-08-07 หลังเปลี่ยนกฎเป็น "ย้ายเดือน M มีผลกับฐานตั้งแต่เดือน M"
+// (เดิม quarter-wide retroactive) — เลขเก่ารุ่น 2026-07-08 ใช้เทียบไม่ได้ทั้งจาก
+// ข้อมูลใหม่ (tin-full + การย้ายพอร์ตหลังจากนั้น) และจากนโยบายใหม่
+// Ground truth ภายนอก: May (treerak.s) ก.ค. = 103.2% ตรงกับ hand-reconcile
+// ของบุชใน Google Sheet (tab May_n, 2026-08-07) ถึงบาท — ฐาน 6,453,184 ของเดือน
+// ก.ค. ไม่รวมโอเพ่น คิทเช่น ฿150,467 ที่ย้ายเข้า ส.ค. (จุดที่นโยบายเดิมคิดผิด)
 
 const fs = require('fs');
 const [qnrrPath, pmPath, vpPath] = process.argv.slice(2);
@@ -68,19 +73,21 @@ function checkScope(label, res, expBase, expNrr) {
   check(`${label} NRR%`, res.by_month[M].nrr_pct, expNrr);
 }
 
-checkScope('Tape (kam)', window._qnrrCompute('puttipong.w@freshket.co', 'kam'), 6326715, 99);
-checkScope('Bookbig (kam)', window._qnrrCompute('anusorn.k@freshket.co', 'kam'), 9725947, 105);
-checkScope('Mild (kam)', window._qnrrCompute('rinlaphat.s@freshket.co', 'kam'), 9038963, 103);
-checkScope('TL Ploy', window._qnrrCompute('pavarisa.mu@freshket.co', 'tl'), 59115214, 105);
-checkScope('TL Name', window._qnrrCompute('nitipat.s@freshket.co', 'tl'), 76661110, 109);
-checkScope('Org admin', window._qnrrCompute(null, 'admin'), 135931139, 107);
+checkScope('Tape (kam)', window._qnrrCompute('puttipong.w@freshket.co', 'kam'), 6326715, 102.5);
+checkScope('Bookbig (kam)', window._qnrrCompute('anusorn.k@freshket.co', 'kam'), 9786673, 107.6);
+checkScope('Mild (kam)', window._qnrrCompute('rinlaphat.s@freshket.co', 'kam'), 9156560, 100.5);
+// May — ground truth ภายนอก (บุช hand-reconcile ยืนยัน 103.2%; ดูหัวไฟล์)
+checkScope('May (kam)', window._qnrrCompute('treerak.s@freshket.co', 'kam'), 6603651, 103.2);
+checkScope('TL Ploy', window._qnrrCompute('pavarisa.mu@freshket.co', 'tl'), 59578478, 102.8);
+checkScope('TL Name', window._qnrrCompute('nitipat.s@freshket.co', 'tl'), 77066948, 107.3);
+checkScope('Org admin', window._qnrrCompute(null, 'admin'), 136809250, 105.4);
 
 const pmRows = loadCsv(pmPath);
-check('PM chain NRR%', window.nrrComputeBucket(pmRows, 'chain').by_month[M].nrr_pct, 116);
-check('PM sa_mc NRR%', window.nrrComputeBucket(pmRows, 'sa_mc').by_month[M].nrr_pct, 101);
+check('PM chain NRR%', window.nrrComputeBucket(pmRows, 'chain').by_month[M].nrr_pct, 112.5);
+check('PM sa_mc NRR%', window.nrrComputeBucket(pmRows, 'sa_mc').by_month[M].nrr_pct, 98.3);
 
-// VP pools all portfolios — has no transfer_in rows, so the fix must be a
-// no-op here. 108% is the pre-fix value; any drift means a regression.
-check('VP pooled NRR% (unchanged)', window.nrrComputeRowsPool(loadCsv(vpPath), 'vp').by_month[M].nrr_pct, 108);
+// VP pools all portfolios — has no transfer_in rows, so the transfer fix and
+// the month-scoped policy must both be no-ops here; any drift = regression.
+check('VP pooled NRR% (no transfers, policy no-op)', window.nrrComputeRowsPool(loadCsv(vpPath), 'vp').by_month[M].nrr_pct, 105.3);
 
 process.exit(fails ? 1 : 0);

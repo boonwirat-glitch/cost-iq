@@ -392,8 +392,9 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   const newFromSalesResult = _groupNRR(newFromSalesAccounts, newFromSalesOutlets);
 
   // v_TIFOLD (going-forward fix): fold transfer-in's own incoming base into the
-  // reported %NRR ratio, symmetric with _qnrrCompute's quarter-wide fold
-  // (07c_qnrr_view.js:207-243, 292). Before this, `nrr` came from `core.nrr`
+  // reported %NRR ratio, symmetric with _qnrrCompute's transfer fold (which is
+  // MONTH-SCOPED since 2026-08-07 — this monthly path is single-month/MoM so it
+  // is inherently month-scoped already). Before this, `nrr` came from `core.nrr`
   // alone -- a transferred-in outlet's own baselinePrevGmv/cohortGmv (already
   // computed by transferInResult above, already waiver-filtered via _waived()
   // inside _groupNRR) never touched the ratio, only the separate
@@ -1051,8 +1052,8 @@ async function renderPortviewTargetBar() {
       : 'เดือนฐาน';
     baselineSection = `<div class="tgt-det-section">
       <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
-      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">Fixed base ตลอดไตรมาส (ไม่เลื่อน)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
-      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานคงที่ทั้ง Q</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">ฐานเดือน${_baseMoLbl} (ปรับเมื่อมีย้ายเข้า/ออก ตั้งแต่เดือนที่ย้าย)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานเดือนนี้</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
     </div>`;
   } else if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];

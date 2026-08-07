@@ -257,21 +257,26 @@ function _qnrrCompute(kamEmail, scope, opts) {
     base_norm_original += b.gmv / b.days;
   });
 
-  // ── Find all core-cohort transfer_out outlets across entire Q ───────────────
-  // Rule: movement_type='transfer_out' ในเดือนไหนก็ได้ใน Q
-  //       AND outlet_id อยู่ใน baseMap (core cohort)
+  // ── Core-cohort transfer_out — MONTH-SCOPED (นโยบายบุช 2026-08-07) ─────────
+  // Rule: movement_type='transfer_out' AND outlet_id อยู่ใน baseMap (core cohort)
+  // period_month = min เดือนที่เจอแถว TO ของ outlet นั้น = เดือนที่ย้ายจริง →
+  // ฐานถูกหัก "ตั้งแต่เดือนนั้นเป็นต้นไป" (ดู base_norm_m ในลูปรายเดือนด้านล่าง)
+  // ไฟล์เก่า (fan-out ทุกเดือน): min = เดือนแรก = พฤติกรรม quarter-wide เดิมเป๊ะ
   var coreTransferOutSet = {}; // outlet_id → {gmv_norm, account_name, period_month}
   // gmv_norm ใช้ unit เดียวกับ base_norm_original = gmv / days (ไม่ × 30)
   // เพื่อให้ base_norm = base_norm_original − transfer_out_base_norm หักได้ถูก
   scopedRows.forEach(function(r){
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_out' && baseMap[r.outlet_id] && !coreTransferOutSet[r.outlet_id]) {
-      var b = baseMap[r.outlet_id];
-      coreTransferOutSet[r.outlet_id] = {
-        gmv_norm:     b.gmv / b.days,   // unit: GMV/day (same as base_norm_original)
-        account_name: r.account_name || '',
-        period_month: r.period_month
-      };
+    if (mv === 'transfer_out' && baseMap[r.outlet_id]) {
+      var prevOut = coreTransferOutSet[r.outlet_id];
+      if (!prevOut || r.period_month < prevOut.period_month) {
+        var b = baseMap[r.outlet_id];
+        coreTransferOutSet[r.outlet_id] = {
+          gmv_norm:     b.gmv / b.days,   // unit: GMV/day (same as base_norm_original)
+          account_name: r.account_name || '',
+          period_month: r.period_month
+        };
+      }
     }
   });
 
@@ -295,21 +300,26 @@ function _qnrrCompute(kamEmail, scope, opts) {
   // only showed in the separate "Transfer in" display bucket and in Total GMV. That
   // meant a portfolio receiving a large transferred-in account got zero accountability
   // for it for the rest of the quarter: its performance never touched core NRR%,
-  // which is what drives commission/pace tracking. This mirrors transfer_out exactly
-  // (same quarter-level, non-month-specific treatment) rather than introducing a new
-  // inconsistency.
+  // which is what drives commission/pace tracking. This mirrors transfer_out exactly.
+  // MONTH-SCOPED update (นโยบายบุช 2026-08-07): เดือนย้าย = min(period_month)
+  // และฐาน (base_gmv) ต้องมาจาก "แถวเดือนแรกสุด" เท่านั้น — base_gmv บนแถวเดือน
+  // หลังๆ เชื่อถือไม่ได้ (ดู src/nrr/nrr_waivers.js:14-20) ของเดิมหยิบแถวแรกตาม
+  // ลำดับ iteration = ขึ้นกับการเรียงไฟล์ ไม่ deterministic
   var coreTransferInSet = {}; // outlet_id → {gmv, gmv_norm, account_name, period_month}
   scopedRows.forEach(function(r){
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_in' && !coreTransferInSet[r.outlet_id]) {
-      var b_gmv  = parseFloat(r.base_gmv) || 0;
-      var b_days = parseFloat(r.base_days) || 31;
-      coreTransferInSet[r.outlet_id] = {
-        gmv:          b_gmv,
-        gmv_norm:     b_gmv / b_days,   // unit: GMV/day (same as base_norm_original)
-        account_name: r.account_name || '',
-        period_month: r.period_month
-      };
+    if (mv === 'transfer_in') {
+      var prevIn = coreTransferInSet[r.outlet_id];
+      if (!prevIn || r.period_month < prevIn.period_month) {
+        var b_gmv  = parseFloat(r.base_gmv) || 0;
+        var b_days = parseFloat(r.base_days) || 31;
+        coreTransferInSet[r.outlet_id] = {
+          gmv:          b_gmv,
+          gmv_norm:     b_gmv / b_days,   // unit: GMV/day (same as base_norm_original)
+          account_name: r.account_name || '',
+          period_month: r.period_month
+        };
+      }
     }
   });
   var transfer_in_base_norm = 0;
@@ -397,10 +407,24 @@ function _qnrrCompute(kamEmail, scope, opts) {
       }
     });
 
-    // Waived-account (nrr_exclusions) base contribution is removed per-month --
-    // unlike transfer_out/in (quarter-wide, computed once into base_norm above),
-    // a waiver applies to one specific month only, so it must be recomputed here.
-    var effectiveBaseNorm = base_norm;
+    // ── base_norm_m: ฐาน month-scoped ของเดือนนี้ (ก่อนหัก waiver) ──────────
+    // นโยบายบุช 2026-08-07: ย้ายเดือน M มีผลกับฐานตั้งแต่เดือน M เป็นต้นไป
+    // เท่านั้น — %NRR ของเดือนที่จบ/ล็อกแล้ว ห้ามขยับเพราะการย้ายในอนาคต
+    // สะสมด้วย min-เดือนย้าย ≤ เดือนนี้: ออก ส.ค. แล้ว ก.ย. ไม่มีแถวก็ยังถือว่าออก
+    // ★ ต้องแก้คู่กับ src/nrr/nrr_logic.js (_qnrrCompute + nrrComputeRowsPool) เสมอ
+    var toM = 0, tiM = 0;
+    Object.keys(coreTransferOutSet).forEach(function(oid){
+      if (coreTransferOutSet[oid].period_month <= month) toM += coreTransferOutSet[oid].gmv_norm;
+    });
+    Object.keys(coreTransferInSet).forEach(function(oid){
+      if (coreTransferInSet[oid].period_month <= month) tiM += coreTransferInSet[oid].gmv_norm;
+    });
+    var base_norm_m = base_norm_original - toM + tiM;
+
+    // Waived-account (nrr_exclusions) base contribution is removed per-month —
+    // a waiver applies to one specific month only, on top of the month-scoped
+    // base above.
+    var effectiveBaseNorm = base_norm_m;
     if (typeof _nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function(oid){
         var b = baseMap[oid];
@@ -410,8 +434,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
       });
     }
 
-    // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive,
-    // และหัก waived-account base ของเดือนนี้)
+    // NRR คำนวณจาก base_norm_m (ฐาน month-scoped: ย้ายเข้า/ออกนับตั้งแต่เดือน
+    // ที่ย้าย, และหัก waived-account base ของเดือนนี้)
     // v92-fix: NO rounding — this flows into _qnrrComputeForCommission's
     // `nrr` ratio (line ~493 below), which the commission engine's tier/gate
     // threshold comparisons ultimately use. Rounding here before that
@@ -437,7 +461,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
-      effective_base_norm: effectiveBaseNorm, // v865: per-month base after waived-account subtraction (base_norm itself is quarter-wide)
+      base_norm_m:    base_norm_m,            // month-scoped base ก่อนหัก waiver (field ไตรมาสด้านล่างคือ fold เต็ม)
+      effective_base_norm: effectiveBaseNorm, // v865: per-month base after waived-account subtraction
       total_gmv:      total_gmv,
       segments:       segments,
       outlets:        outlets,
@@ -1197,7 +1222,7 @@ function _qnrrRenderBreakdown(){
         '<div class="qnrr-base-adj-note">' +
           '<span class="qnrr-base-adj-icon"></span>' +
           'ฐานปรับจาก ' + _fmtM(origBase) + ' → ' + _fmtM(dispBase) +
-          ' (' + parts.join(', ') + ')' +
+          ' (' + parts.join(', ') + ') — มีผลตั้งแต่เดือนที่ย้าย (เดือนก่อนหน้าใช้ฐานเดิม)' +
         '</div>' +
       '</td>' +
     '</tr>';

@@ -1,4 +1,4 @@
-<!-- Freshket Sense v960: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v255: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1314,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v960',
+      version: 'v255',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -37012,7 +37012,7 @@ function _commGetHandoverGmvTiers() {
 // in /nrr's nrrComputeHandoverForKam (nrr_commission.js) — keep both in sync,
 // this is the SECOND place these two functions must match exactly (see the
 // divergence-bug note there).
-function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
+function _commComputeHandoverRetention(kamEmail, planCode, previewResolver, periodOverride) {
   // V3 Tactic B:
   // - Source: bulkHandoverData.byNewKamName (Q10 V3) แทน portviewBulkData isNew detection
   // - Filter: prevOwner === 'SALE' เท่านั้น (PM/ADMIN/KAM ไม่นับ)
@@ -37020,7 +37020,8 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
   // - Current: perf_gmv (GMV เดือน M+1) normalize ÷ perfDays × 30
   // - Window: transfer_month = เดือนก่อน (M-1) เท่านั้น
   const EMPTY = { accounts:0, baseline_gmv:0, current_gmv:0, retention_pct:0,
-                  tier:0, payout:0, detail:[], gmv_tier_label:null, gmv_bucket_gmv:0 };
+                  tier:0, payout:0, detail:[], gmv_tier_label:null, gmv_bucket_gmv:0,
+                  data_missing:false };
   try {
     const hd = (typeof bulkHandoverData !== 'undefined' && bulkHandoverData)
               ? bulkHandoverData : { byNewKamName:{} };
@@ -37030,11 +37031,29 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
     const kamName = pvAccounts.length ? (pvAccounts[0].kamName || '') : '';
     if (!kamName) return EMPTY;
 
-    // current month label เพื่อระบุ transfer_month = เดือนก่อน
-    const now = new Date();
-    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonthLabel = prevMonth.getFullYear() + '-' +
-                           String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
+    // v_hofix: transfer_month ต้องอิง "งวดที่กำลังคิด" ไม่ใช่นาฬิกาเครื่อง
+    // ก.ค. ถูกล็อกตอน 1 ส.ค. → นาฬิกาให้ prevMonthLabel='2026-07' แต่ไฟล์ตอนนั้น
+    // ยังเป็นรอบที่มี '2026-06' → filter ได้ 0 แถว → KAM ทั้ง 14 คนล็อกที่ ฿0
+    // (ยืนยันจาก snapshot จริง: payout 0 + detail [] ทุกแถว)
+    // ไม่ส่ง periodOverride มา = เดินทางเดิมด้วยนาฬิกาเครื่องเป๊ะ (เดือนสดไม่เปลี่ยนพฤติกรรม)
+    let prevMonthLabel;
+    if (periodOverride && /^\d{4}-\d{2}$/.test(periodOverride)) {
+      const _pp = String(periodOverride).split('-');
+      const _pd = new Date(Number(_pp[0]), Number(_pp[1]) - 1 - 1, 1); // -1 index, -1 เดือนก่อน
+      prevMonthLabel = _pd.getFullYear() + '-' + String(_pd.getMonth() + 1).padStart(2, '0');
+    } else {
+      const now = new Date();
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      prevMonthLabel = prevMonth.getFullYear() + '-' +
+                       String(prevMonth.getMonth() + 1).padStart(2, '0'); // YYYY-MM
+    }
+
+    // v_hofix: เช็คระดับไฟล์ว่าเดือนเป้าหมายมีอยู่ในไฟล์มั้ย — "ไฟล์ไม่มีเดือนนี้เลย"
+    // (ข้อมูลขาด) ต้องแยกออกจาก "มีข้อมูลแต่ retention ไม่ถึงเกณฑ์" (฿0 จริง)
+    // ไม่งั้นพอล็อกงวดไปแล้วจะแยกสองกรณีนี้ไม่ออกตลอดกาล — ซึ่งคือสิ่งที่เกิดกับ ก.ค.
+    const _allHoRows = (hd.rows && hd.rows.length) ? hd.rows : [];
+    const _monthPresent = _allHoRows.some(r => (r.transferMonth || '') === prevMonthLabel);
+    const MISSING = Object.assign({}, EMPTY, { data_missing: true });
 
     // ดึงร้านที่โอนมาหา KAM นี้ จาก Q10 V3
     const hoRows = (hd.byNewKamName && hd.byNewKamName[kamName]) || [];
@@ -37045,7 +37064,7 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       r.transferMonth === prevMonthLabel
     );
 
-    if (!handoverRows.length) return EMPTY;
+    if (!handoverRows.length) return _monthPresent ? EMPTY : MISSING;
 
     // Normalize: daily rate × 30 เพื่อให้จำนวนวันแฟร์ทั้งสองฝั่ง
     let baselineNorm = 0, perfNorm = 0;
@@ -37125,7 +37144,8 @@ function _commComputeHandoverRetention(kamEmail, planCode, previewResolver) {
       retention_pct:  retentionPct,
       tier, payout, detail,
       gmv_tier_label: gmvTierLabel,
-      gmv_bucket_gmv: Math.round(baselineNorm)
+      gmv_bucket_gmv: Math.round(baselineNorm),
+      data_missing:   false   // v_hofix: มีข้อมูลจริงถึงมาถึงบรรทัดนี้ได้
     };
   } catch(e) {
     console.warn('[CommEngine] _commComputeHandoverRetention error', e);
@@ -37437,7 +37457,10 @@ function _commBuildKamPayout(kamEmail, periodOverride, planRole, previewResolver
                handover: { payout: 0 }, gate: { cap_multiplier: 1, gate_active: false },
                subtotal: 0, gate_cap: 1, final_payout: 0 };
     }
-    const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver); // MoM always — do not touch
+    // v_hofix: ส่ง periodOverride เข้าไปด้วย — เดิมเป็น component เดียวที่ตกหล่น
+    // (บรรทัดเหนือขึ้นไป upsell ได้รับอยู่แล้ว) ทำให้คิดงวดย้อนหลังด้วยนาฬิกาเครื่อง
+    // เจตนาเดิม "MoM always" ยังอยู่ครบ: ไม่มี periodOverride = ใช้นาฬิกาเหมือนเดิม
+    const handover = _commComputeHandoverRetention(kamEmail, planCode, previewResolver, periodOverride);
     const gate     = _commComputeGmvGate(kamEmail, pct, planCode, previewResolver);
 
     const subtotal    = nrrPayout + upsellSku.total_comm + upsellOutlet.commission + handover.payout;
@@ -39179,7 +39202,10 @@ function _commBuildSnapshotRows(periodOverride) {
                     payout: kamPayout.handover.payout,
                     detail: kamPayout.handover.detail,
                     gmv_tier_label: kamPayout.handover.gmv_tier_label,
-                    gmv_bucket_gmv: kamPayout.handover.gmv_bucket_gmv },
+                    gmv_bucket_gmv: kamPayout.handover.gmv_bucket_gmv,
+                    // v_hofix: ติดธงไว้ในตัว snapshot ว่า ฿0 นี้มาจาก "ไฟล์ไม่มีเดือนนี้"
+                    // หรือ "มีข้อมูลแต่ไม่ถึงเกณฑ์" — พอล็อกแล้วย้อนดูทีหลังจะแยกออก
+                    data_missing: !!kamPayout.handover.data_missing },
         components_subtotal: kamPayout.subtotal,
         gmv_gate: kamPayout.gate,
         final_payout: kamPayout.final_payout,
@@ -39310,7 +39336,8 @@ function _commBuildSnapshotRows(periodOverride) {
                     payout: personPayout.handover.payout,
                     detail: personPayout.handover.detail,
                     gmv_tier_label: personPayout.handover.gmv_tier_label,
-                    gmv_bucket_gmv: personPayout.handover.gmv_bucket_gmv },
+                    gmv_bucket_gmv: personPayout.handover.gmv_bucket_gmv,
+                    data_missing: !!personPayout.handover.data_missing },
         components_subtotal: personPayout.subtotal,
         gmv_gate: personPayout.gate,
         final_payout: personPayout.final_payout,
@@ -44134,8 +44161,9 @@ function _tgtComputeKamNRR(kamEmail, tlEmail, asOfPeriod) {
   const newFromSalesResult = _groupNRR(newFromSalesAccounts, newFromSalesOutlets);
 
   // v_TIFOLD (going-forward fix): fold transfer-in's own incoming base into the
-  // reported %NRR ratio, symmetric with _qnrrCompute's quarter-wide fold
-  // (07c_qnrr_view.js:207-243, 292). Before this, `nrr` came from `core.nrr`
+  // reported %NRR ratio, symmetric with _qnrrCompute's transfer fold (which is
+  // MONTH-SCOPED since 2026-08-07 — this monthly path is single-month/MoM so it
+  // is inherently month-scoped already). Before this, `nrr` came from `core.nrr`
   // alone -- a transferred-in outlet's own baselinePrevGmv/cohortGmv (already
   // computed by transferInResult above, already waiver-filtered via _waived()
   // inside _groupNRR) never touched the ratio, only the separate
@@ -44793,8 +44821,8 @@ async function renderPortviewTargetBar() {
       : 'เดือนฐาน';
     baselineSection = `<div class="tgt-det-section">
       <div class="tgt-det-stitle">วิธีคำนวณ Baseline</div>
-      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">Fixed base ตลอดไตรมาส (ไม่เลื่อน)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
-      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานคงที่ทั้ง Q</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
+      <div class="tgt-fml-row"><span class="tgt-fml-mo">${_baseMoLbl}</span><span class="tgt-fml-eq">ฐานเดือน${_baseMoLbl} (ปรับเมื่อมีย้ายเข้า/ออก ตั้งแต่เดือนที่ย้าย)</span><span class="tgt-fml-res">${_tgtFmtM(nrrResult.baselinePrevGmv)}</span></div>
+      <div class="tgt-fml-total"><span class="tgt-fml-total-lbl">ฐานเดือนนี้</span><span class="tgt-fml-total-val">= ${_tgtFmtM(nrrResult.baselinePrevGmv)}/เดือน</span></div>
     </div>`;
   } else if (typeof bulkHistoryData !== 'undefined' && bulkHistoryData) {
     const _mo2 = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -58533,8 +58561,17 @@ function _qnrrCompute(kamEmail, scope, opts) {
     // ใช้ _effectiveMovement (ไม่ใช่ raw movement_type) เพื่อให้การย้าย KAM↔KAM
     // ทีมเดียวกันที่ tl/admin scope (ซึ่ง reclassify เป็น core_nrr) ยังอยู่ใน
     // baseMap ถูกต้อง — ร้านนั้นเป็นของ scope นั้นตั้งแต่เดือนฐานจริงๆ
+    // v_basefix: ฐาน = NRR + Churn + Comeback + Transfer In เท่านั้น
+    // ของเดิมพึ่งสมมติว่า new_sales/expansion มี base_gmv=0 เสมอ (ลูกค้าใหม่ย่อมไม่มี
+    // ยอดเดือนฐาน) — ข้อมูลจริงหักล้างแล้ว: 16 outlet ทั่วองค์กร ฿790,891 ถูกตีตรา
+    // cohort เดือนปัจจุบันทั้งที่มียอดเดือนฐานติดมา จึงเข้าตัวหารแต่ไม่เข้าตัวตั้ง
+    // (ตัวตั้งรับแค่ core_nrr/churn/transfer_in/comeback) = กด %NRR ลงทั้งไตรมาส
+    // ★ ไฟล์นี้คือตัวที่คิดเงินจริง (_qnrrComputeForCommission) — ต้องแก้คู่กับ
+    //   src/nrr/nrr_logic.js เป๊ะ ไม่งั้นหน้าจอกับยอดจ่ายจะคนละกติกากันอีก
+    var _effMv = _effectiveMovement(r);
     if (r.base_gmv > 0 && !baseMap[r.outlet_id] && r.movement_type !== 'handover'
-        && _effectiveMovement(r) !== 'transfer_in') {
+        && _effMv !== 'transfer_in'
+        && _effMv !== 'new_sales' && _effMv !== 'expansion') {
       baseMap[r.outlet_id] = { gmv: r.base_gmv, days: r.base_days || 31, account_id: r.account_id };
     }
   });
@@ -58548,21 +58585,26 @@ function _qnrrCompute(kamEmail, scope, opts) {
     base_norm_original += b.gmv / b.days;
   });
 
-  // ── Find all core-cohort transfer_out outlets across entire Q ───────────────
-  // Rule: movement_type='transfer_out' ในเดือนไหนก็ได้ใน Q
-  //       AND outlet_id อยู่ใน baseMap (core cohort)
+  // ── Core-cohort transfer_out — MONTH-SCOPED (นโยบายบุช 2026-08-07) ─────────
+  // Rule: movement_type='transfer_out' AND outlet_id อยู่ใน baseMap (core cohort)
+  // period_month = min เดือนที่เจอแถว TO ของ outlet นั้น = เดือนที่ย้ายจริง →
+  // ฐานถูกหัก "ตั้งแต่เดือนนั้นเป็นต้นไป" (ดู base_norm_m ในลูปรายเดือนด้านล่าง)
+  // ไฟล์เก่า (fan-out ทุกเดือน): min = เดือนแรก = พฤติกรรม quarter-wide เดิมเป๊ะ
   var coreTransferOutSet = {}; // outlet_id → {gmv_norm, account_name, period_month}
   // gmv_norm ใช้ unit เดียวกับ base_norm_original = gmv / days (ไม่ × 30)
   // เพื่อให้ base_norm = base_norm_original − transfer_out_base_norm หักได้ถูก
   scopedRows.forEach(function(r){
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_out' && baseMap[r.outlet_id] && !coreTransferOutSet[r.outlet_id]) {
-      var b = baseMap[r.outlet_id];
-      coreTransferOutSet[r.outlet_id] = {
-        gmv_norm:     b.gmv / b.days,   // unit: GMV/day (same as base_norm_original)
-        account_name: r.account_name || '',
-        period_month: r.period_month
-      };
+    if (mv === 'transfer_out' && baseMap[r.outlet_id]) {
+      var prevOut = coreTransferOutSet[r.outlet_id];
+      if (!prevOut || r.period_month < prevOut.period_month) {
+        var b = baseMap[r.outlet_id];
+        coreTransferOutSet[r.outlet_id] = {
+          gmv_norm:     b.gmv / b.days,   // unit: GMV/day (same as base_norm_original)
+          account_name: r.account_name || '',
+          period_month: r.period_month
+        };
+      }
     }
   });
 
@@ -58586,21 +58628,26 @@ function _qnrrCompute(kamEmail, scope, opts) {
   // only showed in the separate "Transfer in" display bucket and in Total GMV. That
   // meant a portfolio receiving a large transferred-in account got zero accountability
   // for it for the rest of the quarter: its performance never touched core NRR%,
-  // which is what drives commission/pace tracking. This mirrors transfer_out exactly
-  // (same quarter-level, non-month-specific treatment) rather than introducing a new
-  // inconsistency.
+  // which is what drives commission/pace tracking. This mirrors transfer_out exactly.
+  // MONTH-SCOPED update (นโยบายบุช 2026-08-07): เดือนย้าย = min(period_month)
+  // และฐาน (base_gmv) ต้องมาจาก "แถวเดือนแรกสุด" เท่านั้น — base_gmv บนแถวเดือน
+  // หลังๆ เชื่อถือไม่ได้ (ดู src/nrr/nrr_waivers.js:14-20) ของเดิมหยิบแถวแรกตาม
+  // ลำดับ iteration = ขึ้นกับการเรียงไฟล์ ไม่ deterministic
   var coreTransferInSet = {}; // outlet_id → {gmv, gmv_norm, account_name, period_month}
   scopedRows.forEach(function(r){
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_in' && !coreTransferInSet[r.outlet_id]) {
-      var b_gmv  = parseFloat(r.base_gmv) || 0;
-      var b_days = parseFloat(r.base_days) || 31;
-      coreTransferInSet[r.outlet_id] = {
-        gmv:          b_gmv,
-        gmv_norm:     b_gmv / b_days,   // unit: GMV/day (same as base_norm_original)
-        account_name: r.account_name || '',
-        period_month: r.period_month
-      };
+    if (mv === 'transfer_in') {
+      var prevIn = coreTransferInSet[r.outlet_id];
+      if (!prevIn || r.period_month < prevIn.period_month) {
+        var b_gmv  = parseFloat(r.base_gmv) || 0;
+        var b_days = parseFloat(r.base_days) || 31;
+        coreTransferInSet[r.outlet_id] = {
+          gmv:          b_gmv,
+          gmv_norm:     b_gmv / b_days,   // unit: GMV/day (same as base_norm_original)
+          account_name: r.account_name || '',
+          period_month: r.period_month
+        };
+      }
     }
   });
   var transfer_in_base_norm = 0;
@@ -58688,10 +58735,24 @@ function _qnrrCompute(kamEmail, scope, opts) {
       }
     });
 
-    // Waived-account (nrr_exclusions) base contribution is removed per-month --
-    // unlike transfer_out/in (quarter-wide, computed once into base_norm above),
-    // a waiver applies to one specific month only, so it must be recomputed here.
-    var effectiveBaseNorm = base_norm;
+    // ── base_norm_m: ฐาน month-scoped ของเดือนนี้ (ก่อนหัก waiver) ──────────
+    // นโยบายบุช 2026-08-07: ย้ายเดือน M มีผลกับฐานตั้งแต่เดือน M เป็นต้นไป
+    // เท่านั้น — %NRR ของเดือนที่จบ/ล็อกแล้ว ห้ามขยับเพราะการย้ายในอนาคต
+    // สะสมด้วย min-เดือนย้าย ≤ เดือนนี้: ออก ส.ค. แล้ว ก.ย. ไม่มีแถวก็ยังถือว่าออก
+    // ★ ต้องแก้คู่กับ src/nrr/nrr_logic.js (_qnrrCompute + nrrComputeRowsPool) เสมอ
+    var toM = 0, tiM = 0;
+    Object.keys(coreTransferOutSet).forEach(function(oid){
+      if (coreTransferOutSet[oid].period_month <= month) toM += coreTransferOutSet[oid].gmv_norm;
+    });
+    Object.keys(coreTransferInSet).forEach(function(oid){
+      if (coreTransferInSet[oid].period_month <= month) tiM += coreTransferInSet[oid].gmv_norm;
+    });
+    var base_norm_m = base_norm_original - toM + tiM;
+
+    // Waived-account (nrr_exclusions) base contribution is removed per-month —
+    // a waiver applies to one specific month only, on top of the month-scoped
+    // base above.
+    var effectiveBaseNorm = base_norm_m;
     if (typeof _nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function(oid){
         var b = baseMap[oid];
@@ -58701,8 +58762,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
       });
     }
 
-    // NRR คำนวณจาก adjusted base_norm (หัก core transfer_out แล้ว retroactive,
-    // และหัก waived-account base ของเดือนนี้)
+    // NRR คำนวณจาก base_norm_m (ฐาน month-scoped: ย้ายเข้า/ออกนับตั้งแต่เดือน
+    // ที่ย้าย, และหัก waived-account base ของเดือนนี้)
     // v92-fix: NO rounding — this flows into _qnrrComputeForCommission's
     // `nrr` ratio (line ~493 below), which the commission engine's tier/gate
     // threshold comparisons ultimately use. Rounding here before that
@@ -58728,7 +58789,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
-      effective_base_norm: effectiveBaseNorm, // v865: per-month base after waived-account subtraction (base_norm itself is quarter-wide)
+      base_norm_m:    base_norm_m,            // month-scoped base ก่อนหัก waiver (field ไตรมาสด้านล่างคือ fold เต็ม)
+      effective_base_norm: effectiveBaseNorm, // v865: per-month base after waived-account subtraction
       total_gmv:      total_gmv,
       segments:       segments,
       outlets:        outlets,
@@ -59488,7 +59550,7 @@ function _qnrrRenderBreakdown(){
         '<div class="qnrr-base-adj-note">' +
           '<span class="qnrr-base-adj-icon"></span>' +
           'ฐานปรับจาก ' + _fmtM(origBase) + ' → ' + _fmtM(dispBase) +
-          ' (' + parts.join(', ') + ')' +
+          ' (' + parts.join(', ') + ') — มีผลตั้งแต่เดือนที่ย้าย (เดือนก่อนหน้าใช้ฐานเดิม)' +
         '</div>' +
       '</td>' +
     '</tr>';

@@ -244,17 +244,24 @@ function _qnrrCompute(kamEmail, scope, opts) {
     base_norm_original += b.gmv / b.days;
   });
 
-  // ── Core-cohort transfer_out across the entire quarter (retroactive) ────
+  // ── Core-cohort transfer_out — MONTH-SCOPED (นโยบายบุช 2026-08-07) ──────
+  // period_month = min เดือนที่เจอแถว transfer_out ของ outlet นั้น = เดือนที่ย้ายจริง
+  // ใช้ตัดสินว่าฐานถูกหักตั้งแต่เดือนไหน (ดู base_norm_m ในลูปรายเดือนด้านล่าง)
+  // หมายเหตุไฟล์เก่า: rep_view รุ่น fan-out ปั๊มแถว TO เหมือนกันทุกเดือน → min =
+  // เดือนแรกของไตรมาส = พฤติกรรม quarter-wide เดิมเป๊ะ (degrade อย่างปลอดภัย)
   var coreTransferOutSet = {};
   scopedRows.forEach(function (r) {
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_out' && baseMap[r.outlet_id] && !coreTransferOutSet[r.outlet_id]) {
-      var b = baseMap[r.outlet_id];
-      coreTransferOutSet[r.outlet_id] = {
-        gmv_norm: b.gmv / b.days,
-        account_name: r.account_name || '',
-        period_month: r.period_month
-      };
+    if (mv === 'transfer_out' && baseMap[r.outlet_id]) {
+      var prevOut = coreTransferOutSet[r.outlet_id];
+      if (!prevOut || r.period_month < prevOut.period_month) {
+        var b = baseMap[r.outlet_id];
+        coreTransferOutSet[r.outlet_id] = {
+          gmv_norm: b.gmv / b.days,
+          account_name: r.account_name || '',
+          period_month: r.period_month
+        };
+      }
     }
   });
 
@@ -268,17 +275,23 @@ function _qnrrCompute(kamEmail, scope, opts) {
     transfer_out_outlets.push({ outlet_id: oid, gmv_norm: t.gmv_norm, account_name: t.account_name, period_month: t.period_month });
   });
 
-  // ── transfer_in across the entire quarter — symmetric with transfer_out ──
+  // ── transfer_in — MONTH-SCOPED, สมมาตรกับ transfer_out ───────────────────
+  // เดือนย้าย = min(period_month) และฐาน (base_gmv) ต้องมาจาก "แถวเดือนแรกสุด"
+  // เท่านั้น — base_gmv บนแถวเดือนหลังๆ เชื่อถือไม่ได้ (ดู nrr_waivers.js:14-20)
+  // ของเดิมหยิบแถวแรกตามลำดับ iteration ซึ่งขึ้นกับการเรียงไฟล์ = ไม่ deterministic
   var coreTransferInSet = {};
   scopedRows.forEach(function (r) {
     var mv = _effectiveMovement(r);
-    if (mv === 'transfer_in' && !coreTransferInSet[r.outlet_id]) {
-      var b_gmv  = parseFloat(r.base_gmv) || 0;
-      var b_days = parseFloat(r.base_days) || 31;
-      coreTransferInSet[r.outlet_id] = {
-        gmv: b_gmv, gmv_norm: b_gmv / b_days,
-        account_name: r.account_name || '', period_month: r.period_month
-      };
+    if (mv === 'transfer_in') {
+      var prevIn = coreTransferInSet[r.outlet_id];
+      if (!prevIn || r.period_month < prevIn.period_month) {
+        var b_gmv  = parseFloat(r.base_gmv) || 0;
+        var b_days = parseFloat(r.base_days) || 31;
+        coreTransferInSet[r.outlet_id] = {
+          gmv: b_gmv, gmv_norm: b_gmv / b_days,
+          account_name: r.account_name || '', period_month: r.period_month
+        };
+      }
     }
   });
   var transfer_in_base_norm = 0;
@@ -393,10 +406,23 @@ function _qnrrCompute(kamEmail, scope, opts) {
       });
     });
 
-    // Waived-account base contribution removed per-month (unlike
-    // transfer_out/in, which are quarter-wide and already baked into
-    // base_norm above) — a waiver applies to one specific month only.
-    var effectiveBaseNorm = base_norm;
+    // ── base_norm_m: ฐาน month-scoped ของเดือนนี้ (ก่อนหัก waiver) ─────────
+    // นโยบายบุช 2026-08-07: ย้ายเดือน M มีผลกับฐานตั้งแต่เดือน M เป็นต้นไป
+    // เท่านั้น — %NRR ของเดือนที่จบ/ล็อกแล้ว ห้ามขยับเพราะการย้ายในอนาคต
+    // (เคสจริง: ร้านย้ายเข้าพอร์ต ส.ค. เคยดูดฐาน ก.ค. ที่ล็อกแล้ว −฿5,000)
+    // สะสมด้วย min-เดือนย้าย ≤ เดือนนี้: ออก ส.ค. แล้ว ก.ย. ไม่มีแถวก็ยังถือว่าออก
+    var toM = 0, tiM = 0;
+    Object.keys(coreTransferOutSet).forEach(function (oid) {
+      if (coreTransferOutSet[oid].period_month <= month) toM += coreTransferOutSet[oid].gmv_norm;
+    });
+    Object.keys(coreTransferInSet).forEach(function (oid) {
+      if (coreTransferInSet[oid].period_month <= month) tiM += coreTransferInSet[oid].gmv_norm;
+    });
+    var base_norm_m = base_norm_original - toM + tiM;
+
+    // Waived-account base contribution removed per-month — a waiver applies
+    // to one specific month only, on top of the month-scoped base above.
+    var effectiveBaseNorm = base_norm_m;
     if (typeof nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function (oid) {
         var b = baseMap[oid];
@@ -426,7 +452,8 @@ function _qnrrCompute(kamEmail, scope, opts) {
     var isPartial   = curr_days > 0 && curr_days < daysInMonth - 2;
 
     by_month[month] = {
-      nrr_pct: nrr_pct, effective_base_norm: effectiveBaseNorm, total_gmv: total_gmv, segments: segments, outlets: outlets,
+      nrr_pct: nrr_pct, base_norm_m: base_norm_m,
+      effective_base_norm: effectiveBaseNorm, total_gmv: total_gmv, segments: segments, outlets: outlets,
       rows: monthRows, curr_days: curr_days, days_in_month: daysInMonth,
       is_partial: isPartial, core_nrr_base: core_nrr_base_sum, contraction: contraction,
       // v_recon: ตัวตั้งดิบ (ยังไม่หาร) เก็บไว้ให้ export กระทบยอดได้ตรงๆ
@@ -523,28 +550,47 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
   var base_norm_original = 0;
   Object.keys(baseMap).forEach(function (oid) { base_norm_original += baseMap[oid].gmv / baseMap[oid].days; });
 
-  var transferOutNorm = 0;
-  var transfer_out_outlets = [];
-  var seenOut = {};
+  // MONTH-SCOPED (นโยบายบุช 2026-08-07 — mirror ของ _qnrrCompute ด้านบน):
+  // เดือนย้าย = min(period_month) ต่อ outlet · ฐาน TI จากแถวเดือนแรกสุด
+  // pool views (pm/admin/vp) จำแนก transfer_out รายเดือนอยู่แล้ว → ได้ผลจริงทันที
+  var poolOutSet = {};
   bucketRows.forEach(function (r) {
-    if (effMv(r) === 'transfer_out' && baseMap[r.outlet_id] && !seenOut[r.outlet_id]) {
-      seenOut[r.outlet_id] = true;
-      transferOutNorm += baseMap[r.outlet_id].gmv / baseMap[r.outlet_id].days;
-      transfer_out_outlets.push({ outlet_id: r.outlet_id, account_name: r.account_name || '', period_month: r.period_month });
+    if (effMv(r) === 'transfer_out' && baseMap[r.outlet_id]) {
+      var prevOut = poolOutSet[r.outlet_id];
+      if (!prevOut || r.period_month < prevOut.period_month) {
+        poolOutSet[r.outlet_id] = {
+          gmv_norm: baseMap[r.outlet_id].gmv / baseMap[r.outlet_id].days,
+          account_name: r.account_name || '', period_month: r.period_month
+        };
+      }
     }
   });
+  var transferOutNorm = 0;
+  var transfer_out_outlets = [];
+  Object.keys(poolOutSet).forEach(function (oid) {
+    transferOutNorm += poolOutSet[oid].gmv_norm;
+    transfer_out_outlets.push({ outlet_id: oid, account_name: poolOutSet[oid].account_name, period_month: poolOutSet[oid].period_month });
+  });
 
+  var poolInSet = {};
+  bucketRows.forEach(function (r) {
+    if (effMv(r) === 'transfer_in') {
+      var prevIn = poolInSet[r.outlet_id];
+      if (!prevIn || r.period_month < prevIn.period_month) {
+        var b_gmv = parseFloat(r.base_gmv) || 0;
+        var b_days = parseFloat(r.base_days) || 31;
+        poolInSet[r.outlet_id] = {
+          gmv_norm: b_gmv / b_days,
+          account_name: r.account_name || '', period_month: r.period_month
+        };
+      }
+    }
+  });
   var transferInNorm = 0;
   var transfer_in_outlets = [];
-  var seenIn = {};
-  bucketRows.forEach(function (r) {
-    if (effMv(r) === 'transfer_in' && !seenIn[r.outlet_id]) {
-      seenIn[r.outlet_id] = true;
-      var b_gmv = parseFloat(r.base_gmv) || 0;
-      var b_days = parseFloat(r.base_days) || 31;
-      transferInNorm += b_gmv / b_days;
-      transfer_in_outlets.push({ outlet_id: r.outlet_id, account_name: r.account_name || '', period_month: r.period_month });
-    }
+  Object.keys(poolInSet).forEach(function (oid) {
+    transferInNorm += poolInSet[oid].gmv_norm;
+    transfer_in_outlets.push({ outlet_id: oid, account_name: poolInSet[oid].account_name, period_month: poolInSet[oid].period_month });
   });
 
   var base_norm = base_norm_original - transferOutNorm + transferInNorm;
@@ -598,7 +644,17 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
       }
     });
 
-    var effectiveBaseNorm = base_norm;
+    // base_norm_m: ฐาน month-scoped ของเดือนนี้ — mirror _qnrrCompute ด้านบน
+    var toM = 0, tiM = 0;
+    Object.keys(poolOutSet).forEach(function (oid) {
+      if (poolOutSet[oid].period_month <= month) toM += poolOutSet[oid].gmv_norm;
+    });
+    Object.keys(poolInSet).forEach(function (oid) {
+      if (poolInSet[oid].period_month <= month) tiM += poolInSet[oid].gmv_norm;
+    });
+    var base_norm_m = base_norm_original - toM + tiM;
+
+    var effectiveBaseNorm = base_norm_m;
     if (typeof nrrAccountWaivedForPeriod === 'function') {
       Object.keys(baseMap).forEach(function (oid) {
         var b = baseMap[oid];
@@ -625,7 +681,8 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     var isPartial = curr_days > 0 && curr_days < daysInMonth - 2;
 
     by_month[month] = {
-      nrr_pct: nrr_pct, effective_base_norm: effectiveBaseNorm, segments: segments, outlets: outlets,
+      nrr_pct: nrr_pct, base_norm_m: base_norm_m,
+      effective_base_norm: effectiveBaseNorm, segments: segments, outlets: outlets,
       rows: monthRows, total_gmv: total_gmv,
       curr_days: curr_days, days_in_month: daysInMonth, is_partial: isPartial
     };

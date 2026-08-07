@@ -481,10 +481,10 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     { key: 'expansion', label: 'Expansion', cls: 'mv-green-lt' },
     { key: 'comeback', label: 'Comeback', cls: 'mv-teal' },
     // v_onemeaning: แถวนี้คือยอดขาย "เดือนนั้นๆ" ของร้านที่ย้ายเข้า — คนละมิติ
-    // กับ "+ ย้ายเข้า" ในโน้ตฐาน (มูลค่า ณ เดือนฐาน, นับทั้งไตรมาส) บุชเคยงง
-    // 196K(2) vs 65K(1) เพราะสองเลขนี้ไม่มีป้ายแยกกัน
+    // กับ "+ ย้ายเข้า" ในโน้ตฐาน (มูลค่า ณ เดือนฐาน นับตั้งแต่เดือนที่ย้ายเข้า)
+    // บุชเคยงง 196K(2) vs 65K(1) เพราะสองเลขนี้ไม่มีป้ายแยกกัน
     { key: 'transfer_in', label: 'Transfer in (ยอดเดือนนั้นๆ)', cls: 'mv-violet',
-      title: 'ยอดขายของเดือนนั้นเอง ของร้านที่ย้ายเข้าในเดือนนั้น — คนละเลขกับ "+ ย้ายเข้า" ในหมายเหตุฐานด้านล่าง ซึ่งเป็นมูลค่า ณ เดือนฐานของร้านย้ายเข้าทั้งไตรมาส' },
+      title: 'ยอดขายของเดือนนั้นเอง ของร้านที่ย้ายเข้าในเดือนนั้น — คนละเลขกับ "+ ย้ายเข้า" ในหมายเหตุฐานด้านล่าง ซึ่งเป็นมูลค่า ณ เดือนฐาน นับเข้าฐานตั้งแต่เดือนที่ย้ายเข้าเป็นต้นไป' },
     { key: 'transfer_out', label: 'Transfer out', cls: 'mv-clay', negative: true }
   ];
   var colCount = columns.length + 1;
@@ -570,7 +570,10 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       var count = bm ? nrrWaivedAccountCountForRows(bm.rows, c.month) : 0;
       if (!count) return DASH;
       var effBase = bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
-      var delta = Math.round((result.base_norm - effBase) * nrrBaseDays());
+      // MONTH-SCOPED: เทียบกับฐานรายเดือน (base_norm_m) ไม่ใช่ฐานไตรมาส — ไม่งั้น
+      // delta จะรวมผลของย้ายเข้า/ออกที่ยังไม่ถึงเดือนนั้น แล้วแปะป้ายผิดว่าเป็น waiver
+      var preWaive = bm.base_norm_m != null ? bm.base_norm_m : result.base_norm;
+      var delta = Math.round((preWaive - effBase) * nrrBaseDays());
       return '<td class="num-cell" style="color:var(--ink3)" title="' + count + ' ร้านถูกยกเว้น NRR เดือนนี้ — ดู #/waivers">−' + nrrFmtGMV(delta) + '</td>';
     }).join('');
     return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
@@ -612,8 +615,17 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     });
     var parts = ['Core NRR ' + nrrFmtGMV(Math.round(_sum.core)) + ' (' + _sum.coreN + ' ร้าน)'];
     if (_sum.churnN) parts.push('Churn ' + nrrFmtGMV(Math.round(_sum.churn)) + ' (' + _sum.churnN + ' ร้าน — นับในฐาน ไม่ได้หักออก)');
-    if (result.transfer_out_base_norm > 0) parts.push('− ย้ายออก ' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * _bd)) + ' (' + result.transfer_out_outlets.length + ')');
-    if (result.transfer_in_base_norm > 0) parts.push('+ ย้ายเข้า (มูลค่าฐาน ณ เดือน' + (QNRR_CFG.months_th[result.base_month] || result.base_month) + ' นับทั้งไตรมาส) ' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * _bd)) + ' (' + result.transfer_in_outlets.length + ' ร้าน)');
+    // MONTH-SCOPED (นโยบายบุช 2026-08-07): ย้ายมีผลกับฐานตั้งแต่เดือนที่ย้าย —
+    // แจกแจงรายเดือนจาก period_month บน outlets (= เดือนย้ายจริงหลัง min-fix)
+    var _tallyByMonth = function (outlets) {
+      var m = {};
+      (outlets || []).forEach(function (o) { m[o.period_month] = (m[o.period_month] || 0) + 1; });
+      return Object.keys(m).sort().map(function (k) {
+        return (QNRR_CFG.months_th[k] || k) + ' ' + m[k] + ' ร้าน';
+      }).join(' · ');
+    };
+    if (result.transfer_out_base_norm > 0) parts.push('− ย้ายออก (นับตั้งแต่เดือนที่ย้ายออก: ' + _tallyByMonth(result.transfer_out_outlets) + ') ' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * _bd)));
+    if (result.transfer_in_base_norm > 0) parts.push('+ ย้ายเข้า (มูลค่าฐาน ณ เดือน' + (QNRR_CFG.months_th[result.base_month] || result.base_month) + ' นับตั้งแต่เดือนที่ย้ายเข้า: ' + _tallyByMonth(result.transfer_in_outlets) + ') ' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * _bd)));
     var exclKeys = Object.keys(_excl);
     var exclTxt = exclKeys.length
       ? ' · ไม่นับเข้าฐาน: ' + exclKeys.map(function (k) {
@@ -627,10 +639,16 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     if (typeof nrrWaivedAccountCountForRows === 'function') {
       var _effParts = result.months.map(function (m) {
         var _bm = result.by_month[m];
+        if (!_bm || _bm.effective_base_norm == null) return null;
         var _n = nrrWaivedAccountCountForRows(_bm && _bm.rows, m);
-        if (!_n || !_bm || _bm.effective_base_norm == null) return null;
         var _eff = Math.round(_bm.effective_base_norm * _bd);
-        return (QNRR_CFG.months_th[m] || m) + ' ' + nrrFmtGMV(_eff) + ' (ยกเว้น ' + _n + ' ร้าน −' + nrrFmtGMV(baseAdjusted - _eff) + ')';
+        // MONTH-SCOPED: ฐานก่อนยกเว้นของ "เดือนนี้" (base_norm_m) ต่างจากตัวเลขรวม
+        // ได้เมื่อมีย้ายเข้า/ออกกลางไตรมาส — แสดงเดือนที่ต่างด้วย ไม่ใช่แค่เดือนมี waiver
+        var _pre = Math.round((_bm.base_norm_m != null ? _bm.base_norm_m : result.base_norm) * _bd);
+        if (!_n && _pre === baseAdjusted) return null;
+        return (QNRR_CFG.months_th[m] || m) + ' ' + nrrFmtGMV(_eff) +
+          (_n ? ' (ยกเว้น ' + _n + ' ร้าน −' + nrrFmtGMV(_pre - _eff) + ')' : '') +
+          (_pre !== baseAdjusted ? ' (ย้ายเข้า/ออกนับตามเดือนที่ย้าย)' : '');
       }).filter(Boolean);
       _effLead = _effParts.length
         ? '<b>ฐาน NRR (ตัวหาร %NRR จริง รายเดือน):</b> ' + _effParts.join(' · ') + '<br>'
@@ -644,7 +662,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     adjNote = '<div class="micro" style="margin-top:8px">ฐานปรับจาก ' + nrrFmtGMV(baseOriginal) + ' → ' + nrrFmtGMV(baseAdjusted) +
       (result.transfer_out_base_norm > 0 ? ' (หัก ' + result.transfer_out_outlets.length + ' outlet ย้ายออก −' + nrrFmtGMV(Math.round(result.transfer_out_base_norm * nrrBaseDays())) + ')' : '') +
       (result.transfer_in_base_norm > 0 ? ' (บวก ' + result.transfer_in_outlets.length + ' outlet ย้ายเข้า +' + nrrFmtGMV(Math.round(result.transfer_in_base_norm * nrrBaseDays())) + ' — มูลค่า ณ เดือนฐาน)' : '') +
-      '</div>';
+      ' — นับตั้งแต่เดือนที่ย้าย</div>';
   }
   // Waived-account (NRR Exclusion) note -- structurally parallel to adjNote
   // above but a separate mechanism (per-month, not quarter-wide transfer
@@ -653,9 +671,9 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
   // adjustment (uniform across every month), the waived base varies PER
   // MONTH -- so this note states each affected month's own adjusted base
   // explicitly, rather than implying the single "ฐาน" bar above already
-  // reflects it (it doesn't -- that bar is always result.base_norm, the
-  // transfer-adjusted quarter-wide figure, not any one month's
-  // effective_base_norm).
+  // reflects it (it doesn't -- that bar is result.base_norm, the full-fold
+  // latest-view figure; each month's real pre-waiver base is by_month[m]
+  // .base_norm_m under the month-scoped transfer policy, 2026-08-07).
   var waivedNote = '';
   if (typeof nrrWaivedAccountCountForRows === 'function') {
     var waivedByMonth = result.months
@@ -663,7 +681,10 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
         var bm = result.by_month[m];
         var count = nrrWaivedAccountCountForRows(bm && bm.rows, m);
         var effBase = bm && bm.effective_base_norm != null ? bm.effective_base_norm : result.base_norm;
-        return { month: m, count: count, effBaseGmv: Math.round(effBase * nrrBaseDays()) };
+        // MONTH-SCOPED: ฐานอ้างอิงของเดือนนี้ = base_norm_m ไม่ใช่ฐานไตรมาส
+        var preBase = bm && bm.base_norm_m != null ? bm.base_norm_m : result.base_norm;
+        return { month: m, count: count, effBaseGmv: Math.round(effBase * nrrBaseDays()),
+                 preBaseGmv: Math.round(preBase * nrrBaseDays()) };
       })
       .filter(function (w) { return w.count > 0; });
     if (waivedByMonth.length) {
@@ -677,7 +698,7 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
       waivedNote = '<div class="micro" style="margin-top:4px">⚠️ ' +
         waivedByMonth.map(function (w) {
           return '%NRR เดือน ' + (QNRR_CFG.months_th[w.month] || w.month) + ' คำนวณจากฐานเฉพาะเดือนนั้น ' + nrrFmtGMV(w.effBaseGmv) +
-            ' (ต่ำกว่าฐาน ' + nrrFmtGMV(baseAdjusted) + ' ด้านบน ' + w.count + ' ร้านถูกยกเว้น −' + nrrFmtGMV(baseAdjusted - w.effBaseGmv) + ' ดูแถว "↳ ยกเว้นจากฐาน NRR" ในตาราง)';
+            ' (ต่ำกว่าฐานเดือนนั้น ' + nrrFmtGMV(w.preBaseGmv) + ' อยู่ ' + w.count + ' ร้านถูกยกเว้น −' + nrrFmtGMV(w.preBaseGmv - w.effBaseGmv) + ' ดูแถว "↳ ยกเว้นจากฐาน NRR" ในตาราง)';
         }).join(' · ') +
         ' — ดูรายละเอียดที่ <a href="#/waivers">Waivers</a></div>';
     }
