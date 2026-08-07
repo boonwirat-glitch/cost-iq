@@ -3097,8 +3097,11 @@ function nrrRenderCommissionSection() {
   if (nrrCommViewMode === 'full') {
     document.getElementById('nrr-comm-strip').innerHTML = '<div class="nrr-comm-ds">' + tabsHtml +
       '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
-      '<select class="nrr-comm-period-select" id="nrr-comm-period-select"><option>กำลังโหลดเดือน...</option></select>' +
-      '<button type="button" class="btn-secondary" id="nrr-comm-export" style="margin-left:8px">Export Excel (รายละเอียดทุกคน)</button>' +
+      '<div class="nrr-comm-toolbar">' +
+        '<label class="nrr-comm-toolbar-lbl" for="nrr-comm-period-select">งวด</label>' +
+        '<select class="nrr-comm-period-select" id="nrr-comm-period-select"><option>กำลังโหลดเดือน...</option></select>' +
+        '<button type="button" class="btn-secondary" id="nrr-comm-export">Export Excel (รายละเอียดทุกคน)</button>' +
+      '</div>' +
       '<div id="nrr-comm-fulltable-body"><div class="ds-skel" style="height:160px"></div></div>' +
       '</div>';
     nrrFetchAvailablePeriods().then(function (periods) {
@@ -5063,6 +5066,13 @@ async function nrrBuildCommissionWorkbook(period) {
       lockedAt, 'ยอดเดือนนั้นขยับหลังล็อก / waiver ตัดสินหลังล็อก (ดูป้ายเตือนบนหน้า Commission)']);
   });
 
+  // ชีทว่าง ≠ ข้อมูลหาย — บุชเปิดชีท HANDOVER ว่างแล้วตกใจ (2026-08-07):
+  // งวดที่ไม่มีบัญชี handover ของใครเลย ชีทจะว่างโดยชอบธรรม ใส่แถวอธิบายแทน
+  if (!shHo.rows.length) {
+    shHo.rows.push(['', '', '', '', '', '', '', '', '', '', '', '',
+      'งวดนี้ไม่มีบัญชี handover ในสูตรของใครเลย (คอลัมน์ HANDOVER บนจอเป็น ฿0 ทุกคน) — ชีทว่างโดยถูกต้อง ไม่ใช่ข้อมูลหาย']);
+  }
+
   // ── README ──
   var R = shReadme.rows;
   R.push(['งวด', period + ' (' + evalLabel + ')']);
@@ -5071,6 +5081,8 @@ async function nrrBuildCommissionWorkbook(period) {
   R.push(['ล็อกล่าสุดเมื่อ', lockedAtMax || '-']);
   R.push(['นิยาม "ล็อกไว้"', 'ตัวเลขที่ใช้จ่ายจริง แช่แข็ง ณ เวลาล็อกงวด — ตัวเลขทางการ']);
   R.push(['นิยาม "สด"', 'คำนวณใหม่จากข้อมูลวันนี้ ใช้ตรวจสอบ/กระทบยอด — ต่างจากล็อกได้ถ้ายอดขยับหลังล็อก, waiver ตัดสินหลังล็อก, หรือ rate ถูกแก้ใน Cockpit']);
+  R.push(['Export อิงยอดไหน', 'คอลัมน์ล็อก/จ่ายจริง = ชุดเดียวกับตารางบนจอ (snapshot ใน DB) · คอลัมน์ "สด" มีไว้เทียบ — ถ้ากด "คำนวณใหม่" แล้วยืนยันเขียนทับ ตัวเลขล็อกทั้งบนจอและใน export จะเปลี่ยนเป็นชุดใหม่พร้อมกัน']);
+  R.push(['อ่าน movement คอลัมน์ไหน', 'ดู "movement (เดือนนี้)" เป็นหลัก = การจำแนกของเดือนที่เลือก (ตัวที่ engine ใช้ตัดสินตัวตั้ง) · "movement (เดือนฐาน)" ไว้ตรวจที่มาของฐาน มิ.ย. เท่านั้น']);
   R.push(['convention ตัวเลข', 'คอลัมน์ (x30) = normalize 30 วัน (ระบบเดียวกับ engine) · คอลัมน์ ฿ อื่นๆ = ยอดจริงตามไฟล์ข้อมูล']);
   R.push(['สถานะ P3 สด', p3Covered ? 'คำนวณได้ (ไฟล์ครอบเดือนนี้)' : 'คำนวณไม่ได้ — ไฟล์ upsell มี existing/new แค่เดือนล่าสุด (รอ rerun SQL ชุดใหม่) ชีท UPSELL ใช้แถว "ล็อกไว้" เป็นหลัก']);
   R.push(['หมายเหตุย้อนหลัง', 'การคำนวณสดย้อนเดือนใช้ผังพอร์ตของ "วันนี้" — ร้านที่ย้ายพอร์ตหลังงวดนั้นจะถูกจัดคนใหม่']);
