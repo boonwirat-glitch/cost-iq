@@ -3079,9 +3079,124 @@ function nrrHandleRecomputeClick(e) {
     });
     return true;
   }
+  // ── v_fullrewrite: เขียนทับทั้งงวด (ทุก component) — ปุ่ม/พรีวิว/ยืนยันแยกชุด ──
+  var fro = e.target.closest('.nrr-fullrewrite-open');
+  if (fro) {
+    var fPanel = document.querySelector('.nrr-fullrewrite-panel');
+    if (fPanel) nrrOpenFullRewritePanel(fro.dataset.period, fPanel);
+    return true;
+  }
+  var frCancel = e.target.closest('.nrr-fullrewrite-cancel');
+  if (frCancel) {
+    var fp = frCancel.closest('.nrr-fullrewrite-panel');
+    if (fp) fp.innerHTML = '';
+    nrrFullRewriteState = null;
+    return true;
+  }
+  var frApply = e.target.closest('.nrr-fullrewrite-apply');
+  if (frApply) {
+    var fst = nrrFullRewriteState;
+    if (!fst || fst.period !== frApply.dataset.period || !fst.changes.length) return true;
+    var fPanel2 = frApply.closest('.nrr-fullrewrite-panel');
+    var frReasonEl = fPanel2 ? fPanel2.querySelector('.nrr-recompute-reason') : null;
+    var frReason = (frReasonEl && frReasonEl.value.trim()) || 'เขียนทับทั้งงวดจากไฟล์ปัจจุบัน — จาก /nrr';
+    var frLabel = QNRR_CFG.months_th[fst.period] || fst.period;
+    var frDiff = fst.changes.reduce(function (s, c) { return s + c.diff; }, 0);
+    if (!confirm('เขียนทับยอดที่ล็อกไว้ของงวด ' + frLabel + ' "ทุก component" จำนวน ' + fst.changes.length + ' คน (Δ รวม ' +
+                 (frDiff > 0 ? '+' : '') + '฿' + Math.abs(frDiff).toLocaleString('en-US') + (frDiff < 0 ? ' ติดลบ' : '') + ')?\n\nยอดเดิมทุก component ถูกเก็บใน revision log เสมอ ย้อนดูได้')) return true;
+    frApply.disabled = true; frApply.textContent = 'กำลังเขียน...';
+    nrrRecomputeFullApply(fst.period, fst.changes, frReason).then(function (res) {
+      if (res && res.ok) {
+        nrrFullRewriteState = null;
+        if (typeof nrrToast === 'function') nrrToast('เขียนทับทั้งงวด ' + res.count + ' รายการเสร็จแล้ว');
+        nrrRenderCommissionSection();
+        nrrRenderStaleLockPill('nrr-comm-stale-pill');
+        nrrRenderStaleLockPill('nrr-waivers-stale-pill');
+      } else {
+        alert('เขียนไม่สำเร็จ: ' + ((res && res.error) || 'ไม่ทราบสาเหตุ'));
+        frApply.disabled = false; frApply.textContent = 'ยืนยันเขียนทับทั้งงวด';
+      }
+    });
+    return true;
+  }
   return false;
 }
 window.nrrHandleRecomputeClick = nrrHandleRecomputeClick;
+
+// ── v_fullrewrite: พรีวิวเขียนทับทั้งงวด — เทียบเก่า→ใหม่แยกราย component ──
+var nrrFullRewriteState = null; // { period, changes } — apply เขียนเฉพาะสิ่งที่พรีวิวโชว์
+
+function nrrOpenFullRewritePanel(period, panel) {
+  if (!panel) return;
+  panel.innerHTML = '<div class="ds-skel" style="height:120px"></div>';
+  nrrRecomputeFullPreview(period).then(function (pre) {
+    if (!document.body.contains(panel)) return;
+    if (!pre.ok) {
+      var msgs = {
+        period_outside_quarter: 'งวดนี้อยู่นอกไตรมาสปัจจุบัน — CSV บน R2 คำนวณย้อนไม่ได้แล้ว ให้ทำจาก Sense Cockpit',
+        not_quarterly_mode: 'งวดนี้ไม่ได้ตั้งเป็นโหมด quarterly — /nrr รองรับเฉพาะ quarterly ให้ทำจาก Sense Cockpit',
+        no_final_rows: 'งวดนี้ไม่มีแถวที่ล็อกไว้ (final) ให้เขียนทับ',
+        policy_unreachable: 'อ่านนโยบายงวด (nrr_policies) ไม่ได้ — ลองใหม่อีกครั้ง',
+        db_unreachable: 'อ่านตาราง snapshot ไม่ได้ — ลองใหม่อีกครั้ง'
+      };
+      panel.innerHTML = '<div class="nrr-recompute-box"><div class="micro">' + (msgs[pre.reason] || pre.reason) + '</div></div>';
+      return;
+    }
+    nrrFullRewriteState = { period: period, changes: pre.changes };
+    var label = QNRR_CFG.months_th[period] || period;
+    var fmtB = function (v) { return '฿' + Math.round(v || 0).toLocaleString('en-US'); };
+    var fmtP = function (v) { return v == null ? '—' : Number(v).toFixed(2) + '%'; };
+    // คู่ "เดิม → ใหม่" ต่อ component — ตัวหนาเมื่อขยับเกิน ฿1 ให้กวาดตาเจอจุดต่างเร็ว
+    var pair = function (oldV, newV) {
+      var moved = Math.abs((newV || 0) - (oldV || 0)) >= 1;
+      return fmtB(oldV) + ' → ' + (moved ? '<b>' + fmtB(newV) + '</b>' : fmtB(newV));
+    };
+    var html = '<div class="nrr-recompute-box">';
+    if (!pre.changes.length) {
+      html += '<div class="nrr-recompute-title">งวด ' + nrrEsc(label) + ' — คำนวณใหม่ทุก component แล้วไม่มียอดใครเปลี่ยน</div>' +
+        '<div class="micro">ไฟล์ปัจจุบันให้ตัวเลขเท่าที่ล็อกไว้ทุกคน</div>';
+    } else {
+      html += '<div class="nrr-recompute-title">พรีวิวเขียนทับทั้งงวด ' + nrrEsc(label) + ' — ทุก component จากไฟล์ปัจจุบัน (เปลี่ยน ' + pre.changes.length + ' คน จาก ' + pre.totalRows + ' แถว)</div>' +
+        '<div class="nrr-table-scroll"><table class="nrr-table nrr-recompute-table"><thead><tr>' +
+        '<th>คน</th><th>role</th><th>%NRR เดิม → ใหม่</th><th>NRR ฿</th><th>Handover ฿</th><th>P1+P3 ฿</th><th>Expansion ฿</th><th>Gate ×</th><th>รวม เดิม → ใหม่</th><th>Δ</th></tr></thead><tbody>' +
+        pre.changes.map(function (c) {
+          var cls = c.diff > 0 ? 'nrr-recompute-up' : c.diff < 0 ? 'nrr-recompute-down' : '';
+          var skuNew = c.comps.upsell_sku
+            ? Number(c.comps.upsell_sku.total_comm != null ? c.comps.upsell_sku.total_comm : (c.comps.upsell_sku.total_commission || 0))
+            : null;
+          var flagTxt = (c.flags && c.flags.length)
+            ? '<div class="micro" style="color:var(--amber-deep, #a06500)">⚠ ' + c.flags.map(nrrEsc).join(' · ') + '</div>' : '';
+          return '<tr><td>' + nrrEsc(c.name) + flagTxt + '</td><td>' + nrrEsc(c.role.toUpperCase()) + '</td>' +
+            '<td class="num">' + fmtP(c.oldPct) + ' → <b>' + fmtP(c.newPct) + '</b></td>' +
+            '<td class="num">' + pair(c.prev.nrr_payout, c.nrrPayout) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.handover, c.comps.handover ? c.comps.handover.payout : c.prev.handover)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.upsell_sku, skuNew == null ? c.prev.upsell_sku : skuNew)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.upsell_outlet, c.comps.upsell_outlet ? c.comps.upsell_outlet.commission : c.prev.upsell_outlet)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl'
+              ? (c.prev.multiplier != null ? c.prev.multiplier + '× (แช่)' : '—')
+              : (c.gate ? c.gate.cap_multiplier + '×' : '—')) + '</td>' +
+            '<td class="num">' + fmtB(c.oldPayout) + ' → <b>' + fmtB(c.newPayout) + '</b></td>' +
+            '<td class="num ' + cls + '">' + (c.diff > 0 ? '+' : '') + fmtB(c.diff).replace('฿-', '−฿') + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<div class="nrr-recompute-total">Δ รวมทั้งงวด: <b class="num">' + (pre.totalDiff > 0 ? '+' : '') + fmtB(pre.totalDiff).replace('฿-', '−฿') + '</b></div>';
+    }
+    if (pre.skipped.length) {
+      html += '<details class="nrr-recompute-skips"><summary>ข้าม ' + pre.skipped.length + ' แถว (ต้องไปทำที่ Sense หรือตรวจมือ)</summary><ul>' +
+        pre.skipped.map(function (s) { return '<li>' + nrrEsc(s.email) + ' (' + nrrEsc(s.role || '') + ') — ' + nrrEsc(s.reason) + '</li>'; }).join('') +
+        '</ul></details>';
+    }
+    html += '<div class="nrr-recompute-actions">' +
+      (pre.changes.length
+        ? '<input class="nrr-search nrr-recompute-reason" placeholder="เหตุผล (จะติดไว้ใน revision log)" value="ไฟล์ข้อมูลถูกอัปเดตหลังล็อก — เขียนทับทั้งงวดจาก /nrr">' +
+          '<button type="button" class="btn-primary nrr-fullrewrite-apply" data-period="' + nrrEsc(period) + '">ยืนยันเขียนทับทั้งงวด</button>'
+        : '') +
+      '<button type="button" class="btn-secondary nrr-fullrewrite-cancel">ปิด</button>' +
+      '</div>' +
+      '<div class="micro" style="margin-top:6px">คำนวณใหม่ทุก component จากไฟล์ปัจจุบัน (%NRR · handover · P1/P3 · expansion · gate) — ยกเว้นตัวคูณ TL ที่แช่ค่าล็อกไว้ (ไฟล์ทีมไม่มีข้อมูลรายเดือน) · component ที่ไฟล์ยังไม่ครอบจะแช่ค่าเดิมพร้อมป้าย ⚠ ไม่มีทางถูกตีเป็น ฿0</div></div>';
+    panel.innerHTML = html;
+  });
+}
 
 function nrrRenderCommissionSection() {
   var isAdmin = nrrProfile.role === 'admin';
@@ -4609,9 +4724,16 @@ function nrrCommissionFullTableHtml(rows) {
       ' ' + String(_ld.getHours()).padStart(2, '0') + ':' + String(_ld.getMinutes()).padStart(2, '0') +
       ' — ตัวเลขแช่แข็ง ณ เวลานั้น อาจต่างจากหน้า NRR ที่คำนวณสดจากไฟล์ล่าสุด ถ้ายอดขยับหลังล็อก';
   }
+  // v_fullrewrite: ปุ่มเขียนทับทั้งงวด — admin + งวดล็อกครบเท่านั้น · แยกจากปุ่ม
+  // "คำนวณใหม่" บน pill (ตัวนั้นแคบเฉพาะ %NRR สำหรับเคส waiver-หลังล็อก)
+  var _period0 = rows[0].period_month;
+  var _rewriteBtn = (allFinal && nrrProfile.role === 'admin' && _period0)
+    ? '<button type="button" class="btn-secondary nrr-fullrewrite-open" data-period="' + nrrEsc(_period0) + '">เขียนทับทั้งงวดจากไฟล์ปัจจุบัน…</button>'
+    : '';
   var headStamp = allFinal
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('final') +
-      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')' + _lockedAtTxt + '</span></div>'
+      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')' + _lockedAtTxt + '</span>' + _rewriteBtn + '</div>' +
+      '<div class="nrr-fullrewrite-panel"></div>'
     : allEstimate
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('estimate') +
       '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้ · ตัวเลขสด ตรงกับหน้า NRR</span></div>'
@@ -5464,11 +5586,12 @@ function nrrCommHandoverListHtml(ho) {
   }
   // v_hofix: "ไฟล์ไม่มีข้อมูลเดือนนี้" ≠ "เดือนนี้ไม่มีร้าน handover" — ข้อความเดิม
   // อันเดียวพูดแทนทั้งสองกรณี ทำให้ ก.ค. ที่ข้อมูลขาดอ่านดูเหมือนไม่มีใคร handover เลย
-  // ทั้งที่จริงมี 12 KAM · ต้นเหตุ: portview_handover.csv เก็บได้เดือนเดียว เขียนทับทุกรอบ
+  // (ตั้งแต่ 2026-08-07 ไฟล์เป็น multi-month แล้ว — เคสนี้จะเกิดเฉพาะเดือนที่
+  //  data team ยังไม่ได้รันให้ครอบจริงๆ)
   if (ho && ho.data_missing) {
     return headerHtml + '<div class="ds-empty" style="padding:8px 0">' +
       '<div class="ds-empty-title">ไม่มีข้อมูล handover ของเดือนนี้ในไฟล์</div>' +
-      '<div class="ds-empty-desc">portview_handover.csv เก็บได้ครั้งละเดือนเดียว — ต้องรัน Q10 ใหม่ให้ครอบเดือนนี้ก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
+      '<div class="ds-empty-desc">ไฟล์ handover บน R2 ยังไม่ครอบเดือนนี้ — ต้องรัน Q10 ใหม่ให้ครอบก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
   }
   if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
   return headerHtml + detail.map(function (d) {

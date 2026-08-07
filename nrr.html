@@ -6086,6 +6086,22 @@ function nrrTierPct(pct) {
 }
 window.nrrTierPct = nrrTierPct;
 
+// GMV gate — twin ของ _commComputeGmvGate (07a:1135) เทียบด้วยค่าปัด 1 ตำแหน่ง
+// (v_round) แต่ ach_pct เก็บค่าไม่ปัดไว้เป็น audit trail
+// v_fullrewrite: แยกเป็น helper เดียว — เดิมถูก inline ซ้ำ 2 ที่และปัดไม่เท่ากัน
+// (_nrrRecomputeRowNrrOnly ใช้ 1dp / nrrEstimateKamCommission ใช้ raw) ตัวถูกคือ 1dp
+function _nrrCommGmvGate(pct) {
+  var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
+  var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
+  var cap = 1.0;
+  var gatePct = nrrTierPct(pct);
+  if (gatePct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
+  else if (gatePct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
+  return { ach_pct: pct, cap_multiplier: cap, gate_active: cap < 1.0,
+           threshold_1: t1, threshold_2: t2 };
+}
+window._nrrCommGmvGate = _nrrCommGmvGate;
+
 // Tier match — same open-interval convention as _commMatchTierByCode:
 // pct >= min (null = open) && pct < max (null = open).
 function nrrCommTierPayout(role, email, period, pct) {
@@ -6369,9 +6385,10 @@ function nrrComputeHandoverForKam(kamEmail, period) {
   if (!kamName) return EMPTY;
 
   var prevMonth = _nrrPrevMonthOf(period);
-  // v_hofix: เช็คระดับไฟล์ก่อน — portview_handover.csv เก็บได้เดือนเดียวและถูกเขียนทับ
-  // ทุกครั้งที่รัน Q10 ใหม่ ถ้าเดือนที่ขอไม่อยู่ในไฟล์เลย นั่นคือ "ข้อมูลขาด"
+  // v_hofix: เช็คระดับไฟล์ก่อน — ถ้าเดือนที่ขอไม่อยู่ในไฟล์เลย นั่นคือ "ข้อมูลขาด"
   // ต้องบอกให้ชัด ไม่ใช่โชว์ ฿0 ซึ่งอ่านแล้วเข้าใจว่า "เดือนนี้ไม่มีใครได้"
+  // (ตั้งแต่ 2026-08-07 ไฟล์เป็น multi-month แล้ว — filter ด้วย transfer_month
+  //  ซึ่ง 1:1 กับ period_month ตาม Q10 จึงถูกต้องกับไฟล์ทั้งสองรุ่น)
   var monthPresent = nrrHandoverCsvCache.rows.some(function (r) {
     return (r.transfer_month || '') === prevMonth;
   });
@@ -6474,11 +6491,11 @@ function nrrEstimateKamCommission(kamEmail, period, pct) {
   // same aggregate-GMV bucketing, same best-match threshold scan, same
   // 1-decimal retention rounding. No automated test guards this; verify
   // manually side-by-side when either engine changes.
-  var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
-  var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
-  var cap = 1.0;
-  if (pct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
-  else if (pct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
+  // v_fullrewrite: ใช้ helper กลาง (ปัด 1dp ก่อนเทียบ — เดิมที่นี่เทียบ raw pct
+  // ซึ่งเพี้ยนจาก engine เงินจริงที่ขอบ เช่น 97.96 ควรปัดเป็น 98.0 แล้วรอด gate)
+  var _gate = _nrrCommGmvGate(pct);
+  var t1 = _gate.threshold_1;
+  var cap = _gate.cap_multiplier;
   var handover = nrrComputeHandoverForKam(kamEmail, period);
   return {
     kind: 'kam', pct: pct, nrr_payout: nrrPayout,
@@ -7149,17 +7166,11 @@ function _nrrRecomputeRowNrrOnly(row, period) {
       subtotal = nrrPayout;
       finalPayout = Math.round(nrrPayout * frozen.multiplier);
     } else {
-      // gate — twin ของ _commComputeGmvGate (07a:1135): เทียบด้วยค่าปัด 1 ตำแหน่ง
-      // (v_round) แต่ ach_pct เก็บค่าไม่ปัดไว้เป็น audit trail
-      var t1 = nrrCommRateGet('gmv_gate', 'threshold_1', 98);
-      var t2 = nrrCommRateGet('gmv_gate', 'threshold_2', 95);
-      var cap = 1.0;
-      var gatePct = nrrTierPct(pct);
-      if (gatePct < t2) cap = nrrCommRateGet('gmv_gate', 'cap_2', 0);
-      else if (gatePct < t1) cap = nrrCommRateGet('gmv_gate', 'cap_1', 0.3);
-      gate = { ach_pct: pct, cap_multiplier: cap, gate_active: cap < 1.0 };
+      // gate — helper กลาง _nrrCommGmvGate (ปัด 1dp ก่อนเทียบ, ach_pct ไม่ปัด)
+      var g = _nrrCommGmvGate(pct);
+      gate = { ach_pct: g.ach_pct, cap_multiplier: g.cap_multiplier, gate_active: g.gate_active };
       subtotal = nrrPayout + frozen.upsellSku + frozen.upsellOutlet + frozen.handover;
-      finalPayout = Math.round(subtotal * cap);
+      finalPayout = Math.round(subtotal * gate.cap_multiplier);
     }
 
     return {
@@ -7281,6 +7292,276 @@ async function nrrRecomputeNrrOnlyApply(period, changes, reason) {
   }
 }
 window.nrrRecomputeNrrOnlyApply = nrrRecomputeNrrOnlyApply;
+
+// ══════════════════════════════════════════════════════════════════════════
+// v_fullrewrite: เขียนทับงวดที่ล็อกแล้ว "ทั้งก้อน" — คำนวณทุก component ใหม่
+// จากไฟล์ปัจจุบัน (%NRR + handover + P1/P3 + expansion + gate) ต่างจากปุ่ม
+// "คำนวณใหม่" เดิมที่แช่ทุกอย่างยกเว้น %NRR
+//
+// เหตุการณ์ต้นเรื่อง (2026-08-07): งวด ก.ค. ถูกล็อกวันที่ 1 ส.ค. ตอนที่ไฟล์
+// portview_handover.csv ยังไม่มีข้อมูล ก.ค. (รุ่นเดือนเดียว) → handover ของ
+// KAM 13 คน (34 บัญชี รับโอนจาก SALE เดือน มิ.ย.) ถูกล็อกเป็น ฿0 ทั้งที่ควรได้
+// พอ data team รันไฟล์ multi-month แล้ว ระบบคำนวณถูกได้ แต่เลขล็อกยังผิดอยู่
+//
+// หลักการเดียวกับปุ่มเดิมทุกข้อ:
+//   - พรีวิวก่อนเสมอ ไม่เขียนอะไรจน admin กดยืนยันสิ่งที่เห็น
+//   - component ที่คำนวณสดไม่ได้ = "แช่ค่าล็อกเดิมไว้ + ติดธงบอกเหตุผล"
+//     ห้ามตีเป็น ฿0 เด็ดขาด (฿0 แยกไม่ออกจาก "ไม่ได้จริง")
+//   - ตัวคูณ TL แช่เสมอ: ไฟล์ sense_upsell_team.csv เป็น snapshot ปัจจุบัน
+//     ไม่มีคอลัมน์เดือน คำนวณย้อนงวดไม่ได้ (จะปลดได้เมื่อไฟล์นั้นมีรายเดือน)
+//   - เขียนทับแถวเดิมใน commission_payout_snapshots (status คง final)
+//     พร้อม revisions kind:'full_rewrite' เก็บค่าเดิมทุก component
+
+// ค่า component เดิมแบบละเอียด (ต่างจาก _nrrCommFrozenComponents ที่คืนแค่ตัวเลข
+// รวม) — ใช้โชว์ "เดิม" ในพรีวิวและเก็บลง revisions ตอนเขียนทับ
+function _nrrCommPrevComponents(row) {
+  var bd = (row && row.breakdown) || {};
+  var frozen = _nrrCommFrozenComponents(row);
+  return {
+    nrr_payout: Number(bd.nrr_payout || 0),
+    handover: frozen.handover,
+    upsell_sku: frozen.upsellSku,
+    upsell_outlet: frozen.upsellOutlet,
+    gate_cap: (bd.gmv_gate && bd.gmv_gate.cap_multiplier != null) ? Number(bd.gmv_gate.cap_multiplier) : null,
+    multiplier: frozen.multiplier
+  };
+}
+
+// คำนวณแถวเดียวใหม่ทุก component · ctx = { evalLabel, bundles: {email→bundle} }
+// คืน {skip} เมื่อทำไม่ได้ — ไม่มีทางคืนตัวเลขที่เดามา
+function _nrrRecomputeRowFull(row, period, ctx) {
+  try {
+    if (!row) return null;
+    var role = String(row.beneficiary_role || '').toLowerCase();
+    var email = row.beneficiary_email;
+    if (!email) return { skip: 'ไม่มีอีเมลผู้รับ' };
+    if (role !== 'kam' && role !== 'tl') {
+      return { skip: 'รองรับเฉพาะ kam/tl จาก /nrr — role ' + role + ' ให้คำนวณใหม่จาก Sense Cockpit' };
+    }
+
+    var frozen = _nrrCommFrozenComponents(row);
+    var prev = _nrrCommPrevComponents(row);
+    var bd = row.breakdown || {};
+
+    // %NRR สด — เหมือนปุ่มเดิมทุกบรรทัด (รวม guard เดือน + ฐานศูนย์)
+    var result = role === 'tl' ? nrrTeamResult(email) : nrrKamResult(email);
+    var bm = result && result.by_month ? result.by_month[period] : null;
+    if (!bm) return { skip: 'engine ไม่มีข้อมูลเดือน ' + period + ' (CSV ปัจจุบันไม่ครอบเดือนนี้)' };
+    var pct = (bm.nrr_curr_norm != null && bm.effective_base_norm > 0)
+      ? bm.nrr_curr_norm / bm.effective_base_norm * 100
+      : bm.nrr_pct;
+    if (pct === null || pct === undefined || isNaN(pct)) return { skip: 'คำนวณ %NRR ใหม่ไม่ได้ (ฐานเป็นศูนย์)' };
+    var nrrPayout = nrrCommTierPayout(role, email, period, pct);
+
+    // ── TL: ตัวคูณแช่เสมอ (ดูหัว block) → เท่ากับปุ่มเดิม แต่ติดป้ายให้ชัด ──
+    if (role === 'tl') {
+      if (!frozen.hasMultiplier) return { skip: 'แถว TL ไม่มีตัวคูณ upsell ที่ล็อกไว้ — ต้องตรวจมือ' };
+      var tlFinal = Math.round(nrrPayout * frozen.multiplier);
+      return {
+        role: role, email: email, period: period,
+        oldPct: row.governed_nrr_pct != null ? Number(row.governed_nrr_pct) : (row.raw_nrr_pct != null ? Number(row.raw_nrr_pct) : null),
+        newPct: pct, oldPayout: Number(row.payout_amount || 0), newPayout: tlFinal,
+        diff: tlFinal - Number(row.payout_amount || 0),
+        nrrPayout: nrrPayout, subtotal: nrrPayout, gate: null,
+        prev: prev,
+        comps: { handover: null, upsell_sku: null, upsell_outlet: null },
+        frozenList: ['upsell_mult'],
+        flags: ['ตัวคูณ TL แช่ค่าล็อกไว้ (' + frozen.multiplier + '×) — ไฟล์ทีมไม่มีข้อมูลรายเดือนให้คำนวณย้อน'],
+        name: bd.kam_name || bd.team_lead_name || email,
+        sourceRow: row
+      };
+    }
+
+    // ── KAM: คำนวณทุก component ──
+    var frozenList = [], flags = [];
+
+    // handover สด — nrrComputeHandoverForKam เป็น period-parametric อยู่แล้ว
+    // (transfer_month = เดือนก่อนงวด ↔ 1:1 กับ period_month ในไฟล์ multi-month)
+    var hoNew = nrrComputeHandoverForKam(email, period);
+    if (hoNew.data_missing) {
+      // ไฟล์ยังไม่มีเดือนนี้ → แช่ของเดิม ห้ามตีเป็น 0
+      hoNew = bd.handover || { payout: frozen.handover };
+      frozenList.push('handover');
+      flags.push('handover แช่ค่าล็อกไว้ — ไฟล์ handover ไม่มีข้อมูลเดือนนี้');
+    }
+    var hoPayout = Number(hoNew.payout || 0);
+
+    // expansion (upsell_outlet) สด — จากแถว movement ของงวดนั้นตรงๆ
+    var outletRows = (typeof nrrOutletsForKam === 'function' ? nrrOutletsForKam(email, period) : [])
+      .filter(function (o) { return o.movement === 'expansion'; });
+    var outletRate = nrrCommRateGet('upsell_outlet', 'rate', 0.005);
+    var outletGmv = outletRows.reduce(function (s, o) { return s + (parseFloat(o.row.curr_gmv) || 0); }, 0);
+    var outletNew = { outlet_gmv: outletGmv, rate: outletRate,
+                      commission: Math.round(outletGmv * outletRate),
+                      expansion_outlets: outletRows.length };
+    var expIds = new Set(outletRows.map(function (o) { return String(o.row.outlet_id); }));
+
+    // P1/P3 สด — bundle ต่อคน + ตรึงเดือนด้วย evalLabel (ห้ามใช้นาฬิกาเครื่อง)
+    var bundle = ctx.bundles ? ctx.bundles[email] : null;
+    var skuNew;
+    if (bundle && bundle.loaded && typeof nrrComputeUpsellSkuWithParams === 'function') {
+      var live = nrrComputeUpsellSkuWithParams(expIds, bundle, QNRR_CFG.base_month, { evalLabel: ctx.evalLabel });
+      var p3Covered = typeof nrrUpsellBundleCoversPeriod === 'function'
+        ? nrrUpsellBundleCoversPeriod(bundle, ctx.evalLabel) : false;
+      if (p3Covered) {
+        skuNew = { p1: live.p1, p3: live.p3, total_comm: live.total_comm, total_gmv_eligible: live.total_gmv_eligible };
+      } else {
+        // P1 คำนวณได้เสมอ (ใช้ total_gmv) · P3 ต้องมี existing/new split ของเดือนนั้น
+        var prevP3 = (bd.upsell_sku && bd.upsell_sku.p3) || { gmv_incremental: 0, comm: 0, groups: [] };
+        skuNew = { p1: live.p1, p3: prevP3,
+                   total_comm: (live.p1.comm || 0) + Number(prevP3.comm || 0),
+                   total_gmv_eligible: (live.p1.gmv || 0) + Number(prevP3.gmv_incremental || 0) };
+        frozenList.push('upsell_sku_p3');
+        flags.push('P3 แช่ค่าล็อกไว้ — ไฟล์ upsell ไม่มี existing/new split ของเดือนนี้ (P1 คำนวณสด)');
+      }
+    } else {
+      skuNew = bd.upsell_sku || { p1: { gmv: 0, comm: 0, groups: [] }, p3: { gmv_incremental: 0, comm: 0, groups: [] }, total_comm: frozen.upsellSku };
+      frozenList.push('upsell_sku');
+      flags.push('P1/P3 แช่ค่าล็อกไว้ — โหลด bundle ของคนนี้ไม่สำเร็จ');
+    }
+    var skuComm = Number(skuNew.total_comm != null ? skuNew.total_comm : (skuNew.total_commission || 0)) || 0;
+
+    // gate + ยอดสุดท้าย — สูตรเดียวกับ engine เงินจริง (handover อยู่ใต้ gate)
+    var g = _nrrCommGmvGate(pct);
+    var gate = { ach_pct: g.ach_pct, cap_multiplier: g.cap_multiplier, gate_active: g.gate_active };
+    var subtotal = nrrPayout + skuComm + Number(outletNew.commission || 0) + hoPayout;
+    var finalPayout = Math.round(subtotal * gate.cap_multiplier);
+
+    return {
+      role: role, email: email, period: period,
+      oldPct: row.governed_nrr_pct != null ? Number(row.governed_nrr_pct) : (row.raw_nrr_pct != null ? Number(row.raw_nrr_pct) : null),
+      newPct: pct, oldPayout: Number(row.payout_amount || 0), newPayout: finalPayout,
+      diff: finalPayout - Number(row.payout_amount || 0),
+      nrrPayout: nrrPayout, subtotal: subtotal, gate: gate,
+      prev: prev,
+      comps: { handover: hoNew, upsell_sku: skuNew, upsell_outlet: outletNew },
+      frozenList: frozenList,
+      flags: flags,
+      name: bd.kam_name || bd.team_lead_name || email,
+      sourceRow: row
+    };
+  } catch (e) {
+    console.error('[nrr full-rewrite] แถว ' + (row && row.beneficiary_email) + ' คำนวณใหม่ไม่ได้', e);
+    return { skip: 'เกิดข้อผิดพลาดระหว่างคำนวณ: ' + (e && e.message) };
+  }
+}
+window._nrrRecomputeRowFull = _nrrRecomputeRowFull;
+
+// พรีวิวทั้งงวด — **ไม่เขียนอะไร** · guard ชุดเดียวกับ nrrRecomputeNrrOnlyPreview
+async function nrrRecomputeFullPreview(period) {
+  if ((QNRR_CFG.q_months || []).indexOf(period) === -1) {
+    return { ok: false, reason: 'period_outside_quarter', changes: [], skipped: [] };
+  }
+  var policy = await nrrFetchPolicyForPeriod(period);
+  if (!policy.loaded) return { ok: false, reason: 'policy_unreachable', changes: [], skipped: [] };
+  if (policy.commission_mode !== 'quarterly') {
+    return { ok: false, reason: 'not_quarterly_mode', changes: [], skipped: [] };
+  }
+  await Promise.all([nrrFetchCommissionPlans(), nrrFetchCommissionRates(), nrrFetchExclusions(true), nrrFetchHandoverCsv()]);
+
+  var fullRows = [];
+  try {
+    var resp = await supa.from('commission_payout_snapshots')
+      .select('*').eq('period_month', period).eq('snapshot_status', 'final');
+    if (resp.error) throw resp.error;
+    fullRows = resp.data || [];
+  } catch (e) {
+    console.warn('[nrr full-rewrite] ดึงแถว snapshot ไม่ได้', e);
+    return { ok: false, reason: 'db_unreachable', changes: [], skipped: [] };
+  }
+  if (!fullRows.length) return { ok: false, reason: 'no_final_rows', changes: [], skipped: [] };
+
+  // เดือนที่ประเมิน (ป้ายไทย) จากงวดที่ขอ ไม่ใช่นาฬิกาเครื่อง
+  var pp = period.split('-');
+  var evalLabel = nrrThMonthLabel(new Date(parseInt(pp[0], 10), parseInt(pp[1], 10) - 1, 1));
+
+  // bundle ต่อ KAM (P1/P3) — โหลดล้มเหลวรายคน = แช่ upsell คนนั้น ไม่ล้มทั้งงวด
+  var bundles = {};
+  var kamEmails = fullRows
+    .filter(function (r) { return String(r.beneficiary_role || '').toLowerCase() === 'kam'; })
+    .map(function (r) { return r.beneficiary_email; });
+  if (typeof nrrFetchUpsellBundle === 'function') {
+    await Promise.all(kamEmails.map(function (em) {
+      return nrrFetchUpsellBundle(em, QNRR_CFG.base_month)
+        .then(function (b) { bundles[em] = b; })
+        .catch(function () { bundles[em] = null; });
+    }));
+  }
+
+  var ctx = { evalLabel: evalLabel, bundles: bundles };
+  var changes = [], skipped = [];
+  fullRows.forEach(function (r) {
+    var res = _nrrRecomputeRowFull(r, period, ctx);
+    if (!res || res.skip) {
+      skipped.push({ email: r.beneficiary_email, role: r.beneficiary_role,
+                     reason: (res && res.skip) || 'คำนวณใหม่ไม่ได้' });
+      return;
+    }
+    var pctMoved = res.oldPct === null || res.oldPct === undefined
+      || Math.abs(Number(res.newPct) - Number(res.oldPct)) > 0.005;
+    if (res.diff !== 0 || pctMoved) changes.push(res);
+  });
+  return { ok: true, period: period, evalLabel: evalLabel, changes: changes, skipped: skipped,
+           totalRows: fullRows.length,
+           totalDiff: changes.reduce(function (s, c) { return s + c.diff; }, 0) };
+}
+window.nrrRecomputeFullPreview = nrrRecomputeFullPreview;
+
+// เขียนผลที่พรีวิวไว้ — รับ changes ที่ผู้ใช้เห็นแล้วเท่านั้น ไม่คำนวณซ้ำตอนเขียน
+var _nrrFullRewriteInFlight = null;
+async function nrrRecomputeFullApply(period, changes, reason) {
+  if (!changes || !changes.length) return { ok: false, error: 'no_changes' };
+  if (!supa || !nrrProfile || nrrProfile.role !== 'admin') return { ok: false, error: 'not_authorized' };
+  if (_nrrFullRewriteInFlight === period) return { ok: false, error: 'in_flight' };
+  _nrrFullRewriteInFlight = period;
+  try {
+    var actor = nrrProfile.email || '';
+    var now = new Date().toISOString();
+    var payload = changes.map(function (c) {
+      var row = c.sourceRow;
+      var bd = Object.assign({}, row.breakdown || {});
+      bd.revisions = (bd.revisions || []).concat([{
+        at: now, by: actor, kind: 'full_rewrite',
+        reason: reason || 'full rewrite from current files',
+        prev_payout: c.oldPayout, prev_nrr_pct: c.oldPct,
+        new_payout: c.newPayout, new_nrr_pct: c.newPct,
+        prev_components: c.prev
+      }]);
+      bd.nrr_pct = c.newPct;
+      bd.nrr_payout = c.nrrPayout;
+      if (c.comps.handover) bd.handover = c.comps.handover;
+      if (c.comps.upsell_sku) bd.upsell_sku = c.comps.upsell_sku;
+      if (c.comps.upsell_outlet) bd.upsell_outlet = c.comps.upsell_outlet;
+      bd.components_subtotal = c.subtotal;
+      if (c.gate) bd.gmv_gate = c.gate;
+      bd.final_payout = c.newPayout;
+      bd.frozen_components = c.frozenList;   // เหลือเฉพาะที่แช่จริงรอบนี้
+      bd.rewrite_flags = c.flags;
+      bd.recomputed_at = now;
+      return Object.assign({}, row, {
+        breakdown: bd,
+        raw_nrr_pct: c.newPct,
+        governed_nrr_pct: c.newPct,
+        payout_amount: c.newPayout,
+        snapshot_status: 'final',      // คง final — ไม่ปลดล็อกกลับเป็น draft
+        updated_at: now, updated_by: actor
+      });
+    });
+    var resp = await supa.from('commission_payout_snapshots')
+      .upsert(payload, { onConflict: 'period_month,beneficiary_role,beneficiary_email' })
+      .select('id');
+    if (resp.error) throw new Error(resp.error.message);
+    nrrCommSnapshots = null;
+    delete nrrCommPeriodCache[period];
+    return { ok: true, count: payload.length, at: now };
+  } catch (e) {
+    console.error('[nrr full-rewrite] เขียนผลไม่สำเร็จ', e);
+    return { ok: false, error: e.message };
+  } finally {
+    _nrrFullRewriteInFlight = null;
+  }
+}
+window.nrrRecomputeFullApply = nrrRecomputeFullApply;
 
 // detect — งวดที่ล็อกแล้วแต่มี waiver ตัดสิน "หลัง" เวลาล็อก/คำนวณล่าสุด
 // sync ล้วน อ่านจาก cache ที่หน้า waivers/commission โหลดอยู่แล้ว
@@ -14820,9 +15101,124 @@ function nrrHandleRecomputeClick(e) {
     });
     return true;
   }
+  // ── v_fullrewrite: เขียนทับทั้งงวด (ทุก component) — ปุ่ม/พรีวิว/ยืนยันแยกชุด ──
+  var fro = e.target.closest('.nrr-fullrewrite-open');
+  if (fro) {
+    var fPanel = document.querySelector('.nrr-fullrewrite-panel');
+    if (fPanel) nrrOpenFullRewritePanel(fro.dataset.period, fPanel);
+    return true;
+  }
+  var frCancel = e.target.closest('.nrr-fullrewrite-cancel');
+  if (frCancel) {
+    var fp = frCancel.closest('.nrr-fullrewrite-panel');
+    if (fp) fp.innerHTML = '';
+    nrrFullRewriteState = null;
+    return true;
+  }
+  var frApply = e.target.closest('.nrr-fullrewrite-apply');
+  if (frApply) {
+    var fst = nrrFullRewriteState;
+    if (!fst || fst.period !== frApply.dataset.period || !fst.changes.length) return true;
+    var fPanel2 = frApply.closest('.nrr-fullrewrite-panel');
+    var frReasonEl = fPanel2 ? fPanel2.querySelector('.nrr-recompute-reason') : null;
+    var frReason = (frReasonEl && frReasonEl.value.trim()) || 'เขียนทับทั้งงวดจากไฟล์ปัจจุบัน — จาก /nrr';
+    var frLabel = QNRR_CFG.months_th[fst.period] || fst.period;
+    var frDiff = fst.changes.reduce(function (s, c) { return s + c.diff; }, 0);
+    if (!confirm('เขียนทับยอดที่ล็อกไว้ของงวด ' + frLabel + ' "ทุก component" จำนวน ' + fst.changes.length + ' คน (Δ รวม ' +
+                 (frDiff > 0 ? '+' : '') + '฿' + Math.abs(frDiff).toLocaleString('en-US') + (frDiff < 0 ? ' ติดลบ' : '') + ')?\n\nยอดเดิมทุก component ถูกเก็บใน revision log เสมอ ย้อนดูได้')) return true;
+    frApply.disabled = true; frApply.textContent = 'กำลังเขียน...';
+    nrrRecomputeFullApply(fst.period, fst.changes, frReason).then(function (res) {
+      if (res && res.ok) {
+        nrrFullRewriteState = null;
+        if (typeof nrrToast === 'function') nrrToast('เขียนทับทั้งงวด ' + res.count + ' รายการเสร็จแล้ว');
+        nrrRenderCommissionSection();
+        nrrRenderStaleLockPill('nrr-comm-stale-pill');
+        nrrRenderStaleLockPill('nrr-waivers-stale-pill');
+      } else {
+        alert('เขียนไม่สำเร็จ: ' + ((res && res.error) || 'ไม่ทราบสาเหตุ'));
+        frApply.disabled = false; frApply.textContent = 'ยืนยันเขียนทับทั้งงวด';
+      }
+    });
+    return true;
+  }
   return false;
 }
 window.nrrHandleRecomputeClick = nrrHandleRecomputeClick;
+
+// ── v_fullrewrite: พรีวิวเขียนทับทั้งงวด — เทียบเก่า→ใหม่แยกราย component ──
+var nrrFullRewriteState = null; // { period, changes } — apply เขียนเฉพาะสิ่งที่พรีวิวโชว์
+
+function nrrOpenFullRewritePanel(period, panel) {
+  if (!panel) return;
+  panel.innerHTML = '<div class="ds-skel" style="height:120px"></div>';
+  nrrRecomputeFullPreview(period).then(function (pre) {
+    if (!document.body.contains(panel)) return;
+    if (!pre.ok) {
+      var msgs = {
+        period_outside_quarter: 'งวดนี้อยู่นอกไตรมาสปัจจุบัน — CSV บน R2 คำนวณย้อนไม่ได้แล้ว ให้ทำจาก Sense Cockpit',
+        not_quarterly_mode: 'งวดนี้ไม่ได้ตั้งเป็นโหมด quarterly — /nrr รองรับเฉพาะ quarterly ให้ทำจาก Sense Cockpit',
+        no_final_rows: 'งวดนี้ไม่มีแถวที่ล็อกไว้ (final) ให้เขียนทับ',
+        policy_unreachable: 'อ่านนโยบายงวด (nrr_policies) ไม่ได้ — ลองใหม่อีกครั้ง',
+        db_unreachable: 'อ่านตาราง snapshot ไม่ได้ — ลองใหม่อีกครั้ง'
+      };
+      panel.innerHTML = '<div class="nrr-recompute-box"><div class="micro">' + (msgs[pre.reason] || pre.reason) + '</div></div>';
+      return;
+    }
+    nrrFullRewriteState = { period: period, changes: pre.changes };
+    var label = QNRR_CFG.months_th[period] || period;
+    var fmtB = function (v) { return '฿' + Math.round(v || 0).toLocaleString('en-US'); };
+    var fmtP = function (v) { return v == null ? '—' : Number(v).toFixed(2) + '%'; };
+    // คู่ "เดิม → ใหม่" ต่อ component — ตัวหนาเมื่อขยับเกิน ฿1 ให้กวาดตาเจอจุดต่างเร็ว
+    var pair = function (oldV, newV) {
+      var moved = Math.abs((newV || 0) - (oldV || 0)) >= 1;
+      return fmtB(oldV) + ' → ' + (moved ? '<b>' + fmtB(newV) + '</b>' : fmtB(newV));
+    };
+    var html = '<div class="nrr-recompute-box">';
+    if (!pre.changes.length) {
+      html += '<div class="nrr-recompute-title">งวด ' + nrrEsc(label) + ' — คำนวณใหม่ทุก component แล้วไม่มียอดใครเปลี่ยน</div>' +
+        '<div class="micro">ไฟล์ปัจจุบันให้ตัวเลขเท่าที่ล็อกไว้ทุกคน</div>';
+    } else {
+      html += '<div class="nrr-recompute-title">พรีวิวเขียนทับทั้งงวด ' + nrrEsc(label) + ' — ทุก component จากไฟล์ปัจจุบัน (เปลี่ยน ' + pre.changes.length + ' คน จาก ' + pre.totalRows + ' แถว)</div>' +
+        '<div class="nrr-table-scroll"><table class="nrr-table nrr-recompute-table"><thead><tr>' +
+        '<th>คน</th><th>role</th><th>%NRR เดิม → ใหม่</th><th>NRR ฿</th><th>Handover ฿</th><th>P1+P3 ฿</th><th>Expansion ฿</th><th>Gate ×</th><th>รวม เดิม → ใหม่</th><th>Δ</th></tr></thead><tbody>' +
+        pre.changes.map(function (c) {
+          var cls = c.diff > 0 ? 'nrr-recompute-up' : c.diff < 0 ? 'nrr-recompute-down' : '';
+          var skuNew = c.comps.upsell_sku
+            ? Number(c.comps.upsell_sku.total_comm != null ? c.comps.upsell_sku.total_comm : (c.comps.upsell_sku.total_commission || 0))
+            : null;
+          var flagTxt = (c.flags && c.flags.length)
+            ? '<div class="micro" style="color:var(--amber-deep, #a06500)">⚠ ' + c.flags.map(nrrEsc).join(' · ') + '</div>' : '';
+          return '<tr><td>' + nrrEsc(c.name) + flagTxt + '</td><td>' + nrrEsc(c.role.toUpperCase()) + '</td>' +
+            '<td class="num">' + fmtP(c.oldPct) + ' → <b>' + fmtP(c.newPct) + '</b></td>' +
+            '<td class="num">' + pair(c.prev.nrr_payout, c.nrrPayout) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.handover, c.comps.handover ? c.comps.handover.payout : c.prev.handover)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.upsell_sku, skuNew == null ? c.prev.upsell_sku : skuNew)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl' ? '—' : pair(c.prev.upsell_outlet, c.comps.upsell_outlet ? c.comps.upsell_outlet.commission : c.prev.upsell_outlet)) + '</td>' +
+            '<td class="num">' + (c.role === 'tl'
+              ? (c.prev.multiplier != null ? c.prev.multiplier + '× (แช่)' : '—')
+              : (c.gate ? c.gate.cap_multiplier + '×' : '—')) + '</td>' +
+            '<td class="num">' + fmtB(c.oldPayout) + ' → <b>' + fmtB(c.newPayout) + '</b></td>' +
+            '<td class="num ' + cls + '">' + (c.diff > 0 ? '+' : '') + fmtB(c.diff).replace('฿-', '−฿') + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        '<div class="nrr-recompute-total">Δ รวมทั้งงวด: <b class="num">' + (pre.totalDiff > 0 ? '+' : '') + fmtB(pre.totalDiff).replace('฿-', '−฿') + '</b></div>';
+    }
+    if (pre.skipped.length) {
+      html += '<details class="nrr-recompute-skips"><summary>ข้าม ' + pre.skipped.length + ' แถว (ต้องไปทำที่ Sense หรือตรวจมือ)</summary><ul>' +
+        pre.skipped.map(function (s) { return '<li>' + nrrEsc(s.email) + ' (' + nrrEsc(s.role || '') + ') — ' + nrrEsc(s.reason) + '</li>'; }).join('') +
+        '</ul></details>';
+    }
+    html += '<div class="nrr-recompute-actions">' +
+      (pre.changes.length
+        ? '<input class="nrr-search nrr-recompute-reason" placeholder="เหตุผล (จะติดไว้ใน revision log)" value="ไฟล์ข้อมูลถูกอัปเดตหลังล็อก — เขียนทับทั้งงวดจาก /nrr">' +
+          '<button type="button" class="btn-primary nrr-fullrewrite-apply" data-period="' + nrrEsc(period) + '">ยืนยันเขียนทับทั้งงวด</button>'
+        : '') +
+      '<button type="button" class="btn-secondary nrr-fullrewrite-cancel">ปิด</button>' +
+      '</div>' +
+      '<div class="micro" style="margin-top:6px">คำนวณใหม่ทุก component จากไฟล์ปัจจุบัน (%NRR · handover · P1/P3 · expansion · gate) — ยกเว้นตัวคูณ TL ที่แช่ค่าล็อกไว้ (ไฟล์ทีมไม่มีข้อมูลรายเดือน) · component ที่ไฟล์ยังไม่ครอบจะแช่ค่าเดิมพร้อมป้าย ⚠ ไม่มีทางถูกตีเป็น ฿0</div></div>';
+    panel.innerHTML = html;
+  });
+}
 
 function nrrRenderCommissionSection() {
   var isAdmin = nrrProfile.role === 'admin';
@@ -16350,9 +16746,16 @@ function nrrCommissionFullTableHtml(rows) {
       ' ' + String(_ld.getHours()).padStart(2, '0') + ':' + String(_ld.getMinutes()).padStart(2, '0') +
       ' — ตัวเลขแช่แข็ง ณ เวลานั้น อาจต่างจากหน้า NRR ที่คำนวณสดจากไฟล์ล่าสุด ถ้ายอดขยับหลังล็อก';
   }
+  // v_fullrewrite: ปุ่มเขียนทับทั้งงวด — admin + งวดล็อกครบเท่านั้น · แยกจากปุ่ม
+  // "คำนวณใหม่" บน pill (ตัวนั้นแคบเฉพาะ %NRR สำหรับเคส waiver-หลังล็อก)
+  var _period0 = rows[0].period_month;
+  var _rewriteBtn = (allFinal && nrrProfile.role === 'admin' && _period0)
+    ? '<button type="button" class="btn-secondary nrr-fullrewrite-open" data-period="' + nrrEsc(_period0) + '">เขียนทับทั้งงวดจากไฟล์ปัจจุบัน…</button>'
+    : '';
   var headStamp = allFinal
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('final') +
-      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')' + _lockedAtTxt + '</span></div>'
+      '<span class="micro">ล็อกครบทุกรายการ (' + rows.length + ')' + _lockedAtTxt + '</span>' + _rewriteBtn + '</div>' +
+      '<div class="nrr-fullrewrite-panel"></div>'
     : allEstimate
     ? '<div class="nrr-comm-fullhead">' + nrrCommStampHtml('estimate') +
       '<span class="micro">ประมาณการทั้งหมด (pace-based) — ยังไม่มี snapshot สำหรับเดือนนี้ · ตัวเลขสด ตรงกับหน้า NRR</span></div>'
@@ -17205,11 +17608,12 @@ function nrrCommHandoverListHtml(ho) {
   }
   // v_hofix: "ไฟล์ไม่มีข้อมูลเดือนนี้" ≠ "เดือนนี้ไม่มีร้าน handover" — ข้อความเดิม
   // อันเดียวพูดแทนทั้งสองกรณี ทำให้ ก.ค. ที่ข้อมูลขาดอ่านดูเหมือนไม่มีใคร handover เลย
-  // ทั้งที่จริงมี 12 KAM · ต้นเหตุ: portview_handover.csv เก็บได้เดือนเดียว เขียนทับทุกรอบ
+  // (ตั้งแต่ 2026-08-07 ไฟล์เป็น multi-month แล้ว — เคสนี้จะเกิดเฉพาะเดือนที่
+  //  data team ยังไม่ได้รันให้ครอบจริงๆ)
   if (ho && ho.data_missing) {
     return headerHtml + '<div class="ds-empty" style="padding:8px 0">' +
       '<div class="ds-empty-title">ไม่มีข้อมูล handover ของเดือนนี้ในไฟล์</div>' +
-      '<div class="ds-empty-desc">portview_handover.csv เก็บได้ครั้งละเดือนเดียว — ต้องรัน Q10 ใหม่ให้ครอบเดือนนี้ก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
+      '<div class="ds-empty-desc">ไฟล์ handover บน R2 ยังไม่ครอบเดือนนี้ — ต้องรัน Q10 ใหม่ให้ครอบก่อน ตัวเลขถึงจะขึ้น (ไม่ใช่แปลว่าเดือนนี้ไม่มีร้าน handover)</div></div>';
   }
   if (!detail.length) return headerHtml + '<div class="ds-empty" style="padding:8px 0"><div class="ds-empty-title">ไม่มีร้าน handover เดือนนี้</div></div>';
   return headerHtml + detail.map(function (d) {
