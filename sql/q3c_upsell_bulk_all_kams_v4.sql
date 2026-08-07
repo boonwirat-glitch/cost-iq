@@ -83,28 +83,46 @@ apr_outlet_ownership AS (
     AND o.user_id IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
-may_outlet_ownership AS (
+-- v_splitallmonths (2026-08-08): generalize "current month" → ทุกเดือนของ
+-- ไตรมาสที่ผ่านมาแล้ว เพื่อให้ existing/new split มีจริงทุกเดือน ไม่ใช่แค่เดือน
+-- ล่าสุดของไฟล์ · ต้นเหตุ: lookback arm เดิม hardcode `0.0 AS existing_gmv`
+-- → พอไฟล์ขยับเข้าเดือนใหม่ P3 "สด" ของเดือนก่อนหน้าคำนวณไม่ได้เลย (เป็น ฿0
+-- เชิงโครงสร้าง — เจอจริงตอน reconcile ก.ค. บนไฟล์ของ ส.ค.: live P3 = 0 ทั้ง
+-- 14 KAM) · นิยาม "existing" ต่อเดือน M = อยู่เดือนฐาน + KAM เดิมทั้งเดือนฐาน
+-- และเดือน M (สแนปช็อตความเป็นเจ้าของ "ณ เดือนนั้น" ไม่ใช่ ณ วันนี้) — เดือน
+-- ล่าสุดของไฟล์ได้ค่าตรงกับนิยามเดิมเป๊ะ (month_ownership(current_mo) ≡
+-- may_outlet_ownership เดิม) แถวเดือนปัจจุบันจึงไม่ขยับแม้แต่แถวเดียว
+quarter_months AS (
+  SELECT month_start
+  FROM dates d,
+       UNNEST(GENERATE_DATE_ARRAY(DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH),
+                                  d.current_mo, INTERVAL 1 MONTH)) AS month_start
+),
+month_ownership AS (
   SELECT
+    qm.month_start,
     CAST(o.user_id AS STRING)       AS outlet_id,
     TRIM(o.staff_owner)             AS staff_owner,
     UPPER(TRIM(o.commercial_owner)) AS commercial_owner
   FROM `freshket-rn.dwh.order` o
-  CROSS JOIN dates d
-  WHERE o.delivery_date >= d.current_mo
-    AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
-    AND o.account_type IN ('SA','MC','Chain','Unknown')
+  JOIN quarter_months qm
+    ON o.delivery_date >= qm.month_start
+   AND o.delivery_date <  DATE_ADD(qm.month_start, INTERVAL 1 MONTH)
+  WHERE o.account_type IN ('SA','MC','Chain','Unknown')
     AND o.user_id IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY qm.month_start, o.user_id ORDER BY o.delivery_date DESC) = 1
 ),
-nrr_core_outlets AS (
-  SELECT m.outlet_id
-  FROM may_outlet_ownership m
-  JOIN apr_outlet_ownership a ON m.outlet_id = a.outlet_id
-  JOIN kam_list k_may ON m.commercial_owner = 'KAM'
-    AND TRIM(m.staff_owner) = TRIM(k_may.kam_name)
-  JOIN kam_list k_apr ON a.commercial_owner = 'KAM'
-    AND TRIM(a.staff_owner) = TRIM(k_apr.kam_name)
-    AND k_apr.kam_email = k_may.kam_email
+-- NRR-core ต่อเดือน: KAM คนเดียวกันทั้งเดือนฐานและเดือนนั้นๆ + ไม่ใช่ new user
+-- ณ เดือนฐาน — logic เดียวกับ nrr_core_outlets เดิมทุกเงื่อนไข แค่เพิ่มมิติเดือน
+nrr_core_by_month AS (
+  SELECT mo.month_start, mo.outlet_id
+  FROM month_ownership mo
+  JOIN apr_outlet_ownership a ON mo.outlet_id = a.outlet_id
+  JOIN kam_list k_m ON mo.commercial_owner = 'KAM'
+    AND TRIM(mo.staff_owner) = TRIM(k_m.kam_name)
+  JOIN kam_list k_a ON a.commercial_owner = 'KAM'
+    AND TRIM(a.staff_owner) = TRIM(k_a.kam_name)
+    AND k_a.kam_email = k_m.kam_email
   WHERE (
     a.new_user_exp_date IS NULL
     OR a.new_user_exp_date < (SELECT baseline_mo FROM dates)
@@ -129,17 +147,10 @@ outlet_history AS (
     AND o.delivery_date <  DATE_ADD((SELECT current_mo FROM dates), INTERVAL 1 MONTH)
   GROUP BY 1, 2
 ),
-outlet_status AS (
-  SELECT oh.account_id, oh.outlet_id,
-    CASE
-      WHEN oh.in_baseline = 1 AND nc.outlet_id IS NOT NULL                    THEN 'existing'
-      WHEN oh.in_current  = 1 AND oh.first_seen >= (SELECT current_mo FROM dates)  THEN 'expansion'
-      WHEN oh.in_current  = 1 AND oh.first_seen <  (SELECT current_mo FROM dates)  THEN 'comeback'
-    END AS outlet_type
-  FROM outlet_history oh
-  LEFT JOIN nrr_core_outlets nc ON oh.outlet_id = nc.outlet_id
-  WHERE oh.in_current = 1
-),
+-- v_splitallmonths: outlet_status เดิม (สแนปช็อตเดือนเดียว) ถูกแทนด้วย
+-- nrr_core_by_month + oh.in_baseline ตรงใน current_split — เงื่อนไข 'existing'
+-- เดิมคือ in_baseline=1 AND อยู่ใน NRR core ซึ่งย้ายไปเทียบต่อเดือนแล้ว
+-- ('expansion'/'comeback' ของ CTE เดิมไม่เคยถูก consumer ไหนใช้)
 
 -- Current month: outlet × group_key
 -- existing_gmv: GMV from existing outlets (used for P3)
@@ -164,12 +175,15 @@ current_items AS (
       END, ' ', CAST(EXTRACT(YEAR FROM o.delivery_date)+543 AS STRING)
     ) AS month_label,
     i.gmv_ex_vat,
-    i.margin_ex_vat   -- v_gp: same unnested item row, no extra join needed
+    i.margin_ex_vat,  -- v_gp: same unnested item row, no extra join needed
+    -- v_splitallmonths: คีย์เดือนสำหรับ join สถานะ existing "ณ เดือนนั้น"
+    DATE_TRUNC(o.delivery_date, MONTH) AS month_start
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
   CROSS JOIN dates d
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
-  WHERE o.delivery_date >= d.current_mo
+  -- v_splitallmonths: จากเดิมเฉพาะ current_mo → ทุกเดือนของไตรมาสที่มาถึงแล้ว
+  WHERE o.delivery_date >= DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
     AND o.delivery_date <  DATE_ADD(d.current_mo, INTERVAL 1 MONTH)
     -- v_gp: this gmv_ex_vat > 0 filter is PRE-EXISTING and stays exactly as is.
     -- Removing it would change total_gmv and therefore move real commission
@@ -183,19 +197,25 @@ current_split AS (
   SELECT
     ci.kam_email, ci.account_id, ci.outlet_id, ci.month_label, ci.group_key,
     ANY_VALUE(ci.category) AS category,  -- v_catbonus: 1:1 with group_key, ANY_VALUE is safe
-    SUM(CASE WHEN os.outlet_type = 'existing' THEN ci.gmv_ex_vat ELSE 0 END) AS existing_gmv,
+    -- v_splitallmonths: 'existing ณ เดือนนั้น' = อยู่เดือนฐาน (oh.in_baseline)
+    -- + อยู่ NRR core ของเดือนนั้น (ncm) — เงื่อนไขเดียวกับ outlet_status เดิม
+    -- แต่เทียบด้วยความเป็นเจ้าของของเดือนที่แถวนั้นสังกัด ไม่ใช่เดือนล่าสุดของไฟล์
+    SUM(CASE WHEN oh.in_baseline = 1 AND ncm.outlet_id IS NOT NULL THEN ci.gmv_ex_vat ELSE 0 END) AS existing_gmv,
     SUM(ci.gmv_ex_vat) AS total_gmv,
     -- v_gp: margin split EXACTLY the same two ways as GMV above. Both splits are
     -- needed, not just the total: the BREAKDOWN table's P1 rows read total_gmv
     -- while its P3 rows read existing_gmv, so a GP lens with only one of them
     -- would silently pair a P3 row's existing-outlet GMV with whole-group GP.
-    SUM(CASE WHEN os.outlet_type = 'existing' THEN COALESCE(ci.margin_ex_vat, 0) ELSE 0 END) AS existing_margin,
+    SUM(CASE WHEN oh.in_baseline = 1 AND ncm.outlet_id IS NOT NULL THEN COALESCE(ci.margin_ex_vat, 0) ELSE 0 END) AS existing_margin,
     SUM(COALESCE(ci.margin_ex_vat, 0)) AS total_margin,
     -- v_gp: GMV of the rows that actually carried a margin value → coverage.
     -- Lets the client tell "GP really is thin" from "margin data is missing".
     SUM(IF(ci.margin_ex_vat IS NULL, 0, ci.gmv_ex_vat)) AS gmv_with_margin
   FROM current_items ci
-  LEFT JOIN outlet_status os ON ci.account_id = os.account_id AND ci.outlet_id = os.outlet_id
+  LEFT JOIN outlet_history oh
+    ON ci.account_id = oh.account_id AND ci.outlet_id = oh.outlet_id
+  LEFT JOIN nrr_core_by_month ncm
+    ON ci.outlet_id = ncm.outlet_id AND ci.month_start = ncm.month_start
   GROUP BY 1,2,3,4,5
 ),
 
@@ -225,6 +245,9 @@ lookback AS (
     -- supply max_baseline (a total_gmv figure), so it has no existing/new split
     -- to carry. Keeping the column present and zero keeps both UNION ALL arms
     -- the same shape.
+    -- v_splitallmonths: 0.0 ตรงนี้ "ถูกต้องถาวร" แล้ว — arm นี้เหลือเฉพาะเดือน
+    -- ก่อนไตรมาส (pool ฐาน P3: เม.ย.–มิ.ย.) ซึ่ง app ไม่เคยใช้เป็นเดือนประเมิน
+    -- ส่วนเดือนในไตรมาสย้ายไปอยู่ current_split ที่มี split จริงทุกเดือนแล้ว
     0.0 AS existing_margin,
     SUM(COALESCE(i.margin_ex_vat, 0)) AS total_margin,
     SUM(IF(i.margin_ex_vat IS NULL, 0, i.gmv_ex_vat)) AS gmv_with_margin
@@ -233,7 +256,8 @@ lookback AS (
   CROSS JOIN dates d
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= d.lookback_start
-    AND o.delivery_date <  d.current_mo
+    -- v_splitallmonths: เดิมกินถึง current_mo (ทับเดือนในไตรมาส) → ตัดที่ต้นไตรมาส
+    AND o.delivery_date <  DATE_ADD(d.baseline_mo, INTERVAL 1 MONTH)
     AND i.gmv_ex_vat > 0
   GROUP BY 1,2,3,4,5,6
 )
