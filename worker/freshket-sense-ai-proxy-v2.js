@@ -15,12 +15,30 @@
 //   /eval        — measure transcript quality against criteria
 //   /analyze-audio (legacy) — kept, not deleted
 
+// v_aifix (2026-08-08): สาย gemini 2.5 กำลังทยอยปิด (2.5 Pro ปิด ต.ค. 2026)
+// และ claude-sonnet-4-6 ก็เป็นรุ่นเก่าแล้ว · บุชเคาะว่า "คงสองระดับ อัปเป็นรุ่น
+// ใหม่ล่าสุดของแต่ละระดับ" — ระดับเร็ว/ถูกยังเป็น haiku (SKU matcher ยิงทีละตัว
+// ปริมาณเยอะ) ระดับฉลาดขึ้นเป็น sonnet-5
 const MODEL_MAP = {
-  claude: { haiku: 'claude-haiku-4-5-20251001', sonnet: 'claude-sonnet-4-6' },
+  claude: { haiku: 'claude-haiku-4-5-20251001', sonnet: 'claude-sonnet-5' },
   gemini: {
-    flash:      'gemini-2.5-flash',
-    flash_lite: 'gemini-2.5-flash-lite', // updated: 2.0-flash-lite shutdown 2026-06-01
+    flash:      'gemini-3.5-flash',
+    flash_lite: 'gemini-3.5-flash-lite',
     flash_35:   'gemini-3.5-flash',         // v2: used for transcript (audio-native)
+  }
+};
+
+// รุ่นสำรองต่อระดับ — รุ่นแรกตายให้ไล่ลงตัวถัดไป ไม่ใช่ตายทั้งระบบ
+// บทเรียน 2026-08-08: ช่องทาง AI กลางของ Sense ล้มทั้งยวงเพราะไม่มีสำรองเลย
+// ชื่อรุ่นอิงเอกสารผู้ให้บริการ ณ ส.ค. 2026 · เช็คของจริงได้ที่ GET /models
+const TEXT_MODEL_CHAIN = {
+  claude: {
+    haiku:  ['claude-haiku-4-5-20251001', 'claude-sonnet-5'],
+    sonnet: ['claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001']
+  },
+  gemini: {
+    haiku:  ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
+    sonnet: ['gemini-3.1-pro', 'gemini-3.6-flash', 'gemini-3.5-flash']
   }
 };
 
@@ -882,60 +900,143 @@ const BRAIN_MODEL_CHAIN = [
   { provider: 'gemini',    model: 'gemini-3.5-flash' }     // floor (เลิกใช้ 2.5 — ใกล้ปิดตัว)
 ];
 
-async function callBrainModel(prompt, env) {
-  let lastErr;
-  // v_echor3: เก็บ "ร่องรอย" ว่าไล่ผ่านรุ่นไหนมาบ้างและพังเพราะอะไร แล้วเขียนลง
-  // DB · เดิม log ลง console อย่างเดียว = ไม่มีใครเห็น จึงไม่มีใครรู้ว่าตกชั้น
+// ── ชั้นล่างสุดของการเรียกโมเดล (v_aifix 2026-08-08) ────────────────────────
+// ก่อนหน้านี้มี fetch ตรงกระจายอยู่ 3 ที่ (brain / ช่องทางกลาง / eval) แต่ละที่
+// จัดการ error คนละแบบ และช่องทางกลาง "กลืน" สาเหตุทิ้งจนหาไม่เจอว่าพังเพราะอะไร
+// ตัวนี้คือจุดเดียวที่ยิงโมเดลจริง — คืนสาเหตุกลับมาเสมอ ไม่โยน ไม่กลืน
+async function _callOneModel(provider, model, env, payload) {
+  const { system, messages, maxTokens, jsonMode } = payload;
+  let res;
+  try {
+    if (provider === 'gemini') {
+      const contents = (messages || []).map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+      const gcfg = { maxOutputTokens: maxTokens || 2000, temperature: 0.2 };
+      if (jsonMode) gcfg.responseMimeType = 'application/json';
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
+        {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: system ? { parts: [{ text: system }] } : undefined,
+            contents, generationConfig: gcfg
+          })
+        });
+    } else {
+      // system: '' ทำให้ Anthropic ตอบ 400 — ต้องตัดคีย์ทิ้งไปเลยเมื่อว่าง
+      const body = { model, max_tokens: maxTokens || 2000, messages: messages || [] };
+      if (system) body.system = system;
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(body)
+      });
+    }
+  } catch (e) {
+    return { ok: false, status: 0, text: '', errMsg: `${model}: ${e?.message || 'network error'}` };
+  }
+
+  // อ่าน body ครั้งเดียว แล้วค่อยแยกว่าเป็นผลลัพธ์หรือ error
+  let d = null, raw = '';
+  try { raw = await res.text(); d = raw ? JSON.parse(raw) : null; } catch (_) {}
+
+  if (!res.ok) {
+    const msg = d?.error?.message || d?.error?.status || raw.slice(0, 300) || `HTTP ${res.status}`;
+    return { ok: false, status: res.status, text: '', errMsg: `${model}: ${msg}` };
+  }
+  const text = provider === 'gemini'
+    ? (d?.candidates?.[0]?.content?.parts?.[0]?.text || '')
+    : (d?.content?.[0]?.text || '');
+  if (!text) {
+    // ปลายทางตอบ 200 แต่ไม่มีเนื้อความ — เดิมกรณีนี้ไหลออกไปเป็นค่าว่างเงียบๆ
+    // (เช่น Gemini ตอบ 200 พร้อม promptFeedback ว่าโดนบล็อก) ต้องนับเป็นล้มเหลว
+    const why = d?.promptFeedback?.blockReason || d?.candidates?.[0]?.finishReason || d?.stop_reason || 'ไม่มีเนื้อความ';
+    return { ok: false, status: 502, text: '', errMsg: `${model}: ตอบกลับว่าง (${why})` };
+  }
+  return { ok: true, status: 200, text, errMsg: '' };
+}
+
+// ไล่รุ่นตาม chain — รุ่นแรกตายให้ลงรุ่นถัดไป · 429/5xx ลองซ้ำรุ่นเดิมหนึ่งครั้ง
+// คืน trail มาด้วยเสมอ เพื่อให้รู้ว่าตกชั้นเพราะอะไร (บทเรียนจาก brain chain
+// ที่วิ่งบนรุ่นล่างสุด 17/18 ครั้งโดยไม่มีใครรู้)
+async function callTextModel(provider, tier, env, payload) {
+  const chain = (TEXT_MODEL_CHAIN[provider] || {})[tier] || [];
   const trail = [];
+  for (const model of chain) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      if (attempt > 1) await new Promise(r => setTimeout(r, 1500));
+      const r = await _callOneModel(provider, model, env, payload);
+      if (r.ok) return { ok: true, text: r.text, model, trail: trail.join(' → ') };
+      trail.push(r.errMsg);
+      if (r.status === 429 || r.status >= 500) continue;  // ชั่วคราว — ลองรุ่นเดิมซ้ำ
+      break;                                              // 4xx อื่น — รุ่นนี้ใช้ไม่ได้
+    }
+  }
+  return { ok: false, text: '', model: chain[chain.length - 1] || null, trail: trail.join(' → ') };
+}
+
+// ── ช่องทาง AI กลางที่ Sense ทุกฟังก์ชันใช้ (POST /) ────────────────────────
+// สัญญากับ client (src/03_rendering.js callAI): ต้องคืน { text } เสมอ
+// เดิมฝั่ง gemini คืน { content: [...] } ซึ่ง client อ่านไม่เจอ → ได้ค่าว่างทุกครั้ง
+// และเวลาปลายทางพังก็คืน { text: "" } เปล่าๆ จนไล่สาเหตุไม่ได้
+async function handleGeneralAI(body, env) {
+  const provider  = body.provider === 'gemini' ? 'gemini' : 'claude';
+  const tier      = body.modelKey === 'sonnet' ? 'sonnet' : 'haiku';
+  const system    = typeof body.system === 'string' ? body.system : '';
+  const messages  = Array.isArray(body.messages) ? body.messages : [];
+  const maxTokens = Math.min(Number(body.maxTokens || 2000), 6000);
+  if (!messages.length) return json({ error: 'messages required' }, 400, env);
+  if (provider === 'gemini' && !env.GEMINI_API_KEY)    return json({ error: 'Gemini not configured' }, 503, env);
+  if (provider === 'claude' && !env.ANTHROPIC_API_KEY) return json({ error: 'Anthropic not configured' }, 503, env);
+
+  const r = await callTextModel(provider, tier, env, { system, messages, maxTokens });
+  if (!r.ok) {
+    console.error(`[ai-proxy] ${provider}/${tier} ล้มทุกรุ่น — ${r.trail}`);
+    return json({
+      error: `AI ปลายทางเรียกไม่สำเร็จ (${provider}/${tier}) — ${r.trail || 'ไม่มีรุ่นใน chain'}`,
+      provider, tier, trail: r.trail
+    }, 502, env);
+  }
+  // คง content[] ไว้ด้วยเพื่อความเข้ากันได้ย้อนหลังกับผู้เรียกเก่าที่อ่านโครงนั้น
+  return json({ text: r.text, model: r.model, content: [{ type: 'text', text: r.text }] }, 200, env);
+}
+
+async function callBrainModel(prompt, env) {
+  // v_aifix: ยิงผ่าน _callOneModel ตัวเดียวกับช่องทางกลาง — เดิมมี fetch ของตัวเอง
+  // ซ้ำอีกชุด ทำให้กติกาการ retry/อ่าน error ไม่ตรงกันสองที่
+  // เก็บ "ร่องรอย" ว่าไล่ผ่านรุ่นไหนมาบ้างและพังเพราะอะไร แล้วเขียนลง DB · เดิม
+  // log ลง console อย่างเดียว = ไม่มีใครเห็น จึงไม่มีใครรู้ว่าตกชั้น
+  const trail = [];
+  let lastErr;
   for (const { provider, model } of BRAIN_MODEL_CHAIN) {
     if (provider === 'gemini' && !env.GEMINI_API_KEY) { trail.push(`${model}:ไม่มีkey`); continue; }
     if (provider === 'anthropic' && !env.ANTHROPIC_API_KEY) { trail.push(`${model}:ไม่มีkey`); continue; }
     for (let attempt = 1; attempt <= 2; attempt++) {
       if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
+      const r = await _callOneModel(provider === 'anthropic' ? 'claude' : 'gemini', model, env, {
+        messages: [{ role: 'user', content: prompt }], maxTokens: 16384, jsonMode: true
+      });
+      if (!r.ok) {
+        lastErr = new Error(r.errMsg);
+        trail.push(r.errMsg);
+        console.error(`[brain] ${r.errMsg}`);
+        if (r.status === 429 || r.status >= 500) continue;   // ชั่วคราว — ลองรุ่นเดิมซ้ำ
+        break;                                               // รุ่นนี้ใช้ไม่ได้ — ลงรุ่นถัดไป
+      }
+      const s = r.text.indexOf('{'), e = r.text.lastIndexOf('}');
+      if (s === -1 || e === -1) {
+        lastErr = new Error(`${model}: no JSON`); trail.push(`${model}:ไม่มีJSON`);
+        console.error(`[brain] ${model}: response had no JSON — ${r.text.slice(0, 200)}`);
+        continue;
+      }
       try {
-        let res, rawText = '';
-        if (provider === 'gemini') {
-          res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 32768, responseMimeType: 'application/json' }
-            })
-          });
-        } else {
-          res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-            body: JSON.stringify({ model, max_tokens: 16384, messages: [{ role: 'user', content: prompt }] })
-          });
-        }
-        if (!res.ok) {
-          // A2v2.2 hotfix (2026-08-05): live test landed on the chain's floor
-          // model with zero visibility into WHY every stronger model fell
-          // through (including claude-sonnet-4-6, a model already proven
-          // working elsewhere in this same file) — log the real body so the
-          // next run answers it instead of guessing again.
-          const bodyText = await res.text().catch(() => '');
-          lastErr = new Error(`${model} ${res.status}`);
-          trail.push(`${model}:${res.status}`);
-          console.error(`[brain] ${model} attempt ${attempt} failed: ${res.status} — ${bodyText.slice(0, 300)}`);
-          // 429/5xx = transient, retry same model once; other 4xx = model not
-          // available on this key → break to the next model in the chain
-          if (res.status === 429 || res.status >= 500) continue;
-          break;
-        }
-        const d = await res.json();
-        rawText = provider === 'gemini'
-          ? (d?.candidates?.[0]?.content?.parts?.[0]?.text || '')
-          : (d?.content?.[0]?.text || '');
-        const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
-        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); trail.push(`${model}:ไม่มีJSON`); console.error(`[brain] ${model}: response had no JSON — ${rawText.slice(0,200)}`); continue; }
-        try { return { parsed: JSON.parse(rawText.slice(s, e + 1)), model, trail: trail.join(' → ') || 'ตัวแรกผ่านเลย' }; }
-        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); trail.push(`${model}:JSONพัง`); console.error(`[brain] ${model}: JSON parse failed — ${rawText.slice(0,200)}`); continue; }
-      } catch (e) {
-        lastErr = e;
-        trail.push(`${model}:${(e?.message || 'throw').slice(0, 40)}`);
-        console.error(`[brain] ${model} attempt ${attempt} threw: ${e?.message || e}`);
+        return { parsed: JSON.parse(r.text.slice(s, e + 1)), model, trail: trail.join(' → ') || 'ตัวแรกผ่านเลย' };
+      } catch (_) {
+        lastErr = new Error(`${model}: JSON parse failed`); trail.push(`${model}:JSONพัง`);
+        console.error(`[brain] ${model}: JSON parse failed — ${r.text.slice(0, 200)}`);
+        continue;
       }
     }
   }
@@ -1377,32 +1478,10 @@ export default {
     if (url.pathname === '/transcribe')    return handleTranscribe(request, env);
     if (url.pathname === '/analyze-audio') return handleAnalyzeAudio(request, env);
 
-    // Legacy general endpoint
+    // ช่องทาง AI กลางของ Sense (ไม่มี path) — ตัวจริงอยู่ใน handleGeneralAI
     let body;
     try { body = await request.json(); }
     catch { return json({ error: 'Invalid JSON' }, 400, env); }
-    const provider  = body.provider  === 'gemini' ? 'gemini' : 'claude';
-    const modelKey  = body.modelKey  === 'sonnet'  ? 'sonnet' : 'haiku';
-    const system    = typeof body.system   === 'string' ? body.system   : '';
-    const messages  = Array.isArray(body.messages)      ? body.messages : [];
-    const maxTokens = Math.min(Number(body.maxTokens || 2000), 6000);
-    if (!messages.length) return json({ error: 'messages required' }, 400, env);
-    if (provider === 'gemini') {
-      if (!env.GEMINI_API_KEY) return json({ error: 'Gemini not configured' }, 503, env);
-      const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
-      const gemBody = { system_instruction: system ? { parts: [{ text: system }] } : undefined, contents, generationConfig: { maxOutputTokens: maxTokens } };
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash}:generateContent?key=${env.GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(gemBody) });
-      const d = await res.json();
-      return json({ content: [{ type: 'text', text: d?.candidates?.[0]?.content?.parts?.[0]?.text || '' }] }, 200, env);
-    }
-    if (!env.ANTHROPIC_API_KEY) return json({ error: 'Anthropic not configured' }, 503, env);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL_MAP.claude[modelKey], max_tokens: maxTokens, system, messages })
-    });
-    const _d = await res.json();
-    const _text = _d?.content?.[0]?.text || _d?.text || '';
-    return json({ text: _text }, res.status, env);
+    return handleGeneralAI(body, env);
   }
 };

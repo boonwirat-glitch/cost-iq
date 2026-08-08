@@ -1,0 +1,29 @@
+# ตั้งค่า deploy ของ Cloudflare Worker (v_aifix 2026-08-08)
+#
+# ทำไมต้องมีไฟล์นี้: 2026-08-08 บุชลองรัน `npx wrangler deploy worker/…-v2.js`
+# โดยไม่มีไฟล์นี้ → wrangler จะเดาชื่อ worker จากชื่อไฟล์เป็น
+# "freshket-sense-ai-proxy-v2" ซึ่ง **คนละตัวกับของจริง** แล้วสร้าง worker ใหม่
+# เปล่าๆ ที่ไม่มี API key ไม่มี cron ส่วนตัวจริงยังเป็นโค้ดเก่า
+#
+# deploy ด้วยคำสั่งเดียวจากรากรีโป:
+#   npx wrangler deploy
+#
+# ⚠ secret ไม่ได้อยู่ในไฟล์นี้และไม่ควรอยู่ — มันเก็บบน worker อยู่แล้ว
+# (GEMINI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY,
+#  SUPABASE_URL) การ deploy ทับ **ไม่ลบ secret** · ถ้าต้องตั้งใหม่ใช้
+#   npx wrangler secret put <ชื่อ>
+
+name = "freshket-sense-ai-proxy"
+main = "worker/freshket-sense-ai-proxy-v2.js"
+compatibility_date = "2026-08-08"
+
+# ⚠⚠ ต้องตรงกับที่ตั้งไว้จริงในหน้า Cloudflare (Settings → Triggers → Cron)
+# ถ้าไฟล์นี้ประกาศไม่ตรง การ deploy จะ "เขียนทับ" ตารางเดิม แล้ว sweepPending
+# ที่เป็นตัวขับ pipeline ของ Echo จะหยุดทำงานเงียบๆ — ตรวจก่อน deploy ครั้งแรกเสมอ
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+# จำนวนวันที่เก็บไฟล์เสียงไว้ก่อนให้ cron กวาดลบ (0 = ไม่ลบเลย)
+# เก็บไว้เพื่อให้ย้อนกลับไปฟัง ลองโมเดลใหม่ และสร้างชุดทดสอบจากคลิปจริงได้
+AUDIO_RETENTION_DAYS = "30"

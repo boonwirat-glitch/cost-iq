@@ -471,14 +471,18 @@ check('worker: chain เรียงแรงสุดก่อน และพ�
       chain.includes("'claude-sonnet-4-6'") && !chain.includes("'gemini-2.5-flash'") &&
       chain.indexOf("'gemini-3.1-pro'") < chain.indexOf("'claude-sonnet-4-6'");
   })());
+// v_aifix: trail ยังอยู่ แต่ข้อความมาจาก _callOneModel (r.errMsg) แล้ว
+// ไม่ใช่ประกอบเองจาก res.status ในนี้
 check('worker: บันทึกร่องรอยการตกชั้นลง DB ไม่ใช่แค่ console',
-  /const trail = \[\];/.test(worker) && /trail\.push\(`\$\{model\}:\$\{res\.status\}`\)/.test(worker) &&
+  /const trail = \[\];/.test(worker) && /trail\.push\(r\.errMsg\)/.test(worker) &&
   /ai_model_trail: aiTrail/.test(worker));
 check('worker: มี /models ไว้ถามว่า key เรียกรุ่นไหนได้จริง (เลิกเดาชื่อรุ่น)',
   /async function handleListModels\(env\)/.test(worker) &&
   /pathname === '\/models'/.test(worker));
+// v_aifix: กติกาเดิมทุกอย่าง แต่ย้ายไปอ่าน status จากผลของ _callOneModel
+// และตอนนี้ใช้ร่วมกันทั้ง brain และช่องทาง AI กลาง (ต้องเจอทั้งสองที่)
 check('worker: 4xx model-missing breaks to next model, 429/5xx retries same model',
-  /if \(res\.status === 429 \|\| res\.status >= 500\) continue;\s*\n\s*break;/.test(worker));
+  (worker.match(/if \(r\.status === 429 \|\| r\.status >= 500\) continue;/g) || []).length >= 2);
 check('worker: runBrain replaces summarize+analyze inside /process',
   /await runBrain\(segments, rubric, bucket, priorIntel, env\)/.test(worker) &&
   !/await runSummarize\(segments, env\)\)\.parsed/.test(worker.slice(worker.indexOf('async function processSession'))));

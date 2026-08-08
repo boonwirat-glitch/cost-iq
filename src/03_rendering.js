@@ -2904,9 +2904,19 @@ On cost-saving alternatives:
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({provider:activeProvider,modelKey,system:sys,messages,maxTokens:maxTok})
       });
-      if(!res.ok)throw new Error('AI proxy '+res.status+': '+await res.text());
-      const d=await res.json();
-      return d.text||'';
+      // v_aifix (2026-08-08): เดิมเวลา worker ตอบ {"text":""} ข้อความ error ที่โยน
+      // ออกมาจะว่างเปล่า และเวลาได้ 200 พร้อม text ว่างก็ปล่อยค่าว่างไหลเข้าหน้าจอ
+      // เงียบๆ — เป็นเหตุที่ตอน AI ทุกตัวหยุดทำงานพร้อมกันไม่มีใครรู้ว่าเพราะอะไร
+      const _raw = await res.text();
+      let _d = null;
+      try { _d = _raw ? JSON.parse(_raw) : null; } catch(_) {}
+      if(!res.ok){
+        const _why = _d?.error || _raw.slice(0,300) || ('HTTP '+res.status);
+        throw new Error('AI proxy '+res.status+': '+_why);
+      }
+      const _text = _d?.text || '';
+      if(!_text) throw new Error('AI proxy ตอบกลับว่าง — '+(_d?.error || _d?.trail || 'ปลายทางไม่ส่งข้อความมา'));
+      return _text;
     }
 
     // Phase 5.1: production is proxy-only. No browser-held Claude/Gemini keys and no direct model endpoints.
