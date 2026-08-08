@@ -866,18 +866,30 @@ async function handleAnalyzeAudio(request, env) {
 // Try strongest-first; fall through on 4xx (model not enabled for this key).
 // The winner is stamped into ci_sessions.ai_model — after the first real run
 // the DB itself answers "is gemini-3.5-pro enabled?".
+// v_echor3 (2026-08-08): chain เดิมมี 'gemini-3.5-pro' อยู่บนสุด ซึ่ง **ไม่มีรุ่นนี้
+// อยู่จริง** (สาย Pro ปัจจุบันคือ 3.1, ส่วน 3.5 มีแต่ Flash) → 404 แล้วตกลงมาชั้น
+// ล่างสุดเงียบๆ · ข้อมูลจริงในDB: gemini-2.5-flash 17 ครั้ง, สองตัวบน 0 ครั้ง
+// เราจึงจ่ายค่าโมเดลถูกที่สุดมาตลอดโดยคิดว่ากำลังใช้ตัวแรงสุด
+//
+// ชื่อรุ่นด้านล่างอิงเอกสาร Google ณ ส.ค. 2026 · **ห้ามเดาชื่อรุ่นอีก** —
+// เปิด GET /models เพื่อดูว่า key นี้เรียกอะไรได้จริงก่อนแก้ทุกครั้ง
+// และดู ci_sessions.ai_model_trail ว่าแต่ละครั้งตกชั้นเพราะอะไร
 const BRAIN_MODEL_CHAIN = [
-  { provider: 'gemini',    model: 'gemini-3.5-pro' },
+  { provider: 'gemini',    model: 'gemini-3.1-pro' },      // reasoning แรงสุดที่ GA
+  { provider: 'gemini',    model: 'gemini-3.6-flash' },    // GA ล่าสุด เร็วและเก่ง
   { provider: 'anthropic', model: 'claude-sonnet-5' },
   { provider: 'anthropic', model: 'claude-sonnet-4-6' },   // known-good today (= legacy /analyze)
-  { provider: 'gemini',    model: 'gemini-2.5-flash' }     // absolute floor
+  { provider: 'gemini',    model: 'gemini-3.5-flash' }     // floor (เลิกใช้ 2.5 — ใกล้ปิดตัว)
 ];
 
 async function callBrainModel(prompt, env) {
   let lastErr;
+  // v_echor3: เก็บ "ร่องรอย" ว่าไล่ผ่านรุ่นไหนมาบ้างและพังเพราะอะไร แล้วเขียนลง
+  // DB · เดิม log ลง console อย่างเดียว = ไม่มีใครเห็น จึงไม่มีใครรู้ว่าตกชั้น
+  const trail = [];
   for (const { provider, model } of BRAIN_MODEL_CHAIN) {
-    if (provider === 'gemini' && !env.GEMINI_API_KEY) continue;
-    if (provider === 'anthropic' && !env.ANTHROPIC_API_KEY) continue;
+    if (provider === 'gemini' && !env.GEMINI_API_KEY) { trail.push(`${model}:ไม่มีkey`); continue; }
+    if (provider === 'anthropic' && !env.ANTHROPIC_API_KEY) { trail.push(`${model}:ไม่มีkey`); continue; }
     for (let attempt = 1; attempt <= 2; attempt++) {
       if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
       try {
@@ -905,6 +917,7 @@ async function callBrainModel(prompt, env) {
           // next run answers it instead of guessing again.
           const bodyText = await res.text().catch(() => '');
           lastErr = new Error(`${model} ${res.status}`);
+          trail.push(`${model}:${res.status}`);
           console.error(`[brain] ${model} attempt ${attempt} failed: ${res.status} — ${bodyText.slice(0, 300)}`);
           // 429/5xx = transient, retry same model once; other 4xx = model not
           // available on this key → break to the next model in the chain
@@ -916,11 +929,12 @@ async function callBrainModel(prompt, env) {
           ? (d?.candidates?.[0]?.content?.parts?.[0]?.text || '')
           : (d?.content?.[0]?.text || '');
         const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
-        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); console.error(`[brain] ${model}: response had no JSON — ${rawText.slice(0,200)}`); continue; }
-        try { return { parsed: JSON.parse(rawText.slice(s, e + 1)), model }; }
-        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); console.error(`[brain] ${model}: JSON parse failed — ${rawText.slice(0,200)}`); continue; }
+        if (s === -1 || e === -1) { lastErr = new Error(`${model}: no JSON`); trail.push(`${model}:ไม่มีJSON`); console.error(`[brain] ${model}: response had no JSON — ${rawText.slice(0,200)}`); continue; }
+        try { return { parsed: JSON.parse(rawText.slice(s, e + 1)), model, trail: trail.join(' → ') || 'ตัวแรกผ่านเลย' }; }
+        catch (_) { lastErr = new Error(`${model}: JSON parse failed`); trail.push(`${model}:JSONพัง`); console.error(`[brain] ${model}: JSON parse failed — ${rawText.slice(0,200)}`); continue; }
       } catch (e) {
         lastErr = e;
+        trail.push(`${model}:${(e?.message || 'throw').slice(0, 40)}`);
         console.error(`[brain] ${model} attempt ${attempt} threw: ${e?.message || e}`);
       }
     }
@@ -1113,8 +1127,9 @@ async function processSession(sessionId, origin, env) {
         // Nothing to analyze — record the outcome honestly instead of leaving
         // the row stuck (client history renders unknown stages as plain text).
         await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
-          { pipeline_stage: 'no_speech', processing_since: null, audio_path: null });
-        await sbStorageDelete(env, row.audio_path).catch(() => {});
+          { pipeline_stage: 'no_speech', processing_since: null });
+        // v_echor3: ไม่ลบเสียงทิ้งแล้ว — เคส no_speech ยิ่งต้องเก็บไว้ฟัง เพราะ
+        // "ไม่มีเสียงพูด" อาจแปลว่าไมค์มีปัญหา ไม่ใช่ว่าไม่มีใครพูดจริงๆ
         return;
       }
 
@@ -1124,10 +1139,13 @@ async function processSession(sessionId, origin, env) {
         transcript_confidence: (typeof t.avg_transcript_confidence === 'number') ? t.avg_transcript_confidence : null,
         speaker_confidence:    (typeof t.avg_speaker_confidence === 'number') ? t.avg_speaker_confidence : null,
         pipeline_stage:        'transcribed',
-        processing_since:      null,
-        audio_path:            null
+        processing_since:      null
       });
-      await sbStorageDelete(env, row.audio_path).catch(() => {});
+      // v_echor3 (2026-08-08): เดิมลบไฟล์เสียงทิ้งตรงนี้ทันที — ผลคือคลิปจริง 43
+      // จาก 44 หายถาวร พอมีคนบอกว่า "ฟังไม่รู้เรื่อง" เราจึงกลับไปฟังต้นฉบับไม่ได้
+      // ลองโมเดลใหม่กับคลิปเดิมไม่ได้ พิสูจน์ไม่ได้ว่าการแก้แต่ละครั้งดีขึ้นจริง
+      // → ทุกการแก้กลายเป็นการเดา นี่คือเหตุผลเชิงโครงสร้างที่ปัญหานี้วนไม่จบ
+      // ตอนนี้เก็บไว้ AUDIO_RETENTION_DAYS วัน แล้ว cron ค่อยกวาดลบ (ดู sweepExpiredAudio)
 
       // continue to the analyze stage: from cron (origin=null) we have a full
       // time budget, so just keep going in-process; from an HTTP trigger,
@@ -1179,7 +1197,7 @@ async function processSession(sessionId, origin, env) {
 
       // A2v2.2: one strong-model call replaces summarize+analyze — the model
       // sees everything at once (summary/skills/customer stay coherent)
-      const { parsed, model: aiModel } = await runBrain(segments, rubric, bucket, priorIntel, env);
+      const { parsed, model: aiModel, trail: aiTrail } = await runBrain(segments, rubric, bucket, priorIntel, env);
       const summary = {
         transcript_summary: parsed.transcript_summary || null,
         notes:              Array.isArray(parsed.notes) ? parsed.notes : [],
@@ -1215,6 +1233,7 @@ async function processSession(sessionId, origin, env) {
         transcript_summary: summary?.transcript_summary || null,
         tone_signals: summary?.tone || null, summary_data: summary || null,
         ai_model: aiModel || null,
+        ai_model_trail: aiTrail || null,   // v_echor3: ตกชั้นเพราะอะไร ดูตรงนี้
         processing_since: null
       });
 
@@ -1284,14 +1303,69 @@ async function sweepPending(env) {
   }
 }
 
+// v_echor3: เก็บไฟล์เสียงไว้กี่วันก่อนลบ · ตั้งค่าได้ผ่าน env ถ้าอยากยืด/หด
+// โดยไม่ต้อง deploy ใหม่ · ตั้ง AUDIO_RETENTION_DAYS=0 = ปิดการลบทั้งหมด
+const AUDIO_RETENTION_DAYS = 30;
+
+// กวาดลบไฟล์เสียงที่เกินอายุ — แทนที่การลบทันทีหลังถอดเสร็จแบบเดิม
+// เจตนา: ต้องเก็บนานพอให้กลับไปฟัง ลองโมเดลใหม่ และสร้างชุดทดสอบจากของจริงได้
+// แต่ไม่เก็บถาวร (ทั้งเรื่องค่า storage และเรื่องข้อมูลลูกค้าในคลิป)
+async function sweepExpiredAudio(env) {
+  const days = Number(env.AUDIO_RETENTION_DAYS ?? AUDIO_RETENTION_DAYS);
+  if (!Number.isFinite(days) || days <= 0) return;   // 0 = ปิดการลบ
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  let rows = [];
+  try {
+    rows = await sbSelect(env,
+      `ci_sessions?select=id,audio_path,visited_at` +
+      `&audio_path=not.is.null&visited_at=lt.${encodeURIComponent(cutoff)}` +
+      `&order=visited_at.asc&limit=25`);
+  } catch (_) { return; }
+  for (const r of rows) {
+    try {
+      await sbStorageDelete(env, r.audio_path);
+      await sbPatch(env, 'ci_sessions', `id=eq.${r.id}`, { audio_path: null });
+    } catch (e) {
+      // ลบไม่สำเร็จ = ปล่อยไว้ให้ tick หน้าลองใหม่ · ห้าม null คอลัมน์ทิ้ง
+      // เพราะจะกลายเป็นไฟล์กำพร้าใน storage ที่ไม่มีใครรู้ว่ามีอยู่
+      console.error(`[audio-sweep] ${r.id} ลบไม่สำเร็จ: ${e?.message || e}`);
+    }
+  }
+}
+
+async function handleListModels(env) {
+  if (!env.GEMINI_API_KEY) return json({ error: 'ไม่มี GEMINI_API_KEY' }, 400, env);
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${env.GEMINI_API_KEY}&pageSize=200`);
+    const d = await r.json();
+    const usable = (d?.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => (m.name || '').replace(/^models\//, ''))
+      .sort();
+    return json({
+      gemini_ที่เรียกได้: usable,
+      chain_ที่ตั้งไว้: BRAIN_MODEL_CHAIN.filter(m => m.provider === 'gemini').map(m => m.model),
+      ตัวที่ตั้งไว้แต่เรียกไม่ได้: BRAIN_MODEL_CHAIN
+        .filter(m => m.provider === 'gemini' && !usable.includes(m.model)).map(m => m.model)
+    }, 200, env);
+  } catch (e) {
+    return json({ error: String(e?.message || e) }, 502, env);
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export default {
   async scheduled(event, env, cfCtx) {
     if (!env.SUPABASE_SERVICE_KEY) return;
     cfCtx.waitUntil(sweepPending(env));
+    cfCtx.waitUntil(sweepExpiredAudio(env));
   },
   async fetch(request, env, cfCtx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(env) });
+    // v_echor3: /models = ถาม Google ตรงๆ ว่า key นี้เรียกรุ่นไหนได้บ้าง
+    // มีเพราะ chain เดิมใส่ชื่อรุ่นที่ "ไม่มีอยู่จริง" ไว้บนสุด แล้วตกลงมาชั้นล่างสุด
+    // เงียบๆ 17 จาก 18 ครั้ง — ต่อไปอย่าเดาชื่อรุ่น ให้เปิดอันนี้ดูก่อน (GET ได้)
+    if (new URL(request.url).pathname === '/models') return handleListModels(env);
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
     const url = new URL(request.url);
     if (url.pathname === '/process')           return handleProcess(request, env, cfCtx);

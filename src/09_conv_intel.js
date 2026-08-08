@@ -18,7 +18,8 @@ const CI = (() => {
     } catch (_) {}
     return String(email || '').split('@')[0] || '—';
   }
-  const MAX_SECS   = 4800; // v587: 80min — bitrate จริงคือ 24kbps (audioBitsPerSecond:24000) = 3000B/s
+  const MAX_SECS   = 4800; // v587: 80min — v_echor3 bitrate 48kbps = 6000B/s (80 นาที ≈ 29MB)
+  let _micSettings = null;   // ค่าไมค์ที่ได้จริง (บางรุ่นเมินค่าที่ขอไปเงียบๆ)
                            // 80min = 14.4MB raw → ~19.2MB base64 ใต้ Gemini 20MB inline limit
                            // (เดิม 5400/90min คำนวณจาก 16kbps ที่ไม่ใช่ค่าจริง → 21.6MB เกิน limit → analyze fail ทั้ง session)
 
@@ -1019,11 +1020,38 @@ body:not(.echo-active) { background:unset; }
       try { window.SenseSentinel?.report('ci_record_start_timeout', 'getUserMedia not settled after 8s'); } catch(_) {}
     }, 8000);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // v_echor3 (2026-08-08): เดิมขอไมค์ด้วย { audio: true } เปล่าๆ = ปล่อยให้
+      // มือถือใช้ค่า default ซึ่งจูนมาเพื่อ "โทรศัพท์" — คนเดียว ปากใกล้ไมค์ ตัด
+      // ทุกอย่างที่ไม่ใช่เสียงนั้นทิ้ง · สถานการณ์จริงของ Echo ตรงข้ามเป๊ะ: วาง
+      // มือถือบนโต๊ะ สองคนนั่งคนละฝั่ง ในร้านอาหารเสียงดัง
+      //   noiseSuppression → กินเสียงลูกค้าที่นั่งไกลทิ้งไปด้วย
+      //   autoGainControl  → ดันเสียงรบกวนขึ้นมาตอนไม่มีใครพูด
+      //   echoCancellation → ออกแบบมาเพื่อตัดเสียงลำโพงตัวเอง ไม่มีประโยชน์ที่นี่
+      // ขอปิดทั้ง 3 ตัว · เบราว์เซอร์ไหนไม่รองรับจะเมินค่าที่ขอไปเฉยๆ ไม่ error
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl:  false,
+          channelCount:     1,
+          sampleRate:       48000
+        }
+      });
       _gumSettled = true; clearTimeout(_gumWatchdog);
+      // บันทึกว่าได้ค่าที่ขอจริงไหม — บางรุ่นเมินเงียบๆ ต้องรู้ตอนไล่คุณภาพเสียง
+      try {
+        const st = stream.getAudioTracks()[0]?.getSettings?.() || {};
+        _micSettings = {
+          echoCancellation: st.echoCancellation, noiseSuppression: st.noiseSuppression,
+          autoGainControl: st.autoGainControl, sampleRate: st.sampleRate, channelCount: st.channelCount
+        };
+        console.log('[CI mic]', JSON.stringify(_micSettings));
+      } catch(_) { _micSettings = null; }
       const mime   = _bestMime();
-      // audioBitsPerSecond:24000 — opus speech quality balanced with Gemini recognition accuracy
-      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 24000 });
+      // v_echor3: 24k → 48k · ที่ 24kbps Opus บีบเสียงพูดคนเดียวใกล้ไมค์ได้พอดี
+      // แต่สองคนคนละระยะในห้องมีเสียงรบกวนคือสัญญาณที่ซับซ้อนกว่ามาก 48k ยังนับว่า
+      // ประหยัด (80 นาที ≈ 29MB) และเป็นตัวแปรที่ถูกที่สุดที่ยังไม่เคยลองขยับเลย
+      _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 48000 });
       _chunks      = [];
       _secs        = 0;
       _recorder.ondataavailable = e => { if (e.data?.size > 0) { _chunks.push(e.data); _idbPutChunk(e.data); } };

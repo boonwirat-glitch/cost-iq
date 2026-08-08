@@ -405,8 +405,16 @@ check('worker: stage claim is conditional on pipeline_stage + null-or-stale proc
   (worker.match(/if \(!claimed\.length\) return;/g) || []).length >= 2);
 check('worker: claim released on stage error (sweep can retry)',
   (worker.match(/\{ processing_since: null \}\)\.catch\(\(\) => \{\}\);/g) || []).length >= 2);
-check('worker: audio deleted from storage right after transcription lands',
-  /audio_path:\s+null\s*\n\s*\}\);\s*\n\s*await sbStorageDelete\(env, row\.audio_path\)\.catch/.test(worker));
+// v_echor3: กลับด้าน — ห้ามลบเสียงทิ้งตอนถอดเสร็จอีกแล้ว เพราะทำให้คลิปจริง 43
+// จาก 44 หายถาวร แล้วพิสูจน์ไม่ได้ว่าการแก้แต่ละครั้งดีขึ้นจริง (= เหตุที่วนไม่จบ)
+check('worker: ไม่ลบไฟล์เสียงทิ้งทันทีหลังถอดเสร็จแล้ว',
+  !/pipeline_stage:\s+'transcribed'[\s\S]{0,400}sbStorageDelete/.test(worker));
+check('worker: มี sweeper ลบเสียงตามอายุแทน + ต่อเข้า cron',
+  /async function sweepExpiredAudio\(env\)/.test(worker) &&
+  /AUDIO_RETENTION_DAYS/.test(worker) &&
+  /waitUntil\(sweepExpiredAudio\(env\)\)/.test(worker));
+check('worker: sweeper ลบ storage สำเร็จก่อนค่อย null คอลัมน์ (กันไฟล์กำพร้า)',
+  /await sbStorageDelete\(env, r\.audio_path\);\s*\n\s*await sbPatch\(env, 'ci_sessions', `id=eq\.\$\{r\.id\}`, \{ audio_path: null \}\);/.test(worker));
 check('worker: rubric fetched from DB and role-filtered server-side (Phase R semantics)',
   /skill_definitions\?echo_enabled=eq\.true/.test(worker) &&
   /!d\.roles \|\| !d\.roles\.length \|\| d\.roles\.includes\(bucket\)/.test(worker));
@@ -451,13 +459,24 @@ check('client: _saveTranscriptOnly prefers ctx.sessionId (fallback path targets 
   /const _ciSessionId = ctx\.sessionId \|\| ctx\.checkinCache\?\.session_id \|\| null;/.test(ci));
 
 console.log('\n[B] source locks — ECHO GOAL 2 Phase A2v2.2 (brain)');
-check('worker: brain model chain strongest-first with known-good floor',
+// v_echor3: chain เดิมมี 'gemini-3.5-pro' บนสุดซึ่งไม่มีรุ่นนี้อยู่จริง → 404 แล้ว
+// ตกลงชั้นล่างสุดเงียบๆ 17/18 ครั้ง · lock ว่าชื่อผีตัวนั้นห้ามกลับมา และห้ามใช้
+// สาย 2.5 เป็นพื้น (ใกล้ปิดตัว)
+check('worker: ชื่อรุ่นผี gemini-3.5-pro ไม่กลับมาเป็น entry ใน chain อีก',
+  !/model:\s*'gemini-3\.5-pro'/.test(worker));
+check('worker: chain เรียงแรงสุดก่อน และพื้นไม่ใช่สาย 2.5',
   (() => {
     const chain = worker.slice(worker.indexOf('BRAIN_MODEL_CHAIN'), worker.indexOf('async function callBrainModel'));
-    return chain.includes("'gemini-3.5-pro'") && chain.includes("'claude-sonnet-5'") &&
-      chain.includes("'claude-sonnet-4-6'") && chain.includes("'gemini-2.5-flash'") &&
-      chain.indexOf("'gemini-3.5-pro'") < chain.indexOf("'claude-sonnet-4-6'");
+    return chain.includes("'gemini-3.1-pro'") && chain.includes("'claude-sonnet-5'") &&
+      chain.includes("'claude-sonnet-4-6'") && !chain.includes("'gemini-2.5-flash'") &&
+      chain.indexOf("'gemini-3.1-pro'") < chain.indexOf("'claude-sonnet-4-6'");
   })());
+check('worker: บันทึกร่องรอยการตกชั้นลง DB ไม่ใช่แค่ console',
+  /const trail = \[\];/.test(worker) && /trail\.push\(`\$\{model\}:\$\{res\.status\}`\)/.test(worker) &&
+  /ai_model_trail: aiTrail/.test(worker));
+check('worker: มี /models ไว้ถามว่า key เรียกรุ่นไหนได้จริง (เลิกเดาชื่อรุ่น)',
+  /async function handleListModels\(env\)/.test(worker) &&
+  /pathname === '\/models'/.test(worker));
 check('worker: 4xx model-missing breaks to next model, 429/5xx retries same model',
   /if \(res\.status === 429 \|\| res\.status >= 500\) continue;\s*\n\s*break;/.test(worker));
 check('worker: runBrain replaces summarize+analyze inside /process',
