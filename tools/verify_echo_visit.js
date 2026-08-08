@@ -467,9 +467,9 @@ check('worker: ชื่อรุ่นผี gemini-3.5-pro ไม่กลั�
 check('worker: chain เรียงแรงสุดก่อน และพื้นไม่ใช่สาย 2.5',
   (() => {
     const chain = worker.slice(worker.indexOf('BRAIN_MODEL_CHAIN'), worker.indexOf('async function callBrainModel'));
-    return chain.includes("'gemini-3.1-pro'") && chain.includes("'claude-sonnet-5'") &&
+    return chain.includes("'gemini-3.1-pro-preview'") && chain.includes("'claude-sonnet-5'") &&
       chain.includes("'claude-sonnet-4-6'") && !chain.includes("'gemini-2.5-flash'") &&
-      chain.indexOf("'gemini-3.1-pro'") < chain.indexOf("'claude-sonnet-4-6'");
+      chain.indexOf("'gemini-3.1-pro-preview'") < chain.indexOf("'claude-sonnet-4-6'");
   })());
 // v_aifix: trail ยังอยู่ แต่ข้อความมาจาก _callOneModel (r.errMsg) แล้ว
 // ไม่ใช่ประกอบเองจาก res.status ในนี้

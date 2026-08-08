@@ -38,7 +38,7 @@ const TEXT_MODEL_CHAIN = {
   },
   gemini: {
     haiku:  ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'],
-    sonnet: ['gemini-3.1-pro', 'gemini-3.6-flash', 'gemini-3.5-flash']
+    sonnet: ['gemini-3.1-pro-preview', 'gemini-3.6-flash', 'gemini-3.5-flash']
   }
 };
 
@@ -893,7 +893,7 @@ async function handleAnalyzeAudio(request, env) {
 // เปิด GET /models เพื่อดูว่า key นี้เรียกอะไรได้จริงก่อนแก้ทุกครั้ง
 // และดู ci_sessions.ai_model_trail ว่าแต่ละครั้งตกชั้นเพราะอะไร
 const BRAIN_MODEL_CHAIN = [
-  { provider: 'gemini',    model: 'gemini-3.1-pro' },      // reasoning แรงสุดที่ GA
+  { provider: 'gemini',    model: 'gemini-3.1-pro-preview' },      // reasoning แรงสุดที่ GA
   { provider: 'gemini',    model: 'gemini-3.6-flash' },    // GA ล่าสุด เร็วและเก่ง
   { provider: 'anthropic', model: 'claude-sonnet-5' },
   { provider: 'anthropic', model: 'claude-sonnet-4-6' },   // known-good today (= legacy /analyze)
@@ -913,7 +913,10 @@ async function _callOneModel(provider, model, env, payload) {
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }]
       }));
-      const gcfg = { maxOutputTokens: maxTokens || 2000, temperature: 0.2 };
+      // Gemini 3.x คิดในใจก่อนตอบ และ "ความคิด" กินโควตา maxOutputTokens ด้วย
+      // ผู้เรียกที่ขอน้อยๆ (SKU matcher ขอ ~20) จะได้คำตอบว่าง finishReason=MAX_TOKENS
+      // (เจอจริงตอนยิงทดสอบ 2026-08-08) → ตั้งพื้น 2048 เฉพาะฝั่ง gemini
+      const gcfg = { maxOutputTokens: Math.max(maxTokens || 2000, 2048), temperature: 0.2 };
       if (jsonMode) gcfg.responseMimeType = 'application/json';
       res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
