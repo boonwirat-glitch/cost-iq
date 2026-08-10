@@ -112,6 +112,46 @@ params AS (
     v_lookback_start AS lookback_start
 ),
 
+-- ── v_anchor (2026-08-08) · ตรึงชื่อกลุ่มไว้ที่ "หมวด ณ ต้นไตรมาส" ───────────
+-- ต้นทาง item_family ถูกจัดหมวดใหม่กลางไตรมาส (วัดได้ 2,030 สินค้า GMV ฿274M ใน
+-- ช่วง เม.ย.-ก.ค. และครึ่งหนึ่งย้ายแล้วย้ายกลับ = taxonomy ยังแกว่ง) · เดิมใช้
+-- item_family ดิบเป็น group_key -> สินค้าตัวเดียวถูกนับคนละคีย์ในคนละเดือน ->
+-- กลุ่มใหม่ "เกิดกลางไตรมาส" มีฐานแค่เศษเดียว -> ผ่านเกณฑ์ P3 ง่ายเกินจริง
+--   เคสพิสูจน์ Status Airport 223070 'หนัง /ไขมันไก่': ระบบเห็นฐาน มิ.ย. 8,320
+--   (2.47x ผ่าน จ่าย 182.85) แต่ยอดจริงทั้งเดือน 14,080 (1.46x ไม่ผ่าน)
+--
+-- กติกา: ยึดหมวดของสินค้าตัวนั้น (ตาม item_id) ณ เดือนแรกสุดของหน้าต่างข้อมูล
+-- แล้วใช้ชื่อนั้นย้อนจัดทุกเดือน · หน้าต่างเริ่มที่ lookback_start ซึ่งผูกกับไตรมาส
+-- อยู่แล้ว -> anchor คงที่ทั้งไตรมาส (Q3 = หมวด ณ เม.ย.) และเลื่อนเองเมื่อขึ้น Q4
+-- เลือก "หมวดแรก" ไม่ใช่ "หมวดล่าสุด" ตามที่บุชเคาะ: เดือนฐานคือสิ่งที่ใช้ตั้งเป้า
+-- ให้ rep ต้นไตรมาส ต้นทางมาเปลี่ยนหมวดกลางคันไม่ควรทำให้เป้าขยับ
+item_anchor_src AS (
+  SELECT
+    i.item_id                          AS item_id,
+    DATE_TRUNC(o.delivery_date, MONTH) AS mo,
+    CASE
+      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+           AND TRIM(COALESCE(i.item_family,'')) != ''
+      THEN i.item_family ELSE i.subclass_name
+    END                                AS group_key,
+    SUM(i.gmv_ex_vat)                  AS gmv
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN UNNEST(o.item) AS i
+  CROSS JOIN params p
+  WHERE o.delivery_date >= p.lookback_start
+    AND o.delivery_date <= p.m3_end
+    AND i.gmv_ex_vat > 0
+    AND i.item_id IS NOT NULL
+  GROUP BY 1,2,3
+),
+-- ตัดสินเสมอด้วย GMV: เดือนแรกอาจมีสองหมวดพร้อมกันตอนกำลังทยอยเปลี่ยน
+-- (เคสหนังไก่ มิ.ย. มีทั้งสองชื่อ) -> เอาหมวดที่ขายมากกว่า ผลจะนิ่ง รันซ้ำได้ค่าเดิม
+item_anchor AS (
+  SELECT item_id, group_key AS grp_anchor
+  FROM item_anchor_src
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY item_id ORDER BY mo ASC, gmv DESC) = 1
+),
+
 -- ── 2. Roster — 14 KAM + 4 PM/AD (added 2026-07-19). Same expected_owner
 --       mechanism and rationale as Quarterly_KAM_portfolio_reconcile.sql's
 --       kam_list — kept in sync deliberately. Ice (AD) is the only one of
@@ -333,15 +373,17 @@ current_gmv_by_group AS (
 group_category AS (
   SELECT group_key, category FROM (
     SELECT
-      CASE
-        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-             AND TRIM(COALESCE(i.item_family,'')) != ''
-        THEN i.item_family ELSE i.subclass_name
-      END AS group_key,
+      COALESCE(ia.grp_anchor,
+        CASE
+          WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+               AND TRIM(COALESCE(i.item_family,'')) != ''
+          THEN i.item_family ELSE i.subclass_name
+        END) AS group_key,
       i.category_high_level AS category,
       SUM(i.gmv_ex_vat) AS _gmv
     FROM `freshket-rn.dwh.order` o
     CROSS JOIN UNNEST(o.item) AS i
+    LEFT JOIN item_anchor ia ON ia.item_id = i.item_id
     CROSS JOIN params p
     WHERE o.delivery_date BETWEEN p.m1_start AND p.m3_end
       AND i.gmv_ex_vat > 0

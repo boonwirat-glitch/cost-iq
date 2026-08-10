@@ -98,6 +98,44 @@ SET v_m3_end     = DATE_SUB(DATE_ADD(v_m3_start, INTERVAL 1 MONTH), INTERVAL 1 D
 SET v_current_mo_start = DATE_TRUNC(DATE_SUB(CURRENT_DATE('Asia/Bangkok'), INTERVAL 1 DAY), MONTH);
 
 WITH
+-- ── v_anchor (2026-08-08) · ตรึงชื่อกลุ่มไว้ที่ "หมวด ณ ต้นไตรมาส" ───────────
+-- ต้นทาง item_family ถูกจัดหมวดใหม่กลางไตรมาส (วัดได้ 2,030 สินค้า GMV ฿274M ใน
+-- ช่วง เม.ย.-ก.ค. และครึ่งหนึ่งย้ายแล้วย้ายกลับ = taxonomy ยังแกว่ง) · เดิมใช้
+-- item_family ดิบเป็น group_key -> สินค้าตัวเดียวถูกนับคนละคีย์ในคนละเดือน ->
+-- กลุ่มใหม่ "เกิดกลางไตรมาส" มีฐานแค่เศษเดียว -> ผ่านเกณฑ์ P3 ง่ายเกินจริง
+--   เคสพิสูจน์ Status Airport 223070 'หนัง /ไขมันไก่': ระบบเห็นฐาน มิ.ย. 8,320
+--   (2.47x ผ่าน จ่าย 182.85) แต่ยอดจริงทั้งเดือน 14,080 (1.46x ไม่ผ่าน)
+--
+-- กติกา: ยึดหมวดของสินค้าตัวนั้น (ตาม item_id) ณ เดือนแรกสุดของหน้าต่างข้อมูล
+-- แล้วใช้ชื่อนั้นย้อนจัดทุกเดือน · หน้าต่างเริ่มที่ lookback_start ซึ่งผูกกับไตรมาส
+-- อยู่แล้ว -> anchor คงที่ทั้งไตรมาส (Q3 = หมวด ณ เม.ย.) และเลื่อนเองเมื่อขึ้น Q4
+-- เลือก "หมวดแรก" ไม่ใช่ "หมวดล่าสุด" ตามที่บุชเคาะ: เดือนฐานคือสิ่งที่ใช้ตั้งเป้า
+-- ให้ rep ต้นไตรมาส ต้นทางมาเปลี่ยนหมวดกลางคันไม่ควรทำให้เป้าขยับ
+item_anchor_src AS (
+  SELECT
+    i.item_id                          AS item_id,
+    DATE_TRUNC(o.delivery_date, MONTH) AS mo,
+    CASE
+      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+           AND TRIM(COALESCE(i.item_family,'')) != ''
+      THEN i.item_family ELSE i.subclass_name
+    END                                AS group_key,
+    SUM(i.gmv_ex_vat)                  AS gmv
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN UNNEST(o.item) AS i
+  WHERE o.delivery_date >= v_lookback_start
+    AND o.delivery_date <  DATE_ADD(v_current_mo_start, INTERVAL 1 MONTH)
+    AND i.gmv_ex_vat > 0
+    AND i.item_id IS NOT NULL
+  GROUP BY 1,2,3
+),
+-- ตัดสินเสมอด้วย GMV: เดือนแรกอาจมีสองหมวดพร้อมกันตอนกำลังทยอยเปลี่ยน
+-- (เคสหนังไก่ มิ.ย. มีทั้งสองชื่อ) -> เอาหมวดที่ขายมากกว่า ผลจะนิ่ง รันซ้ำได้ค่าเดิม
+item_anchor AS (
+  SELECT item_id, group_key AS grp_anchor
+  FROM item_anchor_src
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY item_id ORDER BY mo ASC, gmv DESC) = 1
+),
 -- The 3 months of this quarter, tagged 1/2/3, bounded to only those that
 -- have actually elapsed by v_current_mo_start (running in July only
 -- evaluates July; running in September evaluates all 3).
@@ -233,14 +271,16 @@ group_key_def AS (
   SELECT
     em.month_no, ka.kam_email, ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
-    CASE
-      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-           AND TRIM(COALESCE(i.item_family,'')) != ''
-      THEN i.item_family ELSE i.subclass_name
-    END AS group_key,
+    COALESCE(ia.grp_anchor,
+      CASE
+        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+             AND TRIM(COALESCE(i.item_family,'')) != ''
+        THEN i.item_family ELSE i.subclass_name
+      END) AS group_key,
     i.gmv_ex_vat
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
+  LEFT JOIN item_anchor ia ON ia.item_id = i.item_id
   JOIN elapsed_months em ON o.delivery_date >= em.month_start AND o.delivery_date <= em.month_end
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE i.gmv_ex_vat > 0
@@ -268,13 +308,15 @@ baseline_groups AS (
   SELECT DISTINCT
     ka.kam_email, ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
-    CASE
-      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-           AND TRIM(COALESCE(i.item_family,'')) != ''
-      THEN i.item_family ELSE i.subclass_name
-    END AS group_key
+    COALESCE(ia.grp_anchor,
+      CASE
+        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+             AND TRIM(COALESCE(i.item_family,'')) != ''
+        THEN i.item_family ELSE i.subclass_name
+      END) AS group_key
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
+  LEFT JOIN item_anchor ia ON ia.item_id = i.item_id
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= v_lookback_start AND o.delivery_date <= v_base_end
     AND i.gmv_ex_vat > 0
@@ -284,15 +326,17 @@ lookback_monthly AS (
     ka.kam_email,
     ka.account_id,
     CAST(o.user_id AS STRING) AS outlet_id,
-    CASE
-      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-           AND TRIM(COALESCE(i.item_family,'')) != ''
-      THEN i.item_family ELSE i.subclass_name
-    END AS group_key,
+    COALESCE(ia.grp_anchor,
+      CASE
+        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+             AND TRIM(COALESCE(i.item_family,'')) != ''
+        THEN i.item_family ELSE i.subclass_name
+      END) AS group_key,
     DATE_TRUNC(o.delivery_date, MONTH) AS month_start,
     SUM(i.gmv_ex_vat) AS monthly_gmv
   FROM `freshket-rn.dwh.order` o
   CROSS JOIN UNNEST(o.item) AS i
+  LEFT JOIN item_anchor ia ON ia.item_id = i.item_id
   JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
   WHERE o.delivery_date >= v_lookback_start AND o.delivery_date <= v_base_end
     AND i.gmv_ex_vat > 0
@@ -300,11 +344,12 @@ lookback_monthly AS (
     ka.kam_email,
     ka.account_id,
     CAST(o.user_id AS STRING),
-    CASE
-      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
-           AND TRIM(COALESCE(i.item_family,'')) != ''
-      THEN i.item_family ELSE i.subclass_name
-    END,
+    COALESCE(ia.grp_anchor,
+      CASE
+        WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+             AND TRIM(COALESCE(i.item_family,'')) != ''
+        THEN i.item_family ELSE i.subclass_name
+      END),
     DATE_TRUNC(o.delivery_date, MONTH)
 ),
 max_baseline AS (
