@@ -232,3 +232,68 @@ ORDER BY ABS(
  - IF(j.jul_stable > 2 * j.base_stable
       AND j.jul_stable - j.base_stable >= 8000, j.jul_stable - j.base_stable, 0))
 ) DESC;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 6B · แก้ข้อบกพร่องของส่วนที่ 6 + วัดขนาดจริง
+--
+-- ⚠ ส่วนที่ 6 มีข้อผิดพลาด: STRING_AGG(DISTINCT ...) เรียงลำดับเองไม่ได้
+--   คอลัมน์ group_keys จึง **ไม่ใช่ลำดับเวลา** อ่านลูกศรเป็น "ก่อน → หลัง" ไม่ได้
+--   และผลติด LIMIT 200 จึงไม่รู้ขนาดจริง
+--
+-- ตัวนี้แก้ทั้งสองเรื่อง: บอกกลุ่มของเดือนแรกกับเดือนสุดท้ายจริงๆ และไม่ตัด LIMIT
+--
+-- ชื่อคอลัมน์:
+--   grp_first / grp_last = กลุ่มในเดือนแรก / เดือนสุดท้ายที่พบสินค้าตัวนั้น
+--   direction            = ย้ายจากอะไรไปอะไร (อ่านได้ตรงๆ)
+-- ══════════════════════════════════════════════════════════════════════════
+WITH item_month AS (
+  SELECT
+    i.item_id                          AS item_id,
+    ANY_VALUE(i.item_name_th)          AS item_name,
+    DATE_TRUNC(o.delivery_date, MONTH) AS mo,
+    CASE
+      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+           AND TRIM(COALESCE(i.item_family,'')) != ''
+      THEN i.item_family ELSE i.subclass_name
+    END                                AS group_key,
+    SUM(i.gmv_ex_vat)                  AS gmv
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN UNNEST(o.item) AS i
+  WHERE o.delivery_date >= DATE '2026-04-01'
+    AND o.delivery_date <  DATE '2026-08-01'
+    AND i.gmv_ex_vat > 0
+    AND i.item_id IS NOT NULL
+  GROUP BY 1,3,4
+),
+moved AS (
+  SELECT
+    item_id,
+    ANY_VALUE(item_name)                                            AS item_name,
+    COUNT(DISTINCT group_key)                                       AS n_group_keys,
+    ARRAY_AGG(group_key ORDER BY mo ASC  LIMIT 1)[OFFSET(0)]        AS grp_first,
+    ARRAY_AGG(group_key ORDER BY mo DESC LIMIT 1)[OFFSET(0)]        AS grp_last,
+    SUM(gmv)                                                        AS gmv_total
+  FROM item_month
+  GROUP BY item_id
+  HAVING COUNT(DISTINCT group_key) > 1
+)
+-- สรุปภาพรวมก่อน (แถวเดียว) — เอาไว้ตอบว่า "ใหญ่แค่ไหน"
+SELECT
+  'สรุปภาพรวม'                       AS row_type,
+  CAST(COUNT(*) AS STRING)           AS item_id,
+  CAST(NULL AS STRING)               AS item_name,
+  CAST(NULL AS STRING)               AS grp_first,
+  CAST(NULL AS STRING)               AS grp_last,
+  ROUND(SUM(gmv_total), 2)           AS gmv_total
+FROM moved
+UNION ALL
+SELECT
+  'รายตัว'                            AS row_type,
+  CAST(item_id AS STRING)            AS item_id,
+  item_name,
+  grp_first,
+  grp_last,
+  ROUND(gmv_total, 2)                AS gmv_total
+FROM moved
+ORDER BY row_type, gmv_total DESC;
