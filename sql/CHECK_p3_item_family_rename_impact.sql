@@ -297,3 +297,151 @@ SELECT
   ROUND(gmv_total, 2)                AS gmv_total
 FROM moved
 ORDER BY row_type, gmv_total DESC;
+
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- ส่วนที่ 7B · เหมือนส่วนที่ 7 แต่ยึด "กลุ่มแรก" แทน "กลุ่มล่าสุด" (บุชเลือกเอง)
+--
+-- เหตุผลที่บุชเลือก group_first: เดือนฐานคือสิ่งที่ใช้ตั้งเป้าให้ rep ตอนต้นไตรมาส
+-- ถ้าต้นทางมาเปลี่ยนหมวดกลางคัน ไม่ควรทำให้เป้าขยับ → ยึดหมวด ณ ตอนตั้งเป้าไว้
+-- (ทั้งสองแบบแก้บั๊กได้เท่ากัน เพราะแก่นของบั๊กคือ "สินค้าตัวเดียวถูกนับคนละคีย์
+--  ในคนละเดือน" ไม่ใช่ว่าหมวดไหนถูก — ขอแค่ใช้คีย์เดียวกันทุกเดือนก็พอ)
+--
+-- นิยาม anchor: หมวดของสินค้าตัวนั้นในเดือนแรกสุดที่พบในหน้าต่างข้อมูล
+--   ถ้าเดือนแรกมีหลายหมวดพร้อมกัน (เกิดขึ้นได้ตอนกำลังทยอยเปลี่ยน) → เลือกหมวด
+--   ที่มี GMV สูงกว่าในเดือนนั้น เพื่อให้ผลลัพธ์นิ่ง รันกี่ครั้งก็ได้ค่าเดิม
+--
+-- ⚠ ข้อควรรู้: anchor ผูกกับ "เดือนแรกของหน้าต่าง" ซึ่งเลื่อนตามไตรมาส
+--   Q3 หน้าต่างเริ่ม เม.ย. → anchor = หมวด ณ เม.ย. · Q4 จะกลายเป็น ก.ค.
+--   นี่คือพฤติกรรมที่ตั้งใจ: "หมวด ณ ตอนตั้งฐานของไตรมาสนั้น"
+-- ══════════════════════════════════════════════════════════════════════════
+WITH
+kam_outlets AS (
+  SELECT
+    CAST(um.res_id AS STRING)         AS res_id,
+    CAST(um.account_guid AS STRING)   AS account_id,
+    LOWER(TRIM(um.staff_owner_email)) AS kam_email
+  FROM `freshket-rn.dim.user_master` um
+  WHERE um.commercial_owner = 'KAM'
+    AND um.account_type IN ('SA','MC','Chain','Unknown')
+    AND um.res_id IS NOT NULL AND um.account_guid IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY CAST(um.res_id AS STRING)
+                             ORDER BY um.lasted_order_date DESC NULLS LAST) = 1
+),
+own_base AS (
+  SELECT CAST(o.user_id AS STRING) AS outlet_id, TRIM(o.staff_owner) AS staff_owner,
+         UPPER(TRIM(o.commercial_owner)) AS commercial_owner, DATE(o.new_user_exp_date) AS exp_date
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date >= DATE '2026-06-01' AND o.delivery_date < DATE '2026-07-01'
+    AND o.account_type IN ('SA','MC','Chain','Unknown') AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+own_cur AS (
+  SELECT CAST(o.user_id AS STRING) AS outlet_id, TRIM(o.staff_owner) AS staff_owner,
+         UPPER(TRIM(o.commercial_owner)) AS commercial_owner
+  FROM `freshket-rn.dwh.order` o
+  WHERE o.delivery_date >= DATE '2026-07-01' AND o.delivery_date < DATE '2026-08-01'
+    AND o.account_type IN ('SA','MC','Chain','Unknown') AND o.user_id IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY o.delivery_date DESC) = 1
+),
+nrr_core AS (
+  SELECT ob.outlet_id
+  FROM own_base ob
+  JOIN own_cur oc ON oc.outlet_id = ob.outlet_id
+  WHERE ob.commercial_owner = 'KAM' AND oc.commercial_owner = 'KAM'
+    AND TRIM(ob.staff_owner) = TRIM(oc.staff_owner)
+    AND (ob.exp_date IS NULL OR ob.exp_date < DATE '2026-06-01')
+),
+raw AS (
+  SELECT
+    ka.kam_email, ka.account_id,
+    CAST(o.user_id AS STRING)          AS outlet_id,
+    DATE_TRUNC(o.delivery_date, MONTH) AS mo,
+    i.item_id                          AS item_id,
+    CASE
+      WHEN i.category_high_level IN ('Meat','Vegetable','Fruit')
+           AND TRIM(COALESCE(i.item_family,'')) != ''
+      THEN i.item_family ELSE i.subclass_name
+    END                                AS group_as_is,
+    i.gmv_ex_vat                       AS gmv
+  FROM `freshket-rn.dwh.order` o
+  CROSS JOIN UNNEST(o.item) AS i
+  JOIN kam_outlets ka ON CAST(o.user_id AS STRING) = ka.res_id
+  WHERE o.delivery_date >= DATE '2026-04-01'
+    AND o.delivery_date <  DATE '2026-08-01'
+    AND i.gmv_ex_vat > 0
+    AND i.item_id IS NOT NULL
+),
+-- anchor = หมวดของเดือนแรกสุด · เดือนแรกมีหลายหมวด → เอาหมวดที่ GMV สูงกว่า
+item_anchor AS (
+  SELECT item_id, group_as_is AS grp_anchor
+  FROM (
+    SELECT item_id, mo, group_as_is, SUM(gmv) AS gmv
+    FROM raw GROUP BY 1,2,3
+  )
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY item_id ORDER BY mo ASC, gmv DESC) = 1
+),
+agg_as_is AS (
+  SELECT kam_email, account_id, outlet_id, grp,
+    MAX(IF(mo <  DATE '2026-07-01', gmv_mo, 0)) AS base_mo,
+    MAX(IF(mo =  DATE '2026-07-01', gmv_mo, 0)) AS jul_mo
+  FROM (
+    SELECT kam_email, account_id, outlet_id, group_as_is AS grp, mo, SUM(gmv) AS gmv_mo
+    FROM raw GROUP BY 1,2,3,4,5
+  )
+  GROUP BY 1,2,3,4
+),
+agg_anchor AS (
+  SELECT kam_email, account_id, outlet_id, grp,
+    MAX(IF(mo <  DATE '2026-07-01', gmv_mo, 0)) AS base_mo,
+    MAX(IF(mo =  DATE '2026-07-01', gmv_mo, 0)) AS jul_mo
+  FROM (
+    SELECT r.kam_email, r.account_id, r.outlet_id, ia.grp_anchor AS grp, r.mo, SUM(r.gmv) AS gmv_mo
+    FROM raw r JOIN item_anchor ia ON ia.item_id = r.item_id
+    GROUP BY 1,2,3,4,5
+  )
+  GROUP BY 1,2,3,4
+),
+joined AS (
+  SELECT
+    COALESCE(s.kam_email, a.kam_email)   AS kam_email,
+    COALESCE(s.account_id, a.account_id) AS account_id,
+    COALESCE(s.outlet_id, a.outlet_id)   AS outlet_id,
+    COALESCE(s.grp, a.grp)               AS grp,
+    COALESCE(a.base_mo, 0)               AS base_as_is,
+    COALESCE(a.jul_mo, 0)                AS jul_as_is,
+    COALESCE(s.base_mo, 0)               AS base_anchor,
+    COALESCE(s.jul_mo, 0)                AS jul_anchor
+  FROM agg_anchor s
+  FULL OUTER JOIN agg_as_is a
+    ON  s.kam_email = a.kam_email AND s.account_id = a.account_id
+    AND s.outlet_id = a.outlet_id AND s.grp        = a.grp
+)
+SELECT
+  j.kam_email, j.account_id, j.outlet_id, j.grp AS group_key,
+  ROUND(j.base_as_is, 2)                  AS base_as_is,
+  ROUND(j.jul_as_is,  2)                  AS jul_as_is,
+  IF(j.jul_as_is > 2 * j.base_as_is
+     AND j.jul_as_is - j.base_as_is >= 8000, 'PASS', 'FAIL')     AS verdict_as_is,
+  ROUND(j.base_anchor, 2)                 AS base_anchor,
+  ROUND(j.jul_anchor,  2)                 AS jul_anchor,
+  IF(j.jul_anchor > 2 * j.base_anchor
+     AND j.jul_anchor - j.base_anchor >= 8000, 'PASS', 'FAIL')   AS verdict_anchor,
+  ROUND(
+    (IF(j.jul_as_is  > 2 * j.base_as_is
+        AND j.jul_as_is  - j.base_as_is  >= 8000, j.jul_as_is  - j.base_as_is,  0)
+   - IF(j.jul_anchor > 2 * j.base_anchor
+        AND j.jul_anchor - j.base_anchor >= 8000, j.jul_anchor - j.base_anchor, 0)
+    ) * 0.015, 2)                         AS baht_impact
+FROM joined j
+JOIN nrr_core nc ON nc.outlet_id = j.outlet_id
+WHERE IF(j.jul_as_is  > 2 * j.base_as_is
+         AND j.jul_as_is  - j.base_as_is  >= 8000, 'PASS', 'FAIL')
+   != IF(j.jul_anchor > 2 * j.base_anchor
+         AND j.jul_anchor - j.base_anchor >= 8000, 'PASS', 'FAIL')
+ORDER BY ABS(
+  (IF(j.jul_as_is  > 2 * j.base_as_is
+      AND j.jul_as_is  - j.base_as_is  >= 8000, j.jul_as_is  - j.base_as_is,  0)
+ - IF(j.jul_anchor > 2 * j.base_anchor
+      AND j.jul_anchor - j.base_anchor >= 8000, j.jul_anchor - j.base_anchor, 0))
+) DESC;
