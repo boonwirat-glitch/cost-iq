@@ -2042,16 +2042,28 @@
       }catch(e){}
     }
 
-    // boot watchdog: 25s after load — logged in, trapped errors, critical data never ready
+    // boot watchdog: 20 วิหลัง load — ยังติดจอ loading อยู่ไหม
+    //
+    // v_bootnet (2026-08-11): ของเดิมเงื่อนไขคือ `_count>0 && currentUser &&
+    // !allCriticalReady()` ซึ่ง **ไม่มีวันเป็นจริงในเคสที่ต้องการมันที่สุด** —
+    // promise ที่ค้างไม่โยน error (_count คงเป็น 0) และ boot ที่ค้างก่อน auth
+    // ก็ไม่เคยตั้ง currentUser · ตอนนี้ดูจากสิ่งที่ผู้ใช้เห็นจริงแทน: splash
+    // หรือ lgi-checking ยังคาจออยู่ = ค้าง ไม่ว่าจะด้วยสาเหตุอะไร
     window.addEventListener('load',function(){
       setTimeout(function(){
         try{
-          if(_count>0 && typeof currentUser!=='undefined' && currentUser &&
+          var sp=document.getElementById('sense-splash');
+          var ov=document.getElementById('login-overlay');
+          var splashUp = !!(sp && getComputedStyle(sp).display!=='none');
+          var checkingUp = !!(ov && ov.classList.contains('lgi-checking') &&
+                              getComputedStyle(ov).display!=='none');
+          if(splashUp || checkingUp){ _showBanner('เปิดแอพไม่สำเร็จ'); return; }
+          if(typeof currentUser!=='undefined' && currentUser &&
              typeof allCriticalReady==='function' && !allCriticalReady()){
             _showBanner('โหลดข้อมูลไม่สำเร็จ');
           }
         }catch(e){}
-      },25000);
+      },20000);
     });
 
     function _showBanner(reason){
@@ -2428,11 +2440,48 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
     }catch(e){}
     return false;
   }
+  // v_bootnet (2026-08-11): ผ้าคลุมต้องปลดตัวเองได้ ไม่พึ่ง JS หลัก
+  //
+  // ทำไม: บุชเจอ PWA บน iPhone ค้างจอโลโก้ถาวรหลังพักจอหลายวัน ต้อง kill app ทุกครั้ง
+  // _checkSession() ข้างบนเช็คแค่ว่ามีคีย์ sb-*-auth-token ยาวเกิน 20 ตัวไหม —
+  // **โทเคนหมดอายุก็ผ่าน** แล้ว _applyBootCover() เขียน inline style ทับ CSS ไว้
+  // ทางที่จะปลดผ้าคลุมได้ทั้งหมดอยู่ใน JS หลักหลัง await auth ทั้งสิ้น ถ้าเส้นทางนั้น
+  // ไม่จบ (โทเคนหมดอายุ / เน็ตค้างตอนปลุกเครื่อง / CDN supabase โหลดไม่ขึ้นทำให้
+  // createClient โยน error แล้วบันเดิลตายทั้งก้อน) ก็ไม่มีอะไรมาปลดเลย
+  //
+  // 20 วิ: มากกว่าเพดานรวมของเส้นทางปกติ (getSession 8 + profiles 6) พอสมควร
+  // เพื่อไม่ให้ไปยื้อ boot ที่แค่ช้าจริงๆ · ปลดแล้วไม่ทำลายอะไร — ถ้า auth มาถึง
+  // ทีหลัง onAuthStateChange จะเรียก hideLoginOverlay() เข้าแอปตามปกติ
+  var _senseBootCoverWatchdog = null;
+  function _senseReleaseBootCover(){
+    try{
+      if(window.__senseBootTookOver) return;   // JS หลักรับช่วงต่อไปแล้ว
+      var login=document.getElementById('login-overlay');
+      var splash=document.getElementById('sense-splash');
+      if(login){ login.style.display=''; login.classList.remove('lgi-checking'); }
+      if(splash){ splash.style.display='none'; splash.style.opacity=''; }
+      if(!document.getElementById('sense-bootcover-hint')){
+        var h=document.createElement('div');
+        h.id='sense-bootcover-hint';
+        h.style.cssText='position:fixed;left:50%;transform:translateX(-50%);'+
+          'top:calc(env(safe-area-inset-top,0px) + 10px);z-index:99991;background:#0d1f3c;'+
+          'border:1px solid rgba(188,215,255,.25);border-radius:12px;padding:10px 14px;'+
+          'font-family:"Noto Sans Thai",sans-serif;font-size:12px;color:rgba(225,238,255,.92);'+
+          'box-shadow:0 6px 24px rgba(0,0,0,.45);cursor:pointer;max-width:92vw;line-height:1.4';
+        h.textContent='เชื่อมต่อไม่สำเร็จ · แตะเพื่อลองใหม่';
+        h.addEventListener('click',function(){ try{location.reload();}catch(e){} });
+        (document.body||document.documentElement).appendChild(h);
+      }
+      console.warn('[boot-cover] ปลดผ้าคลุมด้วย watchdog — JS หลักไม่ได้รับช่วงต่อภายในเวลา');
+    }catch(e){}
+  }
   function _applyBootCover(){
     var login=document.getElementById('login-overlay');
     if(login){ login.style.display='none'; }
     var splash=document.getElementById('sense-splash');
     if(splash){ splash.style.display='flex'; splash.style.opacity='1'; }
+    clearTimeout(_senseBootCoverWatchdog);
+    _senseBootCoverWatchdog=setTimeout(_senseReleaseBootCover, 20000);
   }
   try{
     if(_checkSession()){

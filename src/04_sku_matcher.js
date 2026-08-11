@@ -146,14 +146,33 @@ function setAiProvider(p){
     status.panel.open = false;
   }
 
+  // v_bootnet (2026-08-11): IDB open ต้องไม่ค้างเงียบ
+  //
+  // ของเดิมไม่มี onblocked และไม่มีเพดานเวลา — คำขอที่ถูก block (มีคอนเนกชัน
+  // เวอร์ชันเก่าค้างอยู่ หรือ Safari เพี้ยนหลังปลุกเครื่อง) จะ **ไม่ resolve และ
+  // ไม่ reject** = promise ตายคาที่ · ผู้เรียกคือ _preloadFromIndexedDB ซึ่ง
+  // .then() ของมันเป็นตัวเดียวที่สั่ง loadFromCloudflareR2() → ค้างตรงนี้แปลว่า
+  // ผ่าน auth มาแล้วแต่ไม่มีข้อมูลโผล่มาเลยสักไฟล์
+  //
+  // 3 วิพอ: IDB ปกติเปิดใน ~10ms · หมดเวลา = คืน null แล้วให้ผู้เรียก (ซึ่ง
+  // try/catch อยู่แล้ว) ตกไปทางเน็ตตามปกติ
+  const CSV_IDB_OPEN_TIMEOUT_MS = 3000;
   function csvOpen(){
     return new Promise((res, rej)=>{
+      let settled = false;
+      const done = fn => (...a) => { if(settled) return; settled = true; clearTimeout(timer); fn(...a); };
+      const timer = setTimeout(() => {
+        if(settled) return; settled = true;
+        console.warn('[idb] เปิด ' + CSV_DB + ' เกิน ' + CSV_IDB_OPEN_TIMEOUT_MS + 'ms — ข้ามแคชไปใช้เน็ตแทน');
+        rej(new Error('idb open timeout'));
+      }, CSV_IDB_OPEN_TIMEOUT_MS);
       try{
         const r = global.indexedDB.open(CSV_DB, 1);
         r.onupgradeneeded = e => e.target.result.createObjectStore('csv');
-        r.onsuccess = e => res(e.target.result);
-        r.onerror = () => rej(new Error('idb open failed'));
-      }catch(e){ rej(e); }
+        r.onsuccess = done(e => res(e.target.result));
+        r.onerror = done(() => rej(new Error('idb open failed')));
+        r.onblocked = done(() => rej(new Error('idb open blocked')));
+      }catch(e){ done(() => rej(e))(); }
     });
   }
 

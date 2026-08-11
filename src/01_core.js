@@ -13,6 +13,36 @@ window.triggerSkuVerifyFromThisMonth = window.triggerSkuVerifyFromThisMonth || f
 };
 const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 
+// v_bootnet (2026-08-11): เพดานเวลาสำหรับ promise ที่ "กั้นหน้าจอ" อยู่
+//
+// ทำไมต้องมี: บุชเจอ PWA บน iPhone ค้างหน้า loading ถาวรหลังพักจอหลายวัน
+// ต้นเหตุคือ supa.auth.getSession() — พอ access token หมดอายุ มันไม่ใช่การถอด
+// JWT ในเครื่องอีกต่อไป แต่ยิง refresh ผ่านเน็ตภายใต้ navigator.locks และ
+// createClient ข้างบนไม่ได้ตั้ง option อะไรเลย = ไม่มี timeout ไม่มี AbortSignal
+// ถ้าเน็ตเพิ่งกลับมาตอนปลุกเครื่องแล้วซ็อกเก็ตตาย promise นั้นจะไม่ settle
+// ตลอดอายุของหน้าเว็บ → โค้ดหลัง await ไม่มีวันรัน → ไม่มีใครปิดผ้าคลุม boot
+//
+// กติกา: ไม่มีคำตอบใน ms ที่กำหนด = ถือว่า "ไม่รู้" แล้วไปต่อ (คืน null)
+// ห้าม reject — เส้นทาง boot หลายจุดไม่มี .catch ถ้า reject จะกลายเป็น
+// unhandled rejection แล้วเงียบไปเหมือนเดิม
+const SENSE_AUTH_TIMEOUT_MS = 8000;
+function _withTimeout(p, ms, label){
+  var t = null;
+  var limit = ms || SENSE_AUTH_TIMEOUT_MS;
+  return Promise.race([
+    Promise.resolve(p).catch(function(e){
+      console.warn('[boot-guard] ' + (label || 'promise') + ' ล้มเหลว:', (e && e.message) || e);
+      return null;
+    }),
+    new Promise(function(resolve){
+      t = setTimeout(function(){
+        console.warn('[boot-guard] ' + (label || 'promise') + ' เกิน ' + limit + 'ms — ไปต่อโดยถือว่าไม่มีคำตอบ');
+        resolve(null);
+      }, limit);
+    })
+  ]).then(function(v){ clearTimeout(t); return v; });
+}
+
 let currentUser = null;
 let currentUserProfile = null;
 
@@ -222,6 +252,8 @@ function _showLoginOverlayClean(){
       if (el) el.innerHTML = '';
     });
   } catch(_) {}
+  // v_bootnet: บอก watchdog ของผ้าคลุม boot ว่า JS หลักรับช่วงต่อแล้ว
+  try { window.__senseBootTookOver = true; } catch(e) {}
   const ov = document.getElementById('login-overlay');
   passwordRecoveryMode = false;
   if (ov) {
@@ -270,6 +302,8 @@ function _clearPasswordRecoveryUrl(){
 }
 
 function showPasswordResetForm(){
+  // v_bootnet: JS หลักรับช่วงต่อแล้ว — watchdog ไม่ต้องแทรก
+  try { window.__senseBootTookOver = true; } catch(e) {}
   passwordRecoveryMode = true;
   loginTransitionRunning = false;
   const ov = document.getElementById('login-overlay');
@@ -470,7 +504,10 @@ supa.auth.onAuthStateChange((event, session) => {
             // Inject email into currentUserProfile so _patchR2FilesForSales() can read it.
             (function(){
               try{
-                supa.auth.getSession().then(function(result){
+                // v_bootnet: คอมเมนต์เดิมบอกว่า getSession() เป็นการถอด JWT ในเครื่อง
+                // "always instant" — จริงเฉพาะตอน access token ยังไม่หมดอายุ พอหมดแล้ว
+                // มันยิง refresh ผ่านเน็ต ค้างได้ · ถ้าค้าง _doR2Fetch() จะไม่เคยถูกเรียก
+                _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(sales-email)').then(function(result){
                   var _sess = result && result.data && result.data.session;
                   var _email = (_sess && _sess.user && _sess.user.email) || '';
                   if(_email && currentUserProfile && !currentUserProfile.email){
@@ -526,10 +563,25 @@ supa.auth.onAuthStateChange((event, session) => {
           loadUserProfile(); // background revalidate — no await, no gate
         });
       }else{
-        loadUserProfile().then(function(){hideLoginOverlay();});
+        // v_bootnet: ไม่มี Promise.race กั้นไว้เหมือน branch cache-hit ข้างบน
+        // ถ้าคิวรี profiles ค้าง hideLoginOverlay() จะไม่มีวันถูกเรียก
+        _withTimeout(loadUserProfile(), SENSE_AUTH_TIMEOUT_MS, 'loadUserProfile(auth-change)')
+          .then(function(){hideLoginOverlay();});
       }
     }
-  } else if (event === 'SIGNED_OUT' && currentUser) {
+  } else if (event === 'SIGNED_OUT') {
+    // v_bootnet: เดิมสาขานี้ผูกกับ `&& currentUser` — ซึ่งตอน cold boot เป็น null
+    // เสมอ · supabase ยิง SIGNED_OUT ตอน _recoverAndRefresh() โดน refresh token
+    // ปฏิเสธ (เคสนอนข้ามคืนพอดี) แล้วสาขานี้ถูกข้ามทั้งก้อน → ไม่มีใครเรียก
+    // _showLoginOverlayClean() → ผ้าคลุม boot ค้างถาวร
+    //
+    // ยังไม่มี currentUser = ไม่มี session ให้กู้ = เด้งหน้า login เลย ไม่ต้องรอ
+    // grace 1200ms (grace มีไว้กันจอกะพริบตอน "กำลังใช้งานอยู่แล้วโทเคนเด้ง")
+    if (!currentUser) {
+      _senseDataLog('AUTH','🔒 SIGNED_OUT ตอนยังไม่ได้ล็อกอิน — โชว์หน้า login ทันที');
+      _showLoginOverlayClean();
+      return;
+    }
     currentUser = null;
     currentUserProfile = null;
     // v223: SIGNED_OUT from JWT expiry — Supabase auto-refresh may be in flight.
@@ -545,7 +597,9 @@ supa.auth.onAuthStateChange((event, session) => {
       if (currentUser) return; // SIGNED_IN already fired — cancel
       // Step 2: active session check before showing login
       try {
-        const { data } = await supa.auth.getSession();
+        // v_bootnet: ครอบเพดานเวลา — ถ้าค้าง จะไม่มีใครโชว์หน้า login ให้เลย
+        const _sr = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(signed-out)');
+        const data = _sr && _sr.data;
         if (data && data.session && data.session.user) {
           // Session recovered — inject silently without showing login
           _senseDataLog('AUTH','✅ session recovered after SIGNED_OUT (JWT refresh race) — staying signed in');
@@ -581,7 +635,8 @@ async function doLogin() {
     window._doLoginHandled = true;
     currentUser = data.user;
     // Load profile first so role is known before R2 fetch starts
-    await loadUserProfile();
+    // v_bootnet: ครอบเพดานเวลา ไม่งั้นปุ่ม "เข้าสู่ระบบ" หมุนค้างไม่รู้จบ
+    await _withTimeout(loadUserProfile(), SENSE_AUTH_TIMEOUT_MS, 'loadUserProfile(login)');
     // v348: patch R2 filenames for Sales BEFORE starting fetch
     try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
     // v195 Step 1: start R2 fetch after profile + patch ready
@@ -604,6 +659,9 @@ function showLoginError(msg) {
 }
 
 function showSenseSplash(onDone){
+  // v_bootnet: ตั้งแต่จุดนี้ splash มีตัวจับเวลาของตัวเอง (MAX_SHOW/tSetup/tCheck)
+  // แล้ว — watchdog ของผ้าคลุมไม่ต้องแทรกอีก
+  try { window.__senseBootTookOver = true; } catch(e) {}
   const splash=document.getElementById('sense-splash');
   if(!splash){onDone();return;}
   // v217 FIX B: set active flag so refreshAll() calls during load are queued, not executed.
@@ -1058,6 +1116,8 @@ window._hideScreenSkeleton = function(screenId){
     // v682: render nav NOW with correct role — must fire before splash hides
     try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(_skipRole);}catch(e){}
     // Hide splash + login overlay immediately
+    // v_bootnet: เส้นทาง skip-splash ก็ปิด splash เองเหมือนกัน — ปักธงด้วย
+    try { window.__senseBootTookOver = true; } catch(e) {}
     var _splEl=document.getElementById('sense-splash');
     if(_splEl){_splEl.style.display='none';_splEl.style.opacity='0';}
     window._senseSplashActive=false;
@@ -1241,7 +1301,13 @@ function _profileCacheClear(userId){
 async function loadUserProfile() {
   if (!currentUser) return;
   try {
-    const { data, error } = await supa.from('profiles').select('*').eq('id', currentUser.id).single();
+    // v_bootnet: 6000 < SENSE_AUTH_TIMEOUT_MS โดยตั้งใจ — ให้เพดานชั้นในชนะก่อน
+    // จะได้ตกไป branch fallback ข้างล่างที่ปั้น profile ขั้นต่ำจาก session ให้
+    // (ถ้าปล่อยให้เพดานชั้นนอกชนะ currentUserProfile จะค้างเป็น null → role พัง)
+    const _pf = await _withTimeout(
+      supa.from('profiles').select('*').eq('id', currentUser.id).single(),
+      6000, 'profiles.select');
+    const data = _pf && _pf.data, error = _pf ? _pf.error : new Error('profiles fetch timed out');
     if (!error && data) {
       currentUserProfile = data;
       normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
@@ -1337,7 +1403,8 @@ async function checkSession() {
   // Password recovery links should show reset form, not bypass login into the app.
   if(_urlLooksLikePasswordRecovery()){
     try {
-      const { data: { session } } = await supa.auth.getSession();
+      const _pr = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(recovery)');
+      const session = _pr && _pr.data && _pr.data.session;
       if (session?.user) currentUser = session.user;
     } catch(e) {
       console.warn('[password recovery] session check failed:', e.message);
@@ -1349,7 +1416,12 @@ async function checkSession() {
   const ov = document.getElementById('login-overlay');
   if(ov) ov.classList.add('lgi-checking');
   try {
-    const { data: { session } } = await supa.auth.getSession();
+    // v_bootnet: await เดียวที่กั้นทั้งแอป — ต้องมีเพดานเวลาเสมอ
+    // โทเคนหมดอายุ (นอนข้ามคืน) ทำให้ getSession() ยิง refresh ผ่านเน็ตภายใต้
+    // navigator.locks · ถ้าค้าง โค้ดใต้บรรทัดนี้จะไม่มีวันรัน = ผ้าคลุม boot
+    // อยู่ค้างถาวร · หมดเวลา = คืน null = ตกไปเส้นทาง "ไม่มี session" ข้างล่าง
+    const _cs = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot)');
+    const session = _cs && _cs.data && _cs.data.session;
     // Fix v194 Guard B: set flag BEFORE await to block onAuthStateChange(INITIAL_SESSION)
     // from racing into hideLoginOverlay() while checkSession is still handling it.
     if (session && !currentUser) {
@@ -1367,7 +1439,7 @@ async function checkSession() {
         hideLoginOverlay();
         loadUserProfile(); // background revalidate
       }else{
-        await loadUserProfile();
+        await _withTimeout(loadUserProfile(), SENSE_AUTH_TIMEOUT_MS, 'loadUserProfile(boot)');
         // v348: patch R2 for Sales before fetch
         try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
         if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
@@ -1380,9 +1452,20 @@ async function checkSession() {
     window._sessionCheckHandling = false;
     // Network error (offline, etc.) — fall through to show login form
     console.warn('[checkSession] network error:', e.message);
+    // v_bootnet: ต้องเด้งหน้า login จริง ไม่ใช่แค่ถอด class — ดูเหตุผลข้างล่าง
+    _showLoginOverlayClean();
+    return;
   }
-  // No valid session or error — reveal login form
+  // No valid session, timed out, or error — reveal login form
+  //
+  // v_bootnet: ของเดิมทำแค่ ov.classList.remove('lgi-checking') ซึ่ง "ไม่พอ"
+  // เพราะผ้าคลุม boot ใน shell.html เขียน inline style login.style.display='none'
+  // ทับไว้ตั้งแต่ก่อน JS หลักจะรัน — การถอด class ไม่ได้แตะ display เลย
+  // ผลคือหน้า login ไม่โผล่ ส่วน #sense-splash ก็ยัง display:flex ที่ z-index
+  // 10000 → ผู้ใช้เห็นจอโลโก้นิ่งๆ ตลอดกาล (นี่คืออาการที่บุชเจอ)
+  // _showLoginOverlayClean() คืนทั้ง display ของ login และซ่อน splash ให้ครบ
   if(ov) ov.classList.remove('lgi-checking');
+  _showLoginOverlayClean();
 }
 
 // v206a: shared PWA resume session verifier.
@@ -1392,7 +1475,7 @@ async function _pwaSilentSessionCheck(reason, graceMs){
   if(window._pwaResumeCheckInFlight)return window._pwaResumeCheckInFlight;
   window._pwaResumeCheckInFlight=(async()=>{
     try{
-      const first=await supa.auth.getSession();
+      const first=await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(resume-1)');
       let session=first&&first.data&&first.data.session;
       if(session&&session.user){
         currentUser=session.user;
@@ -1401,7 +1484,7 @@ async function _pwaSilentSessionCheck(reason, graceMs){
         return true;
       }
       await new Promise(r=>setTimeout(r,graceMs||2500));
-      const second=await supa.auth.getSession();
+      const second=await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(resume-2)');
       session=second&&second.data&&second.data.session;
       if(session&&session.user){
         currentUser=session.user;
