@@ -403,8 +403,11 @@ check('worker: /process validates session_id as uuid before query interpolation'
 check('worker: stage claim is conditional on pipeline_stage + null-or-stale processing_since',
   /pipeline_stage=eq\.\$\{stage\}&or=\(processing_since\.is\.null,processing_since\.lt\./.test(worker) &&
   (worker.match(/if \(!claimed\.length\) return;/g) || []).length >= 2);
+// v_cpudiet (2026-08-12): error path ต้องทั้งปล่อย claim และบันทึกสาเหตุลง
+// pipeline_error — เดิมปล่อย claim เฉยๆ แบบเงียบ ทำให้ session ที่ล้มซ้ำทั้งวัน
+// ไม่มีร่องรอยให้ไล่เลย
 check('worker: claim released on stage error (sweep can retry)',
-  (worker.match(/\{ processing_since: null \}\)\.catch\(\(\) => \{\}\);/g) || []).length >= 2);
+  (worker.match(/processing_since:\s*null,\s*\n\s*pipeline_error:/g) || []).length >= 2);
 // v_echor3: กลับด้าน — ห้ามลบเสียงทิ้งตอนถอดเสร็จอีกแล้ว เพราะทำให้คลิปจริง 43
 // จาก 44 หายถาวร แล้วพิสูจน์ไม่ได้ว่าการแก้แต่ละครั้งดีขึ้นจริง (= เหตุที่วนไม่จบ)
 check('worker: ไม่ลบไฟล์เสียงทิ้งทันทีหลังถอดเสร็จแล้ว',

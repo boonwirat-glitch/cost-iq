@@ -130,14 +130,9 @@ async function sbStorageDelete(env, path) {
   });
   if (!r.ok) throw new Error(`sbStorageDelete ${r.status}`);
 }
-function _bytesToB64(bytes) {
-  let binary = '';
-  const chunk = 8192;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
+// v_cpudiet: _bytesToB64 ถูกถอดออก — มันคือฆาตกร exceededCpu บน Workers Free
+// (สร้าง binary string ของไฟล์ 9-24MB = CPU เกิน 10ms แน่นอน) · เสียงดิบส่งเป็น
+// body ของ fetch ตรงๆ ได้ทั้ง Groq (FormData) และ Gemini (Files API) โดยไม่ต้อง b64
 
 
 // ── /transcript (v3 hybrid, 2026-07-21) ──────────────────────────────────────
@@ -188,11 +183,46 @@ async function handleTranscript(request, env) {
 // run the exact same logic server-side. Returns the result OBJECT (not a
 // Response); throws on hard failure. audioB64 is optional — computed from
 // bytes when absent (the async path only has bytes from storage).
+// v_cpudiet (2026-08-12): อัปโหลดเสียงดิบเข้า Gemini Files API แทนการแปลง base64
+//
+// ทำไม: Workers Free plan ให้ CPU 10ms ต่อ invocation — _bytesToB64 ของไฟล์
+// 9-24MB กินเกินนั้นแน่นอน ผลคือ cron ทุก tick โดนฆ่าด้วย outcome=exceededCpu
+// (เห็นใน dashboard: error ทุก 2 นาทีตลอด 24 ชม. cpuTimeMs ชนเพดาน 10 พอดี)
+// → pipeline เสียงค้างที่ 'uploaded' ทั้งหมด · การส่ง bytes ดิบเป็น body ของ
+// fetch แทบไม่กิน CPU (runtime สตรีมให้เอง) จึงรอดใน 10ms ได้
+// หมายเหตุ: ควรอัป Workers Paid ($5/เดือน = CPU 30 วิ) อยู่ดี — บุชรับทราบแล้ว
+// ตัวนี้คือการลดความเสี่ยงเชิงโครงสร้าง ไม่ใช่ข้ออ้างให้อยู่ Free ตลอด
+async function _geminiUploadAudio(env, bytes, mime) {
+  const up = await fetch(
+    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${env.GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'X-Goog-Upload-Protocol': 'raw', 'Content-Type': mime || 'audio/webm' },
+      body: bytes
+    });
+  if (!up.ok) throw new Error(`Gemini file upload ${up.status}: ${await up.text().catch(() => '')}`);
+  const meta = await up.json();
+  const f = meta && meta.file;
+  if (!f || !f.uri) throw new Error('Gemini file upload: no uri in response');
+  // ไฟล์เสียงต้องผ่านสถานะ PROCESSING ก่อนใช้ได้ — โพลจนกว่า ACTIVE (I/O ล้วน แทบไม่กิน CPU)
+  let state = f.state, name = f.name;
+  for (let i = 0; i < 20 && state === 'PROCESSING'; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    const chk = await fetch(`https://generativelanguage.googleapis.com/v1beta/${name}?key=${env.GEMINI_API_KEY}`);
+    if (!chk.ok) break;
+    const d = await chk.json().catch(() => null);
+    state = d && d.state;
+  }
+  if (state !== 'ACTIVE') throw new Error(`Gemini file state=${state} (ไม่พร้อมใช้)`);
+  return f.uri;
+}
+
 async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64) {
   const account_name = accountName;
   const mime_type = mimeType;
   const duration_secs = durationSecs;
-  const audio_b64 = audioB64 || _bytesToB64(audioBytes);
+  // v_cpudiet: ห้ามแปลง b64 ที่นี่อีก — ดูคอมเมนต์ _geminiUploadAudio
+  // (audioB64 ยังรับไว้เพื่อเส้นทาง legacy /transcript ที่ client ส่ง b64 มาแล้ว)
 
   // ── Step 1: Groq Whisper — verbatim transcription with real timestamps ──
   const groqForm = new FormData();
@@ -276,6 +306,12 @@ ${segLines}
 
   let diarized = false, speakersDetected = [];
   try {
+    // v_cpudiet: เส้นทาง async (cron/process) ไม่มี b64 — อัปโหลดไฟล์ดิบแล้วอ้าง
+    // ด้วย file_data · เส้นทาง legacy (/transcript) client ส่ง b64 มาอยู่แล้ว
+    // ใช้ inline_data ต่อได้ฟรีๆ ไม่ต้องแปลงซ้ำ
+    const audioPart = audioB64
+      ? { inline_data: { mime_type: mime_type || 'audio/webm', data: audioB64 } }
+      : { file_data: { mime_type: mime_type || 'audio/webm', file_uri: await _geminiUploadAudio(env, audioBytes, mime_type) } };
     const gemRes = await withRetry(async () => {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_35}:generateContent?key=${env.GEMINI_API_KEY}`,
@@ -283,7 +319,7 @@ ${segLines}
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [
-              { inline_data: { mime_type: mime_type || 'audio/webm', data: audio_b64 } },
+              audioPart,
               { text: diarizePrompt }
             ]}],
             generationConfig: { temperature: 0.1, maxOutputTokens: 16384, responseMimeType: 'application/json' }
@@ -319,6 +355,8 @@ ${segLines}
     // Diarize failure is non-fatal — the verbatim transcript is the ground
     // truth; ship it with unknown speakers (client already handles
     // 'whisper_fallback').
+    // v_cpudiet: แต่ห้ามเงียบ — log ไว้ให้เห็นใน observability ว่าตกชั้นเพราะอะไร
+    console.error('[transcribe] diarize ล้มเหลว (non-fatal):', (e && e.message) || e);
   }
 
   const n = segments.length;
@@ -997,6 +1035,28 @@ async function handleGeneralAI(body, env) {
   const r = await callTextModel(provider, tier, env, { system, messages, maxTokens });
   if (!r.ok) {
     console.error(`[ai-proxy] ${provider}/${tier} ล้มทุกรุ่น — ${r.trail}`);
+    // v_xfall (2026-08-12): fallback ข้ามค่าย — บทเรียนจริง: เครดิต Anthropic หมด
+    // ทำให้ Brief/ทุกฟีเจอร์ฝั่ง claude ตายทั้งแอปเป็นวันๆ ทั้งที่ gemini ปกติดี
+    // บุชเคาะ: ตกค่ายไหนก็ให้ข้ามไปอีกค่าย และใช้ "ตัวแรงสุดที่มี access" เสมอ
+    // → ใช้ chain ระดับ sonnet ของค่ายสำรองไม่ว่า request เดิมขอ tier ไหน
+    // (fallback ยิงเฉพาะตอนค่ายหลักล่มทั้ง chain — ไม่ใช่ต้นทุนประจำ)
+    const alt = provider === 'claude' ? 'gemini' : 'claude';
+    const altKey = alt === 'gemini' ? env.GEMINI_API_KEY : env.ANTHROPIC_API_KEY;
+    if (altKey) {
+      const r2 = await callTextModel(alt, 'sonnet', env, { system, messages, maxTokens });
+      if (r2.ok) {
+        console.warn(`[ai-proxy] ${provider}/${tier} ล่ม → ตอบด้วย ${alt}/${r2.model} แทน`);
+        return json({
+          text: r2.text, model: r2.model,
+          fallback_from: `${provider}/${tier}`,
+          content: [{ type: 'text', text: r2.text }]
+        }, 200, env);
+      }
+      return json({
+        error: `AI ล่มทั้งสองค่าย — ${provider}/${tier}: ${r.trail || 'ไม่มีรุ่นใน chain'} · ${alt}/sonnet: ${r2.trail || 'ไม่มีรุ่นใน chain'}`,
+        provider, tier, trail: r.trail, alt_trail: r2.trail
+      }, 502, env);
+    }
     return json({
       error: `AI ปลายทางเรียกไม่สำเร็จ (${provider}/${tier}) — ${r.trail || 'ไม่มีรุ่นใน chain'}`,
       provider, tier, trail: r.trail
@@ -1231,7 +1291,7 @@ async function processSession(sessionId, origin, env) {
         // Nothing to analyze — record the outcome honestly instead of leaving
         // the row stuck (client history renders unknown stages as plain text).
         await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
-          { pipeline_stage: 'no_speech', processing_since: null });
+          { pipeline_stage: 'no_speech', processing_since: null, pipeline_error: null });
         // v_echor3: ไม่ลบเสียงทิ้งแล้ว — เคส no_speech ยิ่งต้องเก็บไว้ฟัง เพราะ
         // "ไม่มีเสียงพูด" อาจแปลว่าไมค์มีปัญหา ไม่ใช่ว่าไม่มีใครพูดจริงๆ
         return;
@@ -1243,7 +1303,8 @@ async function processSession(sessionId, origin, env) {
         transcript_confidence: (typeof t.avg_transcript_confidence === 'number') ? t.avg_transcript_confidence : null,
         speaker_confidence:    (typeof t.avg_speaker_confidence === 'number') ? t.avg_speaker_confidence : null,
         pipeline_stage:        'transcribed',
-        processing_since:      null
+        processing_since:      null,
+        pipeline_error:        null
       });
       // v_echor3 (2026-08-08): เดิมลบไฟล์เสียงทิ้งตรงนี้ทันที — ผลคือคลิปจริง 43
       // จาก 44 หายถาวร พอมีคนบอกว่า "ฟังไม่รู้เรื่อง" เราจึงกลับไปฟังต้นฉบับไม่ได้
@@ -1264,7 +1325,13 @@ async function processSession(sessionId, origin, env) {
       }
     } catch (e) {
       // release the claim so the client sweep can retry this stage
-      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+      // v_cpudiet: บันทึกสาเหตุลง DB ด้วย — ก่อนหน้านี้กลืนเงียบ ทำให้ pipeline
+      // ที่ล้มซ้ำๆ ทั้งวันไม่มีร่องรอยให้ไล่เลย (ต้องเดาจาก processing_since)
+      console.error(`[process] stage uploaded ล้มเหลว ${sessionId}:`, (e && e.message) || e);
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+        processing_since: null,
+        pipeline_error: `${new Date().toISOString()} [transcribe] ${String((e && e.message) || e).slice(0, 400)}`
+      }).catch(() => {});
     }
     return;
   }
@@ -1338,7 +1405,8 @@ async function processSession(sessionId, origin, env) {
         tone_signals: summary?.tone || null, summary_data: summary || null,
         ai_model: aiModel || null,
         ai_model_trail: aiTrail || null,   // v_echor3: ตกชั้นเพราะอะไร ดูตรงนี้
-        processing_since: null
+        processing_since: null,
+        pipeline_error: null
       });
 
       // Side tables — same writes the client pipeline did in
@@ -1377,7 +1445,11 @@ async function processSession(sessionId, origin, env) {
         }, 'kam_email,account_id').catch(() => {});
       }
     } catch (e) {
-      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+      console.error(`[process] stage transcribed ล้มเหลว ${sessionId}:`, (e && e.message) || e);
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+        processing_since: null,
+        pipeline_error: `${new Date().toISOString()} [analyze] ${String((e && e.message) || e).slice(0, 400)}`
+      }).catch(() => {});
     }
     return;
   }
@@ -1395,11 +1467,15 @@ async function sweepPending(env) {
   const staleIso = new Date(Date.now() - PROCESS_CLAIM_STALE_MS).toISOString();
   let rows = [];
   try {
+    // v_cpudiet: เรียงด้วย processing_since (nullsfirst) ไม่ใช่ visited_at —
+    // ของเดิม limit=3 + เรียงตามเวลา visit ทำให้ 3 แถวเก่าสุดที่ล้มซ้ำๆ "จองคิว"
+    // ถาวร แถวใหม่ๆ ข้างหลังไม่มีวันถูก sweep เลย (starvation — เกิดจริง 11 ส.ค.)
+    // เรียงแบบนี้ = แถวที่ยังไม่เคยลอง มาก่อน แล้วค่อยแถวที่ลองนานสุด → ทุกแถวได้คิว
     rows = await sbSelect(env,
       `ci_sessions?select=id,pipeline_stage,status,processing_since` +
       `&and=(or(pipeline_stage.eq.uploaded,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
       `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}))` +
-      `&order=visited_at.asc&limit=3`);
+      `&order=processing_since.asc.nullsfirst&limit=3`);
   } catch (_) { return; }
   for (const r of rows) {
     // sequential on purpose — bounded per tick; the next tick picks up the rest

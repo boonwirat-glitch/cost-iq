@@ -124,6 +124,46 @@ if (!missing.length) {
       r.status === 200 && r.body.text === 'สวัสดี' && calls >= 2,
       `เรียก ${calls} ครั้ง · ${JSON.stringify(r)}`);
 
+    // ── 3d. v_xfall: ค่ายหลักล่มทั้ง chain → ต้องข้ามไปอีกค่าย ────────────
+    // บทเรียนจริง 2026-08-12: เครดิต Anthropic หมด → Brief/ทุกฟีเจอร์ claude
+    // ตายเป็นวันๆ ทั้งที่ gemini ปกติดี · fallback ต้องใช้ chain ระดับ sonnet
+    // ของค่ายสำรอง (= ตัวแรงสุด ตามที่บุชเคาะ)
+    {
+      const claudeDeadGeminiOk = async (url, opts) => {
+        if (String(url).includes('anthropic')) return dead(url, opts);
+        return {
+          ok: true, status: 200,
+          text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text: 'จากค่ายสำรอง' }] } }] })
+        };
+      };
+      r = await read(await run(claudeDeadGeminiOk)(body('claude'), ENV));
+      check('v_xfall: claude ล่มทั้ง chain → ตอบด้วย gemini แทน (HTTP 200)',
+        r.status === 200 && r.body.text === 'จากค่ายสำรอง' &&
+        typeof r.body.fallback_from === 'string' && /claude/.test(r.body.fallback_from),
+        JSON.stringify(r));
+      check('v_xfall: fallback ใช้ chain ระดับ sonnet ของค่ายสำรอง (ตัวแรงสุด)',
+        /callTextModel\(alt,\s*'sonnet'/.test(WK));
+    }
+
+    // ── 3e. v_cpudiet: ห้ามแปลง b64 ของไฟล์เสียงใน worker (CPU 10ms จะฆ่า) ──
+    {
+      const rtSrc = WK.slice(WK.indexOf('async function runTranscribe('),
+                             WK.indexOf('async function handleTranscriptGeminiFull'));
+      check('v_cpudiet: runTranscribe ไม่เรียก _bytesToB64 อีก (ต้นเหตุ exceededCpu)',
+        !/_bytesToB64\(/.test(rtSrc),
+        'Workers Free = CPU 10ms — b64 ของไฟล์ 9-24MB เกินแน่นอน');
+      check('v_cpudiet: diarize เส้นทาง async ใช้ Gemini Files API (file_data)',
+        /file_data/.test(rtSrc) && /_geminiUploadAudio/.test(WK));
+      check('v_cpudiet: sweep เรียง processing_since nullsfirst (กัน starvation)',
+        /order=processing_since\.asc\.nullsfirst/.test(WK),
+        'เรียง visited_at + limit 3 = แถวพังเก่าสุดจองคิวถาวร');
+      check('v_cpudiet: stage ล้มเหลวต้องบันทึก pipeline_error ลง DB',
+        (WK.match(/pipeline_error:\s*`\$\{new Date\(\)\.toISOString\(\)\}/g) || []).length >= 2,
+        'ต้องมีทั้ง stage transcribe และ stage analyze');
+      check('v_cpudiet: stage สำเร็จต้องล้าง pipeline_error',
+        (WK.match(/pipeline_error:\s*null/g) || []).length >= 3);
+    }
+
     // ── 4. ฝั่ง client ต้องไม่กลืนค่าว่าง ────────────────────────────────
     const callAiSrc = CI.slice(CI.indexOf('async function callAI(opts){'),
                                CI.indexOf('function setAiProvider('));
