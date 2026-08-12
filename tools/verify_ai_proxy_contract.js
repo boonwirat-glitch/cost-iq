@@ -154,12 +154,14 @@ if (!missing.length) {
         'Workers Free = CPU 10ms — b64 ของไฟล์ 9-24MB เกินแน่นอน');
       check('v_cpudiet: diarize เส้นทาง async ใช้ Gemini Files API (file_data)',
         /file_data/.test(rtSrc) && /_geminiUploadAudio/.test(WK));
-      check('v_cpudiet: sweep เรียง processing_since nullsfirst (กัน starvation)',
-        /order=processing_since\.asc\.nullsfirst/.test(WK),
-        'เรียง visited_at + limit 3 = แถวพังเก่าสุดจองคิวถาวร');
-      check('v_cpudiet: stage ล้มเหลวต้องบันทึก pipeline_error ลง DB',
-        (WK.match(/pipeline_error:\s*`\$\{new Date\(\)\.toISOString\(\)\}/g) || []).length >= 2,
-        'ต้องมีทั้ง stage transcribe และ stage analyze');
+      // v_queue: เปลี่ยนจากเรียงตาม claim → เรียงตามเวลานัด (next_attempt_at)
+      // เพราะ nullsfirst บน processing_since ทำให้แถวที่เพิ่งล้ม (ปล่อย claim = null)
+      // ลอยขึ้นหัวคิวทุกครั้ง → ผูกขาดคิวจากอีกด้านหนึ่ง เจอจริง 12 ส.ค.
+      check('v_queue: sweep เรียงตามเวลานัด ไม่ใช่ตาม claim',
+        /order=next_attempt_at\.asc\.nullsfirst/.test(WK));
+      check('v_queue: stage ล้มเหลวเข้า failStage จุดเดียว (เดิมเขียน pipeline_error ซ้ำ 2 ที่)',
+        (WK.match(/await failStage\(env, sessionId, '(transcribe|analyze)'/g) || []).length === 2 &&
+        /pipeline_error: note/.test(WK));
       check('v_cpudiet: stage สำเร็จต้องล้าง pipeline_error',
         (WK.match(/pipeline_error:\s*null/g) || []).length >= 3);
     }

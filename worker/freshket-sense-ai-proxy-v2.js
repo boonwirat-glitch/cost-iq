@@ -58,18 +58,67 @@ function json(data, status = 200, env = {}) {
 }
 
 // ── retry helper ─────────────────────────────────────────────────────────────
+// v_queue (2026-08-12): เดิม fn คืน `null` เพื่อบอกว่า "ลองใหม่ได้" — แต่ null
+// ไม่พกสาเหตุมาด้วย พอครบ 3 ครั้ง lastErr ยังเป็น undefined เลยโยนข้อความเปล่า
+// 'All attempts failed' ออกไป · ผลคือ **429 (คิวรวมเต็ม ต้องรอเป็นชั่วโมง) กับ
+// 503 (ปลายทางไม่ว่าง ลองใหม่ได้เลย) แยกกันไม่ออก** ทั้งที่ต้องปฏิบัติคนละแบบ
+// ตอนนี้ให้คืน RETRY(status) แทน แล้วสาเหตุจะไหลไปถึง classifyFailure ได้
+// (ยังรับ `null` แบบเดิมได้ เพื่อไม่ให้ call site ที่ยังไม่แก้พัง)
+function RETRY(status, body) { return { __retry: true, status: status || 0, body: body || '' }; }
+
 async function withRetry(fn, maxAttempts = 3, delays = [0, 2000, 5000]) {
-  let lastErr;
+  let lastErr = null, lastRetry = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (attempt > 1) await new Promise(r => setTimeout(r, delays[attempt - 1] || 5000));
     try {
       const result = await fn(attempt);
+      if (result && result.__retry) { lastRetry = result; continue; }
       if (result !== null) return result;
+      lastRetry = lastRetry || RETRY(0);
     } catch (e) {
       lastErr = e;
     }
   }
-  throw lastErr || new Error('All attempts failed');
+  if (lastErr) throw lastErr;
+  const s = lastRetry && lastRetry.status;
+  throw new Error('ปลายทางปฏิเสธทุกครั้ง (HTTP ' + (s || 'unknown') + ')' +
+    (lastRetry && lastRetry.body ? ': ' + String(lastRetry.body).slice(0, 200) : ''));
+}
+
+// ── การจำแนกความล้มเหลว (v_queue) ────────────────────────────────────────
+// บทเรียน 11-12 ส.ค.: pipeline ปฏิบัติกับความล้มเหลวทุกแบบเหมือนกันหมด คือ
+// "ปล่อย claim แล้วให้ tick ถัดไปลองใหม่" — ซึ่งถูกสำหรับเน็ตล่ม แต่หายนะ
+// สำหรับไฟล์ที่พังถาวร (วนตลอดกาล) และสำหรับ 429 (ยิ่งลองยิ่งตัน)
+const FAIL_PERMANENT = 'permanent';   // ไม่มีวันสำเร็จ — ปิดคิว บอกผู้ใช้
+const FAIL_THROTTLED = 'throttled';   // คิวรวมเต็ม ไม่ใช่ความผิดของงานนี้ — รอ
+const FAIL_TRANSIENT = 'transient';   // น่าจะหายเอง — ถอยหลังแล้วลองใหม่
+
+// โควตา Groq free เป็น "วินาทีเสียงต่อชั่วโมง" (7,200) — รอสั้นกว่าหน้าต่างนี้
+// เท่ากับเดินเข้าไปโดน 429 ซ้ำแน่นอน
+const THROTTLE_WAIT_MS = 60 * 60 * 1000;
+const MAX_ATTEMPTS = 4;
+function backoffMs(attempts) {
+  const mins = [10, 30, 120];
+  return mins[Math.min(Math.max(attempts, 1), mins.length) - 1] * 60 * 1000;
+}
+
+function classifyFailure(err) {
+  const msg = String((err && err.message) || err || '');
+  // ไฟล์ที่ปลายทางอ่านไม่ออก / ไม่มีไฟล์ให้อ่าน = ลองอีกกี่ครั้งก็เหมือนเดิม
+  if (/could not process file|invalid media|unsupported (file|format)|sbStorageGet 40[34]/i.test(msg)) {
+    return { kind: FAIL_PERMANENT, status: 400 };
+  }
+  if (/\b429\b/.test(msg) || /rate.?limit|too many requests|quota/i.test(msg)) {
+    return { kind: FAIL_THROTTLED, status: 429 };
+  }
+  const m = msg.match(/\b([45]\d\d)\b/);
+  const status = m ? Number(m[1]) : 0;
+  // 408/425 = จังหวะไม่ดี ไม่ใช่คำขอผิด · 4xx ที่เหลือ (401 key ผิด, 413 ใหญ่ไป)
+  // ลองใหม่ก็ได้ผลเดิม
+  if (status >= 400 && status < 500 && status !== 408 && status !== 425) {
+    return { kind: FAIL_PERMANENT, status };
+  }
+  return { kind: FAIL_TRANSIENT, status };
 }
 
 // ── Supabase helpers (A2v2.1 async pipeline — service key, server-side only) ──
@@ -246,6 +295,12 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
 
   let groqData;
   try {
+    // v_queue: ยิงครั้งเดียวต่อ 1 รอบคิว — **ห้ามเพิ่มกลับเป็น 3**
+    // โควตา Groq free คิดเป็น "วินาทีเสียง" ไม่ใช่จำนวนคำขอ · คลิป 19 นาที =
+    // 1,140 วินาที ยิง 3 ครั้ง = 3,420 วินาทีต่อ tick เทียบโควตา 7,200/ชม.
+    // ของเดิม (3 ครั้ง × 3 session × ทุก 2 นาที) เผาโควตาหมดตั้งแต่ต้นชั่วโมง
+    // จนไฟล์ที่ดีก็ถอดไม่ผ่าน — ยืนยันกับข้อมูลจริงแล้ว 12 ส.ค.
+    // การลองใหม่เป็นหน้าที่ของคิว (next_attempt_at) ไม่ใช่ของ loop ตรงนี้
     const groqRes = await withRetry(async () => {
       const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -253,9 +308,10 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
         body: groqForm
       });
       if (r.ok) return r;
-      if (r.status === 503 || r.status === 429) return null;
-      throw new Error(`Groq ${r.status}: ${await r.text().catch(() => '')}`);
-    }, 3, [0, 2000, 5000]);
+      const body = await r.text().catch(() => '');
+      if (r.status === 503 || r.status === 429) return RETRY(r.status, body);
+      throw new Error(`Groq ${r.status}: ${body}`);
+    }, 1);
     groqData = await groqRes.json();
   } catch (e) {
     throw new Error('Groq transcribe failed: ' + (e?.message || 'unknown'));
@@ -327,7 +383,7 @@ ${segLines}
         }
       );
       if (r.ok) return r;
-      if (r.status === 503 || r.status === 429) return null;
+      if (r.status === 503 || r.status === 429) return RETRY(r.status);   // v_queue: พกสถานะไปด้วย
       throw new Error(`Gemini diarize ${r.status}`);
     }, 3, [0, 2000, 5000]);
     const gemData = await gemRes.json();
@@ -570,7 +626,7 @@ ${transcriptText}
       }
     );
     if (r.ok) return r;
-    if (r.status === 503 || r.status === 429) return null;
+    if (r.status === 503 || r.status === 429) return RETRY(r.status);   // v_queue: พกสถานะไปด้วย
     throw new Error(`Gemini summarize ${r.status}`);
   }, 3, [0, 2000, 5000]);
 
@@ -900,7 +956,7 @@ async function handleAnalyzeAudio(request, env) {
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: geminiBody }
       );
       if (r.ok) return r;
-      if (r.status === 503 || r.status === 429) return null;
+      if (r.status === 503 || r.status === 429) return RETRY(r.status);   // v_queue: พกสถานะไปด้วย
       throw new Error(`Gemini ${r.status}`);
     }, 3, [0, 2000, 4000]);
 
@@ -1254,6 +1310,38 @@ next_actions: เรียง priority 1 = สำคัญที่สุด ไ
 //   keep-transcript-only policy the client pipeline always had).
 const PROCESS_CLAIM_STALE_MS = 3 * 60 * 1000;
 
+// v_queue: จุดเดียวที่ตัดสินว่า "ล้มเหลวแล้วยังไงต่อ" — เดิมกระจายอยู่ 2 ที่และ
+// ทำเหมือนกันหมดคือปล่อย claim ให้ tick ถัดไปลองใหม่ ซึ่งถูกสำหรับเน็ตล่ม
+// แต่ทำให้ไฟล์พังถาวรวนตลอดกาล และทำให้ 429 ยิ่งลองยิ่งตัน
+//   stageTag 'transcribe' → ล้มถาวร = ไฟล์เสียงใช้ไม่ได้ (failed_audio)
+//   stageTag 'analyze'    → ล้มถาวร = ระบบวิเคราะห์ไม่ผ่าน (failed_system)
+async function failStage(env, sessionId, stageTag, err, row) {
+  const c = classifyFailure(err);
+  const note = `${new Date().toISOString()} [${stageTag}] ${String((err && err.message) || err).slice(0, 400)}`;
+  const patch = { processing_since: null, pipeline_error: note };
+
+  if (c.kind === FAIL_PERMANENT) {
+    patch.pipeline_stage  = stageTag === 'transcribe' ? 'failed_audio' : 'failed_system';
+    patch.next_attempt_at = null;   // ปิดคิวถาวร — ไม่มีวันสำเร็จ ลองอีกก็เปลืองเปล่า
+  } else if (c.kind === FAIL_THROTTLED) {
+    // ไม่แตะ attempts โดยตั้งใจ: คิวรวมเต็มไม่ใช่ความผิดของงานนี้ ถ้านับเป็น
+    // ความผิดจะกลายเป็นว่าไฟล์ดีถูกตีตรา failed_system ทั้งที่ไม่มีอะไรผิด
+    patch.next_attempt_at = new Date(Date.now() + THROTTLE_WAIT_MS).toISOString();
+  } else {
+    const attempts = Number((row && row.attempts) || 0) + 1;
+    patch.attempts = attempts;
+    if (attempts >= MAX_ATTEMPTS) {
+      patch.pipeline_stage  = 'failed_system';
+      patch.next_attempt_at = null;
+    } else {
+      patch.next_attempt_at = new Date(Date.now() + backoffMs(attempts)).toISOString();
+    }
+  }
+  console.error(`[process] ${stageTag} ล้มเหลว ${sessionId} (${c.kind}/${c.status || '-'}) →`,
+    patch.pipeline_stage || ('นัดใหม่ ' + patch.next_attempt_at));
+  await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, patch).catch(() => {});
+}
+
 async function handleProcess(request, env, cfCtx) {
   if (!env.SUPABASE_SERVICE_KEY) return json({ error: 'SUPABASE_SERVICE_KEY not set — add it in worker Settings → Variables' }, 503, env);
   let body;
@@ -1270,7 +1358,7 @@ async function handleProcess(request, env, cfCtx) {
 
 async function processSession(sessionId, origin, env) {
   const rows = await sbSelect(env,
-    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since`);
+    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts`);
   const row = rows && rows[0];
   if (!row) return;
 
@@ -1291,7 +1379,8 @@ async function processSession(sessionId, origin, env) {
         // Nothing to analyze — record the outcome honestly instead of leaving
         // the row stuck (client history renders unknown stages as plain text).
         await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
-          { pipeline_stage: 'no_speech', processing_since: null, pipeline_error: null });
+          { pipeline_stage: 'no_speech', processing_since: null, pipeline_error: null,
+            attempts: 0, next_attempt_at: null });
         // v_echor3: ไม่ลบเสียงทิ้งแล้ว — เคส no_speech ยิ่งต้องเก็บไว้ฟัง เพราะ
         // "ไม่มีเสียงพูด" อาจแปลว่าไมค์มีปัญหา ไม่ใช่ว่าไม่มีใครพูดจริงๆ
         return;
@@ -1304,7 +1393,9 @@ async function processSession(sessionId, origin, env) {
         speaker_confidence:    (typeof t.avg_speaker_confidence === 'number') ? t.avg_speaker_confidence : null,
         pipeline_stage:        'transcribed',
         processing_since:      null,
-        pipeline_error:        null
+        pipeline_error:        null,
+        attempts:              0,      // ผ่าน stage แล้ว งบเริ่มนับใหม่สำหรับ stage หน้า
+        next_attempt_at:       null    // พร้อมให้ tick ถัดไปหยิบทันที
       });
       // v_echor3 (2026-08-08): เดิมลบไฟล์เสียงทิ้งตรงนี้ทันที — ผลคือคลิปจริง 43
       // จาก 44 หายถาวร พอมีคนบอกว่า "ฟังไม่รู้เรื่อง" เราจึงกลับไปฟังต้นฉบับไม่ได้
@@ -1312,26 +1403,20 @@ async function processSession(sessionId, origin, env) {
       // → ทุกการแก้กลายเป็นการเดา นี่คือเหตุผลเชิงโครงสร้างที่ปัญหานี้วนไม่จบ
       // ตอนนี้เก็บไว้ AUDIO_RETENTION_DAYS วัน แล้ว cron ค่อยกวาดลบ (ดู sweepExpiredAudio)
 
-      // continue to the analyze stage: from cron (origin=null) we have a full
-      // time budget, so just keep going in-process; from an HTTP trigger,
-      // self-trigger a fresh invocation instead
+      // v_queue: เลิกต่อ stage 2 ในตัวเอง — Free plan ให้ 50 subrequest ต่อ
+      // invocation และ stage1+stage2 รวมกันใช้ได้ถึง ~51 · นี่คือการกลับไปทำตาม
+      // หลักการที่ไฟล์นี้ประกาศไว้เองข้างบน ("ONE stage per invocation")
+      // จาก HTTP: จุดชนวน invocation ใหม่ให้ (best-effort เผื่อคลิปสั้นจบทัน)
+      // จาก cron: ไม่ต้องทำอะไร — แถวพร้อมแล้ว tick ถัดไปหยิบไปทำ stage 2 เอง
       if (origin) {
         await fetch(`${origin}/process`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId })
         }).catch(() => {});
-      } else {
-        await processSession(sessionId, null, env);
       }
     } catch (e) {
-      // release the claim so the client sweep can retry this stage
-      // v_cpudiet: บันทึกสาเหตุลง DB ด้วย — ก่อนหน้านี้กลืนเงียบ ทำให้ pipeline
-      // ที่ล้มซ้ำๆ ทั้งวันไม่มีร่องรอยให้ไล่เลย (ต้องเดาจาก processing_since)
-      console.error(`[process] stage uploaded ล้มเหลว ${sessionId}:`, (e && e.message) || e);
-      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
-        processing_since: null,
-        pipeline_error: `${new Date().toISOString()} [transcribe] ${String((e && e.message) || e).slice(0, 400)}`
-      }).catch(() => {});
+      // v_queue: ปล่อย claim + ตัดสินชะตาตามสาเหตุ (ดู failStage)
+      await failStage(env, sessionId, 'transcribe', e, row);
     }
     return;
   }
@@ -1406,7 +1491,9 @@ async function processSession(sessionId, origin, env) {
         ai_model: aiModel || null,
         ai_model_trail: aiTrail || null,   // v_echor3: ตกชั้นเพราะอะไร ดูตรงนี้
         processing_since: null,
-        pipeline_error: null
+        pipeline_error: null,
+        attempts: 0,
+        next_attempt_at: null
       });
 
       // Side tables — same writes the client pipeline did in
@@ -1445,11 +1532,8 @@ async function processSession(sessionId, origin, env) {
         }, 'kam_email,account_id').catch(() => {});
       }
     } catch (e) {
-      console.error(`[process] stage transcribed ล้มเหลว ${sessionId}:`, (e && e.message) || e);
-      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
-        processing_since: null,
-        pipeline_error: `${new Date().toISOString()} [analyze] ${String((e && e.message) || e).slice(0, 400)}`
-      }).catch(() => {});
+      // v_queue: ปล่อย claim + ตัดสินชะตาตามสาเหตุ (ดู failStage)
+      await failStage(env, sessionId, 'analyze', e, row);
     }
     return;
   }
@@ -1462,23 +1546,31 @@ async function processSession(sessionId, origin, env) {
 // claim stayed set and the catch never ran (kill, not exception). Cron
 // invocations get a full multi-minute budget, so the cron is the real engine
 // and /process (HTTP) is just a best-effort fast path for short jobs.
-// Requires a Cron Trigger on the worker: Settings → Triggers → "*/2 * * * *".
+// Requires a Cron Trigger on the worker: Settings → Triggers → ดู wrangler.toml
+//
+// v_queue (2026-08-12): หยิบทีละ "1 ขั้นของ 1 session" เท่านั้น
+//   เพดาน Free plan คือ 50 subrequest ต่อ invocation · stage 1 ใช้ได้ถึง ~31
+//   (อ่านแถว + จอง + โหลดเสียง + Groq + อัป Gemini + โพลสถานะ + diarize + เขียน)
+//   และ stage 2 อีก ~19 · ของเดิม limit=3 จึงใช้ได้ถึง 51-204 = เกินเพดานอยู่แล้ว
+//   (ยังไม่ระเบิดเพราะทุก session ล้มเร็ว) · ปล่อยให้ tick ถัดไปหยิบต่อ ถูกกว่า
+//   และตรงกับหลักการ "ONE stage per invocation" ที่ประกาศไว้ตอนออกแบบ A2v2.1
 async function sweepPending(env) {
   const staleIso = new Date(Date.now() - PROCESS_CLAIM_STALE_MS).toISOString();
+  const nowIso   = new Date().toISOString();
   let rows = [];
   try {
-    // v_cpudiet: เรียงด้วย processing_since (nullsfirst) ไม่ใช่ visited_at —
-    // ของเดิม limit=3 + เรียงตามเวลา visit ทำให้ 3 แถวเก่าสุดที่ล้มซ้ำๆ "จองคิว"
-    // ถาวร แถวใหม่ๆ ข้างหลังไม่มีวันถูก sweep เลย (starvation — เกิดจริง 11 ส.ค.)
-    // เรียงแบบนี้ = แถวที่ยังไม่เคยลอง มาก่อน แล้วค่อยแถวที่ลองนานสุด → ทุกแถวได้คิว
+    // เงื่อนไข 3 ชั้น: เป็นงานที่ยังไม่จบ · ไม่มีใครถืออยู่ (หรือถือค้างเกิน 3 นาที)
+    // · และ **ถึงเวลานัดแล้ว** — ชั้นที่สามคือของใหม่ ก่อนหน้านี้แถวที่เพิ่งล้ม
+    // กลับเข้าคิวทันทีใน tick ถัดไป จึงวนลองไฟล์เดิมได้ตลอดกาล
+    // เรียงตามเวลานัด (ยังไม่เคยนัด = มาก่อน) แล้วค่อยตามลำดับ visit → ไม่มีใครผูกขาด
     rows = await sbSelect(env,
-      `ci_sessions?select=id,pipeline_stage,status,processing_since` +
+      `ci_sessions?select=id,pipeline_stage,status,processing_since,attempts` +
       `&and=(or(pipeline_stage.eq.uploaded,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
-      `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}))` +
-      `&order=processing_since.asc.nullsfirst&limit=3`);
+      `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}),` +
+      `or(next_attempt_at.is.null,next_attempt_at.lte.${encodeURIComponent(nowIso)}))` +
+      `&order=next_attempt_at.asc.nullsfirst,visited_at.asc&limit=1`);
   } catch (_) { return; }
   for (const r of rows) {
-    // sequential on purpose — bounded per tick; the next tick picks up the rest
     try { await processSession(r.id, null, env); } catch (_) {}
   }
 }
@@ -1538,7 +1630,13 @@ export default {
   async scheduled(event, env, cfCtx) {
     if (!env.SUPABASE_SERVICE_KEY) return;
     cfCtx.waitUntil(sweepPending(env));
-    cfCtx.waitUntil(sweepExpiredAudio(env));
+    // v_queue: กวาดไฟล์เสียงหมดอายุวันละครั้งพอ (03:00 UTC = 10 โมงเช้าไทย)
+    // ของเดิมยิงคู่กับ sweepPending ทุก tick — งานนั้นใช้ได้ถึง 51 subrequest
+    // ในตัวมันเอง จึงแย่งเพดาน 50 ของ invocation เดียวกันกับงานหลักโดยไม่จำเป็น
+    const at = new Date(event && event.scheduledTime ? event.scheduledTime : Date.now());
+    if (at.getUTCHours() === 3 && at.getUTCMinutes() < 5) {
+      cfCtx.waitUntil(sweepExpiredAudio(env));
+    }
   },
   async fetch(request, env, cfCtx) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(env) });

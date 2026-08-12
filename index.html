@@ -1,4 +1,4 @@
-<!-- Freshket Sense v256: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v257: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1314,7 +1314,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v256',
+      version: 'v257',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51009,6 +51009,28 @@ body:not(.echo-active) { background:unset; }
     return null;
   }
 
+  // v_queue (2026-08-12): ตัวตรวจไฟล์เสียงตัวเดียวที่ใช้ร่วมกันทุกเส้นทาง
+  //
+  // ทำไม: ของเดิมตรวจอยู่ใน _processBlob (เส้นทาง legacy) เท่านั้น — เส้นทางหลัก
+  // _startAsyncPipeline ไม่เคยเรียกเลย · ผลคือ 11 ส.ค. มีคลิป 24KB/54KB จากการอัด
+  // 19-48 นาที (iOS ตัดไมค์ตอนล็อกจอ) หลุดขึ้นไปทั้งก้อน แล้ววนกิน Groq อยู่ 24 ชม.
+  //
+  // ค่าคงที่เดิมคือ _secs * 3000 ซึ่งอิง bitrate 24kbps ของยุคก่อน — เครื่องอัด
+  // ตั้งไว้ที่ 48kbps มาตั้งแต่ v_echor3 ทำให้เกณฑ์หย่อนไปเท่าตัว
+  // เกณฑ์ fatal 0.15 มาจากข้อมูลจริง: ไฟล์ดีอยู่ที่ 0.25-0.51 MB/นาที
+  // ไฟล์พังอยู่ที่ 0.0011-0.02 MB/นาที — ห่างกัน 25 เท่า ตัดตรงกลางได้สบาย
+  const REC_BYTES_PER_SEC = 48000 / 8;   // ต้องตรงกับ audioBitsPerSecond ตอนอัด
+  function _audioLooksTruncated(blobSize, secs) {
+    if (!secs || secs < 60) return null;               // สั้นเกินกว่าจะตัดสิน
+    const expected = secs * REC_BYTES_PER_SEC;
+    if (expected <= 0) return null;
+    const ratio = blobSize / expected;
+    const gotMins = Math.round(blobSize / REC_BYTES_PER_SEC / 60);
+    if (ratio < 0.15) return { fatal: true,  ratio, gotMins };   // ใช้งานไม่ได้จริง
+    if (ratio < 0.7)  return { fatal: false, ratio, gotMins };   // ขาดบางช่วง
+    return null;
+  }
+
   async function _startAsyncPipeline(blob) {
     // pin ctx at start — same v951 discipline as _processBlob (globals can be
     // wiped by open()/picker while we await network)
@@ -51040,9 +51062,21 @@ body:not(.echo-active) { background:unset; }
       await _syncCheckinToDb(ctx.checkinCache).catch(() => {});
       let rowId = ctx.sessionId || ctx.checkinCache?.session_id || null;
       const nowIso = new Date().toISOString();
+
+      // v_queue: ไฟล์ที่สั้นผิดปกติเทียบกับเวลาอัด = ถอดเสียงไม่ได้แน่นอน
+      // ตีตราจบตั้งแต่ตรงนี้ ไม่ส่งเข้าคิว — ประหยัดโควตา Groq และบอก rep ทันที
+      // ตั้งแต่ยังอยู่หน้าร้าน (ยังอัปไฟล์ขึ้นไปตามปกติ เพราะต้องเก็บไว้เป็นหลักฐาน
+      // ว่าไมค์มีปัญหาจริง ตามกติกา "ห้ามลบเสียงทิ้ง" ของ v_echor3)
+      const _trunc = _audioLooksTruncated(blob.size, ctx.secs);
+      const _dead  = !!(_trunc && _trunc.fatal);
+      const _stage = _dead ? 'failed_audio' : 'uploaded';
+      const _deadNote = _dead
+        ? `${nowIso} [client] ไฟล์เสียงไม่สมบูรณ์ — ได้เสียงจริง ~${_trunc.gotMins} นาที จากการอัด ${Math.round(ctx.secs / 60)} นาที`
+        : null;
       if (rowId) {
         const { error } = await supa.from('ci_sessions')
-          .update({ pipeline_stage: 'uploaded', audio_path: path, duration_secs: ctx.secs })
+          .update({ pipeline_stage: _stage, audio_path: path, duration_secs: ctx.secs,
+                    pipeline_error: _deadNote })
           .eq('id', rowId);
         if (error) throw error;
       } else {
@@ -51053,7 +51087,8 @@ body:not(.echo-active) { background:unset; }
           account_name:   ctx.accountName || null,
           visited_at:     ctx.checkinCache?.checked_in_at || nowIso,
           duration_secs:  ctx.secs,
-          pipeline_stage: 'uploaded',
+          pipeline_stage: _stage,
+          pipeline_error: _deadNote,
           audio_path:     path,
           rep_lat:        ctx.checkinCache?.rep_lat ?? null,
           rep_lng:        ctx.checkinCache?.rep_lng ?? null,
@@ -51063,6 +51098,21 @@ body:not(.echo-active) { background:unset; }
         if (error || !rowIns) throw error || new Error('insert failed');
         rowId = rowIns.id;
         if (ctx.checkinCache) ctx.checkinCache.session_id = rowId;
+      }
+
+      // v_queue: ไฟล์ใช้ไม่ได้ = ไม่ต้องปลุก worker เลย จบตรงนี้แบบบอกความจริง
+      if (_dead) {
+        _idbClear(); _stopProcTimer(); _phase = 'idle'; _sessionId = null;
+        if (_checkinCache && _checkinCache === ctx.checkinCache) {
+          _checkinCache = null;
+          try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
+        }
+        _setStep('บันทึก visit แล้ว', 'แต่ไฟล์เสียงไม่สมบูรณ์ — วิเคราะห์ไม่ได้', 100);
+        setTimeout(() => {
+          _unmount();
+          _toast('เสียงที่อัดได้จริงมีแค่ ~' + _trunc.gotMins + ' นาที — visit นับปกติ แต่วิเคราะห์ไม่ได้ ครั้งหน้าลองไม่ล็อกจอ');
+        }, 2400);
+        return;
       }
 
       // 3) trigger — keepalive survives the rep closing the app immediately
@@ -51175,14 +51225,12 @@ body:not(.echo-active) { background:unset; }
     };
     try {
       // ── audio integrity check ──────────────────────────────────────────────
-      const _expectedBytes = _secs * 3000;
-      const _ratio = _expectedBytes > 0 ? blob.size / _expectedBytes : 1;
-      console.log('[CI audio] blob=' + blob.size + 'B expected≈' + _expectedBytes + 'B ratio=' + _ratio.toFixed(2));
+      // v_queue: ใช้ตัวตรวจตัวเดียวกับเส้นทางหลัก (เดิมคำนวณเองด้วยเลข 24kbps)
       // v_echog1: resume จาก transcript ส่ง blob เปล่ามา — อย่าเตือนเสียงหายผิดๆ
-      if (!_resumeFromSegments && _secs >= 60 && _ratio < 0.7) {
-        const _estMins = Math.round(blob.size / 3000 / 60);
-        try { window.SenseSentinel?.report('ci_audio_gap', 'ratio=' + _ratio.toFixed(2)); } catch(_) {}
-        _toast('เสียงที่อัดได้จริง ~' + _estMins + ' นาที (บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ)');
+      const _tr = _resumeFromSegments ? null : _audioLooksTruncated(blob.size, _secs);
+      if (_tr) {
+        try { window.SenseSentinel?.report('ci_audio_gap', 'ratio=' + _tr.ratio.toFixed(2)); } catch(_) {}
+        _toast('เสียงที่อัดได้จริง ~' + _tr.gotMins + ' นาที (บางช่วงอาจหายจากการสลับแอพหรือล็อคจอ)');
       }
 
       // Load rubric from DB if not cached yet
@@ -53266,7 +53314,7 @@ body:not(.echo-active) { background:unset; }
       // เปิดจาก history) + pipeline_stage,rep_lat,rep_lng,checked_in_at (แถบเช็คอิน
       // + สถานะเช็คอินอย่างเดียว)
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,pipeline_error,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -53362,6 +53410,26 @@ body:not(.echo-active) { background:unset; }
       </div>`;
     }
 
+    // ── v_queue: pipeline ยอมแพ้ — บอกเหตุผลจริง ไม่ปล่อยให้เดา
+    if (s.pipeline_stage === 'failed_audio' || s.pipeline_stage === 'failed_system') {
+      const _isAudio = s.pipeline_stage === 'failed_audio';
+      body.innerHTML = `
+<div class="sd2-name">${repName}</div>
+<div class="sd2-meta">${acctLabel} · ${date}${dur !== '—' ? ' · ' + dur : ''}</div>
+${checkinBar}
+<div class="sd2-chips">${cvChip}</div>
+<div style="text-align:center;padding:36px 16px;color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">
+  <div style="margin-bottom:10px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg></div>
+  <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">${_isAudio ? 'ไฟล์เสียงใช้ไม่ได้' : 'วิเคราะห์ไม่สำเร็จ'}</div>
+  <div style="font-size:var(--text-sm);line-height:1.6">${_isAudio
+    ? 'เสียงขาดระหว่างอัด (มักเกิดตอนล็อกจอหรือสลับแอพ)<br>visit นี้ยังนับตามปกติ — ครั้งหน้าลองอัดโดยเปิดหน้าจอทิ้งไว้'
+    : 'ระบบลองวิเคราะห์หลายรอบแล้วยังไม่ผ่าน<br>กด "ลองใหม่" ที่การ์ดในหน้าประวัติได้'}</div>
+  ${s.pipeline_error ? `<div style="margin-top:14px;font-size:var(--text-2xs);color:var(--tx3,#AEAEB2);font-family:'IBM Plex Mono',monospace;word-break:break-all;opacity:.7">${String(s.pipeline_error).slice(0, 160)}</div>` : ''}
+</div>`;
+      if (footer) footer.style.display = 'none';
+      return;
+    }
+
     // ── A2v2.1: async pipeline กำลังทำงาน / ไม่พบเสียง — สถานะตรงๆ แทนแท็บว่าง
     if (s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'no_speech') {
       const _isProcessing = s.pipeline_stage === 'uploaded';
@@ -53378,7 +53446,7 @@ ${checkinBar}
         <span style="width:6px;height:6px;border-radius:50%;background:#534AB7;animation:ci-dot-pulse 1.2s ease-in-out .4s infinite"></span>
       </div>
       <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">ระบบกำลังวิเคราะห์เบื้องหลัง</div>
-      <div style="font-size:var(--text-sm);line-height:1.6">ไม่ต้องเปิดหน้าจอรอ — เสร็จแล้วผลจะขึ้นแทนหน้านี้เอง<br>(ปกติไม่เกิน 2-3 นาที)</div>`
+      <div style="font-size:var(--text-sm);line-height:1.6">ไม่ต้องเปิดหน้าจอรอ — เสร็จแล้วผลจะขึ้นแทนหน้านี้เอง<br>(ปกติภายใน 15 นาที)</div>`
     : `<div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx2,#636366);margin-bottom:4px">ไม่พบเสียงพูดในไฟล์ที่อัด</div>
       <div style="font-size:var(--text-sm);line-height:1.6">visit นี้ยังนับเช็คอินตามปกติ — ถ้าต้องการผลวิเคราะห์ ลองอัดใหม่ใน visit หน้า</div>`}
 </div>`;
@@ -53623,6 +53691,28 @@ ${confBanner}
           <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
           <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#534AB7;background:rgba(83,74,183,.09);padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0">กำลังวิเคราะห์เบื้องหลัง</span>
           <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date}${dur ? ' · ' + dur : ''}</span>
+        </div>`;
+      }
+
+      // v_queue: pipeline ยอมแพ้แล้ว — ต้องบอกตามจริง ไม่ใช่ปล่อยให้ค้างที่
+      // "กำลังวิเคราะห์เบื้องหลัง" ตลอดกาลแบบที่เกิดขึ้นจริง 11-12 ส.ค.
+      if (s.pipeline_stage === 'failed_audio' || s.pipeline_stage === 'failed_system') {
+        const isAudio = s.pipeline_stage === 'failed_audio';
+        const why  = isAudio ? 'ไฟล์เสียงใช้ไม่ได้' : 'วิเคราะห์ไม่สำเร็จ';
+        const hint = isAudio
+          ? 'เสียงขาดระหว่างอัด — visit นี้ยังนับปกติ ครั้งหน้าลองอัดโดยไม่ล็อกจอ'
+          : 'ระบบลองหลายรอบแล้วไม่ผ่าน — แตะเพื่อลองใหม่';
+        return `<div style="background:rgba(255,255,255,.72);border-radius:var(--r-lg);border:0.5px solid rgba(255,59,48,.28);padding:12px 14px;margin-bottom:8px">
+          <div onclick="CI._openSessionDetail('${s.id}')" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+            <span style="font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tx,#1C1C1E);min-width:0;padding-right:8px">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>
+            <span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF3B30;background:rgba(255,59,48,.10);padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;flex-shrink:0;white-space:nowrap">${why}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="flex:1;font-size:var(--text-xs);color:var(--tx2,#636366);font-family:'Noto Sans Thai',sans-serif">${hint}</span>
+            ${isAudio ? '' : `<button onclick="event.stopPropagation();CI._resumeAnalysis('${s.id}')"
+              style="padding:6px 14px;border:none;border-radius:100px;background:#FF3B30;color:#fff;font-size:var(--text-sm);font-weight:var(--fw-semi);font-family:'Noto Sans Thai',sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;flex-shrink:0">ลองใหม่</button>`}
+            <span style="font-size:var(--text-sm);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif;white-space:nowrap">${date}${dur ? ' · ' + dur : ''}</span>
+          </div>
         </div>`;
       }
 

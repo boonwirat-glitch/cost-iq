@@ -383,8 +383,8 @@ check('client: worker confidence fields captured into ctx after transcript call'
 check('client: _saveTranscriptOnly persists confidence on both UPDATE and INSERT paths',
   (ci.match(/transcript_confidence: ctx\.transcriptConfidence \?\? null,?/g) || []).length >= 2 &&
   (ci.match(/speaker_confidence:\s+ctx\.speakerConfidence \?\? null,?/g) || []).length >= 2);
-check('client: session detail select carries transcript_confidence',
-  /pipeline_stage,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence/.test(ci));
+check('client: session detail select carries transcript_confidence + pipeline_error',
+  /pipeline_stage,pipeline_error,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence/.test(ci));
 check('client: low-confidence banner renders honest copy (no false claim about replaying audio)',
   /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < 0\.6\)/.test(ci) &&
   !/ฟังต้นฉบับ/.test(ci));
@@ -524,10 +524,14 @@ check('client: legacy rows without new fields collapse silently (backward compat
 check('worker: cron sweep is the real engine (waitUntil ~30s kill found in live test)',
   /async scheduled\(event, env, cfCtx\)/.test(worker) &&
   /cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(worker) &&
-  /and\(pipeline_stage\.eq\.transcribed,status\.eq\.draft\)/.test(worker) &&
-  /limit=3/.test(worker));
-check('worker: cron path chains stages in-process (origin=null), HTTP path self-triggers',
-  /if \(origin\) \{[\s\S]{0,250}\} else \{\s*\n\s*await processSession\(sessionId, null, env\);/.test(worker));
+  /and\(pipeline_stage\.eq\.transcribed,status\.eq\.draft\)/.test(worker));
+// v_queue (2026-08-12): ข้อเดิมล็อกว่า "cron ต่อ stage ในตัวเอง + limit=3" ซึ่งกลับ
+// ด้านแล้วด้วยเหตุผลเชิงตัวเลข: Free plan ให้ 50 subrequest/invocation แต่
+// stage1+stage2 ใช้ได้ถึง ~51 และ limit=3 ทำให้ถึง 204 · ตอนนี้ 1 ขั้น/1 tick
+// (รายละเอียดการล็อกใหม่อยู่ใน tools/verify_echo_queue.js)
+check('worker: หนึ่ง tick ทำหนึ่งขั้นเท่านั้น — ไม่ต่อ stage ในตัวเอง',
+  !/\} else \{\s*\n\s*await processSession\(sessionId, null, env\);/.test(worker) &&
+  /limit=1/.test(worker));
 
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
