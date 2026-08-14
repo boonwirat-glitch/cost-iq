@@ -38,6 +38,13 @@ var nrrCompanyState = {
 var NRR_CO_COLORS = {
   chain: '#c56a2c',
   sa_mc: '#1295a8',
+  // v_satype (2026-08-14): #/sales splits SA from MC, so MC needs its own hue.
+  // SA keeps the existing teal so the two pages still read as the same data.
+  // #7b5ea7 chosen by running the dataviz palette validator over all three
+  // pairs — passes lightness band / chroma floor / CVD ΔE 8.2 (deutan) /
+  // normal-vision ΔE 17.1 / contrast, in BOTH light and dark surfaces.
+  sa: '#1295a8',
+  mc: '#7b5ea7',
   b2c: 'var(--mv-slate)'
 };
 // Lightness ramp (as rgba alphas over white) for the Sales/KAM/PM/Admin
@@ -486,22 +493,22 @@ function _nrrSalesPipelineTableHtml(pm) {
   var headCells = pm.order.map(function (key) {
     return '<th style="text-align:right;white-space:nowrap;color:' + _nrrPipeBucketColor(key) + '">' + nrrEsc(pm.labels[key]) + '</th>';
   }).join('');
-  var hasOther = pm.order.some(function (key) { return pm.buckets[key].bySquad.other.gmv > 0; });
+  var hasOther = pm.order.some(function (key) { return pm.buckets[key].byAccType.other.gmv > 0; });
 
-  function cellHtml(key, squadKey) {
-    var b = squadKey ? pm.buckets[key].bySquad[squadKey] : pm.buckets[key];
-    var attrs = 'data-bucket="' + key + '"' + (squadKey ? ' data-squad="' + squadKey + '"' : '');
+  function cellHtml(key, typeKey) {
+    var b = typeKey ? pm.buckets[key].byAccType[typeKey] : pm.buckets[key];
+    var attrs = 'data-bucket="' + key + '"' + (typeKey ? ' data-squad="' + typeKey + '"' : '');
     if (!b.gmv) return '<td class="num nrr-pipe-cell" ' + attrs + ' style="text-align:right;cursor:pointer;color:var(--ink3)">—</td>';
     return '<td class="num nrr-pipe-cell" ' + attrs + ' style="text-align:right;cursor:pointer">' +
       nrrFmtGMVExact(b.gmv) +
       '<div class="micro" style="margin-top:1px;color:var(--ink3)">' + b.outlets.toLocaleString() + ' ร้าน</div></td>';
   }
-  function rowHtml(label, squadKey, opts) {
+  function rowHtml(label, typeKey, opts) {
     opts = opts || {};
-    var color = squadKey === 'chain' ? NRR_CO_COLORS.chain : squadKey === 'sa_mc' ? NRR_CO_COLORS.sa_mc : null;
+    var color = NRR_CO_COLORS[typeKey] || null;
     var dotHtml = color ? '<span class="nrr-sat-dot" style="background:' + color + ';margin-right:7px"></span>' : '';
     var borderStyle = color ? 'border-left:3px solid ' + color + ';' : '';
-    var cells = pm.order.map(function (key) { return cellHtml(key, squadKey); }).join('');
+    var cells = pm.order.map(function (key) { return cellHtml(key, typeKey); }).join('');
     return '<tr' + (opts.topline ? ' style="border-top:1px solid var(--line)"' : '') + '>' +
       '<td style="' + (opts.bold ? 'font-weight:600;' : '') + borderStyle + 'padding-left:12px;white-space:nowrap">' + dotHtml + label + '</td>' + cells + '</tr>';
   }
@@ -509,7 +516,8 @@ function _nrrSalesPipelineTableHtml(pm) {
     '<table class="nrr-table nrr-table-compact"><thead><tr><th></th>' + headCells + '</tr></thead>' +
     '<tbody>' +
     rowHtml('Chain', 'chain') +
-    rowHtml('SA/MC', 'sa_mc') +
+    rowHtml('SA', 'sa') +
+    rowHtml('MC', 'mc') +
     (hasOther ? rowHtml('อื่นๆ', 'other') : '') +
     rowHtml('รวม Sales ทั้งหมด', null, { bold: true, topline: true }) +
     '</tbody></table></div>' +
@@ -526,7 +534,7 @@ function _nrrSalesActualsTableHtml(model, cd) {
   var headCells = months.map(function (k) {
     return '<th style="text-align:right;white-space:nowrap">' + nrrEsc(model.labels[k] || k) + (isMtd && k === lastKey ? mtdChip : '') + '</th>';
   }).join('');
-  var ROW_COLOR = { chain: NRR_CO_COLORS.chain, sa_mc: NRR_CO_COLORS.sa_mc };
+  var ROW_COLOR = { chain: NRR_CO_COLORS.chain, sa_mc: NRR_CO_COLORS.sa_mc, sa: NRR_CO_COLORS.sa, mc: NRR_CO_COLORS.mc };
   function rowHtml(label, key, opts) {
     opts = opts || {};
     var cells = months.map(function (k) {
@@ -546,17 +554,27 @@ function _nrrSalesActualsTableHtml(model, cd) {
       '<td style="' + (opts.bold ? 'font-weight:600;' : '') + borderStyle + 'padding-left:12px;white-space:nowrap">' + dotHtml + label + '</td>' + cells + '</tr>';
   }
   var hasOther = months.some(function (k) { return model.by_month[k].other > 0; });
+  // v_satype: SA-vs-MC only exists in company_gmv.csv's new trailing acct_type
+  // column. On an older file there is nothing to split, so show the combined
+  // row and say why — never two silent ฿0 rows.
+  var split = !!model.hasTypeSplit;
+  var typeRows = split
+    ? rowHtml('SA', 'sa') + rowHtml('MC', 'mc')
+    : rowHtml('SA/MC', 'sa_mc');
   return '<div style="overflow-x:auto">' +
     '<table class="nrr-table"><thead><tr><th>Account Type</th>' + headCells + '</tr></thead>' +
     '<tbody>' +
     rowHtml('Chain', 'chain') +
-    rowHtml('SA/MC', 'sa_mc') +
+    typeRows +
     (hasOther ? rowHtml('อื่นๆ', 'other') : '') +
     rowHtml('รวม Sales', 'total', { bold: true, topline: true }) +
     '</tbody></table></div>' +
     '<div class="micro" style="margin-top:10px">' +
     'ยอดซื้อลูกค้าใหม่จาก DWH order ที่ commercial_owner = SALE ตรงๆ (ไม่มี NRR concept) · ' +
-    'แบ่งตาม account_type ของร้าน · เดือนปัจจุบันเป็น MTD (ข้อมูลช้ากว่าจริง 1 วัน)</div>';
+    'แบ่งตาม account_type ของร้าน · เดือนปัจจุบันเป็น MTD (ข้อมูลช้ากว่าจริง 1 วัน)' +
+    (split ? '' : '<br>ตารางนี้ยังรวม SA กับ MC อยู่ เพราะ company_gmv.csv ที่อัปโหลดไว้ ' +
+      'เป็นรุ่นก่อนมีคอลัมน์ acct_type — รัน sql/company_gmv.sql ใหม่แล้วอัปโหลดทับ จะแยกเป็น 3 แถวเอง') +
+    '</div>';
 }
 
 function nrrRenderSalesView() {
@@ -611,13 +629,15 @@ function nrrHandleSalesClick(e) {
 
 var nrrPipeDrawerState = null; // { bucketKey, squadKey, search, shown, repFilter }
 
-var NRR_PIPE_SQUAD_LABEL = { chain: 'Chain', sa_mc: 'SA/MC', other: 'อื่นๆ' };
+// v_satype: keys are account types now (the pipeline table emits them), not
+// the coarser squad keys #/company uses
+var NRR_PIPE_SQUAD_LABEL = { chain: 'Chain', sa: 'SA', mc: 'MC', sa_mc: 'SA/MC', other: 'อื่นๆ' };
 
 function nrrOpenPipelineDrawer(bucketKey, squadKey) {
   var pm = typeof nrrSalesPipelineModel === 'function' ? nrrSalesPipelineModel() : null;
   if (!pm || !pm.buckets[bucketKey]) return;
   var label = pm.labels[bucketKey];
-  var b = squadKey ? pm.buckets[bucketKey].bySquad[squadKey] : pm.buckets[bucketKey];
+  var b = squadKey ? pm.buckets[bucketKey].byAccType[squadKey] : pm.buckets[bucketKey];
   if (!b) return;
   nrrCommDrawerState = null; // leaving commission mode (stale-guards its async fetch)
   nrrPipeDrawerState = { bucketKey: bucketKey, squadKey: squadKey || null, search: '', shown: 100, repFilter: null };
@@ -673,8 +693,10 @@ function nrrRenderPipeRows() {
   var squadKey = nrrPipeDrawerState.squadKey;
   if (squadKey) {
     bucketRows = bucketRows.filter(function (r) {
-      var sq = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
-      return sq === squadKey;
+      var at = r.account_type === 'Chain' ? 'chain'
+             : r.account_type === 'SA'    ? 'sa'
+             : r.account_type === 'MC'    ? 'mc' : 'other';
+      return at === squadKey;
     });
   }
   var q = nrrPipeDrawerState.search;

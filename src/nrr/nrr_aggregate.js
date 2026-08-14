@@ -651,23 +651,34 @@ function nrrCompanyModel() {
 window.nrrCompanyModel = nrrCompanyModel;
 
 // Sale-only pivot for the standalone Sales section: per month
-// {chain, sa_mc, other, total} (gmv) + {orders_total}.
+// {chain, sa_mc, sa, mc, other, total} (gmv) + {orders_total}.
+//
+// v_satype (2026-08-14): the page now wants Chain / SA / MC as three separate
+// rows. SA-vs-MC lives in the new trailing `acct_type` column, so a
+// company_gmv.csv produced before that column existed simply cannot be split —
+// there is no way to recover it client-side. Rather than silently show ฿0 for
+// SA and MC on the old file, we keep filling `sa_mc` in parallel and return
+// `hasTypeSplit` so the table can fall back to the old combined row and say so.
 function nrrSalesByBucket() {
   var cd = window.bulkCompanyData;
   if (!cd || !cd.loaded || !cd.allRows || !cd.allRows.length) return null;
-  var months = [], labels = {}, byMonth = {};
+  var months = [], labels = {}, byMonth = {}, hasTypeSplit = false;
   cd.allRows.forEach(function (r) {
     if (r.owner_group !== 'sale') return;
     if (!byMonth[r.month_key]) {
       months.push(r.month_key); labels[r.month_key] = r.month_label;
-      byMonth[r.month_key] = { chain: 0, sa_mc: 0, other: 0, total: 0, orders_total: 0 };
+      byMonth[r.month_key] = { chain: 0, sa_mc: 0, sa: 0, mc: 0, other: 0, total: 0, orders_total: 0 };
     }
     var m = byMonth[r.month_key];
     var b = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
     m[b] += r.gmv; m.total += r.gmv; m.orders_total += r.orders;
+    // finer split — only when the file actually carries it
+    var t = r.acct_type;
+    if (t === 'sa' || t === 'mc') { m[t] += r.gmv; hasTypeSplit = true; }
+    else if (t === 'chain') { /* already counted in m.chain via bucket */ }
   });
   months.sort();
-  return { months: months, labels: labels, by_month: byMonth };
+  return { months: months, labels: labels, by_month: byMonth, hasTypeSplit: hasTypeSplit };
 }
 window.nrrSalesByBucket = nrrSalesByBucket;
 
@@ -714,7 +725,13 @@ function nrrSalesPipelineModel() {
 
   var buckets = {};
   order.forEach(function (k) {
-    buckets[k] = { gmv: 0, outlets: 0, rows: [], bySquad: { chain: { gmv: 0, outlets: 0 }, sa_mc: { gmv: 0, outlets: 0 }, other: { gmv: 0, outlets: 0 } } };
+    buckets[k] = {
+      gmv: 0, outlets: 0, rows: [],
+      bySquad:   { chain: { gmv: 0, outlets: 0 }, sa_mc: { gmv: 0, outlets: 0 }, other: { gmv: 0, outlets: 0 } },
+      // v_satype: 3-way split for #/sales · bySquad above is left untouched
+      // because #/company's squad cards still read pm.bySquad.sa_mc
+      byAccType: { chain: { gmv: 0, outlets: 0 }, sa: { gmv: 0, outlets: 0 }, mc: { gmv: 0, outlets: 0 }, other: { gmv: 0, outlets: 0 } }
+    };
   });
   var bySquad = { chain: 0, sa_mc: 0, other: 0 };
 
@@ -730,11 +747,18 @@ function nrrSalesPipelineModel() {
       key = 'm' + Math.min(diff, NRR_PIPE_MAX_OFFSET);
     }
     var sq = (r.bucket === 'chain' || r.bucket === 'sa_mc') ? r.bucket : 'other';
+    // sales_handover_pipeline.csv already carries account_type per row, so the
+    // 3-way split needs no SQL change here (unlike company_gmv.csv)
+    var at = r.account_type === 'Chain' ? 'chain'
+           : r.account_type === 'SA'    ? 'sa'
+           : r.account_type === 'MC'    ? 'mc' : 'other';
     buckets[key].gmv += r.last_month_gmv;
     buckets[key].outlets += 1;
     buckets[key].rows.push(r);
     buckets[key].bySquad[sq].gmv += r.last_month_gmv;
     buckets[key].bySquad[sq].outlets += 1;
+    buckets[key].byAccType[at].gmv += r.last_month_gmv;
+    buckets[key].byAccType[at].outlets += 1;
     bySquad[sq] += r.last_month_gmv;
   });
 

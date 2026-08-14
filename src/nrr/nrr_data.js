@@ -355,6 +355,9 @@ window.bulkCompanyData = { loaded: false };
 
 // 8 cols: month_key, month_label, owner_group, kam_email, tl_email,
 //         bucket, gmv, orders
+// v_satype: +1 คอลัมน์ท้าย acct_type ('chain'|'sa'|'mc'|'other') สำหรับหน้า
+// #/sales ที่แยก SA กับ MC · ไฟล์รุ่นเก่ายังไม่มีคอลัมน์นี้ ให้เป็น '' แล้ว
+// nrrSalesByBucket จะถอยไปแสดงแบบรวม SA/MC เองโดยไม่พัง
 function _nrrParseCompanyCsv(text) {
   var lines = text.trim().split('\n').slice(1);
   var rows = [];
@@ -370,7 +373,8 @@ function _nrrParseCompanyCsv(text) {
       tl_email:    (p[4] || '').trim().toLowerCase(),
       bucket:      (p[5] || '').trim(),
       gmv:         parseFloat(p[6]) || 0,
-      orders:      parseInt(p[7], 10) || 0
+      orders:      parseInt(p[7], 10) || 0,
+      acct_type:   (p[8] || '').trim()
     });
   });
   return rows;

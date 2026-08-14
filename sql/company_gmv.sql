@@ -4,7 +4,7 @@
 -- Refresh: manual BigQuery run + manual R2 upload (suggested: daily with the
 --          other /nrr files, or at minimum weekly)
 -- Columns (8): month_key, month_label, owner_group, kam_email, tl_email,
---              bucket, gmv, orders
+--              bucket, gmv, orders, acct_type
 -- Window:  2026-01-01 → yesterday (day-1 lag, Asia/Bangkok). Calendar-year
 --          framing matches the "Target & Plan 2H 2026" sheet — do NOT switch to
 --          a rolling window or Jan will drop out mid-plan-year and the sheet
@@ -17,7 +17,9 @@
 --   3. else commercial_owner KAM/PM/ADMIN/SALE → 'kam'/'pm'/'admin'/'sale'
 --   4. else                                    → 'other' (reconcile bucket)
 --
--- bucket: account_type Chain → 'chain'; SA|MC → 'sa_mc'; else 'other'.
+-- bucket:    account_type Chain → 'chain'; SA|MC → 'sa_mc'; else 'other'.
+-- acct_type: เหมือน bucket แต่แยก SA กับ MC ('chain'|'sa'|'mc'|'other') —
+--   หน้า #/sales ใช้ตัวนี้แสดง 3 กลุ่ม · หน้า #/company ยังใช้ bucket เหมือนเดิม
 --   b2c rows carry bucket '' (not meaningful there).
 --   NOTE: kam rows carry bucket too (the account's own type) but the /nrr app
 --   classifies KAM GMV into squads by tl_email → squad_params (Supabase), NOT
@@ -104,6 +106,17 @@ base_orders AS (
       WHEN IFNULL(o.account_type, '') IN ('SA', 'MC')            THEN 'sa_mc'
       ELSE 'other'
     END                                   AS bucket,
+    -- v_satype (2026-08-14): acct_type แยก SA กับ MC ออกจากกัน — **คอลัมน์ใหม่
+    -- ต่อท้าย ไม่ใช่การเปลี่ยนความหมายของ bucket** เพราะหน้า Company (#/company)
+    -- ทั้ง squad race และตาราง audit ยังอ่าน bucket='sa_mc' อยู่ · ถ้าไปแก้ bucket
+    -- ตรงๆ หน้านั้นจะกลายเป็นศูนย์เงียบๆ ทั้งหน้า
+    CASE
+      WHEN IFNULL(o.account_type, '') IN ('Consumer', 'Enduser') THEN ''
+      WHEN IFNULL(o.account_type, '') = 'Chain'                  THEN 'chain'
+      WHEN IFNULL(o.account_type, '') = 'SA'                     THEN 'sa'
+      WHEN IFNULL(o.account_type, '') = 'MC'                     THEN 'mc'
+      ELSE 'other'
+    END                                   AS acct_type,
     CAST(o.user_id AS STRING)             AS outlet_res_id,
     o.gmv_ex_vat                          AS gmv_ex_vat,
     o.order_id                            AS order_id
@@ -126,6 +139,7 @@ classified AS (
     CASE WHEN b.owner_group = 'kam'
          THEN IFNULL(kd.tl_email, '')            ELSE '' END AS tl_email,
     b.bucket,
+    b.acct_type,
     b.gmv_ex_vat,
     b.order_id
   FROM base_orders b
@@ -141,7 +155,8 @@ SELECT
   tl_email,
   bucket,
   ROUND(SUM(gmv_ex_vat), 0)      AS gmv,
-  COUNT(DISTINCT order_id)       AS orders
+  COUNT(DISTINCT order_id)       AS orders,
+  acct_type                      AS acct_type   -- v_satype: ต่อท้ายเสมอ (คอลัมน์ที่ 9)
 FROM classified
-GROUP BY month_key, month_label, owner_group, kam_email, tl_email, bucket
-ORDER BY month_key, owner_group, bucket, kam_email;
+GROUP BY month_key, month_label, owner_group, kam_email, tl_email, bucket, acct_type
+ORDER BY month_key, owner_group, bucket, acct_type, kam_email;
