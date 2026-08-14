@@ -30,9 +30,10 @@ if (start < 0 || end < 0) { console.error('ERROR: หาบล็อก AB ใ�
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(WK.slice(start, end) +
-  '\nthis.API = { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, AB_MIN_WIN_SEC, _abTsToSec, _abSecToTs, _abParseSegments, _abPrompt };', ctx);
+  '\nthis.API = { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, AB_MIN_WIN_SEC, _abTsToSec, _abSecToTs, _abParseSegments, _abParseCompact, _abPrompt, _abPromptCompact };', ctx);
 const { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, AB_MIN_WIN_SEC,
-        _abTsToSec, _abSecToTs, _abParseSegments, _abPrompt } = ctx.API;
+        _abTsToSec, _abSecToTs, _abParseSegments, _abParseCompact,
+        _abPrompt, _abPromptCompact } = ctx.API;
 
 console.log('\n── 1. ขนาดหน้าต่างต้องอยู่ใต้เพดานอย่างมีระยะเผื่อ ──');
 
@@ -80,6 +81,28 @@ check('ระบุหน้าต่าง = บอกช่วงเป็น 
 check('สั่งข้ามช่วงอื่นชัดเจน', /ห้ามถอด/.test(pWin));
 check('บังคับ ts เป็นเวลาจริงจากต้นไฟล์ (ไม่งั้นรวมหน้าต่างแล้วเวลาเพี้ยนทั้งบท)',
   /เวลาจริงนับจากต้นไฟล์/.test(pWin));
+
+console.log('\n── 4b. รูปแบบคำตอบแบบประหยัด (บรรทัดละท่อน) ──');
+// วัดจริง: JSON กิน ~54 token/ท่อน (8,691 token / 160 ท่อน) โครงห่อล้วนๆ ~25
+{
+  const raw = '00:03|S|สวัสดีครับพี่ วันนี้มาส่งของครับ\n00:07|C|ค่ะ วางตรงนี้เลย\n';
+  const got = _abParseCompact(raw);
+  check('อ่านบรรทัดละท่อนได้', got && got.length === 2);
+  check('ย่อผู้พูดกลับเป็นชื่อเต็ม (S→Sales, C→ลูกค้า)',
+    got[0].speaker === 'Sales' && got[1].speaker === 'ลูกค้า');
+  check('เวลาและข้อความถูกต้อง', got[0].ts === '00:03' && got[1].text === 'ค่ะ วางตรงนี้เลย');
+  check('ข้อความที่มี | อยู่ข้างในไม่ถูกตัดทิ้ง',
+    (_abParseCompact('01:00|S|เอาอันนี้|อันนั้นด้วย') || [])[0]?.text === 'เอาอันนี้|อันนั้นด้วย');
+  check('บรรทัดขยะ (หัวข้อ/คำอธิบาย) ถูกข้าม',
+    (_abParseCompact('นี่คือบทสนทนา\n00:01|S|ครับ\n---') || []).length === 1);
+  check('ไม่มีบรรทัดที่ใช้ได้เลย → null (ไม่ใช่ [] ที่จะถูกนับว่าถอดได้ 0 ท่อน)',
+    _abParseCompact('ขอโทษครับ ถอดไม่ได้') === null);
+  const pc = _abPromptCompact(null, null);
+  check('prompt ประหยัดสั่งรูปแบบชัดและห้าม JSON',
+    /mm:ss\|ผู้พูด\|ข้อความ/.test(pc) && /ห้ามใส่ JSON/.test(pc));
+  check('prompt ประหยัดรองรับหน้าต่างเวลาด้วย',
+    /ถอดเฉพาะช่วง 15:00 ถึง 30:00/.test(_abPromptCompact(900, 1800)));
+}
 
 console.log('\n── 5. แผนหน้าต่าง: ต้องคลุมทั้งคลิป ไม่มีรู ──');
 // จำลองตรรกะแบ่งหน้าต่างจาก sweepAbGemini (ก็อปเงื่อนไขมาเทียบ ไม่ได้เรียกฟังก์ชันจริง

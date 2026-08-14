@@ -1854,6 +1854,48 @@ function _abParseSegments(raw) {
   return (parsed && Array.isArray(parsed.segments)) ? parsed.segments : null;
 }
 
+// ── รูปแบบคำตอบแบบประหยัด (v_ears 14 ส.ค. เย็น) ───────────────────────────
+// วัดจริง: JSON หนึ่งท่อนกิน ~54 token ทั้งที่เนื้อความจริงราว 20-30
+// ({"ts": "00:01", "speaker": "Sales", "text": "…"} = โครงห่อล้วนๆ ~25 token)
+// เปลี่ยนเป็นบรรทัดละท่อน `mm:ss|S|ข้อความ` ตัดทิ้งได้ ~40%
+// สำคัญเพราะ **ตัวชนเพดาน 128 วิ คือจำนวน token ที่ต้องปั่น** — คำตอบสั้นลง 40%
+// = คลิปยาวขึ้น 1.6 เท่าถึงจะชนเพดาน และค่าใช้จ่ายฝั่ง output ลดตามตรง
+function _abParseCompact(raw) {
+  const out = [];
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.match(/^\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\|\s*([^|]{0,20}?)\s*\|\s*(.+?)\s*$/);
+    if (!m) continue;
+    const sp = m[2].trim();
+    out.push({
+      ts: m[1],
+      speaker: sp === 'S' ? 'Sales' : (sp === 'C' ? 'ลูกค้า' : sp),
+      text: m[3].trim()
+    });
+  }
+  return out.length ? out : null;
+}
+
+function _abPromptCompact(fromSec, toSec) {
+  const win = (fromSec == null) ? '' :
+    `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
+    `ช่วงก่อนหน้าและหลังจากนั้นข้ามไปทั้งหมด ห้ามถอด · ` +
+    `เวลาที่ตอบต้องเป็นเวลาจริงนับจากต้นไฟล์ (ไม่ใช่นับใหม่จากต้นช่วง)`;
+  return `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
+
+บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
+- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
+
+ตอบเป็นข้อความล้วน บรรทัดละหนึ่งท่อน รูปแบบเป๊ะๆ นี้เท่านั้น:
+mm:ss|ผู้พูด|ข้อความ
+
+ผู้พูดใช้ตัวอักษรเดียว: S = พนักงานขาย Freshket, C = คนของร้าน
+ห้ามใส่หัวข้อ ห้ามใส่เลขข้อ ห้ามใส่ JSON ห้ามใส่บรรทัดอื่นนอกจากรูปแบบข้างบน
+
+ตัวอย่าง:
+00:03|S|สวัสดีครับพี่ วันนี้มาส่งของครับ
+00:07|C|ค่ะ วางตรงนี้เลย${win}`;
+}
+
 function _abPrompt(fromSec, toSec) {
   const win = (fromSec == null) ? '' :
     `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
@@ -1869,22 +1911,24 @@ function _abPrompt(fromSec, toSec) {
 {"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}]}${win}`;
 }
 
-async function _abCallGemini(env, fileUri, fromSec, toSec) {
+async function _abCallGemini(env, fileUri, fromSec, toSec, fmt) {
   const t0 = Date.now();
+  const compact = fmt === 'compact';
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [
           { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
-          { text: _abPrompt(fromSec, toSec) }
+          { text: compact ? _abPromptCompact(fromSec, toSec) : _abPrompt(fromSec, toSec) }
         ]}],
-        generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'application/json' }
+        generationConfig: { temperature: 0, maxOutputTokens: 65536,
+          responseMimeType: compact ? 'text/plain' : 'application/json' }
       }) });
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
   const d = await r.json();
   const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const segments = _abParseSegments(raw);
+  const segments = compact ? _abParseCompact(raw) : _abParseSegments(raw);
   return {
     segments,
     elapsed_ms: Date.now() - t0,
@@ -1938,7 +1982,9 @@ async function sweepAbGemini(env) {
       const dur = row.duration_secs || 0;
       const winMin = st.win_min || AB_WIN_MIN;
       const windows = [];
-      if (dur / 60 <= AB_SINGLE_MAX_MIN) {
+      // st.single = true → บังคับยิงรอบเดียวไม่ว่ายาวแค่ไหน (ใช้ตอนทดลองว่ารูปแบบ
+      // คำตอบแบบประหยัดทำให้คลิปยาวรอดโดยไม่ต้องซอยจริงไหม)
+      if (st.single === true || dur / 60 <= AB_SINGLE_MAX_MIN) {
         windows.push({ from: null, to: null });     // สั้นพอ ยิงรอบเดียว
       } else {
         for (let s = 0; s < dur; s += winMin * 60) {
@@ -1956,7 +2002,7 @@ async function sweepAbGemini(env) {
     const i = st.next || 0;
     if (i < windows.length) {
       const w = windows[i];
-      const res = await _abCallGemini(env, st.file_uri, w.from, w.to);
+      const res = await _abCallGemini(env, st.file_uri, w.from, w.to, st.fmt);
       const segs = res.segments || [];
       // ตัววัดว่ามันเชื่อคำสั่ง "ถอดเฉพาะช่วง" จริงไหม — ถ้าไม่เชื่อ แผนนี้ใช้ไม่ได้
       let inWin = null;
