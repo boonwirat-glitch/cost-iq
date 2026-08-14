@@ -1799,11 +1799,83 @@ async function handleListModels(env) {
   }
 }
 
+
+// ── v_ears P0 (2026-08-14): งานเทียบโมเดลบน cron — **ชั่วคราว ถอดออกเมื่อเคาะแล้ว**
+//
+// ทำไมต้องอยู่บน cron ไม่ใช่ HTTP: แค่ขั้นโหลดไฟล์เสียง 9MB จาก storage แล้ว
+// อัปเข้า Gemini Files API ก็เกิน 100 วินาที ซึ่งเป็นเพดานของคำขอผ่านเว็บของ
+// Cloudflare (ลองแล้วโดน 524 สามรอบ) · cron ได้เวลาเป็นนาทีจึงทำได้
+//
+// สั่งงานด้วย SQL: update ci_sessions set ab_gemini='{"requested":true}' where id=...
+// ทำทีละ 1 แถวต่อ tick และ **แทนที่งานปกติของ tick นั้น** เพราะ Free plan ให้
+// 50 subrequest ต่อ invocation และงานนี้ใช้ ~24 (โหลด+อัป+โพลสถานะ+ถอด+เขียน)
+async function sweepAbGemini(env) {
+  const rows = await sbSelect(env,
+    `ci_sessions?ab_gemini->>requested=eq.true&audio_path=not.is.null&select=id,audio_path,account_name,duration_secs&limit=1`);
+  const row = rows && rows[0];
+  if (!row) return false;
+  // จองงานทันทีกัน tick ถัดไปหยิบซ้ำ
+  await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: { status: 'running', started_at: new Date().toISOString() } });
+  const t0 = Date.now();
+  try {
+    const bytes = await sbStorageGet(env, row.audio_path);
+    const fileUri = await _geminiUploadAudio(env, bytes, 'audio/webm');
+    const prompt = `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
+
+บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
+- speaker: "Sales" = ฝั่ง Freshket, "ลูกค้า" = ฝั่งร้าน
+- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
+
+ตอบ JSON เท่านั้น:
+{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}]}`;
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ file_data: { mime_type: 'audio/webm', file_uri: fileUri } }, { text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'application/json' }
+        }) });
+    if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(()=>'')).slice(0,200)}`);
+    const d = await r.json();
+    const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch (_) {
+      const a = raw.indexOf('['), z = raw.lastIndexOf(']');
+      if (a !== -1 && z !== -1) { try { parsed = JSON.parse(raw.slice(a, z + 1)); } catch (_) {} }
+    }
+    // v_ears: Gemini คืน **array เปล่าๆ** ไม่ได้ห่อด้วย {"segments":[…]} ตามที่ขอ
+    // (responseMimeType=json บังคับให้เป็น JSON ที่ถูกต้อง แต่ไม่บังคับโครง)
+    // → รับทั้งสองแบบ ดีกว่าไปดัด prompt แล้วหวังว่ามันจะเชื่อ
+    if (Array.isArray(parsed)) parsed = { segments: parsed };
+    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: {
+      status: 'done', model: 'gemini-3.1-pro-preview', elapsed_ms: Date.now() - t0,
+      finish_reason: d?.candidates?.[0]?.finishReason || null,
+      usage: d?.usageMetadata || null,
+      segments: parsed?.segments || null,
+      // v_ears: เก็บคำตอบดิบไว้ด้วยเมื่อไม่ได้ segments ตามที่ขอ — ไม่ใช่เฉพาะตอน
+      // parse พัง · รอบแรกเจอว่า Gemini คืน JSON ที่ parse ผ่านแต่คนละโครง
+      // ทำให้ไม่มีอะไรให้ดูเลยว่ามันตอบอะไรมา
+      parsed_keys: parsed && typeof parsed === 'object' ? Object.keys(parsed).slice(0, 10) : null,
+      raw_head: (parsed && Array.isArray(parsed.segments)) ? undefined : raw.slice(0, 1200)
+    }});
+    console.log(`[ab-gemini] เสร็จ ${row.id} ใน ${Math.round((Date.now()-t0)/1000)} วิ`);
+  } catch (e) {
+    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: { status: 'failed', error: String(e?.message || e), elapsed_ms: Date.now() - t0 } });
+    console.error('[ab-gemini] ล้มเหลว', row.id, e?.message || e);
+  }
+  return true;
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export default {
   async scheduled(event, env, cfCtx) {
     if (!env.SUPABASE_SERVICE_KEY) return;
-    cfCtx.waitUntil(sweepPending(env));
+    // v_ears P0: ถ้ามีงานเทียบโมเดลค้างอยู่ ให้ tick นี้ทำงานนั้นแทนงานปกติ
+    // (กันแย่งเพดาน 50 subrequest กัน) · ไม่มีงานค้าง = ทำงานปกติตามเดิม
+    cfCtx.waitUntil((async () => {
+      const didAb = await sweepAbGemini(env).catch(e => { console.error('[ab-gemini] sweep error', e); return false; });
+      if (!didAb) await sweepPending(env);
+    })());
     // v_queue: กวาดไฟล์เสียงหมดอายุวันละครั้งพอ (03:00 UTC = 10 โมงเช้าไทย)
     // ของเดิมยิงคู่กับ sweepPending ทุก tick — งานนั้นใช้ได้ถึง 51 subrequest
     // ในตัวมันเอง จึงแย่งเพดาน 50 ของ invocation เดียวกันกับงานหลักโดยไม่จำเป็น
