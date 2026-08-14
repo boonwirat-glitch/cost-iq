@@ -367,15 +367,20 @@ check('admin falls back to org-wide roster',
   /role=in\.\(sales,rep,sales_tl,tl,ad,ad_tl,pm,kam\)/.test(sk));
 
 console.log('\n[B] source locks — ECHO GOAL 2 Phase A0 (transcript quality)');
-check('worker: Whisper prompt is built dynamically from account_name',
-  /const \{ audio_b64, mime_type, duration_secs, account_name \} = body;/.test(worker) &&
-  /const dynamicPrompt = safeAccountName/.test(worker) &&
+// v_ears (2026-08-14): prompt เดิมเป็น "ประโยค" ที่ประกอบจาก account_name
+// ซึ่งกลายเป็นต้นเหตุให้ Whisper คายมันกลับมาเป็นบทพูด (60 ท่อน / 16 session)
+// จึงเปลี่ยนเป็น "รายการคำ" + glossary ชื่อสินค้าจริงของร้าน — ข้อล่างล็อก
+// โครงใหม่แทน · รายละเอียดครบใน tools/verify_ears_prompt.js
+check('worker: Whisper prompt เป็นรายการคำ ไม่ใช่ประโยค (กัน prompt รั่ว)',
+  /const \{ audio_b64, mime_type, duration_secs, account_name, sku_glossary \} = body;/.test(worker) &&
+  /const promptParts = \[/.test(worker) &&
   /groqForm\.append\('prompt', dynamicPrompt\);/.test(worker));
-check('worker: account_name is length-capped before use',
-  /String\(account_name \|\| ''\)\.trim\(\)\.slice\(0, 80\)/.test(worker));
-check('client: _callTranscript sends account_name from pinned ctx (not live globals)',
-  /await _callTranscript\(blob, transcriptTimeout, _ctx\.accountName\);/.test(ci) &&
-  /async function _callTranscript\(audioBlob, timeoutMs, accountName\)/.test(ci) &&
+check('worker: account_name + glossary ถูกคุมความยาวก่อนใช้',
+  /String\(account_name \|\| ''\)\.trim\(\)\.slice\(0, 60\)/.test(worker) &&
+  /String\(skuGlossary \|\| ''\)\.trim\(\)\.slice\(0, 300\)/.test(worker));
+check('client: _callTranscript ส่ง account_name + glossary จาก ctx ที่ pin ไว้',
+  /await _callTranscript\(blob, transcriptTimeout, _ctx\.accountName, _ctx\.skuGlossary\);/.test(ci) &&
+  /async function _callTranscript\(audioBlob, timeoutMs, accountName, skuGlossary\)/.test(ci) &&
   /account_name: accountName \|\| undefined/.test(ci));
 check('client: worker confidence fields captured into ctx after transcript call',
   /_ctx\.transcriptConfidence = typeof transcriptResult\.avg_transcript_confidence === 'number'/.test(ci) &&

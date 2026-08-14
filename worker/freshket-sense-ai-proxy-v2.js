@@ -217,11 +217,11 @@ async function handleTranscript(request, env) {
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400, env); }
 
-  const { audio_b64, mime_type, duration_secs, account_name } = body;
+  const { audio_b64, mime_type, duration_secs, account_name, sku_glossary } = body;
   if (!audio_b64) return json({ error: 'audio_b64 required' }, 400, env);
 
   try {
-    const result = await runTranscribe(_b64ToBytes(audio_b64), mime_type, duration_secs, account_name, env, audio_b64);
+    const result = await runTranscribe(_b64ToBytes(audio_b64), mime_type, duration_secs, account_name, env, audio_b64, sku_glossary);
     return json({ text: JSON.stringify(result) }, 200, env);
   } catch (e) {
     return json({ error: e?.message || 'Transcript failed' }, 502, env);
@@ -361,7 +361,7 @@ async function _geminiUploadAudio(env, bytes, mime) {
   return f.uri;
 }
 
-async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64) {
+async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64, skuGlossary) {
   const account_name = accountName;
   const mime_type = mimeType;
   const duration_secs = durationSecs;
@@ -379,12 +379,29 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
   // session because it wasn't in the (previously static) prompt vocabulary.
   // account_name is per-visit and known client-side at record time, so we
   // fold it into the prompt dynamically instead of a single fixed string.
-  const basePrompt = 'บทสนทนาภาษาไทยระหว่างพนักงานขาย Freshket (วัตถุดิบอาหาร) กับเจ้าของร้านอาหาร อาจมีคำว่า Freshket, SKU, delivery, order, กิโล, ลัง';
-  const safeAccountName = String(account_name || '').trim().slice(0, 80);
-  const dynamicPrompt = safeAccountName
-    ? `${basePrompt} ชื่อร้าน/บริษัทลูกค้าที่กำลังคุยด้วยคือ "${safeAccountName}"`
-    : basePrompt;
+  //
+  // v_ears (2026-08-14) เขียนใหม่ทั้งท่อน — บทเรียนจากข้อมูลจริง:
+  //
+  // Whisper ตีความ `prompt` ว่าเป็น "บทที่ถอดมาก่อนหน้านี้" แล้วเขียนต่อ ไม่ใช่
+  // คำสั่ง · prompt เดิมเขียนเป็นประโยคสมบูรณ์ ("บทสนทนาภาษาไทยระหว่าง…") จึง
+  // ชวนให้มันคายกลับมาเป็นบทพูด · วัดจริง 14 ส.ค.: โผล่ใน transcript 60 ท่อน
+  // จาก 16 ใน 52 session และ 17 ท่อนได้ conf > 0.8 (สูงสุด 0.96) = ตัววัดความ
+  // มั่นใจจับไม่ได้เลย
+  //
+  // เขียนใหม่เป็น **รายการคำล้วน ไม่มีประโยค** — ไม่มีอะไรให้ "เขียนต่อ"
+  // และเติม glossary ชื่อสินค้าจริงของร้านนั้น (client ส่งมา ดู _skuGlossaryFor)
+  // ซึ่งเป็นของที่มีอยู่แล้วแต่ไม่เคยเอามาใช้เลย
+  const promptParts = ['Freshket', 'ออเดอร์', 'เครดิต', 'วางบิล', 'ใบเสนอราคา', 'กิโล', 'ลัง'];
+  const safeAccountName = String(account_name || '').trim().slice(0, 60);
+  if (safeAccountName) promptParts.push(safeAccountName);
+  const safeGlossary = String(skuGlossary || '').trim().slice(0, 300);
+  if (safeGlossary) promptParts.push(safeGlossary);
+  const dynamicPrompt = promptParts.join(' ');
   groqForm.append('prompt', dynamicPrompt);
+  // temperature 0 = เลิกให้มันเดาแบบสร้างสรรค์ตอนเสียงไม่ชัด (ค่า default ของ
+  // Whisper คือไล่ 0→0.2→…→1.0 เมื่อ decode ไม่ผ่านเกณฑ์ ซึ่งเป็นบ่อเกิดของ
+  // ประโยคที่ฟังดูลื่นแต่ไม่มีใครพูด)
+  groqForm.append('temperature', '0');
   groqForm.append('response_format', 'verbose_json');
   groqForm.append('timestamp_granularities[]', 'segment');
 
@@ -415,9 +432,35 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
   // Whisper hallucination guard: drop segments Whisper itself flags as
   // probably-not-speech AND low-confidence (its classic invent-text-on-
   // silence failure mode — restaurant background noise triggers it).
-  const rawSegs = (groqData.segments || []).filter(s =>
-    (s.text || '').trim() && !((s.no_speech_prob || 0) > 0.9 && (s.avg_logprob || 0) < -1)
+  // v_ears: ตะแกรงชั้นสอง — ท่อนที่ "เป็นคำใน prompt ล้วนๆ" คือ prompt รั่ว
+  // ไม่ใช่เสียงคน · เช็คด้วยสัดส่วนคำที่ทับกับ prompt เพราะ conf สูงจับไม่ได้
+  // (บางท่อนได้ 0.96) · เกณฑ์ 0.6 = คำในท่อนนั้นมาจาก prompt เกินครึ่ง
+  const _promptWords = new Set(
+    dynamicPrompt.toLowerCase().split(/[\s,]+/).filter(w => w.length >= 3)
   );
+  const _HALLUCINATION_PHRASES = [
+    'โปรดติดตามตอนต่อไป',   // ติดมาจาก subtitle YouTube — คลาสสิกของ Whisper
+    'ขอบคุณที่รับชม',
+    'subscribe',
+  ];
+  function _looksLikePromptEcho(text) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    if (_HALLUCINATION_PHRASES.some(p => t.toLowerCase().includes(p.toLowerCase()))) return true;
+    const words = t.toLowerCase().split(/[\s,]+/).filter(w => w.length >= 3);
+    if (words.length < 3) return false;
+    const hits = words.filter(w => _promptWords.has(w)).length;
+    return (hits / words.length) >= 0.6;
+  }
+  let _echoDropped = 0;
+  const rawSegs = (groqData.segments || []).filter(s => {
+    const txt = (s.text || '').trim();
+    if (!txt) return false;
+    if ((s.no_speech_prob || 0) > 0.9 && (s.avg_logprob || 0) < -1) return false;
+    if (_looksLikePromptEcho(txt)) { _echoDropped++; return false; }
+    return true;
+  });
+  if (_echoDropped) console.log(`[transcribe] ตัดท่อนที่เป็น prompt รั่ว ${_echoDropped} ท่อน`);
   if (!rawSegs.length) {
     return {
       no_speech: true, segments: [], speakers_detected: [],
@@ -440,18 +483,42 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
   // ── Step 2: Gemini — hears the REAL audio, assigns speakers only ────────
   // Output is a tiny id→speaker mapping (hundreds of tokens), so this call
   // stays fast regardless of visit length.
-  const segLines = segments.map(s => `[${s.segment_id}] [${s.ts}] ${s.text}`).join('\n');
-  const diarizePrompt = `ฟัง audio แล้วระบุว่าแต่ละ segment ของ transcript นี้ใครเป็นคนพูด
+  // v_ears (2026-08-14): เลิกห้าม Gemini แก้คำ
+  //
+  // ของเดิมสั่ง "ห้ามแก้ text" แล้วใช้ Gemini แค่แปะชื่อคนพูด — ทั้งที่มันได้ยิน
+  // เสียงจริงชุดเดียวกันและหูดีกว่า Whisper กับภาษาไทย เท่ากับจ่ายค่าโมเดลแพง
+  // แล้วใช้แค่ 10% ของสิ่งที่มันทำได้
+  //
+  // แต่ปล่อยให้แก้ทั้งหมดก็อันตราย (มันจะ "เกลา" จนเพี้ยนจากที่ลูกค้าพูดจริง)
+  // จึงล็อกไว้ 3 ชั้น: แก้ได้เฉพาะท่อนที่ Whisper เองไม่มั่นใจ (conf < 0.5) ·
+  // ต้องมั่นใจจากเสียงจริงเท่านั้น ห้ามเดาจากบริบท · ทุกคำที่แก้ถูกตีตรา
+  // corrected=true เก็บ text เดิมไว้คู่กัน เพื่อให้ตรวจย้อนได้เสมอ
+  const LOW_CONF_EDIT_THRESHOLD = 0.5;
+  const segLines = segments.map(s =>
+    `[${s.segment_id}] [${s.ts}]${s.transcript_confidence < LOW_CONF_EDIT_THRESHOLD ? ' (ไม่ชัด)' : ''} ${s.text}`
+  ).join('\n');
+  const diarizePrompt = `ฟัง audio แล้วทำ 2 อย่างกับ transcript ข้างล่าง
 
 บริบท: สนทนาระหว่าง Sales rep ของ Freshket (จำหน่ายวัตถุดิบอาหาร) กับเจ้าของร้านอาหาร
 speaker ที่ใช้ได้: "Sales" = คนขาย Freshket, "ลูกค้า" = ฝั่งร้าน (ถ้าได้ยินชื่อจริง เช่น "คุณมาลี" ใช้ชื่อนั้นแทน "ลูกค้า" ได้)
 
-TRANSCRIPT (ถอดจาก audio เดียวกันนี้ — ห้ามแก้ text ห้ามเพิ่ม/ลบ segment):
+งานที่ 1 — ระบุคนพูดของทุก segment
+
+งานที่ 2 — แก้คำเฉพาะ segment ที่ติดป้าย (ไม่ชัด) เท่านั้น
+- แก้ได้ต่อเมื่อ **ฟังจากเสียงจริงแล้วมั่นใจ** ว่าคำที่ถูกคืออะไร
+- ห้ามเดาจากบริบท ห้ามเกลาสำนวน ห้ามเติมคำที่ไม่ได้ยิน ห้ามตัดคำที่ได้ยิน
+- ถ้าฟังแล้วยังไม่ชัด **ไม่ต้องส่ง corrected_text มา** (ปล่อยของเดิมไว้ดีกว่าเดาผิด)
+- segment ที่ไม่มีป้าย (ไม่ชัด) ห้ามแตะเด็ดขาด
+
+TRANSCRIPT (ถอดจาก audio เดียวกันนี้ — ห้ามเพิ่ม/ลบ segment):
 ${segLines}
 
 ตอบ JSON เท่านั้น ไม่มี markdown:
 {
-  "assignments": [ { "id": 0, "speaker": "Sales", "confidence": 0.9 } ],
+  "assignments": [
+    { "id": 0, "speaker": "Sales", "confidence": 0.9 },
+    { "id": 7, "speaker": "ลูกค้า", "confidence": 0.8, "corrected_text": "ถุงใส ยาว 22 เซนติเมตร" }
+  ],
   "speakers_detected": ["Sales", "ลูกค้า"]
 }`;
 
@@ -492,13 +559,25 @@ ${segLines}
     if (parsed && Array.isArray(parsed.assignments)) {
       const byId = {};
       parsed.assignments.forEach(a => { if (a && a.id != null) byId[a.id] = a; });
+      let _corrected = 0;
       segments.forEach(s => {
         const a = byId[s.segment_id];
-        if (a && a.speaker) {
+        if (!a) return;
+        if (a.speaker) {
           s.speaker = a.speaker;
           s.speaker_confidence = Math.max(0, Math.min(1, Number(a.confidence) || 0.5));
         }
+        // v_ears: รับคำที่แก้ — เฉพาะท่อนที่เข้าเกณฑ์จริงเท่านั้น กันโมเดล
+        // แถมมาเกินขอบเขตที่สั่งไว้ · เก็บ text เดิมไว้เสมอเพื่อให้ย้อนดูได้
+        const fix = typeof a.corrected_text === 'string' ? a.corrected_text.trim() : '';
+        if (fix && fix !== s.text && s.transcript_confidence < LOW_CONF_EDIT_THRESHOLD) {
+          s.text_original = s.text;
+          s.text = fix;
+          s.corrected = true;
+          _corrected++;
+        }
       });
+      if (_corrected) console.log(`[transcribe] Gemini แก้คำที่ Whisper ไม่มั่นใจ ${_corrected} ท่อน`);
       speakersDetected = Array.isArray(parsed.speakers_detected) ? parsed.speakers_detected : [];
       diarized = segments.some(s => s.speaker !== 'ไม่ทราบ');
     }
@@ -1453,7 +1532,7 @@ async function handleProcess(request, env, cfCtx) {
 
 async function processSession(sessionId, origin, env) {
   const rows = await sbSelect(env,
-    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts`);
+    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,sku_glossary,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts`);
   const row = rows && rows[0];
   if (!row) return;
 
@@ -1468,7 +1547,7 @@ async function processSession(sessionId, origin, env) {
     try {
       const audioBytes = await sbStorageGet(env, row.audio_path);
       const mime = row.audio_path.endsWith('.mp4') ? 'audio/mp4' : 'audio/webm';
-      const t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env);
+      const t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env, undefined, row.sku_glossary || '');
 
       if (t.no_speech || !(t.segments || []).length) {
         // Nothing to analyze — record the outcome honestly instead of leaving

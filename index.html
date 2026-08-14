@@ -1,4 +1,4 @@
-<!-- Freshket Sense v258: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v259: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1322,7 +1322,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v258',
+      version: 'v259',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51040,6 +51040,46 @@ body:not(.echo-active) { background:unset; }
     return null;
   }
 
+  // ── v_ears (2026-08-14): glossary ชื่อสินค้าของร้านนี้ ───────────────────
+  //
+  // Whisper รับ `prompt` เพื่อ "ใบ้" การสะกดคำเฉพาะ — ของเดิมใส่แค่ 6 คำคงที่
+  // ทั้งที่เรามีรายชื่อสินค้าที่ร้านนี้ซื้อประจำอยู่ในมือแล้ว (bulkSkusData)
+  // ผลคือคำอย่าง "เป็กโกรีโน" / "พิคานย่า" ถอดออกมาเพี้ยนทุกครั้ง เพราะโมเดล
+  // ไม่เคยเห็นคำนี้ในบริบทนี้มาก่อน
+  //
+  // เพดาน prompt ของ Whisper คือ 224 token — เกินแล้วมันตัดหัวทิ้งเงียบๆ
+  // จึงคุมด้วยจำนวนอักษรแทน (ไทยกินหลาย token ต่ออักษร ตัดที่ ~260 ตัวอักษร
+  // เผื่อไว้มาก) และเรียงตาม GMV เพื่อให้คำที่พูดถึงบ่อยสุดได้ที่ก่อน
+  const SKU_GLOSSARY_MAX_CHARS = 260;
+  function _skuGlossaryFor(accountGuid) {
+    try {
+      if (!accountGuid || typeof bulkSkusData === 'undefined' || !bulkSkusData) return '';
+      const byMonth = bulkSkusData[accountGuid];
+      if (!byMonth) return '';
+      // เดือนล่าสุดที่มีข้อมูล
+      const months = Object.keys(byMonth).sort();
+      const rows = byMonth[months[months.length - 1]] || [];
+      const seen = new Set(), names = [];
+      rows.slice()
+        .sort((a, b) => (b.gmv || 0) - (a.gmv || 0))
+        .forEach(r => {
+          const n = String(r.n || '').trim();
+          // ข้ามชื่อสั้นเกินจนไม่ช่วยอะไร และชื่อยาวเกินจนกินโควตา
+          if (n.length < 3 || n.length > 28) return;
+          const k = n.toLowerCase();
+          if (seen.has(k)) return;
+          seen.add(k); names.push(n);
+        });
+      let out = '';
+      for (const n of names) {
+        const next = out ? out + ' ' + n : n;
+        if (next.length > SKU_GLOSSARY_MAX_CHARS) break;
+        out = next;
+      }
+      return out;
+    } catch (e) { return ''; }
+  }
+
   async function _startAsyncPipeline(blob) {
     // pin ctx at start — same v951 discipline as _processBlob (globals can be
     // wiped by open()/picker while we await network)
@@ -51048,6 +51088,7 @@ body:not(.echo-active) { background:unset; }
       checkinCache: _checkinCache || null,
       accountGuid:  _accountGuid || null,
       accountName:  _accountName || '',
+      skuGlossary:  _skuGlossaryFor(_accountGuid),
       ownerType:    _ownerType,
       secs:         _secs,
     };
@@ -51085,6 +51126,7 @@ body:not(.echo-active) { background:unset; }
       if (rowId) {
         const { error } = await supa.from('ci_sessions')
           .update({ pipeline_stage: _stage, audio_path: path, duration_secs: ctx.secs,
+                    sku_glossary: ctx.skuGlossary || null,
                     pipeline_error: _deadNote })
           .eq('id', rowId);
         if (error) throw error;
@@ -51094,6 +51136,7 @@ body:not(.echo-active) { background:unset; }
           owner_type:     ctx.ownerType,
           account_id:     ctx.accountGuid || null,
           account_name:   ctx.accountName || null,
+          sku_glossary:   ctx.skuGlossary || null,
           visited_at:     ctx.checkinCache?.checked_in_at || nowIso,
           duration_secs:  ctx.secs,
           pipeline_stage: _stage,
@@ -51229,6 +51272,7 @@ body:not(.echo-active) { background:unset; }
       checkinCache: _checkinCache || null,
       accountGuid:  _accountGuid || null,
       accountName:  _accountName || '',
+      skuGlossary:  _skuGlossaryFor(_accountGuid),
       ownerType:    _ownerType,
       secs:         _secs,
     };
@@ -51253,7 +51297,7 @@ body:not(.echo-active) { background:unset; }
         _setStep('กำลัง transcript...', 'Whisper + Gemini · ถอดเสียง + แยกคนพูด', 10); // v3 hybrid pipeline (worker /transcript)
         // Dynamic timeout: at least 6 min, scale with recording length
         const transcriptTimeout = Math.max(360000, _secs * 1000 * 1.5);
-        const transcriptResult = await _callTranscript(blob, transcriptTimeout, _ctx.accountName);
+        const transcriptResult = await _callTranscript(blob, transcriptTimeout, _ctx.accountName, _ctx.skuGlossary);
         if (transcriptResult.no_speech) {
           _phase = 'idle'; _idbClear(); _unmount();
           _toast('ไม่พบเสียงพูดใน audio'); return;
@@ -51364,7 +51408,7 @@ body:not(.echo-active) { background:unset; }
 
   // ── Pipeline API calls ────────────────────────────────────────────────────────
 
-  async function _callTranscript(audioBlob, timeoutMs, accountName) {
+  async function _callTranscript(audioBlob, timeoutMs, accountName, skuGlossary) {
     const arrayBuf = await audioBlob.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuf);
     let binary = '';
@@ -51391,7 +51435,7 @@ body:not(.echo-active) { background:unset; }
           // Phase A0: account_name lets the (yet-to-deploy) worker bias Whisper's
           // spelling of this visit's store/company name — old worker just ignores
           // the extra field, so this is safe to ship ahead of the worker deploy
-          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs, account_name: accountName || undefined }),
+          body: JSON.stringify({ audio_b64: b64audio, mime_type: mimeType, duration_secs: _secs, account_name: accountName || undefined, sku_glossary: skuGlossary || undefined }),
           signal: ctrl.signal,
         });
         if (res.ok) { clearTimeout(tmo); break; }
