@@ -306,8 +306,8 @@
 <meta content="Freshket Sense" name="apple-mobile-web-app-title"/>
 <meta content="#0d3328" name="theme-color"/>
 <link href="manifest.json" rel="manifest"/>
-<link href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" rel="apple-touch-icon"/>
-<link href="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" rel="icon" type="image/png"/>
+<link href="/assets/sense-icon.png" rel="apple-touch-icon"/>
+<link href="/assets/sense-icon.png" rel="icon" type="image/png"/>
 <script id="freshket-sense-config">
 // Freshket Sense app config boundary — Phase 14.
 // Classic-script compatible on purpose: this file is inlined into index.html by scripts/build.js.
@@ -315,8 +315,16 @@
 (function(global){
   'use strict';
 
-  const ICON_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
-  const OLIVE_AVATAR_URL = 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
+  // v_egress (2026-08-14): ย้ายรูปมาไว้กับตัวแอปบน Cloudflare Pages
+  //
+  // ทำไม: Supabase public storage ส่ง `cache-control: no-cache` มาให้เสมอ =
+  // สั่งเบราว์เซอร์ว่า "ห้ามเก็บ ถามใหม่ทุกครั้ง" · ไอคอนเดิม 911KB + avatar
+  // 2.2MB ถูกโหลดซ้ำ ~226 ครั้ง/วัน = 288MB/วัน = 8.6GB/เดือน ซึ่งเกินโควตา
+  // Cached Egress ของ Supabase (5GB) ด้วยตัวมันเอง — วัดจาก log จริง 14 ส.ค.
+  // Cloudflare Pages ตั้ง cache ยาวให้เอง + ไม่นับเข้าโควตา Supabase เลย
+  const ICON_URL = '/assets/sense-icon.png';
+  const ICON_URL_512 = '/assets/sense-icon-512.png';
+  const OLIVE_AVATAR_URL = '/assets/olive-avatar.png';
   // ?localdata=1 — dev-only override so a freshly-downloaded BigQuery CSV can be
   // tested by dropping it next to this file (in a `localtest/` folder) instead of
   // round-tripping through the real R2 bucket. Never affects production (flag must
@@ -339,6 +347,7 @@
     }),
     assets: Object.freeze({
       iconUrl: ICON_URL,
+      iconUrl512: ICON_URL_512,
       oliveAvatarUrl: OLIVE_AVATAR_URL
     }),
     supabase: Object.freeze({
@@ -2259,8 +2268,8 @@
   var cfg=window.FreshketSenseConfig||{};
   var app=cfg.app||{};
   var assets=cfg.assets||{};
-  var ic=assets.iconUrl||'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png';
-  var m={name:app.name||"Freshket Sense",short_name:app.shortName||"Freshket",start_url:(location.origin + (app.manifestStartUrl||"/")),display:app.manifestDisplay||"standalone",background_color:app.backgroundColor||"#006050",theme_color:app.themeColor||"#006050",icons:[{src:ic,sizes:"512x512",type:"image/png"}]};
+  var ic=assets.iconUrl||'/assets/sense-icon.png';
+  var m={name:app.name||"Freshket Sense",short_name:app.shortName||"Freshket",start_url:(location.origin + (app.manifestStartUrl||"/")),display:app.manifestDisplay||"standalone",background_color:app.backgroundColor||"#006050",theme_color:app.themeColor||"#006050",icons:[{src:ic,sizes:"192x192",type:"image/png"},{src:(assets.iconUrl512||"/assets/sense-icon-512.png"),sizes:"512x512",type:"image/png"}]};
   try{var blob=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});
   var url=URL.createObjectURL(blob);
   var el=document.querySelector("link[rel=manifest]");if(el)el.href=url;}catch(e){}
@@ -2340,7 +2349,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <!-- Brand -->
 <div class="lgi-brand">
 <div class="lgi-logo-box">
-<img alt="Freshket Sense" height="76" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png" style="object-fit:cover;display:block;" width="76"/>
+<img alt="Freshket Sense" height="76" src="/assets/sense-icon.png" style="object-fit:cover;display:block;" width="76"/>
 </div>
 <div class="lgi-wordmark">
         freshket<span class="lgi-badge">
@@ -2570,7 +2579,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="topbar">
 <div class="logo">
 <div class="logo-box">
-<img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/>
+<img alt="Freshket Sense" src="/assets/sense-icon.png"/>
 </div>
     freshket <span class="iq-badge"><svg class="iq-icon" fill="var(--tk-ok-bright)" viewbox="0 0 10 10" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span>
 </div>
@@ -3218,7 +3227,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="rpt2" id="rpt2-doc">
 <div class="rpt2-head">
 <div class="rpt2-brand">
-<div class="rpt2-logo-box"><img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/></div>
+<div class="rpt2-logo-box"><img alt="Freshket Sense" src="/assets/sense-icon.png"/></div>
 <div>
 <div class="rpt2-wordmark">freshket<span class="lgi-badge" style="margin-left:6px;font-size:9px;padding:1px 5px;animation:none"><svg fill="var(--tk-ok-bright)" height="7" viewbox="0 0 10 10" width="7"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>Sense</span></div>
 <div class="rpt2-sub">Cost Reduction Report</div>
@@ -3619,7 +3628,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="onboard-card">
 <div class="onboard-logo-row">
 <div class="onboard-logo-box">
-<img alt="Freshket Sense" src="https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/sense-icon_2.png"/>
+<img alt="Freshket Sense" src="/assets/sense-icon.png"/>
 </div>
 <div>
 <div class="onboard-logo-name">Freshket <em>Sense</em></div>

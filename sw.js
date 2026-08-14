@@ -12,8 +12,19 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v257';
+const CACHE_NAME = 'sense-v258';
 const APP_URL = '/index.html';
+
+// v_egress (2026-08-14): รูปที่แอปใช้ทุกครั้งที่เปิด — เก็บไว้ตั้งแต่ install
+// เดิมรูปพวกนี้อยู่บน Supabase ที่ส่ง `cache-control: no-cache` มาด้วย แปลว่า
+// เบราว์เซอร์ถูกสั่งไม่ให้เก็บ → โหลดใหม่ทุกครั้ง ~226 ครั้ง/วัน = 288MB/วัน
+// ตอนนี้ย้ายมาอยู่กับตัวแอปแล้ว + ให้ SW เก็บอีกชั้น = เปิดครั้งที่ 2 เป็นต้นไป
+// ไม่มีคำขอออกเน็ตเลยแม้แต่ครั้งเดียว
+const STATIC_ASSETS = [
+  '/assets/sense-icon.png',
+  '/assets/sense-icon-512.png',
+  '/assets/olive-avatar.png',
+];
 
 // ── Fetch app HTML cleanly (no redirect leakage) ─────────────────────────────
 async function fetchClean(url) {
@@ -41,9 +52,13 @@ async function fetchClean(url) {
 // ── Install: pre-cache app shell ─────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    fetchClean(APP_URL).then(response => {
+    fetchClean(APP_URL).then(async response => {
+      const cache = await caches.open(CACHE_NAME).catch(()=>null);
+      if (!cache) return;
+      // รูป: ล้มก็ไม่เป็นไร (offline ตอน install) SW ยัง activate ได้ปกติ
+      await Promise.allSettled(STATIC_ASSETS.map(u => cache.add(u)));
       if (!response) return; // offline during install — SW still activates
-      return caches.open(CACHE_NAME).then(cache => cache.put(APP_URL, response.clone())).catch(()=>{});
+      return cache.put(APP_URL, response.clone()).catch(()=>{});
     })
   );
   // v556: skipWaiting() REMOVED from install. New SW stays `waiting` until the
@@ -81,12 +96,33 @@ self.addEventListener('activate', event => {
 // shell frees /nrr, /dashboard, and any future sibling page to load from
 // the network on their own release cadence, untouched by this cache.
 self.addEventListener('fetch', event => {
-  if (event.request.mode !== 'navigate') return;
   const path = new URL(event.request.url).pathname;
+
+  // v_egress: รูปในโฟลเดอร์ assets — เอาจาก cache ก่อนเสมอ (ไฟล์ไม่เคยเปลี่ยน
+  // ระหว่าง build เดียวกัน และ activate ล้าง cache เก่าทิ้งอยู่แล้วตอนขึ้นเวอร์ชันใหม่)
+  if (path.startsWith('/assets/')) {
+    event.respondWith(handleAsset(event.request));
+    return;
+  }
+
+  if (event.request.mode !== 'navigate') return;
   if (path !== '/' && path !== '/index.html') return; // sibling pages → network
 
   event.respondWith(handleNavigate());
 });
+
+async function handleAsset(request) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    const res = await fetch(request);
+    if (res && res.ok) cache.put(request, res.clone()).catch(()=>{});
+    return res;
+  } catch (e) {
+    return fetch(request);   // cache พัง → ปล่อยผ่านไปเน็ตตามปกติ
+  }
+}
 
 async function handleNavigate() {
   const cache = await caches.open(CACHE_NAME);

@@ -1325,7 +1325,7 @@ const CLAUDE_API_KEY = ''; // Phase 2: no production AI secret in browser. Use A
 // ── OLIVE AVATAR ──────────────────────────────────────
 // Paste your Supabase public image URL here.
 // Leave empty ('') to keep the default star icon.
-const OLIVE_AVATAR_URL=(FRESHKET_APP_CONFIG.assets && FRESHKET_APP_CONFIG.assets.oliveAvatarUrl) || 'https://menslbnyyvpxiyvjywcm.supabase.co/storage/v1/object/public/assets/olive-avatar.png';
+const OLIVE_AVATAR_URL=(FRESHKET_APP_CONFIG.assets && FRESHKET_APP_CONFIG.assets.oliveAvatarUrl) || '/assets/olive-avatar.png';
 
 // Thin wrapper: CSV text → File → existing handleFileUpload (no parse logic duplication)
 // v148: Promise-based with timeout/fail-safe so Sense gates never wait forever.
