@@ -1,4 +1,4 @@
-<!-- Freshket Sense v260: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v261: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1327,7 +1327,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v260',
+      version: 'v261',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -53531,8 +53531,10 @@ ${checkinBar}
     }
 
     // ── A2v2.1: async pipeline กำลังทำงาน / ไม่พบเสียง — สถานะตรงๆ แทนแท็บว่าง
-    if (s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'no_speech') {
-      const _isProcessing = s.pipeline_stage === 'uploaded';
+    // v_audiofix: needs_gemini = ไฟล์ดีแต่ใหญ่เกินขีดของตัวถอดปัจจุบัน — ยังไม่ตาย
+    // รอเส้นทางใหม่มารับช่วง จึงแสดงเหมือน 'uploaded' (กำลังทำอยู่) ไม่ใช่ล้มเหลว
+    if (s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'no_speech' || s.pipeline_stage === 'needs_gemini') {
+      const _isProcessing = s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'needs_gemini';
       body.innerHTML = `
 <div class="sd2-name">${repName}</div>
 <div class="sd2-meta">${acctLabel} · ${date}${dur !== '—' ? ' · ' + dur : ''}</div>
@@ -53785,7 +53787,8 @@ ${confBanner}
         </div>`;
       }
       // A2v2.1: async pipeline in flight — server is still working on this row
-      if (s.pipeline_stage === 'uploaded') {
+      // v_audiofix: needs_gemini นับเป็น "ยังทำอยู่" ด้วย (ไฟล์ดี แต่รอตัวถอดที่รับไหว)
+      if (s.pipeline_stage === 'uploaded' || s.pipeline_stage === 'needs_gemini') {
         return `<div onclick="CI._openSessionDetail('${s.id}')" style="cursor:pointer;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.72);border-radius:var(--r-lg);border:0.5px solid rgba(83,74,183,.25);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
           <span style="width:8px;height:8px;border-radius:50%;background:#534AB7;flex-shrink:0;animation:ci-dot-pulse 1.2s ease-in-out infinite"></span>
           <span style="flex:1;min-width:0;font-size:var(--text-base);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E)">${opts?.showAccount || !(_accountGuid || _groupBySales) ? acctLabel : date}</span>

@@ -62,6 +62,89 @@ check('worker อ่าน sku_glossary จากแถว (เส้น cron) �
 check('glossary ถูกใส่เข้า prompt จริง ไม่ใช่รับมาแล้วทิ้ง',
   /promptParts\.push\(safeGlossary\)/.test(WK));
 
+console.log('\n── 2b. เพดานความยาว prompt ต้องนับเป็น "ไบต์" ไม่ใช่ตัวอักษร ──');
+//
+// เหตุจริง 14 ส.ค. 2026: การอัด 2 คลิปตายด้วย
+//   400 "prompt length must be 896 characters or fewer, provided 932/980"
+// ทั้งที่โค้ดคุมไว้ 260+60+300 ตัวอักษร ซึ่ง "ผ่าน" ถ้านับเป็นตัวอักษร
+// → Groq วัดเป็นไบต์ UTF-8 และภาษาไทยกิน 3 ไบต์ต่อตัว
+// harness เดิมเช็คแค่ "มีการคุมความยาว" จึงจับไม่ได้ นี่คือข้อที่อุดรูนั้น
+
+check('worker มี helper วัดไบต์ (ไม่ใช่ .length)',
+  /function _utf8Bytes\(/.test(WK) && /new TextEncoder\(\)\.encode/.test(WK));
+
+check('มีตัวตัดตามไบต์ _clampBytes และเลิกใช้ slice นับตัวอักษรกับ glossary',
+  /function _clampBytes\(/.test(WK) &&
+  !/String\(skuGlossary \|\| ''\)\.trim\(\)\.slice\(/.test(WK),
+  'slice(0,300) คือบรรทัดที่ทำให้ 14 ส.ค. ล่ม');
+
+check('เพดาน prompt ตั้งต่ำกว่า 896 ที่ Groq บังคับ',
+  /const GROQ_PROMPT_MAX_BYTES = (\d+)/.test(WK) &&
+  Number(WK.match(/const GROQ_PROMPT_MAX_BYTES = (\d+)/)[1]) <= 896);
+
+check('เกินเพดานแล้วต้องตัด glossary ทิ้งแล้วยิงต่อ ไม่ปล่อยให้ทั้งคำขอตาย',
+  /prompt ยังเกินหลังตัด glossary/.test(WK));
+
+// รันของจริง: ประกอบ prompt แบบเดียวกับ worker ด้วย glossary ที่ทำให้ล้มจริง
+{
+  const src = WK.slice(WK.indexOf('function _utf8Bytes'), WK.indexOf('const GROQ_MAX_AUDIO_BYTES'));
+  const c = {};
+  vm.createContext(c);
+  vm.runInContext(`const TextEncoder = this.TextEncoder;\n${src}\nthis.API={_utf8Bytes,_clampBytes};`,
+    Object.assign(c, { TextEncoder }));
+  const { _utf8Bytes, _clampBytes } = c.API;
+
+  const MAX = Number(WK.match(/const GROQ_PROMPT_MAX_BYTES = (\d+)/)[1]);
+  // glossary จริงจาก session 843d66eb (ตัวที่ตายด้วย 932) และ 4aa561b4 (980)
+  const GLOSS_REAL = 'ไข่ไก่ เบอร์ 3 ตราเบทาโกร สันนอกหมู ตัดแต่ง สะโพกไก่ เนื้อไหล่หมู ตัดแต่ง '
+    + 'ต้นหอมไทย คัดสวย ผงเจลาติน ตราแม็กกาแรต วุ้นเส้น ตราต้นสน ซอสฝาแดง ตราเด็กสมบูรณ์ '
+    + 'พริกขี้หนูสวน มะนาวแป้น เบอร์ 40 กระเทียมจีนปอกเปลือก โครงไก่ เบียร์ขวดเล็ก ตราคิริน';
+  const ACCT_REAL = 'ร้านอาหารสาขาสยามพารากอน ชั้น 4 โซนอาหารไทย';
+
+  check('รัน: ข้อความไทยล้วน 1 ตัวอักษร = 3 ไบต์ (สมมติฐานที่ทำให้พลาด)',
+    _utf8Bytes('ก') === 3 && 'ก'.length === 1);
+
+  // ประกอบแบบเดียวกับ worker
+  const parts = ['Freshket', 'ออเดอร์', 'เครดิต', 'วางบิล', 'ใบเสนอราคา', 'กิโล', 'ลัง'];
+  parts.push(_clampBytes(ACCT_REAL, 120));
+  const budget = MAX - _utf8Bytes(parts.join(' ')) - 1;
+  const gl = budget > 30 ? _clampBytes(GLOSS_REAL, budget) : '';
+  if (gl) parts.push(gl);
+  const prompt = parts.join(' ');
+
+  check(`รัน: prompt จาก glossary ตัวจริง = ${_utf8Bytes(prompt)} ไบต์ ต้อง ≤ ${MAX}`,
+    _utf8Bytes(prompt) <= MAX,
+    `ของเดิมได้ 932-1,012 ไบต์ = โดน Groq ปฏิเสธทั้งคำขอ`);
+  check('รัน: prompt ยังต่ำกว่าเพดานจริงของ Groq (896) แน่นอน',
+    _utf8Bytes(prompt) <= 896);
+  check('รัน: ยังเหลือชื่อร้านกับคำเฉพาะอยู่ (ตัด glossary ก่อน ไม่ตัดของสำคัญ)',
+    prompt.includes('Freshket') && prompt.includes('ใบเสนอราคา') && prompt.includes('สยามพารากอน'));
+  check('รัน: _clampBytes ไม่ตัดกลางตัวอักษรจนพัง',
+    !/�/.test(_clampBytes(GLOSS_REAL, 51)) && _utf8Bytes(_clampBytes(GLOSS_REAL, 51)) <= 51);
+  check('รัน: ชื่อร้านยาวผิดปกติก็ยังไม่ทำให้ prompt ทะลุเพดาน',
+    (() => {
+      const p2 = ['Freshket', 'ออเดอร์', 'เครดิต', 'วางบิล', 'ใบเสนอราคา', 'กิโล', 'ลัง'];
+      p2.push(_clampBytes('ร้าน'.repeat(200), 120));
+      const b2 = MAX - _utf8Bytes(p2.join(' ')) - 1;
+      if (b2 > 30) p2.push(_clampBytes(GLOSS_REAL, b2));
+      return _utf8Bytes(p2.join(' ')) <= MAX;
+    })());
+}
+
+console.log('\n── 2c. ขนาดไฟล์เสียง: ต้องกันก่อนยิง ไม่ใช่ให้ Groq ตอบ 413 ──');
+// 14 ส.ค.: 25.6MB โดน 413 / 19.0MB ผ่าน → เพดานจริง 25MB
+// ของเดิมไม่เคยเช็ค ทำให้ไฟล์ดีถูกตีตรา "ไฟล์เสีย" แล้วปิดคิวถาวร
+check('มีเพดานขนาดไฟล์ก่อนเรียก Groq',
+  /const GROQ_MAX_AUDIO_BYTES = 24 \* 1024 \* 1024/.test(WK));
+check('เช็คขนาดเป็นขั้นแรกของ runTranscribe',
+  /if \(_audioBytesLen > GROQ_MAX_AUDIO_BYTES\) throw new AudioTooLargeForGroq/.test(WK));
+check('ไฟล์ใหญ่ = พักไว้ที่ needs_gemini ไม่ใช่ failed_audio ถาวร',
+  /if \(err && err\.tooLarge\)/.test(WK) && /pipeline_stage  = 'needs_gemini'/.test(WK));
+check('ฝั่งแอปรู้จัก needs_gemini แล้ว (ไม่งั้นผู้ใช้เห็นหน้าว่าง)',
+  (CI.match(/needs_gemini/g) || []).length >= 2);
+check('400 ที่เป็นความผิดคำขอฝั่งเรา ไม่ถูกตีเป็นไฟล์เสียถาวร',
+  /prompt length\|invalid\[_ \]request\|parameter/.test(WK) && /ourFault: true/.test(WK));
+
 console.log('\n── 3. ตะแกรงกรอง prompt ที่รั่ว ──');
 
 check('มีตัวตรวจ prompt echo',

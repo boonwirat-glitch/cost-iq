@@ -104,6 +104,13 @@ function backoffMs(attempts) {
 
 function classifyFailure(err) {
   const msg = String((err && err.message) || err || '');
+  // ── v_audiofix (2026-08-15): แยก "คำขอของเราเองผิด" ออกจาก "ไฟล์เสีย" ──
+  // 14 ส.ค. bug ฝั่งเรา (prompt ยาวเกินเพดานไบต์) ทำให้ Groq ตอบ 400 แล้วโดน
+  // เหมารวมเป็น "ไฟล์เสียงใช้ไม่ได้" → ปิดคิวถาวร งานที่กู้ได้ถูกฆ่าทิ้งเงียบๆ
+  // ของแบบนี้ต้องลองใหม่ได้ เพราะพอแก้โค้ดแล้วมันจะผ่านทันที
+  if (/prompt length|invalid[_ ]request|parameter|must be \d+ characters/i.test(msg)) {
+    return { kind: FAIL_TRANSIENT, status: 400, ourFault: true };
+  }
   // ไฟล์ที่ปลายทางอ่านไม่ออก / ไม่มีไฟล์ให้อ่าน = ลองอีกกี่ครั้งก็เหมือนเดิม
   if (/could not process file|invalid media|unsupported (file|format)|sbStorageGet 40[34]/i.test(msg)) {
     return { kind: FAIL_PERMANENT, status: 400 };
@@ -361,8 +368,40 @@ async function _geminiUploadAudio(env, bytes, mime) {
   return f.uri;
 }
 
+// ── v_audiofix (2026-08-15): วัดความยาวเป็นไบต์ ไม่ใช่ตัวอักษร ──────────────
+// ผู้ให้บริการทุกเจ้าที่ประกาศเพดาน "characters" จริงๆ แล้ววัดเป็นไบต์ UTF-8
+// ซึ่งภาษาไทยกิน 3 ไบต์ต่อตัว — การใช้ .length / .slice() จึงนับต่ำกว่าจริง 3 เท่า
+function _utf8Bytes(str) {
+  return new TextEncoder().encode(String(str || '')).length;
+}
+// ตัดให้พอดีเพดานไบต์ โดยไม่ตัดกลางตัวอักษร (ตัดกลางแล้วจะได้ตัวอักษรพัง)
+function _clampBytes(str, maxBytes) {
+  const s = String(str || '');
+  if (_utf8Bytes(s) <= maxBytes) return s;
+  let lo = 0, hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (_utf8Bytes(s.slice(0, mid)) <= maxBytes) lo = mid; else hi = mid - 1;
+  }
+  return s.slice(0, lo).trim();
+}
+
+// เพดานขนาดไฟล์ของ Groq = 25MB · วัดจากของจริง 14 ส.ค.: 25.6MB โดน 413,
+// 19.0MB ผ่าน · ของเดิมไม่เคยเช็คก่อนยิงเลย ทำให้ไฟล์ใหญ่ถูกตีตรา "ไฟล์เสีย"
+// แล้วปิดคิวถาวร ทั้งที่ไฟล์ดีทุกอย่าง แค่ตัวถอดปัจจุบันรับไม่ไหว
+const GROQ_MAX_AUDIO_BYTES = 24 * 1024 * 1024;
+class AudioTooLargeForGroq extends Error {
+  constructor(bytes) {
+    super(`ไฟล์เสียง ${(bytes / 1048576).toFixed(1)}MB เกินขีดของตัวถอดปัจจุบัน (24MB) — รอเส้นทาง Gemini`);
+    this.name = 'AudioTooLargeForGroq';
+    this.tooLarge = true;
+  }
+}
+
 async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64, skuGlossary) {
   const account_name = accountName;
+  const _audioBytesLen = audioBytes && (audioBytes.byteLength ?? audioBytes.length);
+  if (_audioBytesLen > GROQ_MAX_AUDIO_BYTES) throw new AudioTooLargeForGroq(_audioBytesLen);
   const mime_type = mimeType;
   const duration_secs = durationSecs;
   // v_cpudiet: ห้ามแปลง b64 ที่นี่อีก — ดูคอมเมนต์ _geminiUploadAudio
@@ -391,12 +430,32 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
   // เขียนใหม่เป็น **รายการคำล้วน ไม่มีประโยค** — ไม่มีอะไรให้ "เขียนต่อ"
   // และเติม glossary ชื่อสินค้าจริงของร้านนั้น (client ส่งมา ดู _skuGlossaryFor)
   // ซึ่งเป็นของที่มีอยู่แล้วแต่ไม่เคยเอามาใช้เลย
+  //
+  // ⚠ v_audiofix (2026-08-15) — บทเรียนราคาแพง: **Groq วัดความยาว prompt เป็นไบต์
+  // ไม่ใช่ตัวอักษร** แต่ของเดิมคุมด้วย .slice() ซึ่งนับเป็นตัวอักษร
+  // ภาษาไทย 1 ตัวอักษร = 3 ไบต์ ใน UTF-8 → prompt ที่ JS บอกว่า 364 ตัวอักษร
+  // จริงๆ คือ 1,012 ไบต์ เทียบเพดาน 896 ที่ Groq บังคับ
+  // ผล: 14 ส.ค. **ทุก session ที่ร้านมีข้อมูลสินค้า ถูกปฏิเสธทั้งคำขอ**
+  //   (400 "prompt length must be 896 characters or fewer, provided 932/980")
+  //   ไม่เกี่ยวกับความยาวคลิปเลย — คลิป 4 นาทีก็ตาย
+  // จึงต้องคุมเป็นไบต์ และตัด glossary เป็นส่วนแรกที่ยอมสละ (ชื่อร้าน + คำเฉพาะ
+  // สำคัญกว่า เพราะเป็นตัวที่ทำให้ชื่อสาขาถอดตรงกันทั้ง session)
+  const GROQ_PROMPT_MAX_BYTES = 800;   // เพดานจริง 896 — เผื่อไว้ 96
   const promptParts = ['Freshket', 'ออเดอร์', 'เครดิต', 'วางบิล', 'ใบเสนอราคา', 'กิโล', 'ลัง'];
-  const safeAccountName = String(account_name || '').trim().slice(0, 60);
+  const safeAccountName = _clampBytes(String(account_name || '').trim(), 120);
   if (safeAccountName) promptParts.push(safeAccountName);
-  const safeGlossary = String(skuGlossary || '').trim().slice(0, 300);
+  const glossaryBudget = GROQ_PROMPT_MAX_BYTES - _utf8Bytes(promptParts.join(' ')) - 1;
+  const safeGlossary = glossaryBudget > 30
+    ? _clampBytes(String(skuGlossary || '').trim(), glossaryBudget)
+    : '';
   if (safeGlossary) promptParts.push(safeGlossary);
-  const dynamicPrompt = promptParts.join(' ');
+  let dynamicPrompt = promptParts.join(' ');
+  // กันชนสุดท้าย: ถ้ายังเกินอยู่ (ชื่อร้านยาวผิดปกติ) ยอมส่ง prompt สั้นลง
+  // ดีกว่าปล่อยให้ Groq ปฏิเสธทั้งคำขอแล้วเสียบทสนทนาไปทั้งอัน
+  if (_utf8Bytes(dynamicPrompt) > GROQ_PROMPT_MAX_BYTES) {
+    dynamicPrompt = _clampBytes(dynamicPrompt, GROQ_PROMPT_MAX_BYTES);
+    console.warn(`[transcribe] prompt ยังเกินหลังตัด glossary — ตัดซ้ำเหลือ ${_utf8Bytes(dynamicPrompt)} ไบต์`);
+  }
   groqForm.append('prompt', dynamicPrompt);
   // temperature 0 = เลิกให้มันเดาแบบสร้างสรรค์ตอนเสียงไม่ชัด (ค่า default ของ
   // Whisper คือไล่ 0→0.2→…→1.0 เมื่อ decode ไม่ผ่านเกณฑ์ ซึ่งเป็นบ่อเกิดของ
@@ -1494,6 +1553,20 @@ async function failStage(env, sessionId, stageTag, err, row) {
   const note = `${new Date().toISOString()} [${stageTag}] ${String((err && err.message) || err).slice(0, 400)}`;
   const patch = { processing_since: null, pipeline_error: note };
 
+  // v_audiofix: ไฟล์ใหญ่เกินขีดของ Groq ไม่ใช่ "ไฟล์เสีย" — ไฟล์ดีทุกอย่าง
+  // แค่ตัวถอดปัจจุบันรับไม่ไหว · พักไว้ที่ stage ของตัวเองรอเส้นทาง Gemini
+  // มารับช่วง แทนที่จะปิดคิวถาวรแล้วเสียบทสนทนาไปเปล่าๆ
+  if (err && err.tooLarge) {
+    patch.pipeline_stage  = 'needs_gemini';
+    patch.next_attempt_at = null;
+    console.warn(`[process] ${sessionId} ไฟล์ใหญ่เกินขีด Groq → พักไว้ที่ needs_gemini`);
+    await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, patch).catch(() => {});
+    return;
+  }
+  if (c.ourFault) {
+    console.error(`[process] ⚠ ความผิดฝั่งเรา (ไม่ใช่ไฟล์เสีย) ${sessionId}: ${note}`);
+  }
+
   if (c.kind === FAIL_PERMANENT) {
     patch.pipeline_stage  = stageTag === 'transcribe' ? 'failed_audio' : 'failed_system';
     patch.next_attempt_at = null;   // ปิดคิวถาวร — ไม่มีวันสำเร็จ ลองอีกก็เปลืองเปล่า
@@ -1747,6 +1820,28 @@ async function sweepPending(env) {
   for (const r of rows) {
     try { await processSession(r.id, null, env); } catch (_) {}
   }
+  await _alertIfFailingOften(env);
+}
+
+// v_audiofix (2026-08-15): 14 ส.ค. การอัด 5 จาก 6 คลิปล้ม แล้ว **ไม่มีใครรู้เลย**
+// จนบุชมาถามเองในวันถัดมา · ไม่มีที่ไหนในระบบที่ส่งเสียงเมื่อของพังเป็นชุด
+// ตัวนี้ไม่ได้กันพัง แต่ทำให้ "พังแล้วรู้ภายในวันเดียว" ซึ่งคือส่วนที่ขาดจริงๆ
+// (อ่านผ่าน `npx wrangler tail` — ยังไม่ผูกกับช่องทางแจ้งเตือนภายนอก)
+let _lastFailAlertAt = 0;
+async function _alertIfFailingOften(env) {
+  if (Date.now() - _lastFailAlertAt < 6 * 3600 * 1000) return;   // เตือนอย่างมาก 4 ครั้ง/วัน
+  try {
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const rows = await sbSelect(env,
+      `ci_sessions?select=id,pipeline_stage,pipeline_error` +
+      `&pipeline_stage=in.(failed_audio,failed_system)&created_at=gte.${encodeURIComponent(since)}&limit=20`);
+    if (!rows || rows.length < 2) return;
+    _lastFailAlertAt = Date.now();
+    console.error(`[ALERT] 🔴 การถอดเสียงล้ม ${rows.length} รายการใน 24 ชม. — ตัวอย่างสาเหตุ:`);
+    for (const r of rows.slice(0, 3)) {
+      console.error(`  · ${r.id} (${r.pipeline_stage}) ${String(r.pipeline_error || '').slice(0, 160)}`);
+    }
+  } catch (_) { /* การเตือนพังต้องไม่ทำให้คิวพัง */ }
 }
 
 // v_echor3: เก็บไฟล์เสียงไว้กี่วันก่อนลบ · ตั้งค่าได้ผ่าน env ถ้าอยากยืด/หด

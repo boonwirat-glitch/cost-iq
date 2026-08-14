@@ -375,9 +375,13 @@ check('worker: Whisper prompt เป็นรายการคำ ไม่ใ�
   /const \{ audio_b64, mime_type, duration_secs, account_name, sku_glossary \} = body;/.test(worker) &&
   /const promptParts = \[/.test(worker) &&
   /groqForm\.append\('prompt', dynamicPrompt\);/.test(worker));
-check('worker: account_name + glossary ถูกคุมความยาวก่อนใช้',
-  /String\(account_name \|\| ''\)\.trim\(\)\.slice\(0, 60\)/.test(worker) &&
-  /String\(skuGlossary \|\| ''\)\.trim\(\)\.slice\(0, 300\)/.test(worker));
+// v_audiofix (2026-08-15): ข้อนี้เคยล็อก .slice() ซึ่งนับเป็น "ตัวอักษร"
+// — และนั่นคือบรรทัดที่ทำให้การอัดวันที่ 14 ส.ค. ล่ม เพราะ Groq วัดเป็นไบต์
+// และภาษาไทยกิน 3 ไบต์ต่อตัว · ล็อกวิธีใหม่ (คุมเป็นไบต์) แทน
+check('worker: account_name + glossary ถูกคุมความยาวเป็น "ไบต์" ก่อนใช้',
+  /_clampBytes\(String\(account_name \|\| ''\)\.trim\(\), 120\)/.test(worker) &&
+  /_clampBytes\(String\(skuGlossary \|\| ''\)\.trim\(\), glossaryBudget\)/.test(worker) &&
+  !/String\(skuGlossary \|\| ''\)\.trim\(\)\.slice\(/.test(worker));
 check('client: _callTranscript ส่ง account_name + glossary จาก ctx ที่ pin ไว้',
   /await _callTranscript\(blob, transcriptTimeout, _ctx\.accountName, _ctx\.skuGlossary\);/.test(ci) &&
   /async function _callTranscript\(audioBlob, timeoutMs, accountName, skuGlossary\)/.test(ci) &&
