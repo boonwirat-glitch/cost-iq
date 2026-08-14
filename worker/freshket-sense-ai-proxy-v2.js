@@ -1809,58 +1809,176 @@ async function handleListModels(env) {
 // สั่งงานด้วย SQL: update ci_sessions set ab_gemini='{"requested":true}' where id=...
 // ทำทีละ 1 แถวต่อ tick และ **แทนที่งานปกติของ tick นั้น** เพราะ Free plan ให้
 // 50 subrequest ต่อ invocation และงานนี้ใช้ ~24 (โหลด+อัป+โพลสถานะ+ถอด+เขียน)
-async function sweepAbGemini(env) {
-  const rows = await sbSelect(env,
-    `ci_sessions?ab_gemini->>requested=eq.true&audio_path=not.is.null&select=id,audio_path,account_name,duration_secs&limit=1`);
-  const row = rows && rows[0];
-  if (!row) return false;
-  // จองงานทันทีกัน tick ถัดไปหยิบซ้ำ
-  await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: { status: 'running', started_at: new Date().toISOString() } });
-  const t0 = Date.now();
-  try {
-    const bytes = await sbStorageGet(env, row.audio_path);
-    const fileUri = await _geminiUploadAudio(env, bytes, 'audio/webm');
-    const prompt = `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
+// เพดานที่วัดได้จริง (7 คลิป, 14 ส.ค.): คำขอตายที่ **128-131 วินาที** เสมอ
+// ตัวที่ชนเพดานคือ "ความยาวคำตอบ" ไม่ใช่ความยาวไฟล์ — output คงที่ ~530 token
+// ต่อนาทีของเสียง · 33.2 นาที = 17,498 token = 100 วิ รอด / 36.1 นาทีขึ้นไป
+// ตายหมด · ฝั่ง input ไม่ใช่ปัญหา (กลืน 49,557 token สบาย)
+// → ทางออกคือให้มันตอบทีละช่วง ไม่ใช่หั่นไฟล์เสียง (ซึ่ง Worker ทำไม่ได้อยู่แล้ว
+//   เพราะถอดรหัส/ประกอบ container ใหม่ไม่ไหวใน CPU 10ms)
+const AB_WIN_MIN = 15;          // หน้าต่างละ 15 นาที ≈ 8,000 token ≈ 50-70 วิ (เผื่อเท่าตัว)
+const AB_SINGLE_MAX_MIN = 25;   // สั้นกว่านี้ยิงรอบเดียวพอ ไม่ต้องซอย
+const AB_MAX_ATTEMPTS = 12;     // กันแถวค้าง 'running' แล้วบล็อกคิวตลอดกาล
+
+function _abTsToSec(ts) {
+  const m = String(ts || '').match(/^(\d+):(\d+)(?::(\d+))?$/);
+  if (!m) return null;
+  return m[3] ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : (+m[1] * 60 + +m[2]);
+}
+function _abSecToTs(sec) {
+  const s = Math.max(0, Math.round(sec));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+// Gemini คืนได้ทั้ง {"segments":[…]} และ **array เปล่าๆ** (responseMimeType=json
+// บังคับให้เป็น JSON ที่ถูกต้อง แต่ไม่บังคับโครง) — รับทั้งสองแบบ ดีกว่าดัด prompt
+// แล้วหวังว่ามันจะเชื่อ · เผื่อกรณีมีข้อความห่อหน้า/หลัง JSON ด้วย
+function _abParseSegments(raw) {
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch (_) {
+    const a = raw.indexOf('['), z = raw.lastIndexOf(']');
+    if (a !== -1 && z > a) { try { parsed = JSON.parse(raw.slice(a, z + 1)); } catch (_) {} }
+    if (!parsed) {
+      const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
+      if (s !== -1 && e > s) { try { parsed = JSON.parse(raw.slice(s, e + 1)); } catch (_) {} }
+    }
+  }
+  if (Array.isArray(parsed)) parsed = { segments: parsed };
+  return (parsed && Array.isArray(parsed.segments)) ? parsed.segments : null;
+}
+
+function _abPrompt(fromSec, toSec) {
+  const win = (fromSec == null) ? '' :
+    `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
+    `ช่วงก่อนหน้าและหลังจากนั้นข้ามไปทั้งหมด ห้ามถอด · ` +
+    `ts ที่ตอบต้องเป็นเวลาจริงนับจากต้นไฟล์ (ไม่ใช่นับใหม่จากต้นช่วง)`;
+  return `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
 
 บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
 - speaker: "Sales" = ฝั่ง Freshket, "ลูกค้า" = ฝั่งร้าน
 - ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
 
 ตอบ JSON เท่านั้น:
-{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}]}`;
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ file_data: { mime_type: 'audio/webm', file_uri: fileUri } }, { text: prompt }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'application/json' }
-        }) });
-    if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(()=>'')).slice(0,200)}`);
-    const d = await r.json();
-    const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let parsed = null;
-    try { parsed = JSON.parse(raw); } catch (_) {
-      const a = raw.indexOf('['), z = raw.lastIndexOf(']');
-      if (a !== -1 && z !== -1) { try { parsed = JSON.parse(raw.slice(a, z + 1)); } catch (_) {} }
+{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}]}${win}`;
+}
+
+async function _abCallGemini(env, fileUri, fromSec, toSec) {
+  const t0 = Date.now();
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
+          { text: _abPrompt(fromSec, toSec) }
+        ]}],
+        generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'application/json' }
+      }) });
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+  const d = await r.json();
+  const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const segments = _abParseSegments(raw);
+  return {
+    segments,
+    elapsed_ms: Date.now() - t0,
+    finish_reason: d?.candidates?.[0]?.finishReason || null,
+    usage: d?.usageMetadata || null,
+    raw_head: segments ? undefined : raw.slice(0, 1200)
+  };
+}
+
+// สั่งงานด้วย SQL:
+//   update ci_sessions set ab_gemini='{"requested":true,"status":"queued"}' where id=…
+// **ต้องมี status:"queued"** — ตัวเลือกแถวกรองด้วย status ถ้าเป็น NULL จะไม่ถูกหยิบ
+//
+// หนึ่ง tick ทำหนึ่งขั้นเท่านั้น (อัปโหลด หรือ หนึ่งหน้าต่าง) ตามแพตเทิร์นเดียว
+// กับ sweepPending — และ **แทนที่งานปกติของ tick นั้น** เพราะ Free plan ให้
+// 50 subrequest ต่อ invocation ส่วนขั้นอัปโหลดใช้ ~24 (โหลด+อัป+โพลสถานะ+เขียน)
+async function sweepAbGemini(env) {
+  const rows = await sbSelect(env,
+    `ci_sessions?ab_gemini->>requested=eq.true&ab_gemini->>status=in.(queued,running)` +
+    `&audio_path=not.is.null&select=id,audio_path,account_name,duration_secs,ab_gemini&limit=1`);
+  const row = rows && rows[0];
+  if (!row) return false;
+  const st = row.ab_gemini || {};
+  const attempts = (st.attempts || 0) + 1;
+  const save = (patch) => sbPatch(env, 'ci_sessions', `id=eq.${row.id}`,
+    { ab_gemini: { ...st, ...patch, attempts, updated_at: new Date().toISOString() } });
+
+  if (attempts > AB_MAX_ATTEMPTS) {
+    await save({ status: 'failed', error: `เกิน ${AB_MAX_ATTEMPTS} รอบแล้วยังไม่จบ — หยุดกันคิวตัน` });
+    return true;
+  }
+
+  try {
+    // ── ขั้นที่ 1: อัปไฟล์เข้า Gemini ครั้งเดียว แล้วใช้ uri ซ้ำทุกหน้าต่าง (ไฟล์อยู่ ~48 ชม.)
+    if (!st.file_uri) {
+      const t0 = Date.now();
+      const fileUri = await _geminiUploadAudio(env, await sbStorageGet(env, row.audio_path), 'audio/webm');
+      const dur = row.duration_secs || 0;
+      const winMin = st.win_min || AB_WIN_MIN;
+      const windows = [];
+      if (dur / 60 <= AB_SINGLE_MAX_MIN) {
+        windows.push({ from: null, to: null });     // สั้นพอ ยิงรอบเดียว
+      } else {
+        for (let s = 0; s < dur; s += winMin * 60) {
+          windows.push({ from: s, to: Math.min(s + winMin * 60, Math.ceil(dur)) });
+        }
+      }
+      await save({ status: 'running', file_uri: fileUri, upload_ms: Date.now() - t0,
+                   win_min: winMin, windows, next: 0, model: 'gemini-3.1-pro-preview' });
+      console.log(`[ab-gemini] อัปเสร็จ ${row.id} — ${windows.length} หน้าต่าง`);
+      return true;
     }
-    // v_ears: Gemini คืน **array เปล่าๆ** ไม่ได้ห่อด้วย {"segments":[…]} ตามที่ขอ
-    // (responseMimeType=json บังคับให้เป็น JSON ที่ถูกต้อง แต่ไม่บังคับโครง)
-    // → รับทั้งสองแบบ ดีกว่าไปดัด prompt แล้วหวังว่ามันจะเชื่อ
-    if (Array.isArray(parsed)) parsed = { segments: parsed };
-    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: {
-      status: 'done', model: 'gemini-3.1-pro-preview', elapsed_ms: Date.now() - t0,
-      finish_reason: d?.candidates?.[0]?.finishReason || null,
-      usage: d?.usageMetadata || null,
-      segments: parsed?.segments || null,
-      // v_ears: เก็บคำตอบดิบไว้ด้วยเมื่อไม่ได้ segments ตามที่ขอ — ไม่ใช่เฉพาะตอน
-      // parse พัง · รอบแรกเจอว่า Gemini คืน JSON ที่ parse ผ่านแต่คนละโครง
-      // ทำให้ไม่มีอะไรให้ดูเลยว่ามันตอบอะไรมา
-      parsed_keys: parsed && typeof parsed === 'object' ? Object.keys(parsed).slice(0, 10) : null,
-      raw_head: (parsed && Array.isArray(parsed.segments)) ? undefined : raw.slice(0, 1200)
-    }});
-    console.log(`[ab-gemini] เสร็จ ${row.id} ใน ${Math.round((Date.now()-t0)/1000)} วิ`);
+
+    // ── ขั้นที่ 2..N: ถอดทีละหน้าต่าง
+    const windows = st.windows || [];
+    const i = st.next || 0;
+    if (i < windows.length) {
+      const w = windows[i];
+      const res = await _abCallGemini(env, st.file_uri, w.from, w.to);
+      const segs = res.segments || [];
+      // ตัววัดว่ามันเชื่อคำสั่ง "ถอดเฉพาะช่วง" จริงไหม — ถ้าไม่เชื่อ แผนนี้ใช้ไม่ได้
+      let inWin = null;
+      if (w.from != null && segs.length) {
+        const ok = segs.filter(s => {
+          const t = _abTsToSec(s && s.ts);
+          return t != null && t >= w.from - 30 && t <= w.to + 30;
+        }).length;
+        inWin = Math.round(ok / segs.length * 100);
+      }
+      windows[i] = { ...w, status: res.segments ? 'done' : 'parse_failed',
+                     elapsed_ms: res.elapsed_ms, finish_reason: res.finish_reason,
+                     out_tok: res.usage?.candidatesTokenCount ?? null,
+                     in_tok: res.usage?.promptTokenCount ?? null,
+                     seg_count: segs.length, in_window_pct: inWin,
+                     raw_head: res.raw_head, segments: segs };
+      const done = i + 1 >= windows.length;
+      if (!done) {
+        await save({ windows, next: i + 1 });
+        console.log(`[ab-gemini] ${row.id} หน้าต่าง ${i + 1}/${windows.length} เสร็จใน ${Math.round(res.elapsed_ms / 1000)} วิ`);
+        return true;
+      }
+      // ── รวมผลทุกหน้าต่างเป็นบทเดียว (หน้าต่างไม่ซ้อนกัน จึงไม่ต้องกันซ้ำ)
+      const merged = windows.flatMap(x => x.segments || [])
+        .sort((a, b) => (_abTsToSec(a?.ts) ?? 0) - (_abTsToSec(b?.ts) ?? 0));
+      const meta = windows.map(x => ({ from: x.from, to: x.to, status: x.status,
+        elapsed_ms: x.elapsed_ms, out_tok: x.out_tok, in_tok: x.in_tok,
+        seg_count: x.seg_count, in_window_pct: x.in_window_pct, raw_head: x.raw_head }));
+      await save({
+        status: 'done', windows: meta, next: windows.length, segments: merged,
+        total_elapsed_ms: meta.reduce((a, x) => a + (x.elapsed_ms || 0), 0) + (st.upload_ms || 0),
+        total_out_tok: meta.reduce((a, x) => a + (x.out_tok || 0), 0),
+        total_in_tok: meta.reduce((a, x) => a + (x.in_tok || 0), 0)
+      });
+      console.log(`[ab-gemini] เสร็จทั้งคลิป ${row.id} — ${merged.length} ท่อน`);
+      return true;
+    }
+    await save({ status: 'failed', error: 'ไม่มีหน้าต่างให้ทำ (state เพี้ยน)' });
   } catch (e) {
-    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`, { ab_gemini: { status: 'failed', error: String(e?.message || e), elapsed_ms: Date.now() - t0 } });
+    // ล้มระหว่างหน้าต่าง = ยังไม่ตาย ปล่อยให้ tick ถัดไปลองหน้าต่างเดิมซ้ำ
+    // (attempts เป็นตัวกันวนไม่รู้จบ) · ล้มตอนอัป = ตายเลยเพราะยังไม่มีอะไรให้ต่อ
+    const fatal = !st.file_uri;
+    await save({ status: fatal ? 'failed' : 'running', error: String(e?.message || e) });
     console.error('[ab-gemini] ล้มเหลว', row.id, e?.message || e);
   }
   return true;
