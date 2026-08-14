@@ -244,7 +244,7 @@ async function handleAbGeminiTranscribe(request, env) {
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400, env); }
-  const { session_id, audio_path, model, max_output_tokens } = body || {};
+  const { session_id, audio_path, model, max_output_tokens, file_uri, from, to } = body || {};
   if (!session_id || !audio_path) return json({ error: 'session_id + audio_path required' }, 400, env);
   try {
   const rows = await sbSelect(env, `ci_sessions?id=eq.${session_id}&select=id,audio_path,duration_secs,account_id`);
@@ -252,8 +252,18 @@ async function handleAbGeminiTranscribe(request, env) {
   if (!row || row.audio_path !== audio_path) return json({ error: 'session/audio_path mismatch' }, 403, env);
 
   const t0 = Date.now();
-  const audioBytes = await sbStorageGet(env, row.audio_path);
-  const fileUri = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
+  // v_ears: อัปโหลดครั้งเดียวแล้วส่ง file_uri กลับ — รอบถัดไปส่งกลับมาได้เลย
+  // ไม่ต้องโหลด+อัปซ้ำ (ไฟล์อยู่บน Gemini ~48 ชม.) · จำเป็นเพราะคลิป 19 นาที
+  // ยิงรอบเดียวโดน 524 timeout ต้องซอยเป็นหน้าต่างละ ~5 นาทีแล้วยิงหลายรอบ
+  const fileUri = file_uri || await _geminiUploadAudio(env, await sbStorageGet(env, row.audio_path), 'audio/webm');
+  // แยกขั้น: รอบแรกอัปอย่างเดียวแล้วคืน uri (รู้ว่าอัปกินเวลาเท่าไร) รอบถัดไป
+  // ค่อยถอดทีละหน้าต่าง — กัน 524 ที่เกิดจาก อัป+ถอด รวมกันเกิน gateway timeout
+  if (body.upload_only) {
+    return json({ session_id, file_uri: fileUri, upload_ms: Date.now() - t0 }, 200, env);
+  }
+  const windowNote = (from || to)
+    ? `\n\n**ถอดเฉพาะช่วงเวลา ${from || '00:00'} ถึง ${to || 'จบไฟล์'} เท่านั้น** ข้ามช่วงอื่นทั้งหมด ts ที่ตอบให้อ้างอิงเวลาจริงในไฟล์`
+    : '';
 
   // single-pass: ถอด + แยกคนพูดจากเสียงจริงในรอบเดียว (ต่างจาก pipeline เดิม
   // ที่ Whisper ถอดก่อนแล้ว Gemini แค่แปะชื่อ) — คำถามที่ P0 ต้องตอบคือ
@@ -266,7 +276,7 @@ async function handleAbGeminiTranscribe(request, env) {
 - ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
 
 ตอบ JSON เท่านั้น:
-{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}],"speakers_detected":["Sales","ลูกค้า"]}`;
+{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}],"speakers_detected":["Sales","ลูกค้า"]}${windowNote}`;
 
   const useModel = model || 'gemini-3.1-pro-preview';
   const r = await fetch(
@@ -297,6 +307,8 @@ async function handleAbGeminiTranscribe(request, env) {
   return json({
     session_id,
     model: useModel,
+    file_uri: fileUri,            // ส่งกลับให้รอบถัดไปใช้ซ้ำ ไม่ต้องอัปใหม่
+    window: (from || to) ? `${from || '00:00'}-${to || 'end'}` : 'full',
     elapsed_ms: Date.now() - t0,
     finish_reason: data?.candidates?.[0]?.finishReason || null,
     usage: data?.usageMetadata || null,       // ใช้คิดต้นทุนจริงต่อคลิป
