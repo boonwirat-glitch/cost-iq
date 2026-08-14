@@ -3,7 +3,7 @@
 -- Output:  company_gmv.csv  (upload to R2 root, same bucket as portview.csv)
 -- Refresh: manual BigQuery run + manual R2 upload (suggested: daily with the
 --          other /nrr files, or at minimum weekly)
--- Columns (8): month_key, month_label, owner_group, kam_email, tl_email,
+-- Columns (9): month_key, month_label, owner_group, kam_email, tl_email,
 --              bucket, gmv, orders, acct_type
 -- Window:  2026-01-01 → yesterday (day-1 lag, Asia/Bangkok). Calendar-year
 --          framing matches the "Target & Plan 2H 2026" sheet — do NOT switch to
@@ -17,13 +17,17 @@
 --   3. else commercial_owner KAM/PM/ADMIN/SALE → 'kam'/'pm'/'admin'/'sale'
 --   4. else                                    → 'other' (reconcile bucket)
 --
--- bucket:    account_type Chain → 'chain'; SA|MC → 'sa_mc'; else 'other'.
--- acct_type: เหมือน bucket แต่แยก SA กับ MC ('chain'|'sa'|'mc'|'other') —
---   หน้า #/sales ใช้ตัวนี้แสดง 3 กลุ่ม · หน้า #/company ยังใช้ bucket เหมือนเดิม
+-- bucket: account_type Chain → 'chain'; SA|MC → 'sa_mc'; else 'other'.
 --   b2c rows carry bucket '' (not meaningful there).
 --   NOTE: kam rows carry bucket too (the account's own type) but the /nrr app
 --   classifies KAM GMV into squads by tl_email → squad_params (Supabase), NOT
 --   by bucket — bucket on kam rows only powers a future cross-portfolio view.
+--
+-- acct_type (v_satype 2026-08-14, คอลัมน์ที่ 9 — ต่อท้ายเสมอ):
+--   เหมือน bucket ทุกอย่าง ยกเว้นแยก SA กับ MC ออกจากกัน
+--   → 'chain' | 'sa' | 'mc' | 'other' (b2c ได้ '' เหมือน bucket)
+--   หน้า #/sales ใช้คอลัมน์นี้แสดง 3 กลุ่ม (Chain / SA / MC)
+--   หน้า #/company ยังอ่าน bucket เหมือนเดิม ห้ามเปลี่ยนความหมายของ bucket
 --
 -- Sales scope: ALL commercial_owner='SALE' rows — deliberately NOT limited to
 --   the 15-rep email list used by sales_history.sql etc., because this export
