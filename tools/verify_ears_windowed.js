@@ -30,22 +30,27 @@ if (start < 0 || end < 0) { console.error('ERROR: หาบล็อก AB ใ�
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(WK.slice(start, end) +
-  '\nthis.API = { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, _abTsToSec, _abSecToTs, _abParseSegments, _abPrompt };', ctx);
-const { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS,
+  '\nthis.API = { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, AB_MIN_WIN_SEC, _abTsToSec, _abSecToTs, _abParseSegments, _abPrompt };', ctx);
+const { AB_WIN_MIN, AB_SINGLE_MAX_MIN, AB_MAX_ATTEMPTS, AB_MIN_WIN_SEC,
         _abTsToSec, _abSecToTs, _abParseSegments, _abPrompt } = ctx.API;
 
 console.log('\n── 1. ขนาดหน้าต่างต้องอยู่ใต้เพดานอย่างมีระยะเผื่อ ──');
 
-check('หน้าต่าง ≤ 20 นาที (33 นาที = 100 วิ ซึ่งชิดเพดาน 128 เกินไป)',
-  AB_WIN_MIN <= 20 && AB_WIN_MIN >= 5, `AB_WIN_MIN=${AB_WIN_MIN}`);
+// เพดานไม่คงที่: 20.2 นาทีเคยผ่านใน 65 วิ แล้ววันเดียวกันโดน 524 ซ้ำสองรอบ
+// ความเร็ว generate แกว่ง 76-175 token/วิ → ต้องคิดจากวันช้าสุด
+check('หน้าต่าง ≤ 16 นาที (งบ 110 วิ ที่ความเร็วต่ำสุด 76 token/วิ)',
+  AB_WIN_MIN <= 16 && AB_WIN_MIN >= 5, `AB_WIN_MIN=${AB_WIN_MIN}`);
 
-check('เกณฑ์ยิงรอบเดียว ≤ 25 นาที (ต่ำกว่า 33 ที่รอดจริง มีเผื่อ)',
-  AB_SINGLE_MAX_MIN <= 25, `AB_SINGLE_MAX_MIN=${AB_SINGLE_MAX_MIN}`);
+check('เกณฑ์ยิงรอบเดียว ≤ 16 นาที (20 นาทีพิสูจน์แล้วว่าเสี่ยง)',
+  AB_SINGLE_MAX_MIN <= 16, `AB_SINGLE_MAX_MIN=${AB_SINGLE_MAX_MIN}`);
 
 // ประมาณเวลาจากอัตราจริง: 530 token/นาที · 33.2 นาที(17,498 tok) ใช้ 100 วิ
 const secFor = (min) => Math.round(min * 530 / 17498 * 100);
-check(`หน้าต่าง ${AB_WIN_MIN} นาที ≈ ${secFor(AB_WIN_MIN)} วิ = ไม่เกินครึ่งหนึ่งของเพดาน 128 วิ`,
+check(`หน้าต่าง ${AB_WIN_MIN} นาที ≈ ${secFor(AB_WIN_MIN)} วิ ในวันปกติ = ไม่เกินครึ่งของเพดาน 128 วิ`,
   secFor(AB_WIN_MIN) <= 64, `ประมาณได้ ${secFor(AB_WIN_MIN)} วิ`);
+// วันช้าสุดที่วัดได้ 76 token/วิ · 530 token/นาทีของเสียง
+check(`หน้าต่าง ${AB_WIN_MIN} นาที ยังรอดในวันช้าสุด (${Math.round(AB_WIN_MIN*530/76)} วิ < 128)`,
+  AB_WIN_MIN * 530 / 76 < 115, `ช้าสุดได้ ${Math.round(AB_WIN_MIN*530/76)} วิ`);
 
 console.log('\n── 2. แปลงเวลา ──');
 check('mm:ss → วินาที', _abTsToSec('15:30') === 930 && _abTsToSec('00:05') === 5);
@@ -86,9 +91,11 @@ function planWindows(durSec, winMin) {
   return out;
 }
 {
-  const short = planWindows(20.2 * 60, AB_WIN_MIN);
-  check('คลิป 20 นาที = ยิงรอบเดียว (ไม่ซอยโดยไม่จำเป็น)',
+  const short = planWindows(10 * 60, AB_WIN_MIN);
+  check('คลิป 10 นาที = ยิงรอบเดียว (ไม่ซอยโดยไม่จำเป็น)',
     short.length === 1 && short[0].from === null);
+  const mid = planWindows(20.2 * 60, AB_WIN_MIN);
+  check('คลิป 20.2 นาที (ตัวที่ 524 ตอนยิงรอบเดียว) ถูกซอยแล้ว', mid.length >= 2);
 
   const long = planWindows(48.8 * 60, AB_WIN_MIN);
   check(`คลิป 48.8 นาที = ${Math.ceil(48.8 / AB_WIN_MIN)} หน้าต่าง`,
@@ -124,8 +131,10 @@ check('ขั้นอัปโหลดจบ tick ตัวเองทัน�
   'อัป+ถอดในรอบเดียวคือสิ่งที่ทำให้ HTTP เดิมโดน 524');
 check('มีเพดานจำนวนรอบกันแถวค้างบล็อกคิว',
   /attempts > AB_MAX_ATTEMPTS/.test(SWEEP) && AB_MAX_ATTEMPTS > 0);
-check('ล้มระหว่างหน้าต่าง = คง running ให้ลองใหม่ · ล้มตอนอัป = failed',
-  /const fatal = !st\.file_uri;/.test(SWEEP));
+check('ล้มตอนอัป = failed ทันที (ยังไม่มีอะไรให้ทำต่อ)',
+  /if \(!st\.file_uri\) \{\s*await save\(\{ status: 'failed', error: msg \}\);/.test(SWEEP));
+check('ล้มด้วยเหตุอื่นที่ไม่ใช่หมดเวลา = คง running ให้ tick ถัดไปลองซ้ำ',
+  /await save\(\{ status: 'running', error: msg \}\);/.test(SWEEP));
 check('วัดว่าโมเดลเชื่อคำสั่งช่วงเวลาจริงไหม (in_window_pct)',
   /in_window_pct/.test(SWEEP),
   'ถ้ามันไม่เชื่อ แผนหน้าต่างใช้ไม่ได้ ต้องรู้จากตัวเลข ไม่ใช่เดา');
@@ -133,6 +142,21 @@ check('รวมผลเรียงตามเวลาจริง',
   /\.sort\(\(a, b\) => \(_abTsToSec\(a\?\.ts\) \?\? 0\) - \(_abTsToSec\(b\?\.ts\) \?\? 0\)\)/.test(SWEEP));
 check('ตอนรวมแล้วไม่เก็บ segments ซ้ำในทุกหน้าต่าง (meta เท่านั้น)',
   /const meta = windows\.map/.test(SWEEP) && !/windows: windows,\s*segments: merged/.test(SWEEP));
+
+console.log('\n── 6b. กันเขียนทับคำสั่งคน + หดหน้าต่างเองเมื่อหมดเวลา ──');
+check('อ่านสถานะสดก่อนเขียน (compare-and-set)',
+  /const fresh = await sbSelect\(env, `ci_sessions\?id=eq\.\$\{row\.id\}&select=ab_gemini`\)/.test(SWEEP),
+  'ไม่มีตัวนี้ = สั่งหยุดด้วย SQL แล้วโดน tick ที่ค้างอยู่เขียนทับกลับเป็น running (เจอจริง 14 ส.ค.)');
+check('สถานะที่คนตั้งไว้เอง (ไม่ใช่ queued/running) ห้ามถูกเขียนทับ',
+  /now\.status !== 'queued' && now\.status !== 'running'/.test(SWEEP));
+check('จับ 524/timeout แล้วผ่าหน้าต่างครึ่งหนึ่ง แทนที่จะลองขนาดเดิมซ้ำ',
+  /const timedOut = \/\\b524\\b\|timeout\|timed out\/i\.test\(msg\)/.test(SWEEP) &&
+  /windows\.splice\(i, 1, \{ from, to: mid \}, \{ from: mid, to \}\)/.test(SWEEP));
+check('มีพื้นหดต่ำสุด — หดจนสั้นมากแล้วยังพัง = ยอมแพ้พร้อมบอกว่าไม่ใช่เรื่องความยาว',
+  /AB_MIN_WIN_SEC/.test(SWEEP) && AB_MIN_WIN_SEC >= 120);
+check('ยิงรอบเดียวที่หมดเวลา ถูกแปลงเป็นหน้าต่างอัตโนมัติ (from ว่าง = 0, to ว่าง = ความยาวจริง)',
+  /const from = w\.from == null \? 0 : w\.from;/.test(SWEEP) &&
+  /const to = w\.to == null \? Math\.ceil\(row\.duration_secs \|\| 0\) : w\.to;/.test(SWEEP));
 
 console.log('\n── 7. รวมผลจริง: เรียงเวลาถูก และไม่ทำท่อนหาย ──');
 {

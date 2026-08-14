@@ -1815,9 +1815,17 @@ async function handleListModels(env) {
 // ตายหมด · ฝั่ง input ไม่ใช่ปัญหา (กลืน 49,557 token สบาย)
 // → ทางออกคือให้มันตอบทีละช่วง ไม่ใช่หั่นไฟล์เสียง (ซึ่ง Worker ทำไม่ได้อยู่แล้ว
 //   เพราะถอดรหัส/ประกอบ container ใหม่ไม่ไหวใน CPU 10ms)
-const AB_WIN_MIN = 15;          // หน้าต่างละ 15 นาที ≈ 8,000 token ≈ 50-70 วิ (เผื่อเท่าตัว)
-const AB_SINGLE_MAX_MIN = 25;   // สั้นกว่านี้ยิงรอบเดียวพอ ไม่ต้องซอย
-const AB_MAX_ATTEMPTS = 12;     // กันแถวค้าง 'running' แล้วบล็อกคิวตลอดกาล
+// ⚠ เพดานไม่คงที่ — วัดซ้ำ 14 ส.ค. บ่าย: คลิป 20.2 นาทีที่เคยผ่านใน 65 วิ
+// **โดน 524 ซ้ำสองรอบ** ด้วยคำขอแบบเดียวกันเป๊ะ · ความเร็ว generate ที่วัดได้
+// แกว่ง 76-175 token/วิ (ต่างกันเท่าตัว) ตามภาระฝั่ง Google
+// → ห้ามตั้งขนาดหน้าต่างจาก "วันที่เร็ว" ต้องคิดจากวันที่ช้าสุด:
+//   งบเวลาปลอดภัย 110 วิ × 76 token/วิ ≈ 8,400 token ≈ 16 นาทีของเสียง
+//   จึงตั้ง 12 นาที (≈6,400 token) ให้เหลือที่หายใจ
+// และต่อให้ตั้งดีแค่ไหนก็ยังพลาดได้ → มีตัวหดหน้าต่างอัตโนมัติเมื่อโดน 524
+const AB_WIN_MIN = 12;          // ≈6,400 token ≈ 40-85 วิ แล้วแต่วัน
+const AB_SINGLE_MAX_MIN = 12;   // สั้นกว่านี้ยิงรอบเดียวพอ (20 นาทีพิสูจน์แล้วว่าเสี่ยง)
+const AB_MIN_WIN_SEC = 180;     // หดได้ต่ำสุด 3 นาที — ต่ำกว่านี้แปลว่าปัญหาไม่ใช่ความยาว
+const AB_MAX_ATTEMPTS = 20;     // กันแถวค้างบล็อกคิวตลอดกาล (เผื่อรอบที่ใช้หดหน้าต่าง)
 
 function _abTsToSec(ts) {
   const m = String(ts || '').match(/^(\d+):(\d+)(?::(\d+))?$/);
@@ -1901,8 +1909,21 @@ async function sweepAbGemini(env) {
   if (!row) return false;
   const st = row.ab_gemini || {};
   const attempts = (st.attempts || 0) + 1;
-  const save = (patch) => sbPatch(env, 'ci_sessions', `id=eq.${row.id}`,
-    { ab_gemini: { ...st, ...patch, attempts, updated_at: new Date().toISOString() } });
+  // เขียนกลับแบบ compare-and-set: อ่านสถานะสดก่อนเสมอ ถ้ามีใครแก้ระหว่างที่
+  // tick นี้ทำงานอยู่ (เช่นคนสั่งหยุดด้วย SQL) ให้ยอมแพ้ ไม่เขียนทับ
+  // — เจอจริง 14 ส.ค.: ตั้ง status='parked' ด้วยมือแล้วโดน tick ที่ค้างอยู่
+  //   เขียน {...st} ทับ กลับไปเป็น 'running' แล้ววนลองซ้ำต่อ
+  const save = async (patch) => {
+    const fresh = await sbSelect(env, `ci_sessions?id=eq.${row.id}&select=ab_gemini`);
+    const now = fresh && fresh[0] && fresh[0].ab_gemini;
+    if (now && now.status && now.status !== 'queued' && now.status !== 'running') {
+      console.log(`[ab-gemini] ${row.id} ถูกสั่ง ${now.status} ระหว่างทาง — ไม่เขียนทับ`);
+      return false;
+    }
+    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`,
+      { ab_gemini: { ...st, ...patch, attempts, updated_at: new Date().toISOString() } });
+    return true;
+  };
 
   if (attempts > AB_MAX_ATTEMPTS) {
     await save({ status: 'failed', error: `เกิน ${AB_MAX_ATTEMPTS} รอบแล้วยังไม่จบ — หยุดกันคิวตัน` });
@@ -1975,11 +1996,37 @@ async function sweepAbGemini(env) {
     }
     await save({ status: 'failed', error: 'ไม่มีหน้าต่างให้ทำ (state เพี้ยน)' });
   } catch (e) {
-    // ล้มระหว่างหน้าต่าง = ยังไม่ตาย ปล่อยให้ tick ถัดไปลองหน้าต่างเดิมซ้ำ
-    // (attempts เป็นตัวกันวนไม่รู้จบ) · ล้มตอนอัป = ตายเลยเพราะยังไม่มีอะไรให้ต่อ
-    const fatal = !st.file_uri;
-    await save({ status: fatal ? 'failed' : 'running', error: String(e?.message || e) });
-    console.error('[ab-gemini] ล้มเหลว', row.id, e?.message || e);
+    const msg = String(e?.message || e);
+    // ล้มตอนอัป = ตายเลย ยังไม่มีอะไรให้ต่อ
+    if (!st.file_uri) {
+      await save({ status: 'failed', error: msg });
+      console.error('[ab-gemini] อัปไม่สำเร็จ', row.id, msg);
+      return true;
+    }
+    // ── หมดเวลา (524) = คำตอบยาวเกินกว่าที่ฝั่งโน้นจะปั่นทัน "ในวันนี้"
+    // ลองขนาดเดิมซ้ำก็มีแต่จะพังซ้ำ → **ผ่าหน้าต่างนั้นครึ่งหนึ่ง** แล้วไปต่อ
+    // (ทำให้ระบบหาขนาดที่วิ่งไหวของวันนั้นเองโดยไม่ต้องมีคนมาจูน)
+    const windows = st.windows || [];
+    const i = st.next || 0;
+    const w = windows[i];
+    const timedOut = /\b524\b|timeout|timed out/i.test(msg);
+    if (timedOut && w) {
+      const from = w.from == null ? 0 : w.from;
+      const to = w.to == null ? Math.ceil(row.duration_secs || 0) : w.to;
+      const mid = Math.floor((from + to) / 2);
+      if (to - from > AB_MIN_WIN_SEC * 2) {
+        windows.splice(i, 1, { from, to: mid }, { from: mid, to });
+        await save({ status: 'running', windows, error: msg,
+                     note: `หด ${Math.round((to-from)/60)} → ${Math.round((mid-from)/60)} นาที เพราะหมดเวลา` });
+        console.warn(`[ab-gemini] ${row.id} หน้าต่าง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid-from)/60)} นาที`);
+        return true;
+      }
+      await save({ status: 'failed', error: `หดจนถึง ${Math.round((to-from)/60)} นาทีแล้วยังหมดเวลา — ปัญหาไม่ใช่ความยาว: ${msg}` });
+      return true;
+    }
+    // เหตุอื่น (เน็ต/500 ชั่วคราว) — ปล่อยให้ tick ถัดไปลองหน้าต่างเดิมซ้ำ
+    await save({ status: 'running', error: msg });
+    console.error('[ab-gemini] ล้มเหลว', row.id, msg);
   }
   return true;
 }
