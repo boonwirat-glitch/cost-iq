@@ -1,4 +1,4 @@
-<!-- Freshket Sense v259: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v260: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -676,7 +676,9 @@ button:active:not(:disabled){transform:scale(0.96) translateY(1px)!important;tra
 .skel-light{background:linear-gradient(90deg,var(--n100) 25%,var(--n200) 50%,var(--n100) 75%);background-size:400px 100%;animation:shimmer 1.4s ease infinite;border-radius:var(--r-sm)}
 
 /* ── UX POLISH: TOAST ── */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--n900);color:var(--tk-text-primary);font-size:var(--text-md);font-weight:var(--fw-semi);padding:9px 16px;border-radius:var(--r-xl);z-index:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s cubic-bezier(.34,1.4,.64,1);white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+/* v260: z-index 500→10500 — toast ต้องลอยเหนือ Echo sheet (#ci-fullsheet z:9999)
+   และ session detail (z:10001) ไม่งั้น error เช็คอิน/บันทึกถูกบังสนิท = "กดแล้วเงียบ" */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--n900);color:var(--tk-text-primary);font-size:var(--text-md);font-weight:var(--fw-semi);padding:9px 16px;border-radius:var(--r-xl);z-index:10500;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s cubic-bezier(.34,1.4,.64,1);white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ── UX POLISH: NAV ACTIVE DOT ── */
@@ -762,8 +764,11 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .data-btn.loaded{background:var(--tk-ok-border)}
 
 /* ── DATA LOAD PILL ── */
+/* v260: bottom ต้องบวก safe-area — ตัวนี้เป็น pill ลอยตัวเดียวในแอปที่ไม่เผื่อ
+   env(safe-area-inset-bottom) ทำให้บน iPhone มี notch (.bnav สูง ~104px) มันทับ
+   แถบเมนู ~24px ตรงกลางซึ่งคือปุ่ม Echo พอดี ทุกครั้งที่เปิดแอป */
 #data-load-pill{
-  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);left:50%;transform:translateX(-50%);
   display:flex;align-items:center;gap:8px;padding:9px 16px 9px 12px;
   background:rgba(10,25,52,.9);border:1px solid var(--tk-ok-border);border-radius:24px;
   font-size:var(--text-md);font-weight:var(--fw-semi);font-family:var(--tk-font-body);
@@ -1322,7 +1327,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v259',
+      version: 'v260',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -12885,19 +12890,32 @@ const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 // กติกา: ไม่มีคำตอบใน ms ที่กำหนด = ถือว่า "ไม่รู้" แล้วไปต่อ (คืน null)
 // ห้าม reject — เส้นทาง boot หลายจุดไม่มี .catch ถ้า reject จะกลายเป็น
 // unhandled rejection แล้วเงียบไปเหมือนเดิม
+//
+// v_authfix (2026-08-14) — บทเรียนจาก auto-logout ที่ v256 ทำพังเอง:
+// เดิม timeout และ error คืน `null` ซึ่งเป็น **ค่าเดียวกับ "Supabase ยืนยันว่า
+// ไม่มี session"** ทุก caller จึงอ่าน "ไม่รู้" เป็น "ล็อกเอาต์แล้ว" → ผู้ใช้พัก
+// จอกลับมา token หมดอายุพอดี getSession ต้องต่อเน็ต refresh ตอนวิทยุมือถือ
+// เพิ่งตื่น → ค้าง/ล้ม → เด้งหน้า login ทุกครั้งทั้งที่ token ใน localStorage
+// ยังดีอยู่ครบ · ตอนนี้ timeout/error คืน AUTH_UNKNOWN แทน — เป็น object ที่
+// `_r && _r.data && _r.data.session` ยังประเมินเป็น falsy เหมือน null ทุกจุด
+// ดังนั้น caller เดิมที่แปลว่า "ไม่มี session" ยังทำงานเหมือนเดิมเป๊ะ แต่จุดที่
+// **ต้องแยก** "ไม่รู้" ออกจาก "ยืนยันแล้วว่าไม่มี" (เส้น resume) เช็คได้ด้วย
+// _authUnknown(_r) ก่อนตัดสินใจเด้งผู้ใช้ออก
 const SENSE_AUTH_TIMEOUT_MS = 8000;
+const AUTH_UNKNOWN = Object.freeze({ __authUnknown: true, data: null });
+function _authUnknown(v){ return !!(v && v.__authUnknown); }
 function _withTimeout(p, ms, label){
   var t = null;
   var limit = ms || SENSE_AUTH_TIMEOUT_MS;
   return Promise.race([
     Promise.resolve(p).catch(function(e){
       console.warn('[boot-guard] ' + (label || 'promise') + ' ล้มเหลว:', (e && e.message) || e);
-      return null;
+      return AUTH_UNKNOWN;
     }),
     new Promise(function(resolve){
       t = setTimeout(function(){
-        console.warn('[boot-guard] ' + (label || 'promise') + ' เกิน ' + limit + 'ms — ไปต่อโดยถือว่าไม่มีคำตอบ');
-        resolve(null);
+        console.warn('[boot-guard] ' + (label || 'promise') + ' เกิน ' + limit + 'ms — ไปต่อโดยถือว่า "ไม่รู้" (ไม่ใช่ล็อกเอาต์)');
+        resolve(AUTH_UNKNOWN);
       }, limit);
     })
   ]).then(function(v){ clearTimeout(t); return v; });
@@ -13459,6 +13477,13 @@ supa.auth.onAuthStateChange((event, session) => {
       try {
         // v_bootnet: ครอบเพดานเวลา — ถ้าค้าง จะไม่มีใครโชว์หน้า login ให้เลย
         const _sr = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(signed-out)');
+        // v_authfix: timeout/เน็ตล้ม = "ไม่รู้" — ห้ามประทับตรา confirmed จาก
+        // ความเงียบ · ปล่อยผู้ใช้อยู่ต่อ ถ้า SIGNED_OUT เป็นของจริง คำขอถัดไป
+        // จะ 401 แล้ววนกลับมาที่นี่พร้อมคำตอบจริงเอง
+        if (_authUnknown(_sr)) {
+          _senseDataLog('AUTH','⏳ SIGNED_OUT แต่เช็คซ้ำตอบไม่ได้ (เน็ต) — ไม่เด้งผู้ใช้ออก');
+          return;
+        }
         const data = _sr && _sr.data;
         if (data && data.session && data.session.user) {
           // Session recovered — inject silently without showing login
@@ -14343,8 +14368,25 @@ async function _pwaSilentSessionCheck(reason, graceMs){
         if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
         return true;
       }
+      // v_authfix (2026-08-14): "ไม่รู้" ≠ "ล็อกเอาต์" — นี่คือต้นเหตุ auto-logout
+      // ของ v256: token หมดอายุระหว่างพักจอ → getSession ต้องต่อเน็ต refresh
+      // ตอนวิทยุมือถือเพิ่งตื่น → ค้าง/ล้ม → เดิมถูกแปลงเป็น null แล้วเดินเข้า
+      // branch "confirmed session lost" ทั้งที่ไม่มีใคร confirm อะไรเลย
+      // (แถม call ที่สองต่อคิวหลัง navigator.locks ของ call แรกที่ค้าง = ค้าง
+      // ตามแน่นอน จึงหลุด "ทุกครั้ง" ไม่ใช่บางครั้ง) · token ใน localStorage
+      // ยังดีอยู่ครบ — การเด้ง login คือการตัดสินใจผิดของแอปเราเอง
+      // กติกาใหม่: ไม่รู้ = ไม่แตะหน้าจอผู้ใช้ ปล่อยใช้งานต่อ แล้วให้
+      // TOKEN_REFRESHED ของ supabase-js จัดการเองเมื่อเน็ตกลับมา
+      if(_authUnknown(first)){
+        console.warn('[pwa:v_authfix] resume check ตอบไม่ได้ (timeout/เน็ตล้ม) — ไม่รบกวนผู้ใช้',reason);
+        return true;
+      }
       await new Promise(r=>setTimeout(r,graceMs||2500));
       const second=await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(resume-2)');
+      if(_authUnknown(second)){
+        console.warn('[pwa:v_authfix] resume check รอบสองก็ตอบไม่ได้ — ไม่รบกวนผู้ใช้',reason);
+        return true;
+      }
       session=second&&second.data&&second.data.session;
       if(session&&session.user){
         currentUser=session.user;
@@ -14352,6 +14394,7 @@ async function _pwaSilentSessionCheck(reason, graceMs){
         if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
         return true;
       }
+      // มาถึงตรงนี้ = Supabase **ตอบจริง** สองครั้งว่าไม่มี session — ค่อยเด้งได้
       if(currentUser){
         console.warn('[pwa:v206a] confirmed session lost after resume',reason);
         currentUser=null;
@@ -25778,7 +25821,10 @@ function __legacyShowScreenFallback(name){
     try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
-    document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+    // v260: sweep เฉพาะจอของแอปหลัก — จอภายใน Echo sheet (#ci-fullsheet ใช้ .scr เหมือนกัน)
+    // ห้ามโดนกวาด ไม่งั้น boot route ที่หน่วงเวลา (fallbackTimer 3.2s ฯลฯ) จะถอด .on
+    // ของ ci-s-record ทิ้งตอนผู้ใช้เพิ่งเปิด Echo → เหลือ overlay ขาวเปล่าค้างถาวร
+    document.querySelectorAll('.scr').forEach(s=>{if(!s.closest('#ci-fullsheet'))s.classList.remove('on');});
     document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
     const _scrEl=document.getElementById('scr-'+name);
     if(_scrEl){_scrEl.classList.add('on');_scrEl.style.display='';}
@@ -25825,7 +25871,8 @@ function __legacyShowScreenFallback(name){
     if(name==='report'&&typeof renderReport==='function')renderReport();
     return;
   }
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  // v260: ข้าม .scr ใน #ci-fullsheet ด้วยเหตุผลเดียวกับ sweep ตัวบน
+  document.querySelectorAll('.scr').forEach(s=>{if(!s.closest('#ci-fullsheet'))s.classList.remove('on');});
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   const scrEl=document.getElementById('scr-'+name);
   const navEl=document.getElementById('nav-'+name);
@@ -54173,18 +54220,28 @@ ${confBanner}
   // แถวระหว่างยังอยู่ในร้าน · การอัดเสียงที่ตามมา UPDATE แถวเดิม (ดู
   // _saveTranscriptOnly) · แถวที่ไม่มีเสียงตามมา = visit แบบ "เช็คอินอย่างเดียว"
   // ซึ่งนับเป็น visit จริงตามนิยามที่บุชเคาะ (นับทั้งคู่ แยกตัวเลข)
+  let _checkinBusy = false; // v260: กันกดรัวระหว่าง GPS ยังไม่ตอบ (ยิงซ้อนกันได้เดิม)
   async function _doCheckin() {
+    if (_checkinBusy) return;
+    _checkinBusy = true;
     const hint = document.getElementById('ci-thint');
     const core = document.getElementById('ci-orb-core');
     if (hint) hint.textContent = 'กำลังระบุตำแหน่ง...';
     if (core) core.classList.add('orb-snapping');   // v552: visual feedback ระหว่าง GPS snap
     try {
-      const pos = await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
-        });
-      });
+      // v260: watchdog 25 วิ — timeout:10000 ของ geolocation ไม่นับช่วงที่ OS
+      // กำลังโชว์ permission prompt และบางเครื่อง (Location Services ปิดทั้ง
+      // เครื่อง) ไม่เรียก callback ใดๆ เลย → เดิมค้าง "กำลังระบุตำแหน่ง..."
+      // ตลอดกาลโดยไม่มีใครฟ้อง = อาการ "กดเช็คอินแล้วเงียบ" ที่ user เจอ
+      const pos = await Promise.race([
+        new Promise((resolve, reject) => {
+          if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+          });
+        }),
+        new Promise((_, reject) => setTimeout(() => reject({ code: 'stuck' }), 25000)),
+      ]);
       const now = new Date();
       _checkinCache = {
         rep_lat:       pos.coords.latitude,
@@ -54233,12 +54290,25 @@ ${confBanner}
 
     } catch(e) {
       if (core) core.classList.remove('orb-snapping');
-      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
-                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
-                : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
+      // v260: ข้อความ error ต้องมองเห็นได้จริง — toast เดิมอยู่ชั้น z-index 500
+      // ใต้ Echo sheet (9999) จึงถูกบังสนิททุกครั้ง = user เห็นแค่ "กดแล้วเงียบ"
+      // (ยก .toast ขึ้นเหนือ sheet ที่ styles_base.css แล้ว) + เขียนซ้ำลง hint
+      // ใต้ปุ่มซึ่งอยู่ในสายตาแน่ๆ และคาไว้ให้อ่านทัน ไม่เด้งหายใน 2 วิ
+      const msg = e.code === 1 ? 'มือถือไม่ให้สิทธิ์ตำแหน่ง — เปิด ตั้งค่า > เลือกเบราว์เซอร์/แอปนี้ > อนุญาตตำแหน่ง แล้วกลับมากดเช็คอินใหม่'
+                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองย้ายจุด/กลางแจ้ง แล้วกดใหม่'
+                : e.code === 3 ? 'หาตำแหน่งไม่ทันเวลา — กดเช็คอินอีกครั้ง'
+                : e.code === 'stuck' ? 'ระบบตำแหน่งไม่ตอบ — เช็คว่าเปิด Location ของเครื่องอยู่ แล้วกดใหม่'
                 : 'GPS error: ' + e.message;
       _toast(msg);
-      if (hint) { hint.textContent = 'กดเพื่อเช็คอิน'; hint.dataset.mode = 'checkin'; }
+      if (hint) {
+        hint.textContent = msg;
+        hint.dataset.mode = 'checkin'; // กดซ้ำ = ลองเช็คอินใหม่ได้ทันที
+        setTimeout(() => {
+          if (hint.dataset.mode === 'checkin' && !_checkinBusy) hint.textContent = 'กดเพื่อเช็คอิน';
+        }, 8000);
+      }
+    } finally {
+      _checkinBusy = false;
     }
   }
 

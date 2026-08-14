@@ -4360,18 +4360,28 @@ ${confBanner}
   // แถวระหว่างยังอยู่ในร้าน · การอัดเสียงที่ตามมา UPDATE แถวเดิม (ดู
   // _saveTranscriptOnly) · แถวที่ไม่มีเสียงตามมา = visit แบบ "เช็คอินอย่างเดียว"
   // ซึ่งนับเป็น visit จริงตามนิยามที่บุชเคาะ (นับทั้งคู่ แยกตัวเลข)
+  let _checkinBusy = false; // v260: กันกดรัวระหว่าง GPS ยังไม่ตอบ (ยิงซ้อนกันได้เดิม)
   async function _doCheckin() {
+    if (_checkinBusy) return;
+    _checkinBusy = true;
     const hint = document.getElementById('ci-thint');
     const core = document.getElementById('ci-orb-core');
     if (hint) hint.textContent = 'กำลังระบุตำแหน่ง...';
     if (core) core.classList.add('orb-snapping');   // v552: visual feedback ระหว่าง GPS snap
     try {
-      const pos = await new Promise((resolve, reject) => {
-        if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 10000, maximumAge: 0
-        });
-      });
+      // v260: watchdog 25 วิ — timeout:10000 ของ geolocation ไม่นับช่วงที่ OS
+      // กำลังโชว์ permission prompt และบางเครื่อง (Location Services ปิดทั้ง
+      // เครื่อง) ไม่เรียก callback ใดๆ เลย → เดิมค้าง "กำลังระบุตำแหน่ง..."
+      // ตลอดกาลโดยไม่มีใครฟ้อง = อาการ "กดเช็คอินแล้วเงียบ" ที่ user เจอ
+      const pos = await Promise.race([
+        new Promise((resolve, reject) => {
+          if (!navigator.geolocation) { reject(new Error('GPS ไม่รองรับ')); return; }
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+          });
+        }),
+        new Promise((_, reject) => setTimeout(() => reject({ code: 'stuck' }), 25000)),
+      ]);
       const now = new Date();
       _checkinCache = {
         rep_lat:       pos.coords.latitude,
@@ -4420,12 +4430,25 @@ ${confBanner}
 
     } catch(e) {
       if (core) core.classList.remove('orb-snapping');
-      const msg = e.code === 1 ? 'ไม่ได้รับสิทธิ์ GPS — อนุญาตในการตั้งค่า'
-                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองกลางแจ้ง'
-                : e.code === 3 ? 'GPS timeout — ลองอีกครั้ง'
+      // v260: ข้อความ error ต้องมองเห็นได้จริง — toast เดิมอยู่ชั้น z-index 500
+      // ใต้ Echo sheet (9999) จึงถูกบังสนิททุกครั้ง = user เห็นแค่ "กดแล้วเงียบ"
+      // (ยก .toast ขึ้นเหนือ sheet ที่ styles_base.css แล้ว) + เขียนซ้ำลง hint
+      // ใต้ปุ่มซึ่งอยู่ในสายตาแน่ๆ และคาไว้ให้อ่านทัน ไม่เด้งหายใน 2 วิ
+      const msg = e.code === 1 ? 'มือถือไม่ให้สิทธิ์ตำแหน่ง — เปิด ตั้งค่า > เลือกเบราว์เซอร์/แอปนี้ > อนุญาตตำแหน่ง แล้วกลับมากดเช็คอินใหม่'
+                : e.code === 2 ? 'ระบุตำแหน่งไม่ได้ — ลองย้ายจุด/กลางแจ้ง แล้วกดใหม่'
+                : e.code === 3 ? 'หาตำแหน่งไม่ทันเวลา — กดเช็คอินอีกครั้ง'
+                : e.code === 'stuck' ? 'ระบบตำแหน่งไม่ตอบ — เช็คว่าเปิด Location ของเครื่องอยู่ แล้วกดใหม่'
                 : 'GPS error: ' + e.message;
       _toast(msg);
-      if (hint) { hint.textContent = 'กดเพื่อเช็คอิน'; hint.dataset.mode = 'checkin'; }
+      if (hint) {
+        hint.textContent = msg;
+        hint.dataset.mode = 'checkin'; // กดซ้ำ = ลองเช็คอินใหม่ได้ทันที
+        setTimeout(() => {
+          if (hint.dataset.mode === 'checkin' && !_checkinBusy) hint.textContent = 'กดเพื่อเช็คอิน';
+        }, 8000);
+      }
+    } finally {
+      _checkinBusy = false;
     }
   }
 

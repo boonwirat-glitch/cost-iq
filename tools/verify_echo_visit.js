@@ -526,9 +526,13 @@ check('client: legacy rows without new fields collapse silently (backward compat
   /const arr\s+= v => \(Array\.isArray\(v\) \? v\.filter\(Boolean\) : \[\]\);/.test(ci) &&
   /const fold = \(title, count, inner\) => inner/.test(ci) &&
   /เกมที่ควรเดิน/.test(ci));
+// v_ears P0 (2026-08-14): scheduled() มีด่าน A/B ชั่วคราวคั่นหน้า — มีงานเทียบ
+// โมเดลค้างให้ทำงานนั้นแทน (กันแย่งเพดาน 50 subrequest) ไม่มีค่อย sweepPending
+// เมื่อถอด ab_gemini ออก ให้คืน check เดิม: /cfCtx\.waitUntil\(sweepPending\(env\)\);/
 check('worker: cron sweep is the real engine (waitUntil ~30s kill found in live test)',
   /async scheduled\(event, env, cfCtx\)/.test(worker) &&
-  /cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(worker) &&
+  /cfCtx\.waitUntil\(\(async \(\) => \{/.test(worker) &&
+  /if \(!didAb\) await sweepPending\(env\);/.test(worker) &&
   /and\(pipeline_stage\.eq\.transcribed,status\.eq\.draft\)/.test(worker));
 // v_queue (2026-08-12): ข้อเดิมล็อกว่า "cron ต่อ stage ในตัวเอง + limit=3" ซึ่งกลับ
 // ด้านแล้วด้วยเหตุผลเชิงตัวเลข: Free plan ให้ 50 subrequest/invocation แต่

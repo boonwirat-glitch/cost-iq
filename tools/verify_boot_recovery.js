@@ -161,4 +161,36 @@ check('csvOpen มีเพดานเวลา',
 
 console.log('\n' + (fail ? '❌' : '✅') +
   ' verify_boot_recovery: ผ่าน ' + pass + ' · ไม่ผ่าน ' + fail);
+
+// ── v_authfix (2026-08-14): "ไม่รู้" ≠ "ล็อกเอาต์" ──────────────────────────
+// v256 ทำ auto-logout ทุกครั้งที่พักจอ: timeout/error ของ getSession ถูกแปลง
+// เป็น null ซึ่งเป็นค่าเดียวกับ "ยืนยันว่าไม่มี session" · เส้น resume จึงเดิน
+// เข้า branch "confirmed session lost" ทั้งที่ Supabase ไม่เคยตอบอะไรเลย
+console.log('\n[v_authfix] แยก "ไม่รู้" ออกจาก "ล็อกเอาต์แล้ว"');
+{
+  const core = fs.readFileSync(path.join(__dirname, '..', 'src', '01_core.js'), 'utf8');
+  check('มี AUTH_UNKNOWN sentinel ที่ data เป็น null (caller เดิมอ่านเป็น falsy เหมือน null)',
+    /const AUTH_UNKNOWN = Object\.freeze\(\{ __authUnknown: true, data: null \}\)/.test(core));
+  check('_withTimeout คืน AUTH_UNKNOWN ทั้งกรณี error และ timeout (ไม่ใช่ null)',
+    (core.match(/return AUTH_UNKNOWN|resolve\(AUTH_UNKNOWN\)/g) || []).length === 2);
+  check('resume check: รอบแรกตอบไม่ได้ → return true (ไม่รบกวนผู้ใช้)',
+    /_authUnknown\(first\)[\s\S]{0,200}return true/.test(core));
+  check('resume check: รอบสองตอบไม่ได้ → return true เช่นกัน',
+    /_authUnknown\(second\)[\s\S]{0,200}return true/.test(core));
+  check('branch "confirmed session lost" อยู่หลังการเช็ค unknown ทั้งสองรอบ',
+    core.indexOf("'[pwa:v206a] confirmed session lost") > core.indexOf('_authUnknown(second)'));
+  check('SIGNED_OUT recovery: unknown → ไม่เด้งผู้ใช้ออก',
+    /_authUnknown\(_sr\)[\s\S]{0,300}return;/.test(core));
+
+  // รันจริง: AUTH_UNKNOWN ต้อง falsy เมื่ออ่านแบบ caller เดิม
+  const vm2 = require('vm');
+  const ctx2 = {};
+  vm2.createContext(ctx2);
+  vm2.runInContext(core.slice(core.indexOf('const AUTH_UNKNOWN'), core.indexOf('function _withTimeout')) + '\nthis.U=AUTH_UNKNOWN;this.f=_authUnknown;', ctx2);
+  check('รัน: U && U.data && U.data.session ประเมินเป็น falsy (caller เดิมไม่พัง)',
+    !(ctx2.U && ctx2.U.data && ctx2.U.data.session));
+  check('รัน: _authUnknown แยกได้ถูก (true กับ sentinel, false กับ null และ response จริง)',
+    ctx2.f(ctx2.U) === true && ctx2.f(null) === false && ctx2.f({ data: { session: null } }) === false);
+}
+
 process.exit(fail ? 1 : 0);

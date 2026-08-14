@@ -66,7 +66,10 @@ function __legacyShowScreenFallback(name){
     try{if(typeof NavConfig!=='undefined'&&NavConfig.render)NavConfig.render(typeof getCurrentRole==='function'?getCurrentRole():'rep');}catch(_){}
     const _grpB=document.getElementById('swipe-grp-b');
     if(_grpB)_grpB.classList.add('on');
-    document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+    // v260: sweep เฉพาะจอของแอปหลัก — จอภายใน Echo sheet (#ci-fullsheet ใช้ .scr เหมือนกัน)
+    // ห้ามโดนกวาด ไม่งั้น boot route ที่หน่วงเวลา (fallbackTimer 3.2s ฯลฯ) จะถอด .on
+    // ของ ci-s-record ทิ้งตอนผู้ใช้เพิ่งเปิด Echo → เหลือ overlay ขาวเปล่าค้างถาวร
+    document.querySelectorAll('.scr').forEach(s=>{if(!s.closest('#ci-fullsheet'))s.classList.remove('on');});
     document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
     const _scrEl=document.getElementById('scr-'+name);
     if(_scrEl){_scrEl.classList.add('on');_scrEl.style.display='';}
@@ -113,7 +116,8 @@ function __legacyShowScreenFallback(name){
     if(name==='report'&&typeof renderReport==='function')renderReport();
     return;
   }
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
+  // v260: ข้าม .scr ใน #ci-fullsheet ด้วยเหตุผลเดียวกับ sweep ตัวบน
+  document.querySelectorAll('.scr').forEach(s=>{if(!s.closest('#ci-fullsheet'))s.classList.remove('on');});
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
   const scrEl=document.getElementById('scr-'+name);
   const navEl=document.getElementById('nav-'+name);

@@ -25,19 +25,32 @@ const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 // กติกา: ไม่มีคำตอบใน ms ที่กำหนด = ถือว่า "ไม่รู้" แล้วไปต่อ (คืน null)
 // ห้าม reject — เส้นทาง boot หลายจุดไม่มี .catch ถ้า reject จะกลายเป็น
 // unhandled rejection แล้วเงียบไปเหมือนเดิม
+//
+// v_authfix (2026-08-14) — บทเรียนจาก auto-logout ที่ v256 ทำพังเอง:
+// เดิม timeout และ error คืน `null` ซึ่งเป็น **ค่าเดียวกับ "Supabase ยืนยันว่า
+// ไม่มี session"** ทุก caller จึงอ่าน "ไม่รู้" เป็น "ล็อกเอาต์แล้ว" → ผู้ใช้พัก
+// จอกลับมา token หมดอายุพอดี getSession ต้องต่อเน็ต refresh ตอนวิทยุมือถือ
+// เพิ่งตื่น → ค้าง/ล้ม → เด้งหน้า login ทุกครั้งทั้งที่ token ใน localStorage
+// ยังดีอยู่ครบ · ตอนนี้ timeout/error คืน AUTH_UNKNOWN แทน — เป็น object ที่
+// `_r && _r.data && _r.data.session` ยังประเมินเป็น falsy เหมือน null ทุกจุด
+// ดังนั้น caller เดิมที่แปลว่า "ไม่มี session" ยังทำงานเหมือนเดิมเป๊ะ แต่จุดที่
+// **ต้องแยก** "ไม่รู้" ออกจาก "ยืนยันแล้วว่าไม่มี" (เส้น resume) เช็คได้ด้วย
+// _authUnknown(_r) ก่อนตัดสินใจเด้งผู้ใช้ออก
 const SENSE_AUTH_TIMEOUT_MS = 8000;
+const AUTH_UNKNOWN = Object.freeze({ __authUnknown: true, data: null });
+function _authUnknown(v){ return !!(v && v.__authUnknown); }
 function _withTimeout(p, ms, label){
   var t = null;
   var limit = ms || SENSE_AUTH_TIMEOUT_MS;
   return Promise.race([
     Promise.resolve(p).catch(function(e){
       console.warn('[boot-guard] ' + (label || 'promise') + ' ล้มเหลว:', (e && e.message) || e);
-      return null;
+      return AUTH_UNKNOWN;
     }),
     new Promise(function(resolve){
       t = setTimeout(function(){
-        console.warn('[boot-guard] ' + (label || 'promise') + ' เกิน ' + limit + 'ms — ไปต่อโดยถือว่าไม่มีคำตอบ');
-        resolve(null);
+        console.warn('[boot-guard] ' + (label || 'promise') + ' เกิน ' + limit + 'ms — ไปต่อโดยถือว่า "ไม่รู้" (ไม่ใช่ล็อกเอาต์)');
+        resolve(AUTH_UNKNOWN);
       }, limit);
     })
   ]).then(function(v){ clearTimeout(t); return v; });
@@ -599,6 +612,13 @@ supa.auth.onAuthStateChange((event, session) => {
       try {
         // v_bootnet: ครอบเพดานเวลา — ถ้าค้าง จะไม่มีใครโชว์หน้า login ให้เลย
         const _sr = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(signed-out)');
+        // v_authfix: timeout/เน็ตล้ม = "ไม่รู้" — ห้ามประทับตรา confirmed จาก
+        // ความเงียบ · ปล่อยผู้ใช้อยู่ต่อ ถ้า SIGNED_OUT เป็นของจริง คำขอถัดไป
+        // จะ 401 แล้ววนกลับมาที่นี่พร้อมคำตอบจริงเอง
+        if (_authUnknown(_sr)) {
+          _senseDataLog('AUTH','⏳ SIGNED_OUT แต่เช็คซ้ำตอบไม่ได้ (เน็ต) — ไม่เด้งผู้ใช้ออก');
+          return;
+        }
         const data = _sr && _sr.data;
         if (data && data.session && data.session.user) {
           // Session recovered — inject silently without showing login
@@ -1483,8 +1503,25 @@ async function _pwaSilentSessionCheck(reason, graceMs){
         if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
         return true;
       }
+      // v_authfix (2026-08-14): "ไม่รู้" ≠ "ล็อกเอาต์" — นี่คือต้นเหตุ auto-logout
+      // ของ v256: token หมดอายุระหว่างพักจอ → getSession ต้องต่อเน็ต refresh
+      // ตอนวิทยุมือถือเพิ่งตื่น → ค้าง/ล้ม → เดิมถูกแปลงเป็น null แล้วเดินเข้า
+      // branch "confirmed session lost" ทั้งที่ไม่มีใคร confirm อะไรเลย
+      // (แถม call ที่สองต่อคิวหลัง navigator.locks ของ call แรกที่ค้าง = ค้าง
+      // ตามแน่นอน จึงหลุด "ทุกครั้ง" ไม่ใช่บางครั้ง) · token ใน localStorage
+      // ยังดีอยู่ครบ — การเด้ง login คือการตัดสินใจผิดของแอปเราเอง
+      // กติกาใหม่: ไม่รู้ = ไม่แตะหน้าจอผู้ใช้ ปล่อยใช้งานต่อ แล้วให้
+      // TOKEN_REFRESHED ของ supabase-js จัดการเองเมื่อเน็ตกลับมา
+      if(_authUnknown(first)){
+        console.warn('[pwa:v_authfix] resume check ตอบไม่ได้ (timeout/เน็ตล้ม) — ไม่รบกวนผู้ใช้',reason);
+        return true;
+      }
       await new Promise(r=>setTimeout(r,graceMs||2500));
       const second=await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(resume-2)');
+      if(_authUnknown(second)){
+        console.warn('[pwa:v_authfix] resume check รอบสองก็ตอบไม่ได้ — ไม่รบกวนผู้ใช้',reason);
+        return true;
+      }
       session=second&&second.data&&second.data.session;
       if(session&&session.user){
         currentUser=session.user;
@@ -1492,6 +1529,7 @@ async function _pwaSilentSessionCheck(reason, graceMs){
         if(ov&&currentUser){ov.style.display='none';ov.classList.remove('lgi-checking');}
         return true;
       }
+      // มาถึงตรงนี้ = Supabase **ตอบจริง** สองครั้งว่าไม่มี session — ค่อยเด้งได้
       if(currentUser){
         console.warn('[pwa:v206a] confirmed session lost after resume',reason);
         currentUser=null;

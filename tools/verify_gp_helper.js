@@ -50,8 +50,10 @@ const senseGpBlock = coreSrc.slice(gpStart, gpEnd);
 // โหลดผ่าน new Function แล้ว return symbol ออกมา ไม่ใช้ eval ตรงๆ เพราะ
 // const/let ที่ประกาศใน eval จะอยู่แต่ใน scope ของ eval เอง มองจากข้างนอกไม่เห็น
 const D = { skus_monthly: {} };
-const senseApi = new Function('D', senseGpBlock +
-  '\nreturn { SENSE_GP_MIN_COVERAGE, senseGpFromSkuRows, senseGpFor };')(D);
+// v_echonick แทรก senseNickname + window.* assignment เข้ากลางบล็อกนี้ —
+// ส่ง window ปลอมเข้าไปให้ assignment ไม่พัง (harness ไม่ได้ทดสอบตัวนั้น)
+const senseApi = new Function('D', 'window', senseGpBlock +
+  '\nreturn { SENSE_GP_MIN_COVERAGE, senseGpFromSkuRows, senseGpFor };')(D, {});
 const SENSE_GP_MIN_COVERAGE = senseApi.SENSE_GP_MIN_COVERAGE;
 const senseGpFromSkuRows = senseApi.senseGpFromSkuRows;
 const senseGpFor = senseApi.senseGpFor;
@@ -276,8 +278,9 @@ t('q3c มี existing_margin + total_margin (แยกฐานเหมือ�
 t('q3c ไม่มีตัวกรอง margin > 0', !/margin_ex_vat\s*>\s*0/.test(q3cCode));
 // ตัวกรอง gmv_ex_vat > 0 ใน q3c เป็นของเดิม ต้องอยู่ครบ 2 จุด — ถ้าใครลบออก
 // total_gmv จะเปลี่ยน แล้วคอมมิชชั่นจริงจะขยับ
-t('q3c ยังมีตัวกรอง gmv_ex_vat > 0 เดิมครบ 2 จุด (ห้ามลบ ไม่งั้นคอมมิชชั่นขยับ)',
-  (q3cCode.match(/i\.gmv_ex_vat\s*>\s*0/g) || []).length === 2);
+// เดิม 2 จุด · จุดที่ 3 เพิ่มมากับ item_anchor CTE (dddd7c6 ตรึงหมวด ณ ต้นไตรมาส)
+t('q3c ยังมีตัวกรอง gmv_ex_vat > 0 เดิมครบ 3 จุด (ห้ามลบ ไม่งั้นคอมมิชชั่นขยับ)',
+  (q3cCode.match(/i\.gmv_ex_vat\s*>\s*0/g) || []).length === 3);
 // ตำแหน่งคอลัมน์: margin ต้องอยู่ท้ายสุด ไม่แทรกกลาง (parser เป็น positional)
 const sql1Tail = sql1.slice(sql1.lastIndexOf('FROM agg a') - 400, sql1.lastIndexOf('FROM agg a'));
 t('SQL1: margin_ex_vat อยู่หลัง last_order_date (ต่อท้าย ไม่แทรกกลาง)',
