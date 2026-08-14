@@ -228,6 +228,89 @@ async function handleTranscript(request, env) {
   }
 }
 
+// ── v_ears P0 (2026-08-14): ห้องทดลอง A/B — Gemini ฟังเสียงตรง single-pass ──
+// เทียบกับ pipeline ปัจจุบัน (Groq Whisper + Gemini diarize) บนคลิปจริงที่เก็บไว้
+// ใน storage · **ชั่วคราว** — ถอดออกเมื่อ P0 จบและเคาะโมเดลแล้ว
+//
+// ทำไมอยู่ใน worker ไม่ใช่สคริปต์ local: API key ทุกตัวอยู่ที่นี่ (ไม่มีสำเนา
+// ในเครื่อง dev) และ transcript ฝั่ง pipeline เดิมมีใน DB แล้ว ไม่ต้องรันซ้ำ
+// จึงเหลือรันแค่ขา Gemini — 1 คลิปต่อ 1 คำขอ ยิงจาก curl ภายนอก
+//
+// กันคนนอกยิงเล่น (endpoint อื่นของ worker นี้เปิด CORS ไม่มี auth):
+// ผู้เรียกต้องส่ง audio_path ที่ตรงกับแถวจริงใน DB มาด้วย — รู้ได้เฉพาะคนที่
+// อ่าน DB ได้อยู่แล้ว (auth-by-knowledge, พอสำหรับ endpoint ทดลองอายุสั้น)
+async function handleAbGeminiTranscribe(request, env) {
+  if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY not set' }, 503, env);
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ error: 'Invalid JSON' }, 400, env); }
+  const { session_id, audio_path, model, max_output_tokens } = body || {};
+  if (!session_id || !audio_path) return json({ error: 'session_id + audio_path required' }, 400, env);
+  try {
+  const rows = await sbSelect(env, `ci_sessions?id=eq.${session_id}&select=id,audio_path,duration_secs,account_id`);
+  const row = rows && rows[0];
+  if (!row || row.audio_path !== audio_path) return json({ error: 'session/audio_path mismatch' }, 403, env);
+
+  const t0 = Date.now();
+  const audioBytes = await sbStorageGet(env, row.audio_path);
+  const fileUri = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
+
+  // single-pass: ถอด + แยกคนพูดจากเสียงจริงในรอบเดียว (ต่างจาก pipeline เดิม
+  // ที่ Whisper ถอดก่อนแล้ว Gemini แค่แปะชื่อ) — คำถามที่ P0 ต้องตอบคือ
+  // "หูของ Gemini ฟังไทยในร้านอาหารจริงแม่นกว่า Whisper แค่ไหน"
+  const prompt = `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
+
+บริบท: พนักงานขายของ Freshket (บริษัทขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
+- speaker: "Sales" = ฝั่ง Freshket, "ลูกค้า" = ฝั่งร้าน (ถ้าได้ยินชื่อจริงใช้ชื่อนั้นแทนได้)
+- คำเฉพาะที่อาจได้ยิน: Freshket, SKU, order, delivery, กิโล, ลัง, เครดิต, วางบิล, ใบเสนอราคา
+- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
+
+ตอบ JSON เท่านั้น:
+{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}],"speakers_detected":["Sales","ลูกค้า"]}`;
+
+  const useModel = model || 'gemini-3.1-pro-preview';
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent?key=${env.GEMINI_API_KEY}`,
+    {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
+          { text: prompt }
+        ]}],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: max_output_tokens || 65536,
+          responseMimeType: 'application/json'
+        }
+      })
+    });
+  if (!r.ok) return json({ error: `Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}` }, 502, env);
+  const data = await r.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let parsed = null;
+  try { parsed = JSON.parse(rawText); }
+  catch (_) {
+    const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
+    if (s !== -1 && e !== -1) { try { parsed = JSON.parse(rawText.slice(s, e + 1)); } catch (_) {} }
+  }
+  return json({
+    session_id,
+    model: useModel,
+    elapsed_ms: Date.now() - t0,
+    finish_reason: data?.candidates?.[0]?.finishReason || null,
+    usage: data?.usageMetadata || null,       // ใช้คิดต้นทุนจริงต่อคลิป
+    parsed_ok: !!(parsed && Array.isArray(parsed.segments)),
+    segments: parsed?.segments || null,
+    speakers_detected: parsed?.speakers_detected || null,
+    raw_head: parsed ? undefined : rawText.slice(0, 500)   // debug เมื่อ parse พัง
+  }, 200, env);
+  } catch (e) {
+    // endpoint ทดลอง — ตอบสาเหตุตรงๆ ดีกว่าปล่อยเป็น 1101 ให้เดา
+    return json({ error: String(e?.message || e) }, 500, env);
+  }
+}
+
 // A2v2.1: core extracted from handleTranscript so /process (async pipeline) can
 // run the exact same logic server-side. Returns the result OBJECT (not a
 // Response); throws on hard failure. audioB64 is optional — computed from
@@ -1647,6 +1730,7 @@ export default {
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
     const url = new URL(request.url);
     if (url.pathname === '/process')           return handleProcess(request, env, cfCtx);
+    if (url.pathname === '/ab-gemini')         return handleAbGeminiTranscribe(request, env); // v_ears P0 — ชั่วคราว
     if (url.pathname === '/transcript')        return handleTranscript(request, env);
     if (url.pathname === '/transcript-gemini') return handleTranscriptGeminiFull(request, env); // v2 path, kept for A/B
     if (url.pathname === '/summarize')     return handleSummarize(request, env);

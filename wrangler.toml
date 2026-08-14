@@ -17,6 +17,15 @@ name = "freshket-sense-ai-proxy"
 main = "worker/freshket-sense-ai-proxy-v2.js"
 compatibility_date = "2026-08-08"
 
+# ⚠⚠ ห้ามลบบรรทัดนี้ — บทเรียนราคาแพง 2026-08-14: GROQ_API_KEY กับ
+# SUPABASE_SERVICE_KEY ถูกตั้งเป็น "text variable" บนหน้า dashboard (ไม่ใช่
+# secret) และ `wrangler deploy` ค่าเริ่มต้นจะ **แทนที่ vars ทั้งชุด** ด้วยของใน
+# ไฟล์นี้ → deploy ครั้งแรกจากเครื่องลบ key ทิ้งเงียบๆ pipeline ล่มทันที
+# (กู้ด้วย `wrangler rollback 3cad20e5`) · keep_vars=true สั่งให้ deploy
+# เก็บ vars ฝั่ง dashboard ไว้เสมอ — จะปลอดภัยถาวรต่อเมื่อย้าย 2 ตัวนั้น
+# เป็น secret จริงด้วย `wrangler secret put` (ต้องมีค่า key — บุชถืออยู่)
+keep_vars = true
+
 # ⚠⚠ ต้องตรงกับที่ตั้งไว้จริงในหน้า Cloudflare (Settings → Triggers → Cron)
 # ถ้าไฟล์นี้ประกาศไม่ตรง การ deploy จะ "เขียนทับ" ตารางเดิม แล้ว sweepPending
 # ที่เป็นตัวขับ pipeline ของ Echo จะหยุดทำงานเงียบๆ — ตรวจก่อน deploy ครั้งแรกเสมอ
