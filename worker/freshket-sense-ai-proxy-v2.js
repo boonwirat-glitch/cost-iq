@@ -1603,9 +1603,159 @@ async function handleProcess(request, env, cfCtx) {
   return json({ accepted: true, session_id: sessionId }, 202, env);
 }
 
+// ══ v_listen (2026-08-16): Gemini เป็นหูหลัก, Whisper เป็นตัวสำรอง ═══════════
+//
+// ทำไมเปลี่ยน — วัดจากคลิปจริง:
+//   · Whisper ไม่มั่นใจในงานตัวเองเกินครึ่ง (3,605 ท่อน/50 การอัด: เฉลี่ย 0.570,
+//     ต่ำกว่า 0.5 อยู่ 35.5%) และผิดแบบมั่นใจ (0.79-0.87) ในจุดที่สำคัญที่สุด
+//     เช่น "เคลม"→"สมภัย", "Restaurant Manager"→"Reservoir Manager", ข้ามทั้งท่อน
+//   · คลิปเดียวกัน Gemini ได้ 415 ท่อน / Whisper 277 และแยกคนพูดให้ในรอบเดียว
+//
+// ข้อจำกัดที่ต้องออกแบบรับ (วัดจริง 7 คลิป):
+//   · คำขอตายที่ 128-131 วิเสมอ · ตัวชนเพดานคือ **จำนวน token ที่ต้องปั่นออกมา**
+//     ไม่ใช่ความยาวไฟล์ (input 49,557 token กลืนสบาย)
+//   · ความเร็ว generate แกว่ง 76-175 token/วิ ตามภาระฝั่ง Google → คลิปเดียวกัน
+//     ผ่านตอนเช้า ตายตอนบ่ายได้ · **ห้ามตั้งขนาดงานจากวันที่เร็ว**
+//   · Gemini ตัดช่วงเวลาไฟล์เสียงเองไม่ได้ แต่สั่งใน prompt ให้ถอดเฉพาะช่วงได้
+//     และมันเชื่อ (วัด in_window_pct = 100% ทุกหน้าต่างที่ทดสอบ)
+//
+// จึงถอด **ทีละช่วง 12 นาที ข้าม cron tick** โดยจำสถานะไว้ที่ listen_state
+// (อัปไฟล์ครั้งเดียว ใช้ file_uri ซ้ำได้ ~48 ชม.) และ **หดช่วงเองเมื่อหมดเวลา**
+const LISTEN_WIN_MIN = 12;
+const LISTEN_SINGLE_MAX_MIN = 12;
+const LISTEN_MIN_WIN_SEC = 180;
+const LISTEN_MAX_ATTEMPTS = 20;
+
+function _listenPrompt(fromSec, toSec, accountName) {
+  const win = (fromSec == null) ? '' :
+    `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
+    `ช่วงก่อนหน้าและหลังจากนั้นข้ามไปทั้งหมด ห้ามถอด · ` +
+    `เวลาที่ตอบต้องเป็นเวลาจริงนับจากต้นไฟล์ (ไม่ใช่นับใหม่จากต้นช่วง)`;
+  const who = accountName ? `\nร้านที่ไปเยี่ยม: ${_clampBytes(String(accountName), 200)}` : '';
+  return `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
+
+บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน${who}
+- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
+
+ตอบเป็นข้อความล้วน บรรทัดละหนึ่งท่อน รูปแบบเป๊ะๆ นี้เท่านั้น:
+mm:ss|ผู้พูด|ข้อความ
+
+ผู้พูดใช้ตัวอักษรเดียว: S = พนักงานขาย Freshket, C = คนของร้าน
+ห้ามใส่หัวข้อ ห้ามใส่เลขข้อ ห้ามใส่ JSON ห้ามใส่บรรทัดอื่นนอกจากรูปแบบข้างบน
+
+ความละเอียดที่ต้องการ (สำคัญมาก):
+- ขึ้นบรรทัดใหม่**ทุกครั้งที่เปลี่ยนคนพูด** และอย่างน้อยทุก 10-15 วินาทีถึงจะพูดคนเดียวยาว
+- หนึ่งบรรทัดควรสั้น ประมาณหนึ่งถึงสองประโยค — **ห้ามรวบหลายประโยคยาวๆ เป็นบรรทัดเดียว**
+- ต้องถอดต่อเนื่องตลอดทั้งช่วง ห้ามข้ามช่วงไหน แม้เป็นช่วงที่คุยเรื่องนอกเรื่องหรือเงียบนาน
+- ห้ามสรุปหรือเรียบเรียงใหม่ ต้องเป็นคำพูดจริงที่ได้ยิน
+
+ตัวอย่าง:
+00:03|S|สวัสดีครับพี่ วันนี้มาส่งของครับ
+00:07|C|ค่ะ วางตรงนี้เลย${win}`;
+}
+
+async function _listenCall(env, fileUri, fromSec, toSec, accountName) {
+  const t0 = Date.now();
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
+          { text: _listenPrompt(fromSec, toSec, accountName) }
+        ]}],
+        generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'text/plain' }
+      }) });
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+  const d = await r.json();
+  const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const segments = _abParseCompact(raw);
+  if (!segments) throw new Error(`Gemini ตอบมาแต่อ่านไม่ออก: ${raw.slice(0, 160)}`);
+  return { segments, elapsed_ms: Date.now() - t0 };
+}
+
+// ทำ "หนึ่งขั้น" ของการถอดด้วย Gemini · คืน null = ยังไม่จบ ให้ tick ถัดไปทำต่อ
+// คืน {segments,…} = จบแล้ว · throw = ล้มแบบที่ควรตกไป Whisper
+async function runListenStep(env, row, audioBytes) {
+  const st = row.listen_state || {};
+  const attempts = (st.attempts || 0) + 1;
+  if (attempts > LISTEN_MAX_ATTEMPTS) {
+    throw new Error(`ถอดด้วย Gemini ไม่จบใน ${LISTEN_MAX_ATTEMPTS} รอบ — ตกไปใช้ตัวสำรอง`);
+  }
+  const save = (patch) => sbPatch(env, 'ci_sessions', `id=eq.${row.id}`,
+    { listen_state: { ...st, ...patch, attempts, updated_at: new Date().toISOString() } });
+
+  // ── ขั้นที่ 1: อัปไฟล์เข้า Gemini ครั้งเดียว แล้ววางแผนช่วงเวลา
+  if (!st.file_uri) {
+    const fileUri = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
+    const dur = row.duration_secs || 0;
+    const windows = [];
+    if (dur / 60 <= LISTEN_SINGLE_MAX_MIN) windows.push({ from: null, to: null });
+    else for (let s = 0; s < dur; s += LISTEN_WIN_MIN * 60) {
+      windows.push({ from: s, to: Math.min(s + LISTEN_WIN_MIN * 60, Math.ceil(dur)) });
+    }
+    await save({ file_uri: fileUri, windows, next: 0, segs: [] });
+    console.log(`[listen] ${row.id} อัปไฟล์เสร็จ — ${windows.length} ช่วง`);
+    return null;
+  }
+
+  // ── ขั้นที่ 2..N: ถอดทีละช่วง
+  const windows = st.windows || [];
+  const i = st.next || 0;
+  const w = windows[i];
+  if (!w) throw new Error('listen_state เพี้ยน — ไม่มีช่วงให้ทำ');
+
+  let res;
+  try {
+    res = await _listenCall(env, st.file_uri, w.from, w.to, row.account_name);
+  } catch (e) {
+    const msg = String(e?.message || e);
+    // หมดเวลา = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน "ในวันนี้" → ผ่าช่วงนั้นครึ่งหนึ่ง
+    // แล้วไปต่อ · ลองขนาดเดิมซ้ำมีแต่จะพังซ้ำและเผาเงินเปล่า
+    if (/\b524\b|timeout|timed out/i.test(msg)) {
+      const from = w.from == null ? 0 : w.from;
+      const to = w.to == null ? Math.ceil(row.duration_secs || 0) : w.to;
+      const mid = Math.floor((from + to) / 2);
+      if (to - from > LISTEN_MIN_WIN_SEC * 2) {
+        windows.splice(i, 1, { from, to: mid }, { from: mid, to });
+        await save({ windows });
+        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid - from) / 60)} นาที`);
+        return null;
+      }
+    }
+    throw e;   // เหตุอื่น (หรือหดจนสุดแล้วยังพัง) → ให้ผู้เรียกตัดสินใจตกไป Whisper
+  }
+
+  const segs = (st.segs || []).concat(res.segments);
+  const done = i + 1 >= windows.length;
+  if (!done) {
+    await save({ next: i + 1, segs });
+    console.log(`[listen] ${row.id} ช่วง ${i + 1}/${windows.length} เสร็จใน ${Math.round(res.elapsed_ms / 1000)} วิ`);
+    return null;
+  }
+
+  // ── รวมผลทุกช่วงเป็นบทเดียว เรียงตามเวลาจริง (ช่วงไม่ซ้อนกัน ไม่ต้องกันซ้ำ)
+  const merged = segs.slice().sort((a, b) => (_abTsToSec(a?.ts) ?? 0) - (_abTsToSec(b?.ts) ?? 0));
+
+  // Gemini ไม่ให้ตัวเลขความมั่นใจรายท่อนแบบ Whisper — แต่มันติดป้าย "[ฟังไม่ชัด]"
+  // ตามที่ prompt สั่ง จึงใช้สัดส่วนท่อนที่ฟังออกเป็นตัวแทน เพื่อให้ป้ายเตือน
+  // "ถอดเสียงไม่ชัดเจน" ในแอปยังทำงานต่อได้ (ถ้าปล่อยเป็น null ป้ายจะเงียบไปเฉยๆ
+  // = เสียตัวกันความผิดพลาดที่ทำไว้แล้วไปเปล่าๆ)
+  const unclear = merged.filter(s => /\[ฟังไม่ชัด\]/.test(s.text || '')).length;
+  const conf = merged.length ? 1 - (unclear / merged.length) : null;
+
+  console.log(`[listen] ${row.id} ถอดจบ — ${merged.length} ท่อน จาก ${windows.length} ช่วง (ฟังไม่ชัด ${unclear})`);
+  return {
+    segments: merged,
+    source: 'gemini-3.1-pro',
+    avg_transcript_confidence: conf,
+    avg_speaker_confidence: null   // แยกคนพูดมาในรอบเดียวกัน ไม่มีคะแนนแยก
+  };
+}
+
 async function processSession(sessionId, origin, env) {
   const rows = await sbSelect(env,
-    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,sku_glossary,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts`);
+    `ci_sessions?id=eq.${sessionId}&select=id,owner_email,owner_type,account_id,account_name,sku_glossary,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts,listen_state`);
   const row = rows && rows[0];
   if (!row) return;
 
@@ -1620,7 +1770,32 @@ async function processSession(sessionId, origin, env) {
     try {
       const audioBytes = await sbStorageGet(env, row.audio_path);
       const mime = row.audio_path.endsWith('.mp4') ? 'audio/mp4' : 'audio/webm';
-      const t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env, undefined, row.sku_glossary || '');
+
+      // ── v_listen: Gemini เป็นหูหลัก · Whisper เป็นตัวสำรอง ──────────────
+      // สวิตช์ย้อนกลับ: ตั้ง env var LISTEN_ENGINE=whisper แล้วกลับไปใช้ของเดิม
+      // ได้ทันทีโดยไม่ต้องแก้โค้ด (เผื่อ Gemini มีปัญหาแล้วต้องถอยด่วน)
+      let t = null;
+      const useGemini = env.LISTEN_ENGINE !== 'whisper' && !!env.GEMINI_API_KEY;
+      if (useGemini) {
+        try {
+          const step = await runListenStep(env, row, audioBytes);
+          if (!step) {
+            // ยังไม่จบ — ปล่อย claim ให้ tick ถัดไปทำช่วงต่อไป (stage ยังเป็น uploaded)
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null });
+            return;
+          }
+          t = step;
+        } catch (e) {
+          // Gemini ไปต่อไม่ได้จริงๆ → ล้างสถานะทิ้งแล้วให้ Whisper รับช่วง
+          // งานต้องไม่ค้างเพราะฝั่งใดฝั่งหนึ่งมีปัญหา
+          console.warn(`[listen] ${sessionId} Gemini ล้ม → ใช้ตัวสำรอง Whisper: ${e?.message || e}`);
+          await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { listen_state: null }).catch(() => {});
+          t = null;
+        }
+      }
+      if (!t) {
+        t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env, undefined, row.sku_glossary || '');
+      }
 
       if (t.no_speech || !(t.segments || []).length) {
         // Nothing to analyze — record the outcome honestly instead of leaving
@@ -1642,7 +1817,8 @@ async function processSession(sessionId, origin, env) {
         processing_since:      null,
         pipeline_error:        null,
         attempts:              0,      // ผ่าน stage แล้ว งบเริ่มนับใหม่สำหรับ stage หน้า
-        next_attempt_at:       null    // พร้อมให้ tick ถัดไปหยิบทันที
+        next_attempt_at:       null,   // พร้อมให้ tick ถัดไปหยิบทันที
+        listen_state:          null    // v_listen: ถอดจบแล้ว ไม่ต้องเก็บสถานะระหว่างทาง
       });
       // v_echor3 (2026-08-08): เดิมลบไฟล์เสียงทิ้งตรงนี้ทันที — ผลคือคลิปจริง 43
       // จาก 44 หายถาวร พอมีคนบอกว่า "ฟังไม่รู้เรื่อง" เราจึงกลับไปฟังต้นฉบับไม่ได้
