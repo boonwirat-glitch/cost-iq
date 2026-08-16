@@ -110,7 +110,10 @@ agg AS (
     COUNT(DISTINCT r.res_id)                                           AS outlet_count_sku,
     -- NEW v4: วันสั่งล่าสุดของ SKU นี้ในเดือนนี้
     -- ใช้สำหรับ approaching signal: SKU order_count=1 → คาดว่าจะสั่งแถวๆ วันนี้ของเดือนถัดไป
-    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date
+    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date,
+    -- v_key: วันสั่งครั้งแรกของ SKU นี้ในเดือนนี้ — แยก "เพิ่งเริ่มสั่งใหม่" ออกจาก
+    -- SKU เก่าที่บังเอิญ order_count=1 ในเดือนนี้ (criterion ค ของฟีเจอร์ Key SKU)
+    FORMAT_DATE('%Y-%m-%d', MIN(r.delivery_date))                      AS first_order_date
   FROM raw r
   GROUP BY r.account_id, r.month_date, r.item_id
 )
@@ -143,7 +146,11 @@ SELECT
   COALESCE(m.default_unit_group, '')  AS default_unit_group,   -- 'EACH' | 'WEIGHT' | ''
   COALESCE(m.ea_unit_name, '')        AS ea_unit_name,          -- กระป๋อง/ขวด/ถุง/แพ็ค etc.
   COALESCE(m.universal_ea_value, 0)   AS universal_ea_value,    -- N per pack (24, 12, 20 ...)
-  a.last_order_date                                             -- NEW v4: YYYY-MM-DD
+  a.last_order_date,                                            -- NEW v4: YYYY-MM-DD
+  -- v_key: appended LAST — this file has no margin columns (unlike SQL1_sense_skus.sql),
+  -- so this lands at a DIFFERENT absolute index than SQL1's first_order_date. The client
+  -- parser dispatches by row length (19→20 cols here vs 21→22 cols there), not a fixed offset.
+  a.first_order_date                                            -- v_key: YYYY-MM-DD
 FROM agg a
 JOIN monthly_total t USING (account_id, month_date)
 LEFT JOIN `freshket-rn.bi_source.item_master_merchandise` m ON CAST(m.item_id AS STRING) = a.item_id

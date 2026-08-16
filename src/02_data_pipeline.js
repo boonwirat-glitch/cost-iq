@@ -428,6 +428,16 @@ function handleFileUpload(type,input){
         // "no data" instead of rendering a confident ฿0.
         const margin=parseFloat(p[18+off])||0;
         const gmvWithMargin=parseFloat(p[19+off])||0;
+        // v_key (2026-08-16): first_order_date appended as the true NEXT column, but the two
+        // source files diverge in length after last_order_date — SQL1 has margin+gmv_with_margin
+        // (21 base cols → 22 with this field), Q3B has neither (19 base cols → 20 with this
+        // field). A fixed offset would make Q3B's new column land on the exact array index this
+        // parser reads as `margin` for SQL1 rows. Row length is the only reliable discriminator
+        // since both files feed this same function.
+        let firstOrderDate=null;
+        if(p.length>=22)      firstOrderDate=(p[20+off]||'').trim()||null;  // SQL1 + first_order_date (22 cols)
+        else if(p.length===20) firstOrderDate=(p[18+off]||'').trim()||null; // Q3B + first_order_date (20 cols)
+        // else: source predates first_order_date (Q3B=19 cols, SQL1=21 cols) → stays null
         if(!aid||!mo||!itemId)return null;
 
         // ── 4-tier display_price logic ──────────────────────────────────────
@@ -500,7 +510,8 @@ function handleFileUpload(type,input){
           q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1,
           last_order_date: lastOrderDate,  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
           margin: margin,                  // SQL1 v_gp: GP บาท ของ SKU นี้ในเดือนนี้ (ติดลบได้)
-          gmv_with_margin: gmvWithMargin   // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
+          gmv_with_margin: gmvWithMargin,  // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
+          first_order_date: firstOrderDate // v_key: แยก "เพิ่งเริ่มสั่งใหม่" จาก SKU เก่าที่บังเอิญ order_count=1
         }};
       }
 
@@ -530,6 +541,14 @@ function handleFileUpload(type,input){
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
           if(D.alts.length&&D.skus.length)computeOPPS();
           if(!_sgRunning&&!_bundlePreWarming){if(window.RenderBus)window.RenderBus.signal('skus');} // v223
+          // v_key self-review fix: SKU data for the CURRENT account can arrive after the
+          // KAM overview / Key SKU screens already painted (async R2 fetch) — without this,
+          // the split button / candidate list would silently stay empty until the user
+          // navigates away and back. Re-render whichever is actually on-screen.
+          try{
+            if(typeof renderKeySkuSplitButton==='function')renderKeySkuSplitButton();
+            if(document.getElementById('scr-key')?.classList.contains('on')&&typeof renderKeyScreen==='function')renderKeyScreen();
+          }catch(_e){}
         }
       }else{
         // no currentAccountId (TL view) — all lines go to remaining
@@ -572,6 +591,12 @@ function handleFileUpload(type,input){
               if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
             }
           }
+          // v_key self-review fix: same "screen already open, data landed late" gap as the
+          // pass-1 hook above, but for the cross-portfolio queue (needs the FULL bulk-skus
+          // parse, not just the current account, since it iterates every account).
+          try{
+            if(document.getElementById('scr-key-queue')?.classList.contains('on')&&typeof renderKeyQueueScreen==='function')renderKeyQueueScreen();
+          }catch(_e){}
           _done();
         }
       }
@@ -657,6 +682,32 @@ function handleFileUpload(type,input){
         // toast removed v205b — bulk ingest noise
         _done();
       }
+    };reader.readAsText(file);return;
+  }
+  if(type==='bulk-sku-reach'){
+    // v_key: company-wide flat lookup, no account grain — small file (one row per
+    // item_id across the whole company), so a single synchronous parse pass is fine,
+    // unlike bulk-skus/bulk-price which need idle-chunking for per-account volume.
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+      const reach={};
+      lines.forEach(l=>{
+        const p=parseCSVRow(l);
+        const itemId=(p[0]||'').trim();
+        if(!itemId)return;
+        reach[itemId]={
+          distinct_account_count: parseInt(p[1])||0,
+          total_gmv: parseFloat(p[2])||0,
+          total_order_count: parseInt(p[3])||0
+        };
+      });
+      companySkuReachData=reach;
+      const count=Object.keys(reach).length;
+      const b=document.getElementById('badge-bulk-sku-reach');if(b){b.textContent='✓ '+count;b.className='dp-slot-badge ok';}
+      fileStatus.sku_reach=true;
+      if(window.RenderBus)window.RenderBus.signal('sku_reach');
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-data'){
@@ -1446,7 +1497,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv',sku_reach:'company_sku_reach.csv'};
 // v738: R2_FILES comes from FRESHKET_APP_CONFIG which is Object.freeze()'d — direct mutation is
 // a silent no-op. _salesR2Override is a mutable local map; _getR2File() checks it first.
 var _salesR2Override = {}; // populated by _patchR2FilesForSales for Sales role
@@ -1505,6 +1556,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
   // v_catbonus: group-key-grain P1/P3 for per-category bonus rates (fast path)
   upsell_team_groups:{type:'bulk-upsell-team-groups',tab:'upsell_team_groups',cache:true},
+  // v_key: company-wide flat lookup (item_id → reach), no account grain — small file, cache like history/handover
+  sku_reach:{type:'bulk-sku-reach',tab:'sku_reach',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -1539,7 +1592,8 @@ const _csvSentinelSpec={
   upsell_team:{minCols:5},
   upsell_team_groups:{minCols:5},
   current_movements:{minCols:8},
-  qnrr:{minCols:13}
+  qnrr:{minCols:13},
+  sku_reach:{minCols:4}
 };
 const _csvQuarantineToasted=new Set();
 function _senseCsvSentinel(tab,text){
@@ -2971,7 +3025,13 @@ function refreshAll(){
     freshEl.textContent=latestMo?'ข้อมูล: '+latestMo:'';
     freshEl.style.display=latestMo?'block':'none';
   }
-  const badge=document.getElementById('opp-nav-badge');if(badge){badge.textContent=OPPS.length;badge.style.display=senseActivated&&OPPS.length>0?'flex':'none';}
+  // v_key pivot: opp-nav-badge/OPPS.length moved into the Products popover's SAVE
+  // subline (_keySkuSaveSubline) — this badge slot is now key-nav-badge (Key SKU
+  // portfolio pending count), refreshed alongside the split button on every refresh.
+  try{
+    if(typeof renderKeySkuNavBadge==='function')renderKeySkuNavBadge();
+    if(typeof renderKeySkuSplitButton==='function')renderKeySkuSplitButton();
+  }catch(_e){}
   updatePbFooter();renderOutletCard();
   // ── KAM mode: update account header whenever data refreshes ──
   // (header only re-renders if kamStateCache is stale, i.e. different account or no cache)

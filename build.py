@@ -15,6 +15,7 @@ MAIN_MODULES = [
     '04_sku_matcher',
     '05_kam_view',
     '06_portview_teamview',
+    '13_key_sku',
 ]
 
 def read(p):
@@ -49,6 +50,7 @@ styles_save     = read('src/styles_save.css')
 styles_report   = read('src/styles_report.css')
 styles_aichat   = read('src/styles_aichat.css')
 styles_sales = read('src/styles_sales.css')
+styles_key    = read('src/styles_key.css')
 styles_tokens  = read('src/styles_tokens.css')
 styles_base    = read('src/styles_base.css')
 styles_layout  = read('src/styles_layout.css')
@@ -110,6 +112,8 @@ out = (shell
              f'<style id="qnrr-module-css">\n{styles_qnrr}</style>')
     .replace('<style id="sales-module-css">\n<!-- INJECT_STYLES_SALES -->\n</style>',
              f'<style id="sales-module-css">\n{styles_sales}</style>')
+    .replace('<style id="key-module-css">\n<!-- INJECT_STYLES_KEY -->\n</style>',
+             f'<style id="key-module-css">\n{styles_key}</style>')
     # ── Build version ──
     .replace("version: 'v212c-diagnostics-counter-fix'",
              f"version: '{VERSION}'")
@@ -120,7 +124,7 @@ out = (shell
 # Verify no unresolved placeholders remain
 for p in ['INJECT_STYLES_TOKENS', 'INJECT_STYLES_MAIN', 'INJECT_STYLES_COMMISSION', 'INJECT_SKILLS', 'INJECT_STYLES_SKILLS', 'INJECT_QNRR', 'INJECT_STYLES_QNRR',
           'INJECT_MAIN_SCRIPT', 'INJECT_COMMISSION', 'INJECT_PATCHES', 'INJECT_SALES',
-          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT',
+          'INJECT_STYLES_RESTAURANT', 'INJECT_STYLES_ECHO', 'INJECT_STYLES_AUTH', 'INJECT_STYLES_NAV', 'INJECT_STYLES_PORTVIEW', 'INJECT_STYLES_TV', 'INJECT_STYLES_OVERVIEW', 'INJECT_STYLES_SAVE', 'INJECT_STYLES_REPORT', 'INJECT_STYLES_AICHAT', 'INJECT_STYLES_KEY',
           'INJECT_NAV_CONFIG']:
     if p in out:
         print(f'WARNING: unresolved placeholder {p}', file=sys.stderr)

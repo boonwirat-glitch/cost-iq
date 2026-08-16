@@ -1,0 +1,123 @@
+/* ══════════════════════════════════════════════════════════════════════
+   KEY SKU — src/styles_key.css (v_key, 2026-08-16, pivoted after self-review)
+   Dark KAM/Portview theme (--tk-*) + --fk-orange family (#FF6600, real
+   Freshket brand orange, verified against freshket.co — the old rose/red
+   token from round 1 is fully retired here). Badges reuse
+   .skbadge/.sku-badge-row verbatim — only new modifier classes (color) here.
+
+   Entry points are now: (1) the Products nav popover (below) and (2) a
+   split button beside "Account Insight" on the account screen — no card is
+   wedged into portview/teamview anymore.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Products nav popover ── */
+.products-popover{position:fixed;width:208px;transform:translateX(-50%);background:var(--tk-bg-topbar-2,#0a1e42);border:1px solid var(--tk-border);border-radius:var(--r-lg);padding:6px;box-shadow:var(--sh-lg);z-index:300}
+.products-popover:after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:10px;height:10px;background:inherit;border-right:1px solid var(--tk-border);border-bottom:1px solid var(--tk-border)}
+.pv-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);color:var(--tk-text-primary);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.04)}
+.pv-row:active{background:var(--tk-bg-surface)}
+.pv-row svg{width:16px;height:16px;flex-shrink:0;color:var(--tk-text-secondary)}
+.pv-row.key svg{color:var(--fk-orange-text)}
+.pv-sub{font-size:var(--text-xs);color:var(--tk-text-muted);font-weight:var(--fw-normal);margin-top:1px}
+
+/* ── kam-overview split row (Account Insight | Key SKU) ── */
+.kav-brief-row{display:flex;gap:8px;margin-bottom:14px}
+.kav-brief-row .kav-brief-btn{width:auto;flex:1;min-width:0;margin-bottom:0}
+.kav-brief-row .kav-brief-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.key-sku-btn{color:#ffe4c2!important;background:linear-gradient(135deg,rgba(255,102,0,.32),rgba(255,150,60,.22))!important;border-color:var(--fk-orange-border)!important;box-shadow:0 0 10px 2px rgba(255,120,0,.35),0 2px 8px rgba(255,102,0,.2)!important}
+.key-sku-btn:hover{background:linear-gradient(135deg,rgba(255,102,0,.45),rgba(255,150,60,.32))!important;border-color:rgba(255,180,110,.8)!important}
+.key-sku-btn.loading,.key-sku-btn:not(.loading){animation:none!important}
+
+/* ── Screen chrome (queue + detail share the same header/footer shape) ── */
+.key-screen-pad{padding:16px;padding-top:calc(var(--topbar-h) + 10px);padding-bottom:100px;max-width:var(--max-w);margin:0 auto;box-sizing:border-box}
+.key-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.key-back-btn{width:32px;height:32px;border-radius:50%;background:var(--tk-bg-surface);border:none;display:flex;align-items:center;justify-content:center;color:var(--tk-text-primary);cursor:pointer;flex-shrink:0}
+.key-header-title{font-size:var(--text-xl2);font-weight:var(--fw-semi);color:var(--tk-text-primary)}
+.key-header-sub{font-size:var(--text-sm);color:var(--tk-text-secondary);margin-top:1px}
+
+/* ── Key SKU Home (scr-key-queue) — flat, cross-portfolio SKU feed ──
+   v_key round3: replaces the old per-account queue list after Bush rejected
+   it for showing only store names/counts, never which SKUs were actually
+   marked Key. Reframed account-centric → SKU-item-centric per his own
+   design note ("แสดงเป็น SKU ข้ามร้านไปเลย ติดป้ายว่าจากร้านไหน"). */
+.key-hero{background:linear-gradient(135deg,var(--tk-ok-dim-2,rgba(0,208,112,.16)),var(--tk-ok-dim,rgba(0,208,112,.05)));
+  border:1px solid var(--tk-ok-border,rgba(0,208,112,.22));border-radius:var(--r-lg);padding:14px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px}
+.key-hero-ico{width:36px;height:36px;border-radius:10px;background:var(--tk-ok-dim-2,rgba(0,208,112,.18));flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;color:var(--tk-ok-bright,#4ddc97)}
+.key-hero-n{font-family:var(--tk-font-mono);font-size:var(--text-xl3);font-weight:var(--fw-bold);color:var(--tk-ok-bright,#4ddc97);line-height:1}
+.key-hero-lbl{font-size:var(--text-sm);color:var(--tk-text-secondary);margin-top:2px}
+
+.key-home-search{position:relative;margin-bottom:16px}
+.key-home-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--tk-text-muted);pointer-events:none}
+.key-home-search input{width:100%;background:var(--tk-bg-surface);border:1px solid var(--tk-border);border-radius:var(--r-sm);
+  color:var(--tk-text-primary);padding:10px 12px 10px 34px;font-size:var(--text-base);font-family:var(--tk-font-body);box-sizing:border-box}
+.key-home-search input::placeholder{color:var(--tk-text-muted)}
+.key-home-search input:focus{outline:none;border-color:var(--fk-orange-border)}
+
+.key-sec-count{font-size:var(--text-xs);color:var(--tk-text-muted);font-weight:var(--fw-normal)}
+
+/* protected (ปกป้องแล้ว) rows */
+.prow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.prow:last-child{border-bottom:none}
+.pcheck{width:19px;height:19px;border-radius:6px;background:var(--tk-ok-bright,#4ddc97);flex-shrink:0;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;color:#04140f}
+.pname{font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tk-text-primary);line-height:1.35}
+.ptag-row{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:nowrap;min-width:0}
+.ptag{font-size:var(--text-xs);color:var(--tk-text-secondary);background:var(--tk-bg-surface);padding:1px 7px;border-radius:6px;
+  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwhen{font-size:10px;color:var(--tk-text-muted);flex-shrink:0;white-space:nowrap}
+
+/* recommended (แนะนำเพิ่ม) rows — flat across portfolio, 1-tap confirm */
+.rrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.rrow:last-child{border-bottom:none}
+.rname{font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tk-text-primary);line-height:1.35}
+.rtag-row{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:nowrap;min-width:0}
+.rtag{font-size:var(--text-xs);color:var(--tk-text-secondary);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addbtn{width:28px;height:28px;border-radius:50%;background:var(--fk-orange);border:none;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:#2e1500;transition:transform .12s}
+.addbtn:active{transform:scale(.88)}
+.addbtn:disabled{opacity:.5;cursor:default}
+
+.key-queue-empty{text-align:center;padding:40px 20px;color:var(--tk-text-secondary);font-size:var(--text-base)}
+
+/* ── Account detail screen ── */
+.key-summary-bar{display:flex;gap:8px;margin-bottom:18px}
+.key-summary-cell{flex:1;background:var(--tk-bg-surface);border-radius:var(--r-md);padding:10px 12px}
+.key-summary-cell.reco{background:var(--fk-orange-dim)}
+.key-summary-label{font-size:var(--text-sm);color:var(--tk-text-secondary)}
+.key-summary-cell.reco .key-summary-label{color:var(--fk-orange-text)}
+.key-summary-val{font-size:var(--text-xl3);font-weight:var(--fw-semi);color:var(--tk-text-primary);margin-top:2px}
+.key-summary-cell.reco .key-summary-val{color:var(--fk-orange-text)}
+
+.key-sec-label{font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--tk-text-secondary);margin:18px 0 8px}
+.key-sec-label:first-child{margin-top:0}
+
+.key-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline);cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.04)}
+.key-check{width:20px;height:20px;border-radius:6px;background:var(--fk-orange);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;color:#2e1500}
+.key-check.off{background:transparent;border:1.5px solid var(--tk-border-strong)}
+.key-check.off svg{display:none}
+.key-sku-name{font-size:var(--text-base);color:var(--tk-text-primary)}
+
+.key-existing-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.key-existing-meta{font-size:var(--text-xs);color:var(--tk-text-secondary);margin-top:2px}
+.key-existing-meta.stale{color:var(--tk-warn)}
+.key-remove-btn{font-size:var(--text-sm);padding:5px 12px;height:auto;background:transparent;border:1px solid var(--tk-border-strong);border-radius:var(--r-sm);color:var(--tk-text-secondary);cursor:pointer;flex-shrink:0}
+.key-more-hint{font-size:var(--text-sm);color:var(--tk-text-muted);margin-top:6px}
+
+.key-add-search{width:100%;background:var(--tk-bg-surface);border:1px solid var(--tk-border);border-radius:var(--r-sm);color:var(--tk-text-primary);padding:9px 12px;font-size:var(--text-base);font-family:var(--tk-font-body)}
+.key-add-search::placeholder{color:var(--tk-text-muted)}
+.key-add-results{margin-top:6px}
+.key-add-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--tk-hairline)}
+.key-add-btn{font-size:var(--text-sm);padding:5px 12px;background:var(--fk-orange-dim);border:none;border-radius:var(--r-sm);color:var(--fk-orange-text);cursor:pointer;flex-shrink:0}
+
+.key-empty-state{text-align:center;padding:32px 16px;color:var(--tk-text-secondary);font-size:var(--text-base);line-height:1.6}
+
+/* ── Sticky confirm footer ── */
+.key-footer{position:sticky;bottom:0;left:0;right:0;background:var(--tk-bg-base);border-top:1px solid var(--tk-hairline);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:var(--max-w);margin:0 auto}
+.key-footer-count{font-size:var(--text-sm);color:var(--tk-text-secondary)}
+.key-footer-count b{color:var(--tk-text-primary);font-weight:var(--fw-semi)}
+.key-confirm-btn{background:var(--fk-orange);color:#2e1500;border:none;padding:11px 22px;border-radius:var(--r-md);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;font-family:var(--tk-font-body)}
+.key-confirm-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Badge color modifiers (base .skbadge/.sku-badge-row shape reused as-is) ── */
+.skbadge-sole-source,.skbadge-newness-key,.skbadge-concentration-key{background:var(--fk-orange-dim);color:var(--fk-orange-text)}

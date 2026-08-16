@@ -2278,6 +2278,9 @@
 <style id="sales-module-css">
 <!-- INJECT_STYLES_SALES -->
 </style>
+<style id="key-module-css">
+<!-- INJECT_STYLES_KEY -->
+</style>
 <style id="skills-module-css">
 <!-- INJECT_STYLES_SKILLS -->
 </style>
@@ -2557,6 +2560,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <symbol fill="none" id="ico-chart" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="1" width="4" x="3" y="13"></rect><rect height="13" rx="1" width="4" x="10" y="8"></rect><rect height="17" rx="1" width="4" x="17" y="4"></rect></symbol>
 <symbol fill="none" id="ico-bolt" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"></path></symbol>
 <symbol fill="currentColor" id="ico-sense" stroke="none" viewbox="0 0 10 10"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></symbol>
+<symbol fill="none" id="ico-products" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"></path><path d="M3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path></symbol>
 <symbol fill="none" id="ico-sliders" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="18" y2="18"></line><circle cx="8" cy="6" fill="currentColor" r="2.5" stroke="none"></circle><circle cx="16" cy="12" fill="currentColor" r="2.5" stroke="none"></circle><circle cx="10" cy="18" fill="currentColor" r="2.5" stroke="none"></circle></symbol>
 <symbol fill="none" id="ico-doc" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" x2="16" y1="13" y2="13"></line><line x1="8" x2="13" y1="17" y2="17"></line></symbol>
 <symbol fill="none" id="ico-arrow" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><line x1="5" x2="19" y1="12" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline></symbol>
@@ -3035,11 +3039,19 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div><!-- /kav-z1 -->
 <!-- ── ZONE 2: Scrollable content ── -->
 <div class="sec" id="kav-z2" style="padding-top:14px">
-<!-- Brief button — glowing outline, first card in Zone 2 -->
+<!-- Brief button — glowing outline, first card in Zone 2 —
+     v_key (2026-08-16 pivot): split 50/50 with the new Key SKU entry so no
+     row is added — SKU movement etc. below keep their exact position. -->
+<div class="kav-brief-row">
 <button class="kam-insight-btn kav-brief-btn" id="kam-insight-btn" onclick="handleKamInsightBtn()">
 <svg class="kam-insight-star" fill="rgba(180,210,255,.9)" height="11" viewbox="0 0 10 10" width="11" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
 <span id="kam-insight-btn-label">Account Insight</span>
 </button>
+<button class="kam-insight-btn kav-brief-btn key-sku-btn" id="key-sku-split-btn" style="display:none" onclick="_keyScreenEntryFrom='overview';showScreen('key')">
+<svg class="kam-insight-star" fill="#ffe4c2" height="11" viewbox="0 0 10 10" width="11" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
+<span id="key-sku-split-btn-label">Key SKU</span>
+</button>
+</div>
 
 <!-- Signal bar — rule-based, renders immediately -->
 <div class="kam-signal-bar" id="kam-signal-bar"></div>
@@ -3350,10 +3362,15 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <span class="lb">Echo</span>
 </button>
-<!-- Sense — restaurant mode + KAM overlay mode (v183) -->
-<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="(isKAM&amp;&amp;document.body.classList.contains('restaurant-sheet'))?_overlayNav('opportunities'):(showScreen('opportunities'),document.body.classList.remove('sense-on-report'))">
-<div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-sense"></use></svg><span class="nbadge" id="opp-nav-badge" style="display:none">0</span></div>
-<span class="lb">Save</span>
+<!-- Products — v_key (2026-08-16): was "Save"/Sense-only, now a shared entry point for
+     Save + Key SKU. Tapping opens a small in-flow popover (toggleProductsPopover) instead
+     of navigating directly — the popover's own two rows call the original Save action
+     (productsGoSave, byte-identical to what this onclick used to do) or the new Key SKU
+     action (productsGoKeySku). Badge now shows Key SKU's portfolio pending count, not
+     OPPS.length (that moved into the popover's SAVE row subline instead). -->
+<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="toggleProductsPopover(this)">
+<div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-products"></use></svg><span class="nbadge" id="key-nav-badge" style="display:none">0</span></div>
+<span class="lb">Products</span>
 </button>
 <button class="ni rest-only" id="nav-report" onclick="showScreen('report');document.body.classList.add('sense-on-report');if(typeof savePlanBadge_onReport==='function')savePlanBadge_onReport();">
 <div class="nwrap"><svg height="22" width="22"><use href="#ico-doc"></use></svg></div>
@@ -3421,6 +3438,10 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span class="lb">Skills</span>
 </button>
 </nav>
+<!-- Products quick-pick popover — v_key (2026-08-16). Positioned by JS (toggleProductsPopover)
+     to sit centered above whichever button opened it. Filled by renderProductsPopover(). -->
+<div id="products-popover-backdrop" onclick="toggleProductsPopover(null,true)" style="display:none;position:fixed;inset:0;z-index:299"></div>
+<div id="products-popover" class="products-popover" style="display:none"></div>
 <!-- ══ SALES SCREENS ══ -->
 <div class="scr" id="scr-sales-portview"></div>
 <div class="scr" id="scr-sales-pipeline"></div>
@@ -3428,6 +3449,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="scr" id="scr-sales-teamview"></div>
 <!-- ══ SKILLS SCREEN ══ -->
 <div class="scr" id="scr-skills"></div>
+<!-- ══ KEY SKU — cross-portfolio queue + per-account picker ══ -->
+<div class="scr" id="scr-key-queue" style="background:var(--tk-bg-base)"></div>
+<div class="scr" id="scr-key" style="background:var(--tk-bg-base)"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:var(--tk-bg-base)">
 <div class="portview-header">

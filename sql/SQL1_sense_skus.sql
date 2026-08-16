@@ -129,7 +129,10 @@ agg AS (
     ROUND(AVG(r.price_ex_vat), 2)                                      AS avg_piece_price,
     COUNT(DISTINCT r.user_id)                                          AS outlet_count_sku,
     -- v207h: วันสั่งล่าสุดของ SKU นี้ในเดือนนั้น — ใช้สำหรับ approaching signal (order_count=1)
-    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date
+    FORMAT_DATE('%Y-%m-%d', MAX(r.delivery_date))                      AS last_order_date,
+    -- v_key: วันสั่งครั้งแรกของ SKU นี้ในเดือนนั้น — ใช้แยก "เพิ่งเริ่มสั่งใหม่" (criterion ค)
+    -- จาก SKU ที่สั่งมานานแล้วแต่บังเอิญ order_count=1 ในเดือนนี้
+    FORMAT_DATE('%Y-%m-%d', MIN(r.delivery_date))                      AS first_order_date
   FROM raw r GROUP BY r.account_id, r.kam_email, r.month_date, r.item_id
 )
 
@@ -166,7 +169,8 @@ SELECT
   -- and the client's legacy pack_size offset trick (hasPackSize, 02_data_pipeline.js
   -- :413) is unaffected. Reads as p[19] / p[20] in the per-KAM file.
   a.margin_ex_vat,
-  a.gmv_with_margin
+  a.gmv_with_margin,
+  a.first_order_date  -- v_key: appended LAST, reads as p[21]; see docs/supabase-migration-key-skus-2026-08-16.sql
 FROM agg a
 JOIN monthly_total t USING (account_id, month_date)
 LEFT JOIN (

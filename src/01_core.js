@@ -228,7 +228,7 @@ function resetRuntimeSessionState(){
   } catch(e) {}
   try { document.documentElement.removeAttribute('data-theme'); } catch(e) {} // phase-0C
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
-  try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
+  try { const b=document.getElementById('key-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
   try { _kamBundleLoaded.clear(); } catch(e) {}
   try { Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]); } catch(e) {}
@@ -1840,6 +1840,7 @@ let bulkCatsData={};       // Q2B: aid → {month_label → [{n,s,p,c}]}
 let bulkSkusData={};       // Q3B: aid → {month_label → [sku objects]}
 const _bulkSkusSeen={};   // v202 dedup: aid → mo → Set<itemId> — prevents double-push when bundle+bulk both load
 let bulkPriceData={};      // Q6B: aid → {item_id → [{mo, unit_price, avg_piece_price}]} (6-month price history for sparkline)
+let companySkuReachData={}; // v_key: item_id → {distinct_account_count, total_gmv, total_order_count} — company-wide, no account grain (Key SKU sole-source criterion)
 let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover.csv — transfer out per KAM
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
 let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_{safekey}.csv — per-KAM demand bundle

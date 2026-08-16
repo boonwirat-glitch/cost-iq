@@ -1,4 +1,4 @@
-<!-- Freshket Sense v261: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v262: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -313,6 +313,17 @@
   --fk-red-dim:      rgba(255,56,92,.08);  /* tint bg */
   --fk-red-border:   rgba(255,56,92,.20);  /* border */
   --fk-red-strong:   rgba(255,56,92,.15);  /* pill/nav active */
+
+  /* ── FRESHKET BRAND ORANGE (v_key self-review, 2026-08-16) ──
+     #FF6600 is verified against the real live site (freshket.co brand
+     extraction, freshket-insights/docs/design/BRAND.md) — unlike --fk-red
+     above (an invented token, not derived from real Freshket brand), this
+     is Freshket's actual brand orange. Used for Key SKU specifically so it
+     doesn't collide with tier-grid green (ON TRACK) or red (AT RISK). */
+  --fk-orange:        #FF6600;
+  --fk-orange-dim:    rgba(255,102,0,.14);
+  --fk-orange-border: rgba(255,150,60,.5);
+  --fk-orange-text:   #ffb066;
 
   /* ── LIGHT THEME CANVAS (additive — Phase 0A) ───────────── */
   --canvas:          #FFFFFF;   /* page background */
@@ -1327,7 +1338,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v261',
+      version: 'v262',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -4494,6 +4505,131 @@ body.sales-mode .scr:not(#ci-fullsheet *) { background: #FFFFFF !important; }
   color: #C0C0C0 !important;
   font-style: italic;
 }
+</style>
+<style id="key-module-css">
+/* ══════════════════════════════════════════════════════════════════════
+   KEY SKU — src/styles_key.css (v_key, 2026-08-16, pivoted after self-review)
+   Dark KAM/Portview theme (--tk-*) + --fk-orange family (#FF6600, real
+   Freshket brand orange, verified against freshket.co — the old rose/red
+   token from round 1 is fully retired here). Badges reuse
+   .skbadge/.sku-badge-row verbatim — only new modifier classes (color) here.
+
+   Entry points are now: (1) the Products nav popover (below) and (2) a
+   split button beside "Account Insight" on the account screen — no card is
+   wedged into portview/teamview anymore.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Products nav popover ── */
+.products-popover{position:fixed;width:208px;transform:translateX(-50%);background:var(--tk-bg-topbar-2,#0a1e42);border:1px solid var(--tk-border);border-radius:var(--r-lg);padding:6px;box-shadow:var(--sh-lg);z-index:300}
+.products-popover:after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:10px;height:10px;background:inherit;border-right:1px solid var(--tk-border);border-bottom:1px solid var(--tk-border)}
+.pv-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);color:var(--tk-text-primary);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.04)}
+.pv-row:active{background:var(--tk-bg-surface)}
+.pv-row svg{width:16px;height:16px;flex-shrink:0;color:var(--tk-text-secondary)}
+.pv-row.key svg{color:var(--fk-orange-text)}
+.pv-sub{font-size:var(--text-xs);color:var(--tk-text-muted);font-weight:var(--fw-normal);margin-top:1px}
+
+/* ── kam-overview split row (Account Insight | Key SKU) ── */
+.kav-brief-row{display:flex;gap:8px;margin-bottom:14px}
+.kav-brief-row .kav-brief-btn{width:auto;flex:1;min-width:0;margin-bottom:0}
+.kav-brief-row .kav-brief-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.key-sku-btn{color:#ffe4c2!important;background:linear-gradient(135deg,rgba(255,102,0,.32),rgba(255,150,60,.22))!important;border-color:var(--fk-orange-border)!important;box-shadow:0 0 10px 2px rgba(255,120,0,.35),0 2px 8px rgba(255,102,0,.2)!important}
+.key-sku-btn:hover{background:linear-gradient(135deg,rgba(255,102,0,.45),rgba(255,150,60,.32))!important;border-color:rgba(255,180,110,.8)!important}
+.key-sku-btn.loading,.key-sku-btn:not(.loading){animation:none!important}
+
+/* ── Screen chrome (queue + detail share the same header/footer shape) ── */
+.key-screen-pad{padding:16px;padding-top:calc(var(--topbar-h) + 10px);padding-bottom:100px;max-width:var(--max-w);margin:0 auto;box-sizing:border-box}
+.key-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.key-back-btn{width:32px;height:32px;border-radius:50%;background:var(--tk-bg-surface);border:none;display:flex;align-items:center;justify-content:center;color:var(--tk-text-primary);cursor:pointer;flex-shrink:0}
+.key-header-title{font-size:var(--text-xl2);font-weight:var(--fw-semi);color:var(--tk-text-primary)}
+.key-header-sub{font-size:var(--text-sm);color:var(--tk-text-secondary);margin-top:1px}
+
+/* ── Key SKU Home (scr-key-queue) — flat, cross-portfolio SKU feed ──
+   v_key round3: replaces the old per-account queue list after Bush rejected
+   it for showing only store names/counts, never which SKUs were actually
+   marked Key. Reframed account-centric → SKU-item-centric per his own
+   design note ("แสดงเป็น SKU ข้ามร้านไปเลย ติดป้ายว่าจากร้านไหน"). */
+.key-hero{background:linear-gradient(135deg,var(--tk-ok-dim-2,rgba(0,208,112,.16)),var(--tk-ok-dim,rgba(0,208,112,.05)));
+  border:1px solid var(--tk-ok-border,rgba(0,208,112,.22));border-radius:var(--r-lg);padding:14px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px}
+.key-hero-ico{width:36px;height:36px;border-radius:10px;background:var(--tk-ok-dim-2,rgba(0,208,112,.18));flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;color:var(--tk-ok-bright,#4ddc97)}
+.key-hero-n{font-family:var(--tk-font-mono);font-size:var(--text-xl3);font-weight:var(--fw-bold);color:var(--tk-ok-bright,#4ddc97);line-height:1}
+.key-hero-lbl{font-size:var(--text-sm);color:var(--tk-text-secondary);margin-top:2px}
+
+.key-home-search{position:relative;margin-bottom:16px}
+.key-home-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--tk-text-muted);pointer-events:none}
+.key-home-search input{width:100%;background:var(--tk-bg-surface);border:1px solid var(--tk-border);border-radius:var(--r-sm);
+  color:var(--tk-text-primary);padding:10px 12px 10px 34px;font-size:var(--text-base);font-family:var(--tk-font-body);box-sizing:border-box}
+.key-home-search input::placeholder{color:var(--tk-text-muted)}
+.key-home-search input:focus{outline:none;border-color:var(--fk-orange-border)}
+
+.key-sec-count{font-size:var(--text-xs);color:var(--tk-text-muted);font-weight:var(--fw-normal)}
+
+/* protected (ปกป้องแล้ว) rows */
+.prow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.prow:last-child{border-bottom:none}
+.pcheck{width:19px;height:19px;border-radius:6px;background:var(--tk-ok-bright,#4ddc97);flex-shrink:0;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;color:#04140f}
+.pname{font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tk-text-primary);line-height:1.35}
+.ptag-row{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:nowrap;min-width:0}
+.ptag{font-size:var(--text-xs);color:var(--tk-text-secondary);background:var(--tk-bg-surface);padding:1px 7px;border-radius:6px;
+  min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pwhen{font-size:10px;color:var(--tk-text-muted);flex-shrink:0;white-space:nowrap}
+
+/* recommended (แนะนำเพิ่ม) rows — flat across portfolio, 1-tap confirm */
+.rrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.rrow:last-child{border-bottom:none}
+.rname{font-size:var(--text-base);font-weight:var(--fw-semi);color:var(--tk-text-primary);line-height:1.35}
+.rtag-row{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:nowrap;min-width:0}
+.rtag{font-size:var(--text-xs);color:var(--tk-text-secondary);min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addbtn{width:28px;height:28px;border-radius:50%;background:var(--fk-orange);border:none;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:#2e1500;transition:transform .12s}
+.addbtn:active{transform:scale(.88)}
+.addbtn:disabled{opacity:.5;cursor:default}
+
+.key-queue-empty{text-align:center;padding:40px 20px;color:var(--tk-text-secondary);font-size:var(--text-base)}
+
+/* ── Account detail screen ── */
+.key-summary-bar{display:flex;gap:8px;margin-bottom:18px}
+.key-summary-cell{flex:1;background:var(--tk-bg-surface);border-radius:var(--r-md);padding:10px 12px}
+.key-summary-cell.reco{background:var(--fk-orange-dim)}
+.key-summary-label{font-size:var(--text-sm);color:var(--tk-text-secondary)}
+.key-summary-cell.reco .key-summary-label{color:var(--fk-orange-text)}
+.key-summary-val{font-size:var(--text-xl3);font-weight:var(--fw-semi);color:var(--tk-text-primary);margin-top:2px}
+.key-summary-cell.reco .key-summary-val{color:var(--fk-orange-text)}
+
+.key-sec-label{font-size:var(--text-md);font-weight:var(--fw-semi);color:var(--tk-text-secondary);margin:18px 0 8px}
+.key-sec-label:first-child{margin-top:0}
+
+.key-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline);cursor:pointer;-webkit-tap-highlight-color:rgba(0,0,0,.04)}
+.key-check{width:20px;height:20px;border-radius:6px;background:var(--fk-orange);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;color:#2e1500}
+.key-check.off{background:transparent;border:1.5px solid var(--tk-border-strong)}
+.key-check.off svg{display:none}
+.key-sku-name{font-size:var(--text-base);color:var(--tk-text-primary)}
+
+.key-existing-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--tk-hairline)}
+.key-existing-meta{font-size:var(--text-xs);color:var(--tk-text-secondary);margin-top:2px}
+.key-existing-meta.stale{color:var(--tk-warn)}
+.key-remove-btn{font-size:var(--text-sm);padding:5px 12px;height:auto;background:transparent;border:1px solid var(--tk-border-strong);border-radius:var(--r-sm);color:var(--tk-text-secondary);cursor:pointer;flex-shrink:0}
+.key-more-hint{font-size:var(--text-sm);color:var(--tk-text-muted);margin-top:6px}
+
+.key-add-search{width:100%;background:var(--tk-bg-surface);border:1px solid var(--tk-border);border-radius:var(--r-sm);color:var(--tk-text-primary);padding:9px 12px;font-size:var(--text-base);font-family:var(--tk-font-body)}
+.key-add-search::placeholder{color:var(--tk-text-muted)}
+.key-add-results{margin-top:6px}
+.key-add-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--tk-hairline)}
+.key-add-btn{font-size:var(--text-sm);padding:5px 12px;background:var(--fk-orange-dim);border:none;border-radius:var(--r-sm);color:var(--fk-orange-text);cursor:pointer;flex-shrink:0}
+
+.key-empty-state{text-align:center;padding:32px 16px;color:var(--tk-text-secondary);font-size:var(--text-base);line-height:1.6}
+
+/* ── Sticky confirm footer ── */
+.key-footer{position:sticky;bottom:0;left:0;right:0;background:var(--tk-bg-base);border-top:1px solid var(--tk-hairline);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:var(--max-w);margin:0 auto}
+.key-footer-count{font-size:var(--text-sm);color:var(--tk-text-secondary)}
+.key-footer-count b{color:var(--tk-text-primary);font-weight:var(--fw-semi)}
+.key-confirm-btn{background:var(--fk-orange);color:#2e1500;border:none;padding:11px 22px;border-radius:var(--r-md);font-size:var(--text-base);font-weight:var(--fw-semi);cursor:pointer;font-family:var(--tk-font-body)}
+.key-confirm-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Badge color modifiers (base .skbadge/.sku-badge-row shape reused as-is) ── */
+.skbadge-sole-source,.skbadge-newness-key,.skbadge-concentration-key{background:var(--fk-orange-dim);color:var(--fk-orange-text)}
 </style>
 <style id="skills-module-css">
 /* ══════════════════════════════════════════════════════
@@ -11749,6 +11885,7 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <symbol fill="none" id="ico-chart" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><rect height="8" rx="1" width="4" x="3" y="13"></rect><rect height="13" rx="1" width="4" x="10" y="8"></rect><rect height="17" rx="1" width="4" x="17" y="4"></rect></symbol>
 <symbol fill="none" id="ico-bolt" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M13 2L4.5 13.5H12L11 22 19.5 10.5H12L13 2z"></path></symbol>
 <symbol fill="currentColor" id="ico-sense" stroke="none" viewbox="0 0 10 10"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></symbol>
+<symbol fill="none" id="ico-products" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"></path><path d="M3 8v8l9 5 9-5V8"></path><path d="M12 13v8"></path></symbol>
 <symbol fill="none" id="ico-sliders" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" viewbox="0 0 24 24"><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="18" y2="18"></line><circle cx="8" cy="6" fill="currentColor" r="2.5" stroke="none"></circle><circle cx="16" cy="12" fill="currentColor" r="2.5" stroke="none"></circle><circle cx="10" cy="18" fill="currentColor" r="2.5" stroke="none"></circle></symbol>
 <symbol fill="none" id="ico-doc" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" x2="16" y1="13" y2="13"></line><line x1="8" x2="13" y1="17" y2="17"></line></symbol>
 <symbol fill="none" id="ico-arrow" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><line x1="5" x2="19" y1="12" y2="12"></line><polyline points="13 6 19 12 13 18"></polyline></symbol>
@@ -12227,11 +12364,19 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div><!-- /kav-z1 -->
 <!-- ── ZONE 2: Scrollable content ── -->
 <div class="sec" id="kav-z2" style="padding-top:14px">
-<!-- Brief button — glowing outline, first card in Zone 2 -->
+<!-- Brief button — glowing outline, first card in Zone 2 —
+     v_key (2026-08-16 pivot): split 50/50 with the new Key SKU entry so no
+     row is added — SKU movement etc. below keep their exact position. -->
+<div class="kav-brief-row">
 <button class="kam-insight-btn kav-brief-btn" id="kam-insight-btn" onclick="handleKamInsightBtn()">
 <svg class="kam-insight-star" fill="rgba(180,210,255,.9)" height="11" viewbox="0 0 10 10" width="11" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
 <span id="kam-insight-btn-label">Account Insight</span>
 </button>
+<button class="kam-insight-btn kav-brief-btn key-sku-btn" id="key-sku-split-btn" style="display:none" onclick="_keyScreenEntryFrom='overview';showScreen('key')">
+<svg class="kam-insight-star" fill="#ffe4c2" height="11" viewbox="0 0 10 10" width="11" xmlns="http://www.w3.org/2000/svg"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>
+<span id="key-sku-split-btn-label">Key SKU</span>
+</button>
+</div>
 
 <!-- Signal bar — rule-based, renders immediately -->
 <div class="kam-signal-bar" id="kam-signal-bar"></div>
@@ -12542,10 +12687,15 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 </div>
 <span class="lb">Echo</span>
 </button>
-<!-- Sense — restaurant mode + KAM overlay mode (v183) -->
-<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="(isKAM&amp;&amp;document.body.classList.contains('restaurant-sheet'))?_overlayNav('opportunities'):(showScreen('opportunities'),document.body.classList.remove('sense-on-report'))">
-<div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-sense"></use></svg><span class="nbadge" id="opp-nav-badge" style="display:none">0</span></div>
-<span class="lb">Save</span>
+<!-- Products — v_key (2026-08-16): was "Save"/Sense-only, now a shared entry point for
+     Save + Key SKU. Tapping opens a small in-flow popover (toggleProductsPopover) instead
+     of navigating directly — the popover's own two rows call the original Save action
+     (productsGoSave, byte-identical to what this onclick used to do) or the new Key SKU
+     action (productsGoKeySku). Badge now shows Key SKU's portfolio pending count, not
+     OPPS.length (that moved into the popover's SAVE row subline instead). -->
+<button class="ni rest-only kam-disabled-sense nav-disabled" id="nav-opportunities" onclick="toggleProductsPopover(this)">
+<div class="nwrap" style="position:relative"><svg height="22" style="overflow:visible" width="22"><use href="#ico-products"></use></svg><span class="nbadge" id="key-nav-badge" style="display:none">0</span></div>
+<span class="lb">Products</span>
 </button>
 <button class="ni rest-only" id="nav-report" onclick="showScreen('report');document.body.classList.add('sense-on-report');if(typeof savePlanBadge_onReport==='function')savePlanBadge_onReport();">
 <div class="nwrap"><svg height="22" width="22"><use href="#ico-doc"></use></svg></div>
@@ -12613,6 +12763,10 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <span class="lb">Skills</span>
 </button>
 </nav>
+<!-- Products quick-pick popover — v_key (2026-08-16). Positioned by JS (toggleProductsPopover)
+     to sit centered above whichever button opened it. Filled by renderProductsPopover(). -->
+<div id="products-popover-backdrop" onclick="toggleProductsPopover(null,true)" style="display:none;position:fixed;inset:0;z-index:299"></div>
+<div id="products-popover" class="products-popover" style="display:none"></div>
 <!-- ══ SALES SCREENS ══ -->
 <div class="scr" id="scr-sales-portview"></div>
 <div class="scr" id="scr-sales-pipeline"></div>
@@ -12620,6 +12774,9 @@ document.documentElement.style.background = '#080f1e'; // v198g: fix white overs
 <div class="scr" id="scr-sales-teamview"></div>
 <!-- ══ SKILLS SCREEN ══ -->
 <div class="scr" id="scr-skills"></div>
+<!-- ══ KEY SKU — cross-portfolio queue + per-account picker ══ -->
+<div class="scr" id="scr-key-queue" style="background:var(--tk-bg-base)"></div>
+<div class="scr" id="scr-key" style="background:var(--tk-bg-base)"></div>
 <!-- ══ TEAMVIEW — Team tab (TL/Admin only) ══ -->
 <div class="scr" id="scr-teamview" style="background:var(--tk-bg-base)">
 <div class="portview-header">
@@ -13093,7 +13250,7 @@ function resetRuntimeSessionState(){
   } catch(e) {}
   try { document.documentElement.removeAttribute('data-theme'); } catch(e) {} // phase-0C
   try { if(typeof setMode==='function')setMode('kam'); } catch(e) {} // force KAM mode (prevent restaurant flash — must run AFTER remove)
-  try { const b=document.getElementById('opp-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
+  try { const b=document.getElementById('key-nav-badge');if(b){b.textContent='0';b.style.display='none';} } catch(e) {}
   // v202a bundle state
   try { _kamBundleLoaded.clear(); } catch(e) {}
   try { Object.keys(_kamBundleInFlight).forEach(k=>delete _kamBundleInFlight[k]); } catch(e) {}
@@ -14705,6 +14862,7 @@ let bulkCatsData={};       // Q2B: aid → {month_label → [{n,s,p,c}]}
 let bulkSkusData={};       // Q3B: aid → {month_label → [sku objects]}
 const _bulkSkusSeen={};   // v202 dedup: aid → mo → Set<itemId> — prevents double-push when bundle+bulk both load
 let bulkPriceData={};      // Q6B: aid → {item_id → [{mo, unit_price, avg_piece_price}]} (6-month price history for sparkline)
+let companySkuReachData={}; // v_key: item_id → {distinct_account_count, total_gmv, total_order_count} — company-wide, no account grain (Key SKU sole-source criterion)
 let bulkHandoverData={ byAccountId:{}, byKamName:{} }; // Q10: portview_handover.csv — transfer out per KAM
 let bulkOutletsData={};    // Q5B: aid → {month_label → [outlet objects]}
 let bulkUpsellData={ byKam:{}, baselineGroups:{}, loaded:false }; // Q3C: sense_upsell_{safekey}.csv — per-KAM demand bundle
@@ -15757,6 +15915,16 @@ function handleFileUpload(type,input){
         // "no data" instead of rendering a confident ฿0.
         const margin=parseFloat(p[18+off])||0;
         const gmvWithMargin=parseFloat(p[19+off])||0;
+        // v_key (2026-08-16): first_order_date appended as the true NEXT column, but the two
+        // source files diverge in length after last_order_date — SQL1 has margin+gmv_with_margin
+        // (21 base cols → 22 with this field), Q3B has neither (19 base cols → 20 with this
+        // field). A fixed offset would make Q3B's new column land on the exact array index this
+        // parser reads as `margin` for SQL1 rows. Row length is the only reliable discriminator
+        // since both files feed this same function.
+        let firstOrderDate=null;
+        if(p.length>=22)      firstOrderDate=(p[20+off]||'').trim()||null;  // SQL1 + first_order_date (22 cols)
+        else if(p.length===20) firstOrderDate=(p[18+off]||'').trim()||null; // Q3B + first_order_date (20 cols)
+        // else: source predates first_order_date (Q3B=19 cols, SQL1=21 cols) → stays null
         if(!aid||!mo||!itemId)return null;
 
         // ── 4-tier display_price logic ──────────────────────────────────────
@@ -15829,7 +15997,8 @@ function handleFileUpload(type,input){
           q6b_ea_divide: _q6bFactor&&_q6bFactor.type==='per_ea'&&_q6bFactor.divisor>1,
           last_order_date: lastOrderDate,  // SQL1 v207h: ใช้คำนวณ approaching signal ของ SKU order_count=1
           margin: margin,                  // SQL1 v_gp: GP บาท ของ SKU นี้ในเดือนนี้ (ติดลบได้)
-          gmv_with_margin: gmvWithMargin   // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
+          gmv_with_margin: gmvWithMargin,  // SQL1 v_gp: ใช้วัด coverage — ดู senseGpFor()
+          first_order_date: firstOrderDate // v_key: แยก "เพิ่งเริ่มสั่งใหม่" จาก SKU เก่าที่บังเอิญ order_count=1
         }};
       }
 
@@ -15859,6 +16028,14 @@ function handleFileUpload(type,input){
           D.skus=mk.length?D.skus_monthly[mk[0]]:[];fileStatus.skus=true;
           if(D.alts.length&&D.skus.length)computeOPPS();
           if(!_sgRunning&&!_bundlePreWarming){if(window.RenderBus)window.RenderBus.signal('skus');} // v223
+          // v_key self-review fix: SKU data for the CURRENT account can arrive after the
+          // KAM overview / Key SKU screens already painted (async R2 fetch) — without this,
+          // the split button / candidate list would silently stay empty until the user
+          // navigates away and back. Re-render whichever is actually on-screen.
+          try{
+            if(typeof renderKeySkuSplitButton==='function')renderKeySkuSplitButton();
+            if(document.getElementById('scr-key')?.classList.contains('on')&&typeof renderKeyScreen==='function')renderKeyScreen();
+          }catch(_e){}
         }
       }else{
         // no currentAccountId (TL view) — all lines go to remaining
@@ -15901,6 +16078,12 @@ function handleFileUpload(type,input){
               if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
             }
           }
+          // v_key self-review fix: same "screen already open, data landed late" gap as the
+          // pass-1 hook above, but for the cross-portfolio queue (needs the FULL bulk-skus
+          // parse, not just the current account, since it iterates every account).
+          try{
+            if(document.getElementById('scr-key-queue')?.classList.contains('on')&&typeof renderKeyQueueScreen==='function')renderKeyQueueScreen();
+          }catch(_e){}
           _done();
         }
       }
@@ -15986,6 +16169,32 @@ function handleFileUpload(type,input){
         // toast removed v205b — bulk ingest noise
         _done();
       }
+    };reader.readAsText(file);return;
+  }
+  if(type==='bulk-sku-reach'){
+    // v_key: company-wide flat lookup, no account grain — small file (one row per
+    // item_id across the whole company), so a single synchronous parse pass is fine,
+    // unlike bulk-skus/bulk-price which need idle-chunking for per-account volume.
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const lines=e.target.result.trim().split('\n').slice(1).filter(l=>l.trim());
+      const reach={};
+      lines.forEach(l=>{
+        const p=parseCSVRow(l);
+        const itemId=(p[0]||'').trim();
+        if(!itemId)return;
+        reach[itemId]={
+          distinct_account_count: parseInt(p[1])||0,
+          total_gmv: parseFloat(p[2])||0,
+          total_order_count: parseInt(p[3])||0
+        };
+      });
+      companySkuReachData=reach;
+      const count=Object.keys(reach).length;
+      const b=document.getElementById('badge-bulk-sku-reach');if(b){b.textContent='✓ '+count;b.className='dp-slot-badge ok';}
+      fileStatus.sku_reach=true;
+      if(window.RenderBus)window.RenderBus.signal('sku_reach');
+      _done();
     };reader.readAsText(file);return;
   }
   if(type==='bulk-data'){
@@ -16775,7 +16984,7 @@ async function _csvCacheClear(){return window.FreshketSenseRuntime.data.csvCache
 
 // R2 file map — Cloudflare R2 bucket (freshket-data)
 const R2_BASE=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Base) || 'https://pub-12078d17646340808024e8cc95504995.r2.dev';
-const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv'};
+const R2_FILES=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Files) || {portview:'portview.csv',history:'bulk_history.csv',categories:'bulk_categories.csv',sku_current:'bulk_sku_current.csv',outlets:'bulk_outlets.csv',skus:'bulk_skus.csv',alternatives:'bulk_alternatives.csv',price:'bulk_price.csv',handover:'portview_handover.csv',upsell_team:'sense_upsell_team.csv',upsell_team_groups:'sense_upsell_team_groups.csv',current_movements:'portview_current_movements.csv',sku_reach:'company_sku_reach.csv'};
 // v738: R2_FILES comes from FRESHKET_APP_CONFIG which is Object.freeze()'d — direct mutation is
 // a silent no-op. _salesR2Override is a mutable local map; _getR2File() checks it first.
 var _salesR2Override = {}; // populated by _patchR2FilesForSales for Sales role
@@ -16834,6 +17043,8 @@ const R2_SPECS=(FRESHKET_APP_CONFIG.data && FRESHKET_APP_CONFIG.data.r2Specs) ||
   upsell_team:{type:'bulk-upsell-team',tab:'upsell_team',cache:true},
   // v_catbonus: group-key-grain P1/P3 for per-category bonus rates (fast path)
   upsell_team_groups:{type:'bulk-upsell-team-groups',tab:'upsell_team_groups',cache:true},
+  // v_key: company-wide flat lookup (item_id → reach), no account grain — small file, cache like history/handover
+  sku_reach:{type:'bulk-sku-reach',tab:'sku_reach',cache:true},
 };
 const _cloudLoadedTabs=new Set();
 const _cloudInFlight={};
@@ -16868,7 +17079,8 @@ const _csvSentinelSpec={
   upsell_team:{minCols:5},
   upsell_team_groups:{minCols:5},
   current_movements:{minCols:8},
-  qnrr:{minCols:13}
+  qnrr:{minCols:13},
+  sku_reach:{minCols:4}
 };
 const _csvQuarantineToasted=new Set();
 function _senseCsvSentinel(tab,text){
@@ -18300,7 +18512,13 @@ function refreshAll(){
     freshEl.textContent=latestMo?'ข้อมูล: '+latestMo:'';
     freshEl.style.display=latestMo?'block':'none';
   }
-  const badge=document.getElementById('opp-nav-badge');if(badge){badge.textContent=OPPS.length;badge.style.display=senseActivated&&OPPS.length>0?'flex':'none';}
+  // v_key pivot: opp-nav-badge/OPPS.length moved into the Products popover's SAVE
+  // subline (_keySkuSaveSubline) — this badge slot is now key-nav-badge (Key SKU
+  // portfolio pending count), refreshed alongside the split button on every refresh.
+  try{
+    if(typeof renderKeySkuNavBadge==='function')renderKeySkuNavBadge();
+    if(typeof renderKeySkuSplitButton==='function')renderKeySkuSplitButton();
+  }catch(_e){}
   updatePbFooter();renderOutletCard();
   // ── KAM mode: update account header whenever data refreshes ──
   // (header only re-renders if kamStateCache is stale, i.e. different account or no cache)
@@ -25893,11 +26111,12 @@ function __legacyShowScreenFallback(name){
   if(name==='portview'){renderPortview();
     // In KAM mode nav-overview IS the portview button — highlight it
     if(isKAM){const _ov=document.getElementById('nav-overview');if(_ov)_ov.classList.add('on');}
-    // Force-disable ร้าน + Sense on portview — no account in context yet
+    // Force-disable ร้าน on portview — no account in context yet.
+    // v_key round3: Products (nav-opportunities) is no longer Save-only — its popover's
+    // Key SKU row works fine with no account selected (routes to the portfolio queue),
+    // so it must stay tappable here.
     const _rb=document.getElementById('nav-restaurant');
-    const _sb=document.getElementById('nav-opportunities');
     if(_rb)_rb.classList.add('nav-disabled');
-    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
   }
   // KAM account view: ร้าน active (user is "in" a store context), show drag handle
   if(isKAM&&name==='overview'){
@@ -25913,21 +26132,21 @@ function __legacyShowScreenFallback(name){
     // v687: sync first-card offset after teamview is visible and layout settles
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},300);
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},600);
-    // Disable Save while in teamview — must select account first
-    const _sb=document.getElementById('nav-opportunities');
-    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
   }
-  // Disable Save + Restaurant when on skills — no account context
+  // Disable Restaurant when on skills — no account context (Products stays enabled, see above)
   if(name==='skills'&&isKAM){
-    const _sb=document.getElementById('nav-opportunities');
     const _rb=document.getElementById('nav-restaurant');
-    if(_sb)_sb.classList.add('nav-disabled');
     if(_rb)_rb.classList.add('nav-disabled');
   }
+  // v_key: Key SKU screens — queue is cross-portfolio (like portview), key is per-account
+  // (like overview) but lives outside .main (like portview/teamview) since it needs its
+  // own sticky footer without the restaurant-swipe layout getting in the way.
+  if(name==='key-queue'){ if(typeof renderKeyQueueScreen==='function') renderKeyQueueScreen(); }
+  if(name==='key'){ if(typeof renderKeyScreen==='function') renderKeyScreen(); }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
-  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills')?'none':'';
+  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills'||name==='key'||name==='key-queue')?'none':'';
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
@@ -27704,6 +27923,11 @@ function __legacySetModeFallback(mode){
     showScreen('overview');
     // ── No-account empty state takes priority ──
     if(_renderKamNoAcctState())return; // skip rest of render — empty state owns the screen
+    // v_key: Key SKU split button + nav badge — independent of the AI-insight hasData gate below
+    try{
+      if(typeof renderKeySkuSplitButton==='function') renderKeySkuSplitButton();
+      if(typeof renderKeySkuNavBadge==='function') renderKeySkuNavBadge();
+    }catch(_e){}
     const kamCards=document.getElementById('kam-cards');
     const kamLoad=document.getElementById('kam-loading2');
     const kamEmpty=document.getElementById('kam-empty-state');
@@ -29772,14 +29996,14 @@ function _exitKamSenseMode(){
 }
 // ─────────────────────────────────────────────────────────────────────────────
 function _updateKamNavDisabled() {
+  // v_key round3: Products (nav-opportunities) used to be Save-only and required an
+  // account; it's now a popover offering Key SKU too, which works fine with no account
+  // selected (routes to the portfolio queue) — so it must stay enabled regardless of hasAcct.
   const hasAcct = currentAccountId && currentAccountId !== 'default';
   const restBtn = document.getElementById('nav-restaurant');
-  const senseBtn = document.getElementById('nav-opportunities');
   if (restBtn) restBtn.classList.toggle('nav-disabled', !hasAcct);
-  if (senseBtn) {
-    if (isKAM) senseBtn.classList.toggle('nav-disabled', !hasAcct);
-    else senseBtn.classList.remove('nav-disabled');
-  }
+  const senseBtn = document.getElementById('nav-opportunities');
+  if (senseBtn) senseBtn.classList.remove('nav-disabled');
 }
 
 function _overlayNav(screenName) {
@@ -31184,6 +31408,8 @@ function __legacyRenderPortviewSummaryFallback(){
     navBadge.textContent=atRisk;
     navBadge.style.display=atRisk>0?'flex':'none';
   }
+  // v_key: Products nav badge — reliable hook since this fires whenever portview data changes/loads
+  try{ if(typeof renderKeySkuNavBadge==='function') renderKeySkuNavBadge(); }catch(_e){}
 }
 
 function portviewSelectAccount(accountId){
@@ -33701,6 +33927,925 @@ function _updateRestSwipe(grp,idx,opts){
   log('loaded');
 })(window);
 
+// ══════════════════════════════════════════════════════════════════════════
+// KEY SKU — src/13_key_sku.js (v_key, 2026-08-16)
+//
+// Rep picks which SKUs, per account, must never go out of stock. Recommends
+// candidates first (rep mostly just confirms/unticks) using 3 signals:
+//   (ก) concentration — SKU is a big share of this account's own spend
+//   (ข) sole-source   — almost nobody else company-wide buys this SKU either
+//   (ค) newness       — account only just started ordering it
+//
+// Design doc: ~/.claude/plans/feature-price-trend-splendid-sunbeam.md
+// Test spec:  tools/verify_key_sku.js
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── SECTION: pure scoring functions (unit-tested directly by the harness) ──
+
+function _keySkuNoiseFloorPass(skuGmv, accountMonthTotalGmv) {
+  return (skuGmv || 0) >= Math.max(3000, (accountMonthTotalGmv || 0) * 0.005);
+}
+
+function _keySkuConcentrationScore(pct, isTop1) {
+  if (pct >= 15) return 40;
+  if (pct >= 8) return 24;
+  if (isTop1) return 12;
+  return 0;
+}
+
+function _keySkuSoleSourceScore(reach) {
+  if (!reach) return 0;
+  if (reach.distinct_account_count <= 3 && reach.total_order_count >= 2) return 35;
+  if (reach.distinct_account_count >= 4 && reach.distinct_account_count <= 7) return 21;
+  return 0;
+}
+
+function _keySkuNewnessScore(orderCount, lastOrderDate, nowMs) {
+  if (orderCount !== 1) return 0;
+  if (!lastOrderDate) return 0;
+  var days = (nowMs - new Date(lastOrderDate).getTime()) / 86400000;
+  if (days >= 0 && days <= 14) return 25;
+  return 0;
+}
+
+// Priority: sole-source > newness > concentration (sole-source = "nobody else
+// can cover this if it runs out", the most urgent "ห้ามขาด" signal).
+function _keySkuBadges(scores) {
+  var tags = [];
+  if (scores.soleSource > 0) {
+    tags.push({ key: 'sole_source', label: 'มีร้านนี้ร้านเดียวที่สั่ง', priority: 1 });
+  }
+  if (scores.newness > 0) {
+    var d = scores.daysSince != null ? scores.daysSince : 0;
+    tags.push({ key: 'newness', label: 'เพิ่งเริ่มสั่ง ' + d + ' วันก่อน', priority: 2 });
+  }
+  if (scores.concentration > 0) {
+    var pct = Math.round((scores.pct || 0) * 10) / 10;
+    tags.push({ key: 'concentration', label: 'ซื้อ ' + pct + '% ของยอดร้านนี้', priority: 3 });
+  }
+  tags.sort(function (a, b) { return a.priority - b.priority; });
+  return tags.slice(0, 2);
+}
+
+// skuRows: [{id,name,pct,isTop1,gmvRecentMonth,accountMonthTotalGmv,orderCount,lastOrderDate,reach}]
+function computeKeySkuCandidates(skuRows, opts) {
+  opts = opts || {};
+  var now = opts.now || Date.now();
+  var result = [];
+  (skuRows || []).forEach(function (row) {
+    if (!row || row.id == null) return;
+    if (!_keySkuNoiseFloorPass(row.gmvRecentMonth, row.accountMonthTotalGmv)) return;
+    var concentration = _keySkuConcentrationScore(row.pct || 0, !!row.isTop1);
+    var soleSource = _keySkuSoleSourceScore(row.reach);
+    var newness = _keySkuNewnessScore(row.orderCount, row.lastOrderDate, now);
+    var total = concentration + soleSource + newness;
+    if (total <= 0) return;
+    var daysSince = row.lastOrderDate ? Math.round((now - new Date(row.lastOrderDate).getTime()) / 86400000) : null;
+    var badges = _keySkuBadges({ soleSource: soleSource, newness: newness, concentration: concentration, pct: row.pct, daysSince: daysSince });
+    result.push({
+      id: row.id,
+      name: row.name,
+      score: total,
+      breakdown: { concentration: concentration, soleSource: soleSource, newness: newness },
+      badges: badges
+    });
+  });
+  result.sort(function (a, b) { return b.score - a.score; });
+  return result;
+}
+
+// ── SECTION: bind pure functions to real portfolio data ──────────────────
+
+function _keySkuMonthSort(m) {
+  var p = (m || '').split(' ');
+  var MO = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return (parseInt(p[1] || 0) * 12) + MO.indexOf(p[0]);
+}
+
+// Builds the skuRows input for computeKeySkuCandidates from bulkSkusData +
+// bulkCurrentMonthData + companySkuReachData (all already loaded portfolio-
+// wide — no extra fetch needed, this runs client-side per account on open).
+function _keySkuBuildRows(accountId) {
+  var byMonth = (typeof bulkSkusData !== 'undefined' && bulkSkusData[accountId]) || {};
+  var months = Object.keys(byMonth).sort(function (a, b) { return _keySkuMonthSort(b) - _keySkuMonthSort(a); });
+  if (!months.length) return [];
+
+  var curLabel = (typeof bulkCurrentMonthData !== 'undefined' && bulkCurrentMonthData[accountId] && bulkCurrentMonthData[accountId].month_label) || '';
+  var closedMonths = months.filter(function (m) { return m !== curLabel; });
+  var latestMonth = months[0];
+  var latestClosed = closedMonths[0];
+  if (!latestClosed) {
+    // v_key self-review fix: a brand-new account (first month ever, no closed
+    // month to anchor concentration/noise-floor against) used to return []
+    // here — showing ZERO candidates for exactly the accounts where "just
+    // started ordering" (criterion ค) matters most. Fall back to using the
+    // only month available (almost always MTD) as its own baseline instead:
+    // less precise than a full closed month, but far better than nothing.
+    if (!latestMonth) return [];
+    var mtdRows = (byMonth[latestMonth] || []).filter(function (r) { return r && r.id != null; });
+    var mtdTotal = mtdRows.reduce(function (s, r) { return s + (r.gmv || r.s || 0); }, 0);
+    var mtdTop1Id = null, mtdTop1Val = -1;
+    mtdRows.forEach(function (r) {
+      var v = r.p != null ? r.p : (r.pct || 0);
+      if (v > mtdTop1Val) { mtdTop1Val = v; mtdTop1Id = r.id; }
+    });
+    return mtdRows.map(function (r) {
+      return {
+        id: r.id,
+        name: r.n || r.name || '',
+        pct: r.p != null ? r.p : (r.pct || 0),
+        isTop1: r.id === mtdTop1Id,
+        gmvRecentMonth: r.gmv || r.s || 0,
+        accountMonthTotalGmv: mtdTotal,
+        orderCount: r.order_count != null ? r.order_count : 0,
+        lastOrderDate: r.last_order_date || null,
+        reach: (typeof companySkuReachData !== 'undefined' ? companySkuReachData[r.id] : null) || null
+      };
+    });
+  }
+
+  var latestClosedRows = byMonth[latestClosed] || [];
+  var accountMonthTotalGmv = latestClosedRows.reduce(function (s, r) { return s + (r.gmv || r.s || 0); }, 0);
+  var latestMonthRows = byMonth[latestMonth] || [];
+  var latestMonthMap = {};
+  latestMonthRows.forEach(function (r) { if (r && r.id != null) latestMonthMap[r.id] = r; });
+  var latestClosedMap = {};
+  latestClosedRows.forEach(function (r) { if (r && r.id != null) latestClosedMap[r.id] = r; });
+
+  // avg pct across closed months only (excludes MTD — a big MTD order shouldn't skew concentration)
+  var pctSum = {}, pctCount = {};
+  closedMonths.forEach(function (m) {
+    (byMonth[m] || []).forEach(function (r) {
+      if (!r || r.id == null) return;
+      pctSum[r.id] = (pctSum[r.id] || 0) + (r.p != null ? r.p : (r.pct || 0));
+      pctCount[r.id] = (pctCount[r.id] || 0) + 1;
+    });
+  });
+  var avgPct = {};
+  Object.keys(pctSum).forEach(function (id) { avgPct[id] = pctSum[id] / pctCount[id]; });
+  var top1Id = null, top1Val = -1;
+  Object.keys(avgPct).forEach(function (id) { if (avgPct[id] > top1Val) { top1Val = avgPct[id]; top1Id = id; } });
+
+  // union of ids from the latest closed month AND the latest month (which may be MTD) —
+  // a SKU that appears ONLY in MTD (order_count=1, brand new) must still be scored,
+  // otherwise Tier B of the "newness" criterion silently never fires.
+  var allIds = {};
+  Object.keys(latestClosedMap).forEach(function (id) { allIds[id] = true; });
+  Object.keys(latestMonthMap).forEach(function (id) { allIds[id] = true; });
+
+  var rows = [];
+  Object.keys(allIds).forEach(function (id) {
+    var closedRow = latestClosedMap[id];
+    var latestRow = latestMonthMap[id] || closedRow;
+    if (!latestRow) return;
+    rows.push({
+      id: id,
+      name: latestRow.n || latestRow.name || '',
+      pct: avgPct[id] != null ? avgPct[id] : (latestRow.p != null ? latestRow.p : (latestRow.pct || 0)),
+      isTop1: id === top1Id,
+      // noise floor / concentration base always come from the closed month when available —
+      // an MTD-only new SKU has no closed-month figure, so its own (partial-month) gmv is
+      // the best available signal instead.
+      gmvRecentMonth: closedRow ? (closedRow.gmv || closedRow.s || 0) : (latestRow.gmv || latestRow.s || 0),
+      accountMonthTotalGmv: accountMonthTotalGmv,
+      orderCount: latestRow.order_count != null ? latestRow.order_count : 0,
+      lastOrderDate: latestRow.last_order_date || null,
+      reach: (typeof companySkuReachData !== 'undefined' ? companySkuReachData[id] : null) || null
+    });
+  });
+  return rows;
+}
+
+function computeKeySkuCandidatesForAccount(accountId, opts) {
+  return computeKeySkuCandidates(_keySkuBuildRows(accountId), opts);
+}
+
+// ── SECTION: small inline icons (this app uses hand-rolled stroke SVGs, no icon font) ──
+var _KEY_ICON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="M21 2l-9.6 9.6"></path><path d="M15.5 7.5l3 3L22 7l-3-3"></path></svg>';
+var _KEY_BACK_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+var _KEY_CHECK_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+function _keySkuEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Safe to embed as a single-quoted JS string-literal ARGUMENT inside an
+// onclick="..." HTML attribute (e.g. onclick="fn('VALUE')"). _keySkuEsc alone
+// is NOT enough here: the browser HTML-decodes the attribute value BEFORE
+// compiling it as JS, so escaping a quote as the entity &#39; just decodes
+// back to a literal ' before the JS parser ever sees it — an apostrophe in a
+// real SKU/account name (e.g. "Chef's Choice") would terminate the JS string
+// early, breaking the handler or worse. Escape the JS string delimiter first
+// (backslash, then quote), THEN HTML-escape the result for the surrounding
+// double-quoted attribute.
+function _keySkuAttrEsc(s) {
+  var str = String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── SECTION: persist/restore — mirrors _persistPlan/_restorePlan (08_patches.js) ──
+
+var _keySkuState = { byAccount: {} }; // accountId -> {existingIds:Set<string>, rows:[{sku_id,sku_name,set_at}], loaded:bool, loading:Promise|null}
+var _keySkuPortfolioIds = null; // Set<accountId> with >=1 active row, from one bulk query — powers coverage counts without N queries
+var _keySkuPortfolioRows = null; // [{account_id,sku_id,sku_name,set_at}] — same bulk query, full rows for the flat "ปกป้องแล้ว" feed
+
+function _keySkuLocalKey(accountId) { return 'sbk_key_' + accountId; }
+
+// Every outlet under an account, deduped across whatever months are loaded —
+// used to fan a confirmed Key SKU out to every outlet (supply planning works
+// at outlet/res_id grain, not billing-account grain). Reads bulkOutletsData,
+// already in memory client-side (bulk_outlets.csv) — no new fetch.
+function _keySkuOutletsFor(accountId) {
+  var byMonth = (typeof bulkOutletsData !== 'undefined' && bulkOutletsData[accountId]) || {};
+  var seen = {}; var out = [];
+  Object.keys(byMonth).forEach(function (m) {
+    (byMonth[m] || []).forEach(function (o) {
+      if (!o || !o.outlet_id || seen[o.outlet_id]) return;
+      seen[o.outlet_id] = true;
+      out.push({ outlet_id: o.outlet_id, outlet_name: o.outlet_name || '' });
+    });
+  });
+  return out;
+}
+
+function _keySkuEnsureLoaded(accountId) {
+  if (!accountId) return Promise.resolve({ existingIds: new Set(), rows: [] });
+  var st = _keySkuState.byAccount[accountId];
+  if (st && st.loaded) return Promise.resolve(st);
+  if (st && st.loading) return st.loading;
+  var p = new Promise(function (resolve) {
+    function applyRows(rows) {
+      // v_keyoutlet: a confirmed SKU now writes one DB row per outlet, so the
+      // same sku_id can arrive multiple times here — collapse to one entry
+      // per sku_id before it reaches the per-account "existing" list/count,
+      // else the UI would show the same SKU N times (once per outlet).
+      var seenSku = {}; var deduped = [];
+      (rows || []).forEach(function (r) {
+        if (seenSku[r.sku_id]) return;
+        seenSku[r.sku_id] = true;
+        deduped.push(r);
+      });
+      var ids = new Set(deduped.map(function (r) { return String(r.sku_id); }));
+      var next = { existingIds: ids, rows: deduped, loaded: true, loading: null };
+      _keySkuState.byAccount[accountId] = next;
+      resolve(next);
+    }
+    if (typeof supa !== 'undefined' && supa) {
+      supa.from('key_skus').select('sku_id,sku_name,set_at')
+        .eq('account_id', accountId).eq('status', 'active')
+        .then(function (res) {
+          if (res.error) console.warn('[KeySKU] restore error:', res.error.message);
+          if (res.data) {
+            try { localStorage.setItem(_keySkuLocalKey(accountId), JSON.stringify(res.data)); } catch (e) {}
+            applyRows(res.data);
+          } else {
+            try {
+              var local = localStorage.getItem(_keySkuLocalKey(accountId));
+              applyRows(local ? JSON.parse(local) : []);
+            } catch (e) { applyRows([]); }
+          }
+        })
+        .catch(function () {
+          try {
+            var local = localStorage.getItem(_keySkuLocalKey(accountId));
+            applyRows(local ? JSON.parse(local) : []);
+          } catch (e) { applyRows([]); }
+        });
+    } else {
+      try {
+        var local = localStorage.getItem(_keySkuLocalKey(accountId));
+        applyRows(local ? JSON.parse(local) : []);
+      } catch (e) { applyRows([]); }
+    }
+  });
+  _keySkuState.byAccount[accountId] = { loaded: false, loading: p };
+  return p;
+}
+
+// One bulk query for "which accounts have at least 1 active Key SKU" — avoids
+// firing N per-account queries just to paint coverage counts on Portview/queue.
+function _keySkuEnsurePortfolioLoaded() {
+  if (_keySkuPortfolioIds) return Promise.resolve(_keySkuPortfolioIds);
+  var userEmail = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile.email : null;
+  if (typeof supa === 'undefined' || !supa || !userEmail) {
+    _keySkuPortfolioIds = new Set(); _keySkuPortfolioRows = [];
+    return Promise.resolve(_keySkuPortfolioIds);
+  }
+  // Same query as before, just widened by 3 columns — one round trip still powers both
+  // the coverage Set (existing callers) and the flat "ปกป้องแล้ว" feed (getPortfolioProtectedItems).
+  return supa.from('key_skus').select('account_id,sku_id,sku_name,set_at').eq('set_by', userEmail).eq('status', 'active')
+    .then(function (res) {
+      var rows = res.data || [];
+      _keySkuPortfolioRows = rows;
+      var ids = new Set(rows.map(function (r) { return r.account_id; }));
+      _keySkuPortfolioIds = ids;
+      return ids;
+    })
+    .catch(function () { _keySkuPortfolioIds = new Set(); _keySkuPortfolioRows = []; return _keySkuPortfolioIds; });
+}
+
+function _keySkuConfirm(accountId, items) {
+  if (!accountId || !items || !items.length) return Promise.resolve();
+  var userEmail = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile.email : null;
+  var accountName = (typeof bulkAccountNames !== 'undefined' && bulkAccountNames[accountId]) || '';
+  var nowIso = new Date().toISOString();
+  // Bush 2026-08-16: supply planning works at outlet grain (res_name/res_id),
+  // not billing-account grain — marking a SKU "Key" for an account must apply
+  // to every outlet under it. Fan out one DB row per (item, outlet) pair;
+  // fall back to the old single-row-per-account shape (outlet_id null) only
+  // when the outlet list isn't loaded yet, so a confirm never silently no-ops.
+  var outlets = _keySkuOutletsFor(accountId);
+  var rows = [];
+  items.forEach(function (it) {
+    if (outlets.length) {
+      outlets.forEach(function (o) {
+        rows.push({
+          account_id: accountId, account_name: accountName, outlet_id: o.outlet_id, outlet_name: o.outlet_name,
+          sku_id: String(it.id), sku_name: it.name || '',
+          status: 'active', set_by: userEmail, set_at: nowIso, removed_by: null, removed_at: null
+        });
+      });
+    } else {
+      rows.push({
+        account_id: accountId, account_name: accountName, outlet_id: null, outlet_name: null,
+        sku_id: String(it.id), sku_name: it.name || '',
+        status: 'active', set_by: userEmail, set_at: nowIso, removed_by: null, removed_at: null
+      });
+    }
+  });
+  // Always write localStorage as instant fallback, mirroring _persistPlan.
+  // Built from `items` (one entry per SKU), not the outlet-fanned `rows` —
+  // the local cache backs the per-account "existing" list, which is SKU-level.
+  try {
+    var existing = _keySkuState.byAccount[accountId];
+    var mergedRows = (existing && existing.rows ? existing.rows.filter(function (r) { return !items.some(function (it) { return String(it.id) === String(r.sku_id); }); }) : [])
+      .concat(items.map(function (it) { return { sku_id: String(it.id), sku_name: it.name || '', set_at: nowIso }; }));
+    localStorage.setItem(_keySkuLocalKey(accountId), JSON.stringify(mergedRows));
+  } catch (e) {}
+  if (typeof supa !== 'undefined' && supa) {
+    // Plain insert, not upsert: key_skus_active_uidx is a PARTIAL unique index
+    // (where status='active'), and Postgres can't use a partial index as an
+    // ON CONFLICT arbiter unless the ON CONFLICT clause repeats that exact
+    // predicate — which supabase-js's {onConflict:'cols'} option has no way to
+    // express, so .upsert() here fails every call with 42P10 (confirmed against
+    // the real DB). In practice this is always a fresh insert anyway: the
+    // candidate list already excludes any sku_id with an existing active row
+    // (see renderKeyScreen's `!existingIds.has(...)` filter), so a real conflict
+    // only happens on a stale in-memory list (e.g. two tabs) — treat 23505
+    // (unique_violation) as "already active, nothing to do" rather than an error.
+    return supa.from('key_skus').insert(rows)
+      .then(function (res) {
+        if (res.error && res.error.code !== '23505') console.warn('[KeySKU] confirm insert error:', res.error.message);
+      })
+      .catch(function (e) { console.warn('[KeySKU] confirm exception:', e.message); })
+      .then(function () { delete _keySkuState.byAccount[accountId]; _keySkuPortfolioIds = null; _keySkuPortfolioRows = null; });
+  }
+  delete _keySkuState.byAccount[accountId];
+  return Promise.resolve();
+}
+
+// Soft delete only — status flip, never a hard DELETE (audit trail must survive).
+function _keySkuRemoveOne(accountId, skuId) {
+  var userEmail = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile.email : null;
+  var nowIso = new Date().toISOString();
+  if (typeof supa !== 'undefined' && supa) {
+    return supa.from('key_skus')
+      .update({ status: 'removed', removed_by: userEmail, removed_at: nowIso })
+      .eq('account_id', accountId).eq('sku_id', String(skuId))
+      .then(function (res) { if (res.error) console.warn('[KeySKU] remove error:', res.error.message); })
+      .catch(function (e) { console.warn('[KeySKU] remove exception:', e.message); })
+      .then(function () { delete _keySkuState.byAccount[accountId]; _keySkuPortfolioIds = null; _keySkuPortfolioRows = null; });
+  }
+  delete _keySkuState.byAccount[accountId];
+  return Promise.resolve();
+}
+
+// ── SECTION: scr-key-queue (cross-portfolio) ──────────────────────────────
+
+// Short calendar date ("14 ส.ค.") — same Thai-month-abbreviation convention used
+// throughout 02_data_pipeline.js, no year (this feed only ever shows recent items).
+function _keySkuShortDate(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr);
+  var MO = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return d.getDate() + ' ' + MO[d.getMonth()];
+}
+
+// Flat, cross-portfolio feed of already-confirmed Key SKUs — reuses the same bulk
+// query _keySkuEnsurePortfolioLoaded() already runs for coverage counts (call that
+// first; this just maps the cached rows, no extra fetch).
+function getPortfolioProtectedItems() {
+  // v_keyoutlet: rows are now one-per-outlet for the same account+sku — collapse
+  // back to one card per confirmed SKU before this reaches the flat home feed.
+  var seen = {}; var rows = [];
+  (_keySkuPortfolioRows || []).forEach(function (r) {
+    var key = r.account_id + '|' + String(r.sku_id);
+    if (seen[key]) return;
+    seen[key] = true;
+    rows.push(r);
+  });
+  return rows.map(function (r) {
+    return {
+      accountId: r.account_id,
+      accountName: (typeof bulkAccountNames !== 'undefined' && bulkAccountNames[r.account_id]) || r.account_id,
+      skuId: r.sku_id, skuName: r.sku_name, setAt: r.set_at
+    };
+  }).sort(function (a, b) { return new Date(b.setAt) - new Date(a.setAt); });
+}
+
+// Flat, cross-portfolio candidate feed — same per-account scoring as the account
+// screen (computeKeySkuCandidatesForAccount), just flattened across every account
+// already loaded in portview and tagged with which store each one is from. Excludes
+// anything already confirmed for that account (checked against the same bulk query).
+function getPortfolioKeySkuCandidates() {
+  var accounts = (typeof getPortviewAccounts === 'function') ? getPortviewAccounts() : [];
+  var confirmedKeys = new Set((_keySkuPortfolioRows || []).map(function (r) { return r.account_id + '|' + String(r.sku_id); }));
+  var out = [];
+  accounts.forEach(function (a) {
+    computeKeySkuCandidatesForAccount(a.id).forEach(function (c) {
+      if (confirmedKeys.has(a.id + '|' + String(c.id))) return;
+      out.push({ accountId: a.id, accountName: a.name, sku: c });
+    });
+  });
+  out.sort(function (x, y) {
+    var xSole = x.sku.badges.some(function (b) { return b.key === 'sole_source'; });
+    var ySole = y.sku.badges.some(function (b) { return b.key === 'sole_source'; });
+    if (xSole !== ySole) return xSole ? -1 : 1;
+    return (y.sku.score || 0) - (x.sku.score || 0);
+  });
+  return out;
+}
+
+// Cross-account search for the pinned search bar — loops each account's own latest-
+// month SKU rows (already in memory via bulkSkusData, same data computeKeySkuCandidates
+// reads) matching against SKU name or account name. No new fetch.
+function _keySkuPortfolioSearch(query) {
+  query = (query || '').trim().toLowerCase();
+  if (!query) return [];
+  var accounts = (typeof getPortviewAccounts === 'function') ? getPortviewAccounts() : [];
+  var confirmedKeys = new Set((_keySkuPortfolioRows || []).map(function (r) { return r.account_id + '|' + String(r.sku_id); }));
+  var out = [];
+  accounts.forEach(function (a) {
+    var nameMatches = a.name && a.name.toLowerCase().indexOf(query) !== -1;
+    var byMonth = (typeof bulkSkusData !== 'undefined' && bulkSkusData[a.id]) || {};
+    var months = Object.keys(byMonth).sort(function (x, y) { return _keySkuMonthSort(y) - _keySkuMonthSort(x); });
+    var latestRows = months.length ? (byMonth[months[0]] || []) : [];
+    latestRows.forEach(function (r) {
+      if (!r || !r.n) return;
+      if (confirmedKeys.has(a.id + '|' + String(r.id))) return;
+      if (nameMatches || r.n.toLowerCase().indexOf(query) !== -1) {
+        out.push({ accountId: a.id, accountName: a.name, skuId: r.id, skuName: r.n });
+      }
+    });
+  });
+  return out.slice(0, 20);
+}
+
+// One-tap confirm from the flat feed or search results — writes straight to
+// key_skus via the existing _keySkuConfirm (same insert/localStorage/invalidate
+// path the per-account screen's "ยืนยัน" button uses), then repaints this screen
+// from fresh state so counts/badge stay consistent (simpler and safer than trying
+// to hand-patch every derived count in place).
+function keyPortfolioQuickConfirm(accountId, skuId, skuName, btnEl) {
+  if (btnEl) btnEl.disabled = true;
+  _keySkuConfirm(accountId, [{ id: skuId, name: skuName }]).then(function () {
+    if (typeof showToast === 'function') showToast('เพิ่ม "' + skuName + '" เป็น Key SKU แล้ว');
+    if (typeof renderKeySkuNavBadge === 'function') renderKeySkuNavBadge();
+    if (typeof renderKeySkuSplitButton === 'function') renderKeySkuSplitButton();
+    renderKeyQueueScreen();
+  });
+}
+
+var _KEY_SHIELD_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3.5v6c0 5-3.4 8.8-8 10-4.6-1.2-8-5-8-10v-6z"></path><path d="M9 12l2 2 4-4"></path></svg>';
+var _KEY_PLUS_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>';
+var _KEY_SEARCH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>';
+
+function _keySkuBadgeHtml(badges) {
+  return (badges || []).map(function (b) {
+    return '<span class="skbadge skbadge-' + (b.key === 'sole_source' ? 'sole-source' : b.key === 'newness' ? 'newness-key' : 'concentration-key') + '">' + _keySkuEsc(b.label) + '</span>';
+  }).join('');
+}
+
+var _keyHomeQuery = ''; // sticky across re-renders so a quick-confirm repaint doesn't clear what the rep was searching
+var _keyProtExpanded = false, _keyRecoExpanded = false;
+var KEY_PROT_CAP = 8, KEY_RECO_CAP = 10;
+
+function renderKeyQueueScreen() {
+  var scr = document.getElementById('scr-key-queue');
+  if (!scr) return;
+  var accounts = (typeof getPortviewAccounts === 'function') ? getPortviewAccounts() : [];
+  scr.innerHTML =
+    '<div class="key-screen-pad">' +
+      '<div class="key-header">' +
+        '<button class="key-back-btn" onclick="showScreen(\'portview\')">' + _KEY_BACK_SVG + '</button>' +
+        '<div><div class="key-header-title">Key SKU</div><div class="key-header-sub">ทั่วพอร์ต · ' + accounts.length + ' ร้าน</div></div>' +
+      '</div>' +
+      '<div class="key-hero"><div class="key-hero-ico">' + _KEY_SHIELD_SVG + '</div>' +
+        '<div><div class="key-hero-n" id="key-hero-n">0</div><div class="key-hero-lbl">Marked as Key SKU</div></div>' +
+      '</div>' +
+      '<div class="key-home-search">' + _KEY_SEARCH_SVG +
+        '<input type="text" id="key-home-q" placeholder="ค้นหา SKU หรือชื่อร้าน..." value="' + _keySkuEsc(_keyHomeQuery) + '" oninput="_keyHomeFilter(this.value)">' +
+      '</div>' +
+      '<div class="key-sec-label">ปกป้องแล้ว <span class="key-sec-count" id="key-prot-count"></span></div>' +
+      '<div id="key-prot-list">กำลังโหลด...</div>' +
+      '<div class="key-more-hint" id="key-prot-more" style="display:none;cursor:pointer" onclick="_keyProtExpandToggle()"></div>' +
+      '<div class="key-sec-label" style="margin-top:20px">แนะนำเพิ่ม <span class="key-sec-count" id="key-reco-count"></span></div>' +
+      '<div id="key-reco-list"></div>' +
+      '<div class="key-more-hint" id="key-reco-more" style="display:none;cursor:pointer" onclick="_keyRecoExpandToggle()"></div>' +
+    '</div>';
+  if (!accounts.length) {
+    document.getElementById('key-prot-list').innerHTML = '<div class="key-queue-empty">ยังไม่มีร้านในพอร์ต</div>';
+    return;
+  }
+  _keySkuEnsurePortfolioLoaded().then(function () { _keyHomeRenderLists(_keyHomeQuery); });
+}
+
+function _keyHomeFilter(value) {
+  _keyHomeQuery = value;
+  _keyProtExpanded = false; _keyRecoExpanded = false; // a new search starts collapsed again
+  _keyHomeRenderLists(value);
+}
+
+function _keyProtExpandToggle() { _keyProtExpanded = true; _keyHomeRenderLists(_keyHomeQuery); }
+function _keyRecoExpandToggle() { _keyRecoExpanded = true; _keyHomeRenderLists(_keyHomeQuery); }
+
+function _keyHomeRenderLists(query) {
+  var q = (query || '').trim().toLowerCase();
+  var allProt = getPortfolioProtectedItems();
+  var allReco = getPortfolioKeySkuCandidates();
+
+  var prot = q ? allProt.filter(function (p) {
+    return p.skuName.toLowerCase().indexOf(q) > -1 || p.accountName.toLowerCase().indexOf(q) > -1;
+  }) : allProt;
+  var reco = q ? allReco.filter(function (r) {
+    return r.sku.name.toLowerCase().indexOf(q) > -1 || r.accountName.toLowerCase().indexOf(q) > -1;
+  }) : allReco;
+
+  // Searching also surfaces SKUs the scoring engine didn't flag — "เพิ่มเอง" fallback,
+  // same data _keySkuPortfolioSearch already scans (bulkSkusData, no extra fetch).
+  if (q) {
+    var already = new Set(reco.map(function (r) { return r.accountId + '|' + String(r.sku.id); }));
+    _keySkuPortfolioSearch(q).forEach(function (m) {
+      var k = m.accountId + '|' + String(m.skuId);
+      if (already.has(k)) return;
+      already.add(k);
+      reco.push({ accountId: m.accountId, accountName: m.accountName, sku: { id: m.skuId, name: m.skuName, badges: [] } });
+    });
+  }
+
+  var heroN = document.getElementById('key-hero-n');
+  if (heroN) heroN.textContent = allProt.length;
+  var protCountEl = document.getElementById('key-prot-count');
+  if (protCountEl) protCountEl.textContent = prot.length + ' จาก ' + allProt.length;
+  var recoCountEl = document.getElementById('key-reco-count');
+  if (recoCountEl) recoCountEl.textContent = reco.length + ' ทั่วพอร์ต';
+
+  var protShow = _keyProtExpanded ? prot : prot.slice(0, KEY_PROT_CAP);
+  var protListEl = document.getElementById('key-prot-list');
+  if (protListEl) {
+    protListEl.innerHTML = protShow.length ? protShow.map(function (p) {
+      return '<div class="prow"><div class="pcheck">' + _KEY_CHECK_SVG + '</div><div style="flex:1;min-width:0">' +
+        '<div class="pname">' + _keySkuEsc(p.skuName) + '</div><div class="ptag-row"><span class="ptag">' + _keySkuEsc(p.accountName) + '</span>' +
+        '<span class="pwhen">เพิ่มเมื่อ ' + _keySkuShortDate(p.setAt) + '</span></div></div></div>';
+    }).join('') : '<div class="key-empty-state">' + (q ? 'ไม่พบ SKU ที่ตรงกับคำค้นนี้' : 'ยังไม่มี SKU ที่ตั้งเป็น Key') + '</div>';
+  }
+  var protMoreEl = document.getElementById('key-prot-more');
+  if (protMoreEl) {
+    if (!_keyProtExpanded && prot.length > KEY_PROT_CAP) { protMoreEl.style.display = ''; protMoreEl.textContent = 'ดูทั้งหมด ' + prot.length + ' รายการ →'; }
+    else protMoreEl.style.display = 'none';
+  }
+
+  var recoShow = _keyRecoExpanded ? reco : reco.slice(0, KEY_RECO_CAP);
+  var recoListEl = document.getElementById('key-reco-list');
+  if (recoListEl) {
+    recoListEl.innerHTML = recoShow.length ? recoShow.map(function (r) {
+      var badgeHtml = _keySkuBadgeHtml(r.sku.badges);
+      return '<div class="rrow"><div style="flex:1;min-width:0"><div class="rname">' + _keySkuEsc(r.sku.name) + '</div>' +
+        '<div class="rtag-row"><span class="rtag">' + _keySkuEsc(r.accountName) + '</span>' + badgeHtml + '</div></div>' +
+        '<button class="addbtn" onclick="keyPortfolioQuickConfirm(\'' + _keySkuAttrEsc(r.accountId) + '\',\'' + _keySkuAttrEsc(r.sku.id) + '\',\'' + _keySkuAttrEsc(r.sku.name) + '\',this)">' + _KEY_PLUS_SVG + '</button></div>';
+    }).join('') : '<div class="key-empty-state">' + (q ? 'ไม่พบ SKU ที่ตรงกับคำค้นนี้' : 'ไม่มี SKU แนะนำเพิ่มแล้ว') + '</div>';
+  }
+  var recoMoreEl = document.getElementById('key-reco-more');
+  if (recoMoreEl) {
+    if (!_keyRecoExpanded && reco.length > KEY_RECO_CAP) { recoMoreEl.style.display = ''; recoMoreEl.textContent = 'ดูเพิ่มอีก ' + (reco.length - KEY_RECO_CAP) + ' รายการ →'; }
+    else recoMoreEl.style.display = 'none';
+  }
+}
+
+// ── SECTION: scr-key (per-account picker) ─────────────────────────────────
+
+var _keyScreenState = null; // {accountId, candidates, checkedIds:Set<string>, existingRows:[]}
+var _keyScreenEntryFrom = null; // screen name to return to on back — set right before showScreen('key')
+
+function _keySkuDaysAgo(dateStr) {
+  if (!dateStr) return null;
+  return Math.round((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function renderKeyScreen() {
+  var scr = document.getElementById('scr-key');
+  if (!scr) return;
+  var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+  var accountName = (accountId && typeof bulkAccountNames !== 'undefined' && bulkAccountNames[accountId]) || '—';
+  if (!accountId || accountId === 'default') {
+    scr.innerHTML = '<div class="key-screen-pad"><div class="key-empty-state">เลือกร้านก่อน — กลับไปที่คิว Key SKU แล้วเลือกร้าน</div></div>';
+    return;
+  }
+  var candidates = computeKeySkuCandidatesForAccount(accountId);
+  var backTarget = _keyScreenEntryFrom || 'key-queue';
+  scr.innerHTML =
+    '<div class="key-screen-pad">' +
+      '<div class="key-header">' +
+        '<button class="key-back-btn" onclick="showScreen(\'' + backTarget + '\')">' + _KEY_BACK_SVG + '</button>' +
+        '<div><div class="key-header-title">' + _keySkuEsc(accountName) + '</div><div class="key-header-sub">Key SKU</div></div>' +
+      '</div>' +
+      '<div id="key-body-slot">กำลังโหลด...</div>' +
+    '</div>';
+  _keySkuEnsureLoaded(accountId).then(function (st) {
+    var existingIds = st.existingIds;
+    var recommended = candidates.filter(function (c) { return !existingIds.has(String(c.id)); });
+    _keyScreenState = {
+      accountId: accountId,
+      candidates: recommended,
+      checkedIds: new Set(recommended.map(function (c) { return String(c.id); })), // pre-ticked — rep unticks the wrong ones
+      existingRows: st.rows
+    };
+    _keyRenderBody();
+  });
+}
+
+function _keyRenderBody() {
+  var s = _keyScreenState;
+  if (!s) return;
+  var slot = document.getElementById('key-body-slot');
+  if (!slot) return;
+
+  var recoHtml = s.candidates.length
+    ? s.candidates.map(function (c) {
+        var checked = s.checkedIds.has(String(c.id));
+        var badgeHtml = c.badges.map(function (b) {
+          return '<span class="skbadge skbadge-' + (b.key === 'sole_source' ? 'sole-source' : b.key === 'newness' ? 'newness-key' : 'concentration-key') + '">' + _keySkuEsc(b.label) + '</span>';
+        }).join('');
+        return '<div class="key-row" data-sku-id="' + _keySkuEsc(c.id) + '" onclick="toggleKeyRow(this)">' +
+          '<div class="key-check' + (checked ? '' : ' off') + '">' + _KEY_CHECK_SVG + '</div>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="key-sku-name">' + _keySkuEsc(c.name) + '</div>' +
+            (badgeHtml ? '<div class="sku-badge-row">' + badgeHtml + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('')
+    : '<div class="key-empty-state">ยังไม่มี SKU ที่เข้าเกณฑ์แนะนำสำหรับร้านนี้ — เพิ่มเองได้ด้านล่าง</div>';
+
+  var existingHtml = '';
+  if (s.existingRows.length) {
+    var showN = Math.min(6, s.existingRows.length);
+    existingHtml = s.existingRows.slice(0, showN).map(function (r) {
+      var days = _keySkuDaysAgo(r.set_at);
+      var stale = false; // v1: staleness needs last_order_date lookup against current bulkSkusData — left for a follow-up pass
+      return '<div class="key-existing-row">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="key-sku-name">' + _keySkuEsc(r.sku_name) + '</div>' +
+          '<div class="key-existing-meta' + (stale ? ' stale' : '') + '">Key SKU ตั้งแต่ ' + (r.set_at ? new Date(r.set_at).toLocaleDateString('th-TH') : '—') + '</div>' +
+        '</div>' +
+        '<button class="key-remove-btn" onclick="keyRemoveExisting(\'' + _keySkuAttrEsc(r.sku_id) + '\')">เอาออก</button>' +
+      '</div>';
+    }).join('') + (s.existingRows.length > showN ? '<div class="key-more-hint">และอีก ' + (s.existingRows.length - showN) + ' รายการ</div>' : '');
+  }
+
+  slot.innerHTML =
+    '<div class="key-summary-bar">' +
+      '<div class="key-summary-cell"><div class="key-summary-label">ยืนยันแล้ว</div><div class="key-summary-val">' + s.existingRows.length + '</div></div>' +
+      '<div class="key-summary-cell reco"><div class="key-summary-label">แนะนำเพิ่ม</div><div class="key-summary-val">' + s.candidates.length + '</div></div>' +
+    '</div>' +
+    (s.candidates.length ? '<div class="key-sec-label">แนะนำให้เป็น Key</div>' + recoHtml : recoHtml) +
+    (s.existingRows.length ? '<div class="key-sec-label">เป็น Key SKU อยู่แล้ว</div>' + existingHtml : '') +
+    '<div class="key-sec-label">เพิ่มเอง</div>' +
+    '<input type="text" class="key-add-search" placeholder="ค้นหา SKU อื่น..." oninput="keySearchAddSku(this.value)">' +
+    '<div class="key-add-results" id="key-add-results"></div>' +
+    '<div class="key-footer">' +
+      '<div class="key-footer-count">เลือกไว้ <b id="key-footer-n">' + s.checkedIds.size + '</b> SKU</div>' +
+      '<button class="key-confirm-btn" onclick="keyConfirmSelections()">ยืนยัน</button>' +
+    '</div>';
+}
+
+function toggleKeyRow(el) {
+  var s = _keyScreenState;
+  if (!s) return;
+  var skuId = el.getAttribute('data-sku-id');
+  var box = el.querySelector('.key-check');
+  if (s.checkedIds.has(skuId)) {
+    s.checkedIds.delete(skuId);
+    box.classList.add('off');
+  } else {
+    s.checkedIds.add(skuId);
+    box.classList.remove('off');
+  }
+  var footerN = document.getElementById('key-footer-n');
+  if (footerN) footerN.textContent = s.checkedIds.size;
+}
+
+function keyRemoveExisting(skuId) {
+  var s = _keyScreenState;
+  if (!s) return;
+  _keySkuRemoveOne(s.accountId, skuId).then(function () {
+    if (typeof showToast === 'function') showToast('เอา ' + skuId + ' ออกจาก Key SKU แล้ว');
+    renderKeyScreen(); // re-fetch + repaint — coverage recompute is live, not cached
+  });
+}
+
+function keySearchAddSku(query) {
+  var s = _keyScreenState;
+  var results = document.getElementById('key-add-results');
+  if (!s || !results) return;
+  query = (query || '').trim().toLowerCase();
+  if (!query) { results.innerHTML = ''; return; }
+  var byMonth = (typeof bulkSkusData !== 'undefined' && bulkSkusData[s.accountId]) || {};
+  var months = Object.keys(byMonth).sort(function (a, b) { return _keySkuMonthSort(b) - _keySkuMonthSort(a); });
+  var latestRows = months.length ? (byMonth[months[0]] || []) : [];
+  var alreadyKey = new Set(s.existingRows.map(function (r) { return String(r.sku_id); }));
+  var alreadyCandidate = new Set(s.candidates.map(function (c) { return String(c.id); }));
+  var matches = latestRows.filter(function (r) {
+    return r && r.n && r.n.toLowerCase().indexOf(query) !== -1 && !alreadyKey.has(String(r.id)) && !alreadyCandidate.has(String(r.id));
+  }).slice(0, 8);
+  results.innerHTML = matches.length
+    ? matches.map(function (r) {
+        return '<div class="key-add-row"><div class="key-sku-name">' + _keySkuEsc(r.n) + '</div>' +
+          '<button class="key-add-btn" onclick="keyAddSku(\'' + _keySkuAttrEsc(r.id) + '\',\'' + _keySkuAttrEsc(r.n) + '\')">เพิ่ม</button></div>';
+      }).join('')
+    : '<div class="key-more-hint">ไม่พบ SKU ที่ตรงกับคำค้นนี้</div>';
+}
+
+function keyAddSku(skuId, skuName) {
+  var s = _keyScreenState;
+  if (!s) return;
+  s.candidates.push({ id: skuId, name: skuName, score: 0, breakdown: {}, badges: [] });
+  s.checkedIds.add(String(skuId));
+  var results = document.getElementById('key-add-results');
+  if (results) results.innerHTML = '';
+  var input = document.querySelector('.key-add-search');
+  if (input) input.value = '';
+  _keyRenderBody();
+}
+
+function keyConfirmSelections() {
+  var s = _keyScreenState;
+  if (!s) return;
+  var items = s.candidates.filter(function (c) { return s.checkedIds.has(String(c.id)); });
+  if (!items.length) { if (typeof showToast === 'function') showToast('ยังไม่ได้เลือก SKU'); return; }
+  _keySkuConfirm(s.accountId, items).then(function () {
+    if (typeof showToast === 'function') showToast('บันทึก Key SKU แล้ว ' + items.length + ' รายการ');
+    renderKeyScreen(); // repaint from fresh DB state — moves confirmed items into "เป็น Key SKU อยู่แล้ว"
+  });
+}
+
+// ── SECTION: Products popover (nav) + kam-overview split button ──────────
+// v_key pivot (2026-08-16): self-review found the original entry points (a
+// standalone card wedged into the portview tier grid, a rollup section stacked
+// above teamview's own stats) visually crowded existing screens. Replaced with:
+//   (1) the "Save" nav tab renamed "Products" — tapping it opens this popover
+//       instead of navigating away, offering SAVE or Key SKU in-flow.
+//   (2) a sibling button next to "Account Insight" on the account screen,
+//       splitting that row 50/50 instead of adding a new row.
+// Colour is --fk-orange (#FF6600, real Freshket brand orange, verified against
+// freshket.co) — not --fk-red (an invented token, never real Freshket brand).
+
+function _keySkuSaveSubline() {
+  if (typeof currentAccountId === 'undefined' || !currentAccountId || currentAccountId === 'default') return 'เลือกร้านก่อน';
+  if (typeof senseActivated === 'undefined' || !senseActivated) return 'แตะเพื่อเริ่มวิเคราะห์';
+  var n = (typeof OPPS !== 'undefined' && OPPS) ? OPPS.length : 0;
+  return n > 0 ? (n + ' SKU มีโอกาสประหยัด') : 'ไม่พบช่องประหยัดเพิ่ม';
+}
+
+function renderProductsPopover() {
+  var pop = document.getElementById('products-popover');
+  if (!pop) return;
+  var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+  var saveSub = _keySkuSaveSubline();
+  var keySub = 'กำลังโหลด...';
+  pop.innerHTML =
+    '<div class="pv-row" onclick="productsGoSave()">' +
+      '<svg width="16" height="16" viewBox="0 0 10 10" fill="currentColor"><path d="M5,0 L6.3,3.7 L10,5 L6.3,6.3 L5,10 L3.7,6.3 L0,5 L3.7,3.7 Z"></path></svg>' +
+      '<div><div>SAVE</div><div class="pv-sub" id="pv-save-sub">' + _keySkuEsc(saveSub) + '</div></div>' +
+    '</div>' +
+    '<div class="pv-row key" onclick="productsGoKeySku()">' +
+      _KEY_ICON_SVG +
+      '<div><div>Key SKU</div><div class="pv-sub" id="pv-key-sub">' + _keySkuEsc(keySub) + '</div></div>' +
+    '</div>';
+  if (!accountId || accountId === 'default') {
+    _keySkuEnsurePortfolioLoaded().then(function (coveredIds) {
+      var accounts = (typeof getPortviewAccounts === 'function') ? getPortviewAccounts() : [];
+      var pending = accounts.filter(function (a) {
+        return computeKeySkuCandidatesForAccount(a.id).length > 0 && !coveredIds.has(a.id);
+      }).length;
+      var el = document.getElementById('pv-key-sub');
+      if (el) el.textContent = pending > 0 ? (pending + ' ร้านยังไม่ได้ตรวจ') : 'ตรวจครบทุกร้านแล้ว';
+    });
+  } else {
+    _keySkuEnsureLoaded(accountId).then(function (st) {
+      var pending = computeKeySkuCandidatesForAccount(accountId).filter(function (c) { return !st.existingIds.has(String(c.id)); }).length;
+      var el = document.getElementById('pv-key-sub');
+      if (el) el.textContent = pending > 0 ? (pending + ' SKU รอตรวจ') : (st.existingIds.size + ' SKU ยืนยันแล้ว');
+    });
+  }
+}
+
+function toggleProductsPopover(btnEl, forceClose) {
+  var pop = document.getElementById('products-popover');
+  var backdrop = document.getElementById('products-popover-backdrop');
+  if (!pop || !backdrop) return;
+  var willShow = !forceClose && pop.style.display === 'none';
+  if (!willShow) { pop.style.display = 'none'; backdrop.style.display = 'none'; return; }
+  if (btnEl && btnEl.getBoundingClientRect) {
+    var r = btnEl.getBoundingClientRect();
+    var cx = r.left + r.width / 2;
+    var halfW = 104; // .products-popover width:208px / 2 — keep in sync with styles_key.css
+    var vv = window.visualViewport;
+    var voffTop = (vv && vv.offsetTop) || 0;
+    var vh = (vv && vv.height) || window.innerHeight;
+    // Clamp against the app shell's own bounds (.bnav is the real max-width:440px shell,
+    // centered) rather than the raw window — on a viewport wider than the shell (desktop
+    // testing, tablets) window.innerWidth alone would place the popover off to one side.
+    var bnavRect = (function () { var el = document.querySelector('.bnav'); return el ? el.getBoundingClientRect() : null; })();
+    var shellLeft = bnavRect ? bnavRect.left : ((vv && vv.offsetLeft) || 0);
+    var shellRight = bnavRect ? bnavRect.right : (((vv && vv.width) || window.innerWidth) + ((vv && vv.offsetLeft) || 0));
+    var margin = 10; // small safety gutter from the shell edge
+    pop.style.left = Math.max(shellLeft + halfW + margin, Math.min(shellRight - halfW - margin, cx)) + 'px';
+    // Vertical: mirror installFabSafeZone's spirit (06_portview_teamview.js) — clamp so the
+    // popover can never render pushed above the topbar area, even from an unusual btnEl position.
+    var rawBottom = vh + voffTop - r.top + 10;
+    pop.style.bottom = Math.max(10, Math.min(rawBottom, vh + voffTop - 80)) + 'px';
+  }
+  renderProductsPopover();
+  pop.style.display = 'block';
+  backdrop.style.display = 'block';
+}
+
+// Whatever screen div currently carries the 'on' class — used to send scr-key's
+// back button to wherever the user actually came from, instead of a hardcoded target.
+function _keySkuCurrentScreenName() {
+  var el = document.querySelector('.scr.on');
+  return el ? el.id.replace(/^scr-/, '') : null;
+}
+
+// Byte-identical to what nav-opportunities's onclick used to do directly,
+// before Products/the popover existed — same Sense-gate/overlay-nav behaviour.
+// v_key round3: now reachable from Home too (nav-opportunities is no longer
+// disabled there) — this path never ran with no account before, and 'opportunities'
+// was never built to render without one, so guard it explicitly instead of guessing.
+function productsGoSave() {
+  toggleProductsPopover(null, true);
+  var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+  if (!accountId || accountId === 'default') {
+    if (typeof showToast === 'function') showToast('เลือกร้านก่อนเพื่อดู SAVE');
+    return;
+  }
+  if (isKAM && document.body.classList.contains('restaurant-sheet')) { _overlayNav('opportunities'); return; }
+  showScreen('opportunities');
+  document.body.classList.remove('sense-on-report');
+}
+
+function productsGoKeySku() {
+  toggleProductsPopover(null, true);
+  var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+  if (accountId && accountId !== 'default') {
+    _keyScreenEntryFrom = _keySkuCurrentScreenName() || 'overview';
+    showScreen('key');
+  } else {
+    showScreen('key-queue');
+  }
+}
+
+// Portfolio-wide pending-account count on the Products nav badge — cheap,
+// loops accounts already in memory, one bulk Supabase query (not N-per-account).
+function renderKeySkuNavBadge() {
+  var badge = document.getElementById('key-nav-badge');
+  if (!badge) return;
+  var accounts = (typeof getPortviewAccounts === 'function') ? getPortviewAccounts() : [];
+  if (!accounts.length) { badge.style.display = 'none'; return; }
+  _keySkuEnsurePortfolioLoaded().then(function (coveredIds) {
+    var pending = accounts.filter(function (a) {
+      return computeKeySkuCandidatesForAccount(a.id).length > 0 && !coveredIds.has(a.id);
+    }).length;
+    badge.textContent = pending;
+    badge.style.display = pending > 0 ? 'flex' : 'none';
+  });
+}
+
+// Account-level split button (right half of the Account Insight row).
+function renderKeySkuSplitButton() {
+  var btn = document.getElementById('key-sku-split-btn');
+  var lbl = document.getElementById('key-sku-split-btn-label');
+  if (!btn || !lbl) return;
+  var accountId = (typeof currentAccountId !== 'undefined') ? currentAccountId : null;
+  if (!accountId || accountId === 'default') { btn.style.display = 'none'; return; }
+  var candidates = computeKeySkuCandidatesForAccount(accountId);
+  _keySkuEnsureLoaded(accountId).then(function (st) {
+    var pending = candidates.filter(function (c) { return !st.existingIds.has(String(c.id)); }).length;
+    if (candidates.length === 0 && st.existingIds.size === 0) { btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-flex';
+    lbl.textContent = pending > 0 ? ('Key SKU · ' + pending) : ('Key SKU · ' + st.existingIds.size + ' ตรวจแล้ว');
+  });
+}
 </script>
 <!-- ══ VERIFY SHEET ══ -->
 <div class="verify-sheet-overlay" id="verifySheetOverlay" onclick="closeVerifySheet()"></div>
@@ -60656,35 +61801,27 @@ window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
   var NAV_CONFIG = {
     'rep': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'tl': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'admin': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'ad': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'pm': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'ad_tl': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'sales': {
       tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills'],
-      saveDisabledOn: [],
     },
     'sales_tl': {
       tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills', 'sales-teamview'],
-      saveDisabledOn: [],
     },
   };
 
@@ -60726,12 +61863,13 @@ window._qnrrToggleAcctRows = _qnrrToggleAcctRows;
 
   }
 
+  // v_key round3: Products (nav-opportunities) used to be Save-only and got disabled
+  // on account-less screens via a per-role disabled-screens list — retired now that its
+  // popover's Key SKU row works with no account selected too. Kept as a no-op since other
+  // modules still call this defensively (see 05_kam_view.js's "idempotent" comment at its call site).
   function updateSaveState(screen) {
-    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : null;
-    var config = role ? NAV_CONFIG[role] : null;
     var btn = document.getElementById('nav-opportunities');
-    if (!btn || !config) return;
-    btn.classList.toggle('nav-disabled', config.saveDisabledOn.indexOf(screen) !== -1);
+    if (btn) btn.classList.remove('nav-disabled');
   }
 
   var _origShow = window.showScreen;

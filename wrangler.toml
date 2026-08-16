@@ -10,7 +10,9 @@
 #
 # ⚠ secret ไม่ได้อยู่ในไฟล์นี้และไม่ควรอยู่ — มันเก็บบน worker อยู่แล้ว
 # (GEMINI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, SUPABASE_SERVICE_KEY,
-#  SUPABASE_URL) การ deploy ทับ **ไม่ลบ secret** · ถ้าต้องตั้งใหม่ใช้
+#  SUPABASE_URL, GOOGLE_SA_CLIENT_EMAIL, GOOGLE_SA_PRIVATE_KEY,
+#  GOOGLE_SHEETS_SPREADSHEET_ID — 3 ตัวหลัง v_keyexport 2026-08-16) การ deploy
+# ทับ **ไม่ลบ secret** · ถ้าต้องตั้งใหม่ใช้
 #   npx wrangler secret put <ชื่อ>
 
 name = "freshket-sense-ai-proxy"

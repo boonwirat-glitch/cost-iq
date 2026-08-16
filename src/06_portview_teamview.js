@@ -393,14 +393,14 @@ function _exitKamSenseMode(){
 }
 // ─────────────────────────────────────────────────────────────────────────────
 function _updateKamNavDisabled() {
+  // v_key round3: Products (nav-opportunities) used to be Save-only and required an
+  // account; it's now a popover offering Key SKU too, which works fine with no account
+  // selected (routes to the portfolio queue) — so it must stay enabled regardless of hasAcct.
   const hasAcct = currentAccountId && currentAccountId !== 'default';
   const restBtn = document.getElementById('nav-restaurant');
-  const senseBtn = document.getElementById('nav-opportunities');
   if (restBtn) restBtn.classList.toggle('nav-disabled', !hasAcct);
-  if (senseBtn) {
-    if (isKAM) senseBtn.classList.toggle('nav-disabled', !hasAcct);
-    else senseBtn.classList.remove('nav-disabled');
-  }
+  const senseBtn = document.getElementById('nav-opportunities');
+  if (senseBtn) senseBtn.classList.remove('nav-disabled');
 }
 
 function _overlayNav(screenName) {
@@ -1805,6 +1805,8 @@ function __legacyRenderPortviewSummaryFallback(){
     navBadge.textContent=atRisk;
     navBadge.style.display=atRisk>0?'flex':'none';
   }
+  // v_key: Products nav badge — reliable hook since this fires whenever portview data changes/loads
+  try{ if(typeof renderKeySkuNavBadge==='function') renderKeySkuNavBadge(); }catch(_e){}
 }
 
 function portviewSelectAccount(accountId){

@@ -10,3 +10,7 @@ dist/
 
 # wrangler local state (build cache + dev tmp — not app source)
 .wrangler/
+
+# local wrangler CLI install (v_keyexport 2026-08-16 — installed with --no-save,
+# no package.json in this repo; keep it that way)
+node_modules/

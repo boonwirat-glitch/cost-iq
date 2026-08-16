@@ -7,6 +7,10 @@
 // Env secrets: ANTHROPIC_API_KEY, GROQ_API_KEY, GEMINI_API_KEY
 //              SUPABASE_SERVICE_KEY (A2v2.1 — required by /process only; every
 //              other endpoint works without it)
+//              GOOGLE_SA_CLIENT_EMAIL, GOOGLE_SA_PRIVATE_KEY,
+//              GOOGLE_SHEETS_SPREADSHEET_ID (v_keyexport — Key SKU → Google
+//              Sheets export only; scheduled() skips the export silently if
+//              these are unset, everything else works without them)
 //
 // v4 (2026-06-15) — Echo v2 architecture per spec
 //   /transcript  — audio → segments[] with segment_id + confidence (ground truth layer)
@@ -2354,6 +2358,114 @@ async function sweepAbGemini(env) {
   return true;
 }
 
+// ── Key SKU → Google Sheets export (v_keyexport, 2026-08-16) ───────────────
+// บุชขอ: ไม่ต้องอัปเดตถี่ (ทีม supply เช็ควันละไม่กี่ครั้งพอ) แค่ 4 รอบ/วันตาม
+// เวลาไทยที่กำหนด และห้ามให้โครงสร้างนี้กินพื้นที่ Supabase เพิ่ม (free plan)
+// — เกาะกับ cron ที่มีอยู่แล้ว (ทุก 5 นาที 2-15 UTC ใน wrangler.toml) เหมือน
+// sweepExpiredAudio ทำ ไม่เพิ่ม cron trigger ใหม่เลย (ทุกเวลาข้างล่างอยู่ในช่วง
+// 2-15 UTC เดิมพอดี) และไม่เพิ่มตาราง/คอลัมน์ใหม่ — ใช้ key_skus_export_state
+// แถวเดียว (id=1, สร้างไว้แล้วตั้งแต่ KEY-9) แค่เก็บ last_exported_at เฉยๆ
+// เป็นสแนปช็อตทั้งก้อนทุกรอบ (ไม่ใช่ event queue) พลาดรอบไหนไม่มีข้อมูลหาย
+// รอบถัดไปส่งของปัจจุบันซ้ำเองอยู่แล้ว จึงไม่ต้องมี retry/backoff ก็ได้
+//   12:00 / 15:00 / 17:00 / 20:00 น. ไทย = 05:00 / 08:00 / 10:00 / 13:00 UTC
+const KEY_EXPORT_UTC_HOURS = [5, 8, 10, 13];
+
+function _b64urlFromBytes(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function _b64urlJson(obj) {
+  return btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function _pemToDer(pem) {
+  const b64 = pem.replace(/-----BEGIN PRIVATE KEY-----/, '')
+                 .replace(/-----END PRIVATE KEY-----/, '')
+                 .replace(/\s+/g, '');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// Self-signed JWT → Google OAuth token (RFC 7523 service-account flow) เซ็นด้วย
+// Web Crypto API เพราะ Workers ไม่มี Node crypto ให้ใช้
+async function _googleAccessToken(env) {
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = `${_b64urlJson({ alg: 'RS256', typ: 'JWT' })}.${_b64urlJson({
+    iss: env.GOOGLE_SA_CLIENT_EMAIL,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now, exp: now + 3600
+  })}`;
+  const key = await crypto.subtle.importKey('pkcs8', _pemToDer(env.GOOGLE_SA_PRIVATE_KEY),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
+  const jwt = `${unsigned}.${_b64urlFromBytes(new Uint8Array(sigBuf))}`;
+
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${jwt}`
+  });
+  if (!r.ok) throw new Error(`google token ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
+  return (await r.json()).access_token;
+}
+
+function _sheetsValuesUrl(env, range, suffix, qs) {
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEETS_SPREADSHEET_ID}` +
+    `/values/${encodeURIComponent(range)}${suffix || ''}`;
+  return qs ? `${base}?${qs}` : base;
+}
+async function _sheetsFetch(token, url, method, body) {
+  const r = await fetch(url, {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  if (!r.ok) throw new Error(`sheets ${method} ${url} ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
+  return r.json();
+}
+function _keyExportThaiStamp(d) {
+  const t = new Date(d.getTime() + 7 * 3600 * 1000); // ไม่พึ่ง Intl locale data
+  const p = n => String(n).padStart(2, '0');
+  return `${p(t.getUTCDate())}/${p(t.getUTCMonth() + 1)}/${t.getUTCFullYear()} ${p(t.getUTCHours())}:${p(t.getUTCMinutes())} น.`;
+}
+
+async function exportKeySkusToSheet(env) {
+  if (!env.GOOGLE_SA_CLIENT_EMAIL || !env.GOOGLE_SA_PRIVATE_KEY || !env.GOOGLE_SHEETS_SPREADSHEET_ID) {
+    console.log('[key-sku-export] ยังไม่ได้ตั้ง Google secrets — ข้ามรอบนี้');
+    return;
+  }
+  const rows = await sbSelect(env,
+    `key_skus?status=eq.active&select=account_name,outlet_id,outlet_name,sku_id,sku_name,set_by,set_at` +
+    `&order=account_name.asc,outlet_name.asc,sku_name.asc&limit=5000`);
+
+  // v_keyoutlet 2026-08-16: supply planning works at outlet grain — res_name/
+  // res_id (their terms) = outlet_name/outlet_id here. account_name kept as
+  // context since one account can have several outlets.
+  const header = ['บริษัท (account)', 'res_name', 'res_id (user_id)', 'รหัส SKU', 'ชื่อ SKU', 'ผู้บันทึกโดย (KAM)', 'วันที่บันทึก'];
+  const body = rows.map(r => [
+    r.account_name || '', r.outlet_name || '', r.outlet_id || '', r.sku_id || '', r.sku_name || '',
+    r.set_by || '', r.set_at ? _keyExportThaiStamp(new Date(r.set_at)) : ''
+  ]);
+  const now = new Date();
+
+  const token = await _googleAccessToken(env);
+  await _sheetsFetch(token, _sheetsValuesUrl(env, "'Key SKUs'!A1:Z10000", ':clear'), 'POST', {});
+  await _sheetsFetch(token, _sheetsValuesUrl(env, "'Key SKUs'!A1", '', 'valueInputOption=USER_ENTERED'), 'PUT',
+    { values: [header, ...body] });
+  await _sheetsFetch(token, _sheetsValuesUrl(env, "'Change Log'!A1", ':append',
+    'valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS'), 'POST',
+    { values: [[_keyExportThaiStamp(now), body.length]] });
+
+  // แถวเดียว ไม่มี insert เพิ่ม — ไม่กินพื้นที่โตขึ้นเลย
+  await sbPatch(env, 'key_skus_export_state', 'id=eq.1', { last_exported_at: now.toISOString() })
+    .catch(e => console.warn('[key-sku-export] อัป last_exported_at ไม่ผ่าน (ไม่ critical)', e));
+
+  console.log(`[key-sku-export] ส่งออกสำเร็จ ${body.length} รายการ`);
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 export default {
   async scheduled(event, env, cfCtx) {
@@ -2370,6 +2482,10 @@ export default {
     const at = new Date(event && event.scheduledTime ? event.scheduledTime : Date.now());
     if (at.getUTCHours() === 3 && at.getUTCMinutes() < 5) {
       cfCtx.waitUntil(sweepExpiredAudio(env));
+    }
+    // v_keyexport: ส่งออก Key SKU ไป Google Sheets 4 รอบ/วันตามเวลาไทยที่บุชขอ
+    if (KEY_EXPORT_UTC_HOURS.includes(at.getUTCHours()) && at.getUTCMinutes() < 5) {
+      cfCtx.waitUntil(exportKeySkusToSheet(env).catch(e => console.error('[key-sku-export] ล้มเหลว', e)));
     }
   },
   async fetch(request, env, cfCtx) {

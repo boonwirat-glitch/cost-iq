@@ -33,35 +33,27 @@
   var NAV_CONFIG = {
     'rep': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'tl': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'admin': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'ad': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'pm': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'ad_tl': {
       tabs: ['portview', 'restaurant', 'echo-kam', 'opportunities', 'skills'],
-      saveDisabledOn: ['portview', 'teamview', 'skills'],
     },
     'sales': {
       tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills'],
-      saveDisabledOn: [],
     },
     'sales_tl': {
       tabs: ['sales-portview', 'sales-pipeline', 'sales-echo', 'sales-commission', 'skills', 'sales-teamview'],
-      saveDisabledOn: [],
     },
   };
 
@@ -103,12 +95,13 @@
 
   }
 
+  // v_key round3: Products (nav-opportunities) used to be Save-only and got disabled
+  // on account-less screens via a per-role disabled-screens list — retired now that its
+  // popover's Key SKU row works with no account selected too. Kept as a no-op since other
+  // modules still call this defensively (see 05_kam_view.js's "idempotent" comment at its call site).
   function updateSaveState(screen) {
-    var role = (typeof getCurrentRole === 'function') ? getCurrentRole() : null;
-    var config = role ? NAV_CONFIG[role] : null;
     var btn = document.getElementById('nav-opportunities');
-    if (!btn || !config) return;
-    btn.classList.toggle('nav-disabled', config.saveDisabledOn.indexOf(screen) !== -1);
+    if (btn) btn.classList.remove('nav-disabled');
   }
 
   var _origShow = window.showScreen;

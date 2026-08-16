@@ -138,11 +138,12 @@ function __legacyShowScreenFallback(name){
   if(name==='portview'){renderPortview();
     // In KAM mode nav-overview IS the portview button — highlight it
     if(isKAM){const _ov=document.getElementById('nav-overview');if(_ov)_ov.classList.add('on');}
-    // Force-disable ร้าน + Sense on portview — no account in context yet
+    // Force-disable ร้าน on portview — no account in context yet.
+    // v_key round3: Products (nav-opportunities) is no longer Save-only — its popover's
+    // Key SKU row works fine with no account selected (routes to the portfolio queue),
+    // so it must stay tappable here.
     const _rb=document.getElementById('nav-restaurant');
-    const _sb=document.getElementById('nav-opportunities');
     if(_rb)_rb.classList.add('nav-disabled');
-    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
   }
   // KAM account view: ร้าน active (user is "in" a store context), show drag handle
   if(isKAM&&name==='overview'){
@@ -158,21 +159,21 @@ function __legacyShowScreenFallback(name){
     // v687: sync first-card offset after teamview is visible and layout settles
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},300);
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},600);
-    // Disable Save while in teamview — must select account first
-    const _sb=document.getElementById('nav-opportunities');
-    if(_sb&&isKAM)_sb.classList.add('nav-disabled');
   }
-  // Disable Save + Restaurant when on skills — no account context
+  // Disable Restaurant when on skills — no account context (Products stays enabled, see above)
   if(name==='skills'&&isKAM){
-    const _sb=document.getElementById('nav-opportunities');
     const _rb=document.getElementById('nav-restaurant');
-    if(_sb)_sb.classList.add('nav-disabled');
     if(_rb)_rb.classList.add('nav-disabled');
   }
+  // v_key: Key SKU screens — queue is cross-portfolio (like portview), key is per-account
+  // (like overview) but lives outside .main (like portview/teamview) since it needs its
+  // own sticky footer without the restaurant-swipe layout getting in the way.
+  if(name==='key-queue'){ if(typeof renderKeyQueueScreen==='function') renderKeyQueueScreen(); }
+  if(name==='key'){ if(typeof renderKeyScreen==='function') renderKeyScreen(); }
   // portview + teamview live OUTSIDE .main in DOM — hide .main so its min-height
   // doesn't push those screens below the fold
   const mainEl=document.querySelector('.main');
-  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills')?'none':'';
+  if(mainEl)mainEl.style.display=(name==='portview'||name==='teamview'||name==='sales-portview'||name==='sales-pipeline'||name==='sales-commission'||name==='sales-teamview'||name==='skills'||name==='key'||name==='key-queue')?'none':'';
   // Clean up portview return fab if navigating away from per-account view
   const existingFab=document.getElementById('portview-return-fab');
   if(existingFab&&name==='portview')existingFab.remove();
@@ -1949,6 +1950,11 @@ function __legacySetModeFallback(mode){
     showScreen('overview');
     // ── No-account empty state takes priority ──
     if(_renderKamNoAcctState())return; // skip rest of render — empty state owns the screen
+    // v_key: Key SKU split button + nav badge — independent of the AI-insight hasData gate below
+    try{
+      if(typeof renderKeySkuSplitButton==='function') renderKeySkuSplitButton();
+      if(typeof renderKeySkuNavBadge==='function') renderKeySkuNavBadge();
+    }catch(_e){}
     const kamCards=document.getElementById('kam-cards');
     const kamLoad=document.getElementById('kam-loading2');
     const kamEmpty=document.getElementById('kam-empty-state');

@@ -23,6 +23,17 @@
   --fk-red-border:   rgba(255,56,92,.20);  /* border */
   --fk-red-strong:   rgba(255,56,92,.15);  /* pill/nav active */
 
+  /* ── FRESHKET BRAND ORANGE (v_key self-review, 2026-08-16) ──
+     #FF6600 is verified against the real live site (freshket.co brand
+     extraction, freshket-insights/docs/design/BRAND.md) — unlike --fk-red
+     above (an invented token, not derived from real Freshket brand), this
+     is Freshket's actual brand orange. Used for Key SKU specifically so it
+     doesn't collide with tier-grid green (ON TRACK) or red (AT RISK). */
+  --fk-orange:        #FF6600;
+  --fk-orange-dim:    rgba(255,102,0,.14);
+  --fk-orange-border: rgba(255,150,60,.5);
+  --fk-orange-text:   #ffb066;
+
   /* ── LIGHT THEME CANVAS (additive — Phase 0A) ───────────── */
   --canvas:          #FFFFFF;   /* page background */
   --surface:         #F7F7F7;   /* card / band */
