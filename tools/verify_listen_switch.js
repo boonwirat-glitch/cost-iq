@@ -30,7 +30,7 @@ function check(name, ok, detail) {
   else { fail++; console.log('  ✗ ' + name + (detail ? '\n      ' + detail : '')); }
 }
 
-const STAGE1 = WK.slice(WK.indexOf('// ── Stage 1: uploaded → transcribed'),
+const STAGE1 = WK.slice(WK.indexOf('// ── Stage 1: uploaded / needs_gemini → transcribed'),
                        WK.indexOf('// ── Stage 2: transcribed → analyzed'));
 const STEP = WK.slice(WK.indexOf('async function runListenStep'), WK.indexOf('async function processSession'));
 
@@ -46,7 +46,16 @@ check('ไม่มี GEMINI_API_KEY ก็ยังทำงานได้ (�
 
 console.log('\n── 2. Gemini ล้ม = ต้องตกไป Whisper งานห้ามค้าง ──');
 check('มี try/catch ครอบเส้น Gemini แล้วปล่อยให้ t เป็น null',
-  /catch \(e\) \{[\s\S]{0,400}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,200}t = null;/.test(STAGE1));
+  /catch \(e\) \{[\s\S]{0,2500}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
+// v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอย — เมื่องบ Gemini
+// เอง (LISTEN_MAX_ATTEMPTS) หมดจริงถึงปิดถาวร ส่วน hiccup ชั่วคราวปล่อยให้ tick
+// ถัดไปลองซ้ำ ไม่แตะ general attempts (เพดานแค่ 4) เพื่อไม่ให้ blip ที่ไม่เกี่ยวกับ
+// Gemini มาปิดคิวถาวรทั้งที่งบ Gemini จริงยังเหลือเยอะ
+check('needs_gemini: งบ Gemini หมดจริงถึงปิดถาวร (ไม่ผ่าน classifyFailure ที่จะเดาผิด)',
+  /const genuinelyExhausted = \/ไม่จบใน \\d\+ รอบ\//.test(STAGE1) &&
+  /pipeline_stage: 'failed_audio', processing_since: null, next_attempt_at: null/.test(STAGE1));
+check('needs_gemini: hiccup ชั่วคราวไม่แตะ general attempts — แค่ปล่อย claim ให้ tick ถัดไป',
+  /hiccup ชั่วคราวรายหน้าต่าง[\s\S]{0,500}processing_since: null \}\)\.catch/.test(STAGE1));
 check('ล้างสถานะระหว่างทางทิ้งก่อนส่งต่อให้ Whisper (ไม่งั้นค้างครึ่งๆ)',
   /listen_state: null \}\)\.catch/.test(STAGE1));
 check('t เป็น null เมื่อไหร่ = เรียก Whisper เสมอ',
@@ -84,7 +93,7 @@ console.log('\n── 5. prompt: ช่วงเวลา + ความละ�
 {
   const src = WK.slice(WK.indexOf('function _listenPrompt'), WK.indexOf('async function _listenCall'));
   const helpers = WK.slice(WK.indexOf('function _utf8Bytes'), WK.indexOf('const GROQ_MAX_AUDIO_BYTES'))
-    + WK.slice(WK.indexOf('function _abSecToTs'), WK.indexOf('// Gemini คืนได้ทั้ง'));
+    + WK.slice(WK.indexOf('function _abSecToTs'), WK.indexOf('// ── รูปแบบคำตอบแบบประหยัด'));
   const c = { TextEncoder };
   vm.createContext(c);
   vm.runInContext(`${helpers}\n${src}\nthis.API={_listenPrompt};`, c);
@@ -109,10 +118,25 @@ check('Gemini คืนค่าความมั่นใจจากสัด
   /const unclear = merged\.filter\(s => \/\\\[ฟังไม่ชัด\\\]\/\.test/.test(STEP) &&
   /const conf = merged\.length \? 1 - \(unclear \/ merged\.length\) : null/.test(STEP),
   'ปล่อย null = ป้าย "ถอดเสียงไม่ชัดเจน" ในแอปจะไม่ขึ้นเลย เสียตัวกันพลาดที่ทำไว้');
-check('ป้ายในแอปยังอ่านค่านี้อยู่ (เกณฑ์ < 0.6)',
-  /typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < 0\.6/.test(CI));
+check('ป้ายในแอปยังอ่านค่านี้อยู่ (เกณฑ์แยกตามหู — gemini เข้มกว่า whisper มาก)',
+  /typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < _confThreshold/.test(CI) &&
+  /const _confThreshold = s\.transcript_source === 'gemini-3\.1-pro' \? 1 : 0\.6;/.test(CI),
+  'ค่า proxy ของ Gemini กระจุกใกล้ 1.0 เกือบทุกแถวจริง — เกณฑ์ 0.6 คงที่จะไม่มีวันขึ้นป้ายเลย');
 check('ระบุแหล่งที่มาเป็น gemini เพื่อให้ตรวจย้อนได้ว่าบทไหนมาจากหูไหน',
   /source: 'gemini-3\.1-pro'/.test(STEP));
+
+console.log('\n── 6b. v_filecleanup: ลบไฟล์ Gemini Files API หลังเลิกใช้ (best-effort) ──');
+check('_geminiUploadAudio คืน {uri,name} ไม่ใช่ string เปล่า (name จำเป็นสำหรับสั่งลบ)',
+  /return \{ uri: f\.uri, name \};/.test(WK));
+check('มี _geminiDeleteFile ไว้สั่งลบ และพลาดได้โดยไม่ทำ pipeline พัง (best-effort)',
+  /async function _geminiDeleteFile\(env, name\)/.test(WK) &&
+  /method: 'DELETE'/.test(WK));
+check('ถอดจบครบทุกช่วงแล้วลบไฟล์ทิ้งก่อน return ผลลัพธ์',
+  /if \(st\.file_name\) await _geminiDeleteFile\(env, st\.file_name\);\s*return \{/.test(STEP));
+check('เลิกใช้ไฟล์เพราะตกไป Whisper ก็ลบทิ้งก่อนล้าง listen_state',
+  /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,150}listen_state: null \}\)/.test(STAGE1));
+check('needs_gemini งบหมดถาวรก็ลบไฟล์ทิ้งก่อนปิดคิว',
+  /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,200}pipeline_stage: 'failed_audio'/.test(STAGE1));
 
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',

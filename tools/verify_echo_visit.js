@@ -215,6 +215,24 @@ check('v952: visibilitychange re-syncs pending checkin',
   /visibilitychange[\s\S]{0,300}_checkinCache\.session_id[\s\S]{0,200}_syncCheckinToDb/.test(ci));
 check('v952: final failure reports to sentinel',
   /ci_checkin_sync_fail/.test(ci));
+// v_checkinretry (2026-08-17): เดิม give-up มีแค่ telemetry เงียบๆ ไม่มีอะไรบอก
+// rep เลยว่าเช็คอินยังไม่ขึ้นระบบ — ต้องมี pill ค้างให้เห็น + แตะลองใหม่ได้เอง
+// และ restore จาก cache (ออฟไลน์เปิดแอปทีหลัง) ต้องปลุก retry queue ด้วย
+check('v_checkinretry: มี pill เตือนค้างไว้เมื่อ retry หมดรอบ (ไม่ใช่ telemetry อย่างเดียว)',
+  /id="ci-checkin-warn"/.test(ci) && /_setCheckinWarnVisible\(true\)/.test(ci));
+check('v_checkinretry: แตะ pill เตือนแล้วลองซ้ำได้ทันที',
+  /async function _retryCheckinSyncNow\(\)/.test(ci) &&
+  /onclick="CI\._retryCheckinSyncNow\(\)"/.test(ci));
+check('v_checkinretry: pill เตือนหายไปเมื่อ sync สำเร็จ (ทุกเส้นทาง)',
+  (ci.match(/_setCheckinWarnVisible\(false\)/g) || []).length >= 3);
+check('v_checkinretry: restore เช็คอินจาก cache (ออฟไลน์เปิดแอปทีหลัง) ปลุก retry queue ด้วย',
+  /if \(!cached\.session_id\) _armCheckinRetry\(\);\s*\n\s*return true;/.test(ci));
+
+// v_screenlock (2026-08-17): ข้อความระหว่างอัดเสียงเดิมบอกผิดว่า "ทำงานอยู่
+// เบื้องหลัง" ได้ ทั้งที่ iOS ตัดไมค์ทันทีที่ล็อกจอจริง (เหตุการณ์ 11 ส.ค.)
+check('v_screenlock: ข้อความระหว่างอัดเตือนให้เปิดจอไว้ ไม่ใช่หลอกว่าปิดจอได้',
+  /id="ci-rec-hint">เปิดหน้าจอทิ้งไว้ระหว่างคุย/.test(ci) &&
+  !/id="ci-rec-hint">echo กำลังรับฟัง/.test(ci));
 check('v952: admin empty covisit list reports telemetry',
   /ci_admin_covisit_empty/.test(ci));
 check('v952: resume owner-check uses _authEmail',
@@ -395,14 +413,38 @@ check('client: _saveTranscriptOnly persists confidence on both UPDATE and INSERT
 check('client: session detail select carries transcript_confidence + pipeline_error',
   /pipeline_stage,pipeline_error,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence/.test(ci));
 check('client: low-confidence banner renders honest copy (no false claim about replaying audio)',
-  /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < 0\.6\)/.test(ci) &&
+  /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < _confThreshold\)/.test(ci) &&
   !/ฟังต้นฉบับ/.test(ci));
+// v_confproxy (2026-08-17): 0.6 คงที่ใช้ไม่ได้กับ Gemini — proxy ของมันกระจุกใกล้
+// 1.0 เกือบทุกแถวไม่ว่าคุณภาพเสียงจะแย่แค่ไหนจริง (วัดจากข้อมูลจริง) ป้ายเตือนจึง
+// ต้องแยกเกณฑ์ตาม transcript_source ไม่งั้นจะไม่มีวันขึ้นเลยสำหรับ Gemini
+check('client: session detail select ดึง transcript_source มาด้วย (จำเป็นต่อการแยกเกณฑ์)',
+  /transcript_confidence,transcript_source/.test(ci));
+check('client: เกณฑ์เตือนแยกตาม transcript_source — gemini เข้มกว่า whisper มาก',
+  /const _confThreshold = s\.transcript_source === 'gemini-3\.1-pro' \? 1 : 0\.6;/.test(ci));
+
+// v_recdebounce (2026-08-17): _phase ยังเป็น 'idle' ตลอดช่วงรอ getUserMedia() —
+// เดิมกดซ้อนสองครั้งในช่วงนี้ผ่านด่านได้ทั้งคู่ กลายเป็นสอง MediaRecorder ทำงาน
+// พร้อมกัน (mirror _checkinBusy pattern ที่มีอยู่แล้วสำหรับเช็คอิน)
+check('client: startRecording มี busy-guard กันกดซ้อนระหว่างรอ getUserMedia',
+  /let _startRecBusy = false;/.test(ci) &&
+  /if \(_phase !== 'idle' \|\| _startRecBusy\) return;/.test(ci) &&
+  /_startRecBusy = true;/.test(ci));
+check('client: busy-guard ถูกปล่อยทั้งเส้นทางสำเร็จและล้มเหลว',
+  /_phase\s+= 'recording';\s*\n\s*_startRecBusy = false;/.test(ci) &&
+  /_phase = 'idle';\s*\n\s*_startRecBusy = false;/.test(ci));
 
 console.log('\n[B] source locks — ECHO GOAL 2 Phase A2v2.1 (async pipeline)');
 // worker side
 check('worker: /process route registered with ctx',
   /if \(url\.pathname === '\/process'\)\s+return handleProcess\(request, env, cfCtx\);/.test(worker) &&
   /async fetch\(request, env, cfCtx\)/.test(worker));
+// v_resumefix (2026-08-17): เดิม /process ตอบ 202 เสมอแม้กับ failed_system ที่
+// processSession ไม่มี stage ไหนรับเลย — ทำให้ปุ่ม "ลองใหม่" หลอกว่าสำเร็จทั้งที่
+// ไม่มีอะไรเกิดขึ้นจริง ตอนนี้ต้องปลุกกลับ transcribed ก่อนจริงๆ
+check('worker: handleProcess ปลุก failed_system กลับ transcribed ก่อนยิง processSession จริง (ปุ่ม "ลองใหม่" ต้องลองใหม่จริง)',
+  /pipeline_stage === 'failed_system'[\s\S]{0,250}pipeline_stage: 'transcribed', status: 'draft', attempts: 0/.test(worker) &&
+  worker.indexOf("pipeline_stage === 'failed_system'") < worker.indexOf('cfCtx.waitUntil(processSession('));
 check('worker: cores extracted and reused by legacy endpoints',
   /await runTranscribe\(_b64ToBytes\(audio_b64\)/.test(worker) &&
   /await runSummarize\(segments, env\)/.test(worker) &&
@@ -425,8 +467,23 @@ check('worker: มี sweeper ลบเสียงตามอายุแท�
   /async function sweepExpiredAudio\(env\)/.test(worker) &&
   /AUDIO_RETENTION_DAYS/.test(worker) &&
   /waitUntil\(sweepExpiredAudio\(env\)\)/.test(worker));
+// v_retention7 (2026-08-17): บุชเคาะ 30→7 หลัง bucket ใช้ไป ~21% ของโควตาฟรี
+// จากแค่ 5 วัน pilot — ต้องตรงกันทั้ง JS fallback และ wrangler.toml [vars]
+check('worker: ค่า fallback ตอนนี้คือ 7 วัน (ไม่ใช่ 30 เดิม)',
+  /const AUDIO_RETENTION_DAYS = 7;/.test(worker));
+check('wrangler.toml: AUDIO_RETENTION_DAYS ตั้งเป็น "7" ตรงกับ JS fallback',
+  /AUDIO_RETENTION_DAYS = "7"/.test(fs.readFileSync(path.join(__dirname, '..', 'wrangler.toml'), 'utf8')));
 check('worker: sweeper ลบ storage สำเร็จก่อนค่อย null คอลัมน์ (กันไฟล์กำพร้า)',
   /await sbStorageDelete\(env, r\.audio_path\);\s*\n\s*await sbPatch\(env, 'ci_sessions', `id=eq\.\$\{r\.id\}`, \{ audio_path: null \}\);/.test(worker));
+// v_skilllog (2026-08-17): echo_skill_observations/kam_skill_log ไม่มีนโยบายลบ
+// มาก่อน — เกาะรอบ 03:00 UTC เดียวกับ sweepExpiredAudio ไม่เพิ่ม cron ใหม่
+check('worker: มี sweeper สำหรับ skill logs ทั้งสองตาราง + เกาะ cron รอบเดิม',
+  /async function sweepExpiredSkillLogs\(env\)/.test(worker) &&
+  /SKILL_LOG_RETENTION_DAYS/.test(worker) &&
+  /waitUntil\(sweepExpiredSkillLogs\(env\)\)/.test(worker));
+check('worker: ลบ echo_skill_observations ด้วย observed_at (timestamp) และ kam_skill_log ด้วย session_date (date)',
+  /sbDelete\(env, 'echo_skill_observations', `observed_at=lt\.\$\{encodeURIComponent\(cutoffIso\)\}`\)/.test(worker) &&
+  /sbDelete\(env, 'kam_skill_log', `session_date=lt\.\$\{encodeURIComponent\(cutoffDate\)\}`\)/.test(worker));
 check('worker: rubric fetched from DB and role-filtered server-side (Phase R semantics)',
   /skill_definitions\?echo_enabled=eq\.true/.test(worker) &&
   /!d\.roles \|\| !d\.roles\.length \|\| d\.roles\.includes\(bucket\)/.test(worker));
@@ -530,13 +587,12 @@ check('client: legacy rows without new fields collapse silently (backward compat
   /const arr\s+= v => \(Array\.isArray\(v\) \? v\.filter\(Boolean\) : \[\]\);/.test(ci) &&
   /const fold = \(title, count, inner\) => inner/.test(ci) &&
   /เกมที่ควรเดิน/.test(ci));
-// v_ears P0 (2026-08-14): scheduled() มีด่าน A/B ชั่วคราวคั่นหน้า — มีงานเทียบ
-// โมเดลค้างให้ทำงานนั้นแทน (กันแย่งเพดาน 50 subrequest) ไม่มีค่อย sweepPending
-// เมื่อถอด ab_gemini ออก ให้คืน check เดิม: /cfCtx\.waitUntil\(sweepPending\(env\)\);/
+// v_needsgemini (2026-08-17): ด่าน A/B ชั่วคราว (sweepAbGemini) ถอดออกแล้ว —
+// เคาะโมเดลจบแล้ว (Gemini ชนะ) ตามที่ migration ของมันตั้งใจไว้แต่แรก
 check('worker: cron sweep is the real engine (waitUntil ~30s kill found in live test)',
   /async scheduled\(event, env, cfCtx\)/.test(worker) &&
-  /cfCtx\.waitUntil\(\(async \(\) => \{/.test(worker) &&
-  /if \(!didAb\) await sweepPending\(env\);/.test(worker) &&
+  /cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(worker) &&
+  !/async function sweepAbGemini/.test(worker) && !/sweepAbGemini\(env\)/.test(worker) &&
   /and\(pipeline_stage\.eq\.transcribed,status\.eq\.draft\)/.test(worker));
 // v_queue (2026-08-12): ข้อเดิมล็อกว่า "cron ต่อ stage ในตัวเอง + limit=3" ซึ่งกลับ
 // ด้านแล้วด้วยเหตุผลเชิงตัวเลข: Free plan ให้ 50 subrequest/invocation แต่

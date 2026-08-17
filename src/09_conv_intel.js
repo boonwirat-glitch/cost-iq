@@ -604,6 +604,13 @@ body:not(.echo-active) { background:unset; }
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         <span style="font-size:var(--text-xs);font-weight:var(--fw-medium);color:#1A7A3A;font-family:'Noto Sans Thai',sans-serif">เช็คอิน <span id="ci-checkin-time">—</span></span>
       </div>
+      <!-- v_checkinretry (2026-08-17): เดิม retry หมดรอบเงียบๆ มีแค่ telemetry —
+           rep ไม่รู้เลยว่าเช็คอินยังไม่ขึ้นระบบ · pill นี้ค้างอยู่จนกว่าจะ sync
+           สำเร็จหรือ rep แตะลองใหม่เอง -->
+      <div id="ci-checkin-warn" onclick="CI._retryCheckinSyncNow()" style="display:none;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;background:rgba(255,59,48,.10);border:0.5px solid rgba(255,59,48,.28);cursor:pointer">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span style="font-size:var(--text-xs);font-weight:var(--fw-medium);color:#C0281C;font-family:'Noto Sans Thai',sans-serif">เช็คอินยังไม่ขึ้นระบบ · แตะลองใหม่</span>
+      </div>
     </div>
   </div>
   <!-- visit hero — hide during picker state, show after account selected -->
@@ -672,7 +679,11 @@ body:not(.echo-active) { background:unset; }
   <div id="ci-rec-active" style="display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:12px">
     <div class="ci-wave-wrap" id="ci-wf"></div>
     <div class="timer-val" id="ci-tval">0:00</div>
-    <div class="timer-hint" id="ci-rec-hint">echo กำลังรับฟัง · ทำงานอยู่เบื้องหลัง</div>
+    <!-- v_screenlock (2026-08-17): ข้อความเดิม "ทำงานอยู่เบื้องหลัง" หลอกว่าปิดจอ
+         ได้ปลอดภัย — จริงๆ iOS ตัดไมค์ทันทีที่ล็อกจอ (เหตุการณ์จริง 11 ส.ค. เสียง
+         19-48 นาทีเหลือ 24-54KB) ข้อความนี้ต้องเตือนไว้ก่อนตั้งแต่เริ่มอัด ไม่ใช่
+         บอกทีหลังตอนเจอไฟล์ขาดไปแล้ว -->
+    <div class="timer-hint" id="ci-rec-hint">เปิดหน้าจอทิ้งไว้ระหว่างคุย · ถ้าจอล็อกเสียงอาจขาดหาย</div>
   </div>
   <!-- stop + cancel buttons — only during recording -->
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
@@ -1007,9 +1018,15 @@ body:not(.echo-active) { background:unset; }
   }
 
   // ── Recording ─────────────────────────────────────────────────────────────
+  // v_recdebounce (2026-08-17): _phase ยังเป็น 'idle' อยู่ตลอดช่วงรอ
+  // getUserMedia() (อาจช้าเพราะ permission dialog/มือถือค้าง) — กดซ้อนสองครั้ง
+  // ในช่วงนี้ผ่านด่าน _phase !== 'idle' ได้ทั้งคู่ กลายเป็นสอง MediaRecorder
+  // ทำงานพร้อมกัน ต่างจาก _doCheckin ที่มี _checkinBusy กันไว้แล้วแต่แรก
+  let _startRecBusy = false;
   async function startRecording() {
     document.body.classList.add('echo-active');
-    if (_phase !== 'idle') return;
+    if (_phase !== 'idle' || _startRecBusy) return;
+    _startRecBusy = true;
     // RECORD-HANG-DIAG: getUserMedia() has zero telemetry today — if it truly
     // hangs (mic held by another process, browser deadlock) the promise never
     // settles and the catch block below never runs, leaving no trace at all.
@@ -1063,6 +1080,7 @@ body:not(.echo-active) { background:unset; }
       _recorder.start(1000);
       _startTime = Date.now();
       _phase     = 'recording';
+      _startRecBusy = false;   // _phase !== 'idle' เองก็กันซ้อนได้แล้วจากนี้ไป
       _isOwnRecording = true; // recording own session
       _acquireWakeLock(); // v587: กันจอดับระหว่างอัด
       // v_echog1: retry เช็คอินที่ค้างในเครื่อง (จุดกดเช็คอินเน็ตอาจหลุด) —
@@ -1091,10 +1109,22 @@ body:not(.echo-active) { background:unset; }
     } catch (err) {
       _gumSettled = true; clearTimeout(_gumWatchdog);
       _phase = 'idle';
+      _startRecBusy = false;
       // RECORD-HANG-DIAG: this catch never wrote to app_errors before — only a
       // toast the rep could dismiss/miss, leaving zero trace for diagnosis later
       try { window.SenseSentinel?.report('ci_record_start_fail', (err?.name || 'Error') + ':' + (err?.message || 'unknown')); } catch(_) {}
-      _toast(err.name === 'NotAllowedError' ? 'กรุณาอนุญาตไมโครโฟน' : 'เปิดไมค์ไม่ได้: ' + err.message);
+      // v_micfix (2026-08-17): เดิม "กรุณาอนุญาตไมโครโฟน" ไม่บอกวิธีเลย — เบราว์เซอร์
+      // จะไม่โชว์ permission prompt ซ้ำเองอีกหลังถูกปฏิเสธ ผู้ใช้จึงไม่มีทางไปต่อได้
+      // เลยจากข้อความเดิม ต่างจาก location ที่มีคำแนะนำเปิด settings ชัดเจนอยู่แล้ว
+      // (ดู _doCheckin) · mirror รูปแบบเดียวกันที่นี่
+      const micMsg = err.name === 'NotAllowedError'
+          ? 'มือถือไม่ให้สิทธิ์ไมโครโฟน — เปิด ตั้งค่า > เลือกเบราว์เซอร์/แอปนี้ > อนุญาตไมโครโฟน แล้วกลับมากดอัดใหม่'
+        : err.name === 'NotFoundError'
+          ? 'ไม่พบไมโครโฟนในเครื่อง — เช็คว่ามีไมค์ต่ออยู่ แล้วลองใหม่'
+        : err.name === 'NotReadableError'
+          ? 'ไมโครโฟนถูกแอปอื่นใช้งานอยู่ — ปิดแอปที่อาจใช้ไมค์ค้างไว้ (โทรศัพท์/แอปอัดเสียงอื่น) แล้วลองใหม่'
+        : 'เปิดไมค์ไม่ได้: ' + err.message;
+      _toast(micMsg);
     }
   }
 
@@ -1281,6 +1311,11 @@ body:not(.echo-active) { background:unset; }
     };
     _startProcTimer();
     _setStep('กำลังบันทึกขึ้นระบบ...', 'อัปโหลดเสียง — ไม่กี่วินาที', 30);
+    // v_orphanfix (2026-08-17): ประกาศไว้นอก try เพื่อให้ catch รู้ว่าอัปโหลด
+    // สำเร็จไปแล้วหรือยัง — ถ้า DB เขียนต่อไม่ผ่านหลังอัปสำเร็จ ไฟล์นี้จะกลาย
+    // เป็นไฟล์กำพร้าใน storage ที่ไม่มี session ไหนอ้างถึงเลย
+    let path = null;
+    let _uploadedOk = false;
     try {
       const userId = _getAuthUserId();
       const email  = _authEmail();
@@ -1290,10 +1325,11 @@ body:not(.echo-active) { background:unset; }
       const ext  = (blob.type || '').includes('mp4') ? 'mp4' : 'webm';
       const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
-      const path = `echo-audio/${userId}/${rand}.${ext}`;
+      path = `echo-audio/${userId}/${rand}.${ext}`;
       const { error: upErr } = await supa.storage.from('ciq-data')
         .upload(path, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
       if (upErr) throw upErr;
+      _uploadedOk = true;
 
       // 2) claim/create the session row at stage 'uploaded'
       await _syncCheckinToDb(ctx.checkinCache).catch(() => {});
@@ -1398,6 +1434,13 @@ body:not(.echo-active) { background:unset; }
       // memory + IDB; behave exactly like before this feature existed
       console.warn('[CI async] upload path failed, falling back to local pipeline:', err?.message || err);
       try { window.SenseSentinel?.report('ci_async_upload_fail', String(err?.message || err).slice(0, 200)); } catch(_) {}
+      // v_orphanfix: อัปโหลดขึ้น storage สำเร็จแล้ว แต่ขั้นเขียน DB ถัดไปพัง — ไฟล์
+      // นี้ไม่มี session ไหนอ้างถึงเลย (ทั้ง fallback ก็ใช้ blob ในเครื่อง ไม่ใช้ path
+      // นี้) ถ้าไม่ลบจะกลายเป็นไฟล์กำพร้าค้าง storage ตลอดไป (ไม่มี audio_path ให้
+      // sweepExpiredAudio ไปเจอ เพราะไม่มีแถวไหนชี้มา)
+      if (_uploadedOk && path) {
+        try { await supa.storage.from('ciq-data').remove([path]); } catch(_) {}
+      }
       _stopProcTimer();
       _processBlob(blob);
     }
@@ -3553,8 +3596,10 @@ body:not(.echo-active) { background:unset; }
       // v_echog1: + transcript,summary_data (เดิมไม่ดึง → แท็บบทสนทนาว่างเสมอเมื่อ
       // เปิดจาก history) + pipeline_stage,rep_lat,rep_lng,checked_in_at (แถบเช็คอิน
       // + สถานะเช็คอินอย่างเดียว)
+      // v_confproxy: +transcript_source — จำเป็นต้องรู้ว่าถอดด้วยหูไหนก่อนตัดสิน
+      // ว่าค่า transcript_confidence เชื่อถือได้แค่ไหน (ดูคอมเมนต์ที่ป้ายเตือนด้านล่าง)
       const { data, error } = await supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,pipeline_error,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,pipeline_error,transcript,summary_data,rep_lat,rep_lng,checked_in_at,transcript_confidence,transcript_source')
         .eq('id', sessionId)
         .single();
       if (error || !data) throw error || new Error('not found');
@@ -3642,8 +3687,18 @@ body:not(.echo-active) { background:unset; }
     // against real data yet — revisit once Phase E has baseline numbers.
     // Copy deliberately does NOT say "listen to the original audio" — Echo
     // never stores/replays the recording, only the transcript.
+    //
+    // v_confproxy (2026-08-17): 0.6 ใช้ไม่ได้กับ transcript_source='gemini-3.1-pro'
+    // — Gemini ไม่มีตัวเลขความมั่นใจจริงแบบ Whisper (ดู runListenStep ฝั่ง worker)
+    // ค่านี้เป็นแค่ตัวแทนจากสัดส่วนท่อนที่มันติดป้าย "[ฟังไม่ชัด]" เอง ซึ่งมันไม่ค่อย
+    // ติดป้ายนี้เลยไม่ว่าคุณภาพเสียงจะแย่แค่ไหนจริง (ข้อมูลจริงที่วัดได้: กระจุกใกล้
+    // 1.0 เกือบทุกแถว) → เกณฑ์ 0.6 แทบไม่มีวันติดสำหรับ Gemini เลย ป้ายเตือนเงียบ
+    // ไปทั้งที่ควรขึ้น ใช้เกณฑ์เข้มกว่ามากสำหรับ Gemini แทน: แค่มีท่อนเดียวที่มันเอง
+    // ยังยอมรับว่าฟังไม่ชัด (conf < 1.0) ก็ควรเตือนแล้ว เพราะมันประเมินตัวเองสูงเกิน
+    // จริงเป็นปกติอยู่แล้ว
+    const _confThreshold = s.transcript_source === 'gemini-3.1-pro' ? 1 : 0.6;
     let confBanner = '';
-    if (typeof s.transcript_confidence === 'number' && s.transcript_confidence < 0.6) {
+    if (typeof s.transcript_confidence === 'number' && s.transcript_confidence < _confThreshold) {
       confBanner = `<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin-top:10px;background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.22);border-radius:var(--r-md);font-size:var(--text-sm);color:#B26A00;line-height:1.5;font-family:'Noto Sans Thai',sans-serif">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span>ถอดเสียงไม่ชัดเจน (ความมั่นใจ ${Math.round(s.transcript_confidence*100)}%) — ควรตรวจสอบความถูกต้องก่อนเชื่อผลวิเคราะห์ในหน้านี้</span>
@@ -4562,23 +4617,31 @@ ${confBanner}
 
   // ── v952: retry queue — เช็คอินที่ค้างในเครื่องต้องหาทางขึ้นระบบเองจนได้ ────
   // ยิงซ้ำทุก 15 วิ (สูงสุด 8 ครั้ง = 2 นาที) + ยิงทันทีตอนแอปกลับมา visible
-  // สำเร็จ → toast ✓ เงียบๆ · แพ้ครบ → รายงานเหตุผลจริงเข้า app_errors (เลิกเดา)
+  // สำเร็จ → toast ✓ เงียบๆ · แพ้ครบ → ค้าง pill แดงไว้ให้ rep เห็น + รายงานจริง
+  // เข้า app_errors (v_checkinretry 2026-08-17: เดิมมีแค่ telemetry อย่างเดียว
+  // ไม่มีอะไรบอก rep ว่าเช็คอินยังไม่ขึ้นระบบเลย — เงียบสนิทจนอาจเสียทั้ง visit)
   let _checkinRetryTimer = null, _checkinRetryCount = 0;
   function _disarmCheckinRetry() {
     if (_checkinRetryTimer) { clearInterval(_checkinRetryTimer); _checkinRetryTimer = null; }
+  }
+  function _setCheckinWarnVisible(show) {
+    const warn = document.getElementById('ci-checkin-warn');
+    if (warn) warn.style.display = show ? 'flex' : 'none';
   }
   function _armCheckinRetry() {
     if (_checkinRetryTimer) return;
     _checkinRetryCount = 0;
     _checkinRetryTimer = setInterval(async () => {
-      if (!_checkinCache || _checkinCache.session_id) { _disarmCheckinRetry(); return; }
+      if (!_checkinCache || _checkinCache.session_id) { _disarmCheckinRetry(); _setCheckinWarnVisible(false); return; }
       _checkinRetryCount++;
       const ok = await _syncCheckinToDb().catch(() => false);
       if (ok) {
         _disarmCheckinRetry();
+        _setCheckinWarnVisible(false);
         if (typeof showToast === 'function') showToast('เช็คอินส่งขึ้นระบบแล้ว', '✓');
       } else if (_checkinRetryCount >= 8) {
         _disarmCheckinRetry();
+        _setCheckinWarnVisible(true);   // ค้างไว้ให้เห็น — แตะเพื่อลองใหม่เองได้ (_retryCheckinSyncNow)
         try {
           window.SenseSentinel?.report('ci_checkin_sync_fail',
             (_lastCheckinSyncError || 'unknown') + ' | role=' +
@@ -4587,6 +4650,20 @@ ${confBanner}
       }
     }, 15000);
   }
+  // แตะ pill แดง — ลองซ้ำทันทีนอกรอบ 15 วิ แล้วเข้าคิวใหม่ถ้ายังไม่ผ่าน
+  async function _retryCheckinSyncNow() {
+    if (!_checkinCache || _checkinCache.session_id) { _setCheckinWarnVisible(false); return; }
+    if (typeof showToast === 'function') showToast('กำลังลองส่งเช็คอินอีกครั้ง...', '⏳');
+    const ok = await _syncCheckinToDb().catch(() => false);
+    if (ok) {
+      _disarmCheckinRetry();
+      _setCheckinWarnVisible(false);
+      if (typeof showToast === 'function') showToast('เช็คอินส่งขึ้นระบบแล้ว', '✓');
+    } else {
+      _armCheckinRetry();
+      if (typeof showToast === 'function') showToast('ยังส่งไม่สำเร็จ — ระบบจะลองซ้ำให้เองต่อ', '⚠');
+    }
+  }
   // กลับมาหน้าแอป (สลับแอพ/ปลดล็อคจอ) แล้วมีเช็คอินค้าง → ยิงทันที ไม่รอรอบ 15 วิ
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
@@ -4594,6 +4671,7 @@ ${confBanner}
     _syncCheckinToDb().then(ok => {
       if (ok) {
         _disarmCheckinRetry();
+        _setCheckinWarnVisible(false);
         if (typeof showToast === 'function') showToast('เช็คอินส่งขึ้นระบบแล้ว', '✓');
       }
     }).catch(() => {});
@@ -4633,6 +4711,11 @@ ${confBanner}
       if (timeEl) timeEl.textContent = t.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' })
         + ' · ถึง ' + _exp.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
       if (pill) pill.style.display = 'flex';
+      // v_checkinretry (2026-08-17): เดิม _armCheckinRetry มีจุดเรียกเดียวคือใน
+      // _doCheckin ตอนกดเช็คอินสดๆ — แถวที่ restore กลับมาจาก cache (เช็คอิน
+      // ออฟไลน์ตอนเปิดแอปทีหลัง) ไม่เคยมีตัวลองซ้ำทำงานเลย ถ้ายังไม่มี session_id
+      // ต้องปลุกคิว retry ที่นี่ด้วย ไม่งั้นเช็คอินนี้จะไม่มีวันขึ้นระบบเองอัตโนมัติ
+      if (!cached.session_id) _armCheckinRetry();
       return true;
     } catch(_) { return false; }
   }
@@ -5198,7 +5281,7 @@ ${confBanner}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
+  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _retryCheckinSyncNow, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
 
 })();
 

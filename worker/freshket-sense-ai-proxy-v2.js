@@ -179,6 +179,10 @@ async function sbUpsert(env, table, row, onConflict) {
   });
   if (!r.ok) throw new Error(`sbUpsert ${table} ${r.status}: ${await r.text().catch(() => '')}`);
 }
+async function sbDelete(env, table, query) {
+  const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}?${query}`, { method: 'DELETE', headers: _sbHeaders(env) });
+  if (!r.ok) throw new Error(`sbDelete ${table} ${r.status}: ${await r.text().catch(() => '')}`);
+}
 async function sbStorageGet(env, path) {
   const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, { headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbStorageGet ${r.status}: ${await r.text().catch(() => '')}`);
@@ -239,101 +243,6 @@ async function handleTranscript(request, env) {
   }
 }
 
-// ── v_ears P0 (2026-08-14): ห้องทดลอง A/B — Gemini ฟังเสียงตรง single-pass ──
-// เทียบกับ pipeline ปัจจุบัน (Groq Whisper + Gemini diarize) บนคลิปจริงที่เก็บไว้
-// ใน storage · **ชั่วคราว** — ถอดออกเมื่อ P0 จบและเคาะโมเดลแล้ว
-//
-// ทำไมอยู่ใน worker ไม่ใช่สคริปต์ local: API key ทุกตัวอยู่ที่นี่ (ไม่มีสำเนา
-// ในเครื่อง dev) และ transcript ฝั่ง pipeline เดิมมีใน DB แล้ว ไม่ต้องรันซ้ำ
-// จึงเหลือรันแค่ขา Gemini — 1 คลิปต่อ 1 คำขอ ยิงจาก curl ภายนอก
-//
-// กันคนนอกยิงเล่น (endpoint อื่นของ worker นี้เปิด CORS ไม่มี auth):
-// ผู้เรียกต้องส่ง audio_path ที่ตรงกับแถวจริงใน DB มาด้วย — รู้ได้เฉพาะคนที่
-// อ่าน DB ได้อยู่แล้ว (auth-by-knowledge, พอสำหรับ endpoint ทดลองอายุสั้น)
-async function handleAbGeminiTranscribe(request, env) {
-  if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY not set' }, 503, env);
-  let body;
-  try { body = await request.json(); }
-  catch { return json({ error: 'Invalid JSON' }, 400, env); }
-  const { session_id, audio_path, model, max_output_tokens, file_uri, from, to } = body || {};
-  if (!session_id || !audio_path) return json({ error: 'session_id + audio_path required' }, 400, env);
-  try {
-  const rows = await sbSelect(env, `ci_sessions?id=eq.${session_id}&select=id,audio_path,duration_secs,account_id`);
-  const row = rows && rows[0];
-  if (!row || row.audio_path !== audio_path) return json({ error: 'session/audio_path mismatch' }, 403, env);
-
-  const t0 = Date.now();
-  // v_ears: อัปโหลดครั้งเดียวแล้วส่ง file_uri กลับ — รอบถัดไปส่งกลับมาได้เลย
-  // ไม่ต้องโหลด+อัปซ้ำ (ไฟล์อยู่บน Gemini ~48 ชม.) · จำเป็นเพราะคลิป 19 นาที
-  // ยิงรอบเดียวโดน 524 timeout ต้องซอยเป็นหน้าต่างละ ~5 นาทีแล้วยิงหลายรอบ
-  const fileUri = file_uri || await _geminiUploadAudio(env, await sbStorageGet(env, row.audio_path), 'audio/webm');
-  // แยกขั้น: รอบแรกอัปอย่างเดียวแล้วคืน uri (รู้ว่าอัปกินเวลาเท่าไร) รอบถัดไป
-  // ค่อยถอดทีละหน้าต่าง — กัน 524 ที่เกิดจาก อัป+ถอด รวมกันเกิน gateway timeout
-  if (body.upload_only) {
-    return json({ session_id, file_uri: fileUri, upload_ms: Date.now() - t0 }, 200, env);
-  }
-  const windowNote = (from || to)
-    ? `\n\n**ถอดเฉพาะช่วงเวลา ${from || '00:00'} ถึง ${to || 'จบไฟล์'} เท่านั้น** ข้ามช่วงอื่นทั้งหมด ts ที่ตอบให้อ้างอิงเวลาจริงในไฟล์`
-    : '';
-
-  // single-pass: ถอด + แยกคนพูดจากเสียงจริงในรอบเดียว (ต่างจาก pipeline เดิม
-  // ที่ Whisper ถอดก่อนแล้ว Gemini แค่แปะชื่อ) — คำถามที่ P0 ต้องตอบคือ
-  // "หูของ Gemini ฟังไทยในร้านอาหารจริงแม่นกว่า Whisper แค่ไหน"
-  const prompt = `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
-
-บริบท: พนักงานขายของ Freshket (บริษัทขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
-- speaker: "Sales" = ฝั่ง Freshket, "ลูกค้า" = ฝั่งร้าน (ถ้าได้ยินชื่อจริงใช้ชื่อนั้นแทนได้)
-- คำเฉพาะที่อาจได้ยิน: Freshket, SKU, order, delivery, กิโล, ลัง, เครดิต, วางบิล, ใบเสนอราคา
-- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
-
-ตอบ JSON เท่านั้น:
-{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}],"speakers_detected":["Sales","ลูกค้า"]}${windowNote}`;
-
-  const useModel = model || 'gemini-3.1-pro-preview';
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent?key=${env.GEMINI_API_KEY}`,
-    {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
-          { text: prompt }
-        ]}],
-        generationConfig: {
-          temperature: 0,
-          maxOutputTokens: max_output_tokens || 65536,
-          responseMimeType: 'application/json'
-        }
-      })
-    });
-  if (!r.ok) return json({ error: `Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}` }, 502, env);
-  const data = await r.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  let parsed = null;
-  try { parsed = JSON.parse(rawText); }
-  catch (_) {
-    const s = rawText.indexOf('{'), e = rawText.lastIndexOf('}');
-    if (s !== -1 && e !== -1) { try { parsed = JSON.parse(rawText.slice(s, e + 1)); } catch (_) {} }
-  }
-  return json({
-    session_id,
-    model: useModel,
-    file_uri: fileUri,            // ส่งกลับให้รอบถัดไปใช้ซ้ำ ไม่ต้องอัปใหม่
-    window: (from || to) ? `${from || '00:00'}-${to || 'end'}` : 'full',
-    elapsed_ms: Date.now() - t0,
-    finish_reason: data?.candidates?.[0]?.finishReason || null,
-    usage: data?.usageMetadata || null,       // ใช้คิดต้นทุนจริงต่อคลิป
-    parsed_ok: !!(parsed && Array.isArray(parsed.segments)),
-    segments: parsed?.segments || null,
-    speakers_detected: parsed?.speakers_detected || null,
-    raw_head: parsed ? undefined : rawText.slice(0, 500)   // debug เมื่อ parse พัง
-  }, 200, env);
-  } catch (e) {
-    // endpoint ทดลอง — ตอบสาเหตุตรงๆ ดีกว่าปล่อยเป็น 1101 ให้เดา
-    return json({ error: String(e?.message || e) }, 500, env);
-  }
-}
-
 // A2v2.1: core extracted from handleTranscript so /process (async pipeline) can
 // run the exact same logic server-side. Returns the result OBJECT (not a
 // Response); throws on hard failure. audioB64 is optional — computed from
@@ -369,7 +278,19 @@ async function _geminiUploadAudio(env, bytes, mime) {
     state = d && d.state;
   }
   if (state !== 'ACTIVE') throw new Error(`Gemini file state=${state} (ไม่พร้อมใช้)`);
-  return f.uri;
+  return { uri: f.uri, name };
+}
+
+// v_filecleanup (2026-08-17): Google เองก็ล้างไฟล์ที่ไม่ได้สั่งลบทิ้งให้ใน ~48 ชม.
+// (เพดานเดียวกับที่ file_uri หมดอายุ) ดังนั้นนี่ไม่ใช่ตัวกันไฟล์ค้างถาวร — แต่ลด
+// ปริมาณไฟล์ที่ค้างอยู่บนโควตาฝั่ง Google ระหว่างรอ 48 ชม. นั้น best-effort ล้วน
+// (การลบพลาดไม่ควรทำให้ pipeline หลักพัง — Google เก็บกวาดเองอยู่แล้วเป็นตาข่ายรอง)
+async function _geminiDeleteFile(env, name) {
+  if (!name) return;
+  try {
+    await fetch(`https://generativelanguage.googleapis.com/v1beta/${name}?key=${env.GEMINI_API_KEY}`,
+      { method: 'DELETE' });
+  } catch (_) { /* best-effort — 48h TTL ฝั่ง Google เป็นตาข่ายรอง */ }
 }
 
 // ── v_audiofix (2026-08-15): วัดความยาวเป็นไบต์ ไม่ใช่ตัวอักษร ──────────────
@@ -586,13 +507,19 @@ ${segLines}
 }`;
 
   let diarized = false, speakersDetected = [];
+  let _diarizeFileName = null;   // v_filecleanup: ไฟล์ครั้งเดียวจบ — ลบทิ้งหลังใช้เสร็จ
   try {
     // v_cpudiet: เส้นทาง async (cron/process) ไม่มี b64 — อัปโหลดไฟล์ดิบแล้วอ้าง
     // ด้วย file_data · เส้นทาง legacy (/transcript) client ส่ง b64 มาอยู่แล้ว
     // ใช้ inline_data ต่อได้ฟรีๆ ไม่ต้องแปลงซ้ำ
-    const audioPart = audioB64
-      ? { inline_data: { mime_type: mime_type || 'audio/webm', data: audioB64 } }
-      : { file_data: { mime_type: mime_type || 'audio/webm', file_uri: await _geminiUploadAudio(env, audioBytes, mime_type) } };
+    let audioPart;
+    if (audioB64) {
+      audioPart = { inline_data: { mime_type: mime_type || 'audio/webm', data: audioB64 } };
+    } else {
+      const uploaded = await _geminiUploadAudio(env, audioBytes, mime_type);
+      _diarizeFileName = uploaded.name;
+      audioPart = { file_data: { mime_type: mime_type || 'audio/webm', file_uri: uploaded.uri } };
+    }
     const gemRes = await withRetry(async () => {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_MAP.gemini.flash_35}:generateContent?key=${env.GEMINI_API_KEY}`,
@@ -650,6 +577,10 @@ ${segLines}
     // 'whisper_fallback').
     // v_cpudiet: แต่ห้ามเงียบ — log ไว้ให้เห็นใน observability ว่าตกชั้นเพราะอะไร
     console.error('[transcribe] diarize ล้มเหลว (non-fatal):', (e && e.message) || e);
+  } finally {
+    // v_filecleanup: ไฟล์นี้ใช้ครั้งเดียวจบภายใน call นี้ (ไม่ข้าม tick เหมือน
+    // runListenStep) — ลบทิ้งได้ทันทีไม่ว่าสำเร็จหรือพัง
+    if (_diarizeFileName) await _geminiDeleteFile(env, _diarizeFileName);
   }
 
   const n = segments.length;
@@ -1603,6 +1534,20 @@ async function handleProcess(request, env, cfCtx) {
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return json({ error: 'valid session_id required' }, 400, env);
 
   const origin = new URL(request.url).origin;
+  // v_resumefix (2026-08-17): เดิม /process ตอบ 202 เสมอไม่ว่า pipeline_stage
+  // จะเป็นอะไร — processSession ไม่มี stage ไหนรับ failed_system เลย (เห็นแค่
+  // uploaded/needs_gemini/transcribed) ทำให้ปุ่ม "ลองใหม่" ฝั่งแอปกด /process
+  // แล้วได้ 202 (= ข้อความ "สำเร็จ") กลับมาทั้งที่ไม่มีอะไรเกิดขึ้นจริงเลย —
+  // ปลุกกลับไปที่ transcribed ก่อน (มี transcript อยู่แล้วเสมอสำหรับ
+  // failed_system เพราะพังตอน analyze ไม่ใช่ตอน transcribe) ให้ Stage 2 ทำงาน
+  // จริงก่อนตอบ accepted — ทำให้ปุ่มนี้ "ลองใหม่" จริงไม่ว่าจะกดกี่ครั้งก็ตาม
+  try {
+    const rows = await sbSelect(env, `ci_sessions?id=eq.${sessionId}&select=pipeline_stage`);
+    if (rows && rows[0] && rows[0].pipeline_stage === 'failed_system') {
+      await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
+        { pipeline_stage: 'transcribed', status: 'draft', attempts: 0, pipeline_error: null, next_attempt_at: null });
+    }
+  } catch (_) { /* เช็คไม่ผ่าน — ปล่อยให้ processSession ตัดสินตามสถานะเดิม */ }
   cfCtx.waitUntil(processSession(sessionId, origin, env).catch(() => {}));
   return json({ accepted: true, session_id: sessionId }, 202, env);
 }
@@ -1691,14 +1636,16 @@ async function runListenStep(env, row, audioBytes) {
 
   // ── ขั้นที่ 1: อัปไฟล์เข้า Gemini ครั้งเดียว แล้ววางแผนช่วงเวลา
   if (!st.file_uri) {
-    const fileUri = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
+    const uploaded = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
     const dur = row.duration_secs || 0;
     const windows = [];
     if (dur / 60 <= LISTEN_SINGLE_MAX_MIN) windows.push({ from: null, to: null });
     else for (let s = 0; s < dur; s += LISTEN_WIN_MIN * 60) {
       windows.push({ from: s, to: Math.min(s + LISTEN_WIN_MIN * 60, Math.ceil(dur)) });
     }
-    await save({ file_uri: fileUri, windows, next: 0, segs: [] });
+    // v_filecleanup: เก็บ file_name (คนละอันกับ file_uri) ไว้ด้วย — ต้องใช้ตอนสั่งลบ
+    // ไฟล์ทิ้งเมื่อถอดจบ/เลิกใช้ (ดู _geminiDeleteFile)
+    await save({ file_uri: uploaded.uri, file_name: uploaded.name, windows, next: 0, segs: [] });
     console.log(`[listen] ${row.id} อัปไฟล์เสร็จ — ${windows.length} ช่วง`);
     return null;
   }
@@ -1749,6 +1696,9 @@ async function runListenStep(env, row, audioBytes) {
   const conf = merged.length ? 1 - (unclear / merged.length) : null;
 
   console.log(`[listen] ${row.id} ถอดจบ — ${merged.length} ท่อน จาก ${windows.length} ช่วง (ฟังไม่ชัด ${unclear})`);
+  // v_filecleanup: ถอดครบทุกช่วงแล้ว ไม่ต้องใช้ไฟล์นี้อีก — ลบทิ้ง (best-effort,
+  // Google เก็บกวาดเองใน 48 ชม. เป็นตาข่ายรองอยู่แล้วถ้าลบตรงนี้พลาด)
+  if (st.file_name) await _geminiDeleteFile(env, st.file_name);
   return {
     segments: merged,
     source: 'gemini-3.1-pro',
@@ -1767,9 +1717,14 @@ async function processSession(sessionId, origin, env) {
   const claimQuery = (stage) =>
     `id=eq.${sessionId}&pipeline_stage=eq.${stage}&or=(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)})`;
 
-  // ── Stage 1: uploaded → transcribed ──────────────────────────────────────
-  if (row.pipeline_stage === 'uploaded' && row.audio_path) {
-    const claimed = await sbPatch(env, 'ci_sessions', claimQuery('uploaded'), { processing_since: new Date().toISOString() });
+  // ── Stage 1: uploaded / needs_gemini → transcribed ───────────────────────
+  // v_needsgemini (2026-08-17): เดิม needs_gemini ไม่มี cron ไหนหยิบเลย — ไฟล์
+  // ค้างตลอดกาลทั้งที่ Gemini (ตัวหลักตอนนี้) รับไฟล์ใหญ่ได้สบาย ไม่ผูกกับเพดาน
+  // 24MB ของ Groq · เข้า stage นี้แปลว่า Whisper พิสูจน์แล้วว่ารับไม่ไหว จึงบังคับ
+  // ใช้ Gemini อย่างเดียว ห้ามตกกลับไป Whisper ซ้ำ (จะเจอ tooLarge วนอีก)
+  if ((row.pipeline_stage === 'uploaded' || row.pipeline_stage === 'needs_gemini') && row.audio_path) {
+    const forcedGemini = row.pipeline_stage === 'needs_gemini';
+    const claimed = await sbPatch(env, 'ci_sessions', claimQuery(row.pipeline_stage), { processing_since: new Date().toISOString() });
     if (!claimed.length) return; // another invocation owns this stage
     try {
       const audioBytes = await sbStorageGet(env, row.audio_path);
@@ -1779,20 +1734,62 @@ async function processSession(sessionId, origin, env) {
       // สวิตช์ย้อนกลับ: ตั้ง env var LISTEN_ENGINE=whisper แล้วกลับไปใช้ของเดิม
       // ได้ทันทีโดยไม่ต้องแก้โค้ด (เผื่อ Gemini มีปัญหาแล้วต้องถอยด่วน)
       let t = null;
-      const useGemini = env.LISTEN_ENGINE !== 'whisper' && !!env.GEMINI_API_KEY;
+      const useGemini = forcedGemini || (env.LISTEN_ENGINE !== 'whisper' && !!env.GEMINI_API_KEY);
       if (useGemini) {
+        if (!env.GEMINI_API_KEY) {
+          // ตกมาที่นี่เพราะ Whisper รับไม่ไหว แต่ไม่มีกุญแจ Gemini เลย — ไม่มีทางออก
+          // ตอนนี้ ปล่อย claim + เลื่อนนัดยาว (ไม่ปิดถาวร เผื่อมีคนตั้งกุญแจให้ภายหลัง)
+          await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
+            { processing_since: null, next_attempt_at: new Date(Date.now() + THROTTLE_WAIT_MS).toISOString() });
+          return;
+        }
         try {
           const step = await runListenStep(env, row, audioBytes);
           if (!step) {
-            // ยังไม่จบ — ปล่อย claim ให้ tick ถัดไปทำช่วงต่อไป (stage ยังเป็น uploaded)
+            // ยังไม่จบ — ปล่อย claim ให้ tick ถัดไปทำช่วงต่อไป (stage เดิม)
             await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null });
             return;
           }
           t = step;
         } catch (e) {
+          if (forcedGemini) {
+            // v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอยแล้ว —
+            // ตัวคุมงบลองใหม่ที่ถูกต้องคือ listen_state.attempts/LISTEN_MAX_ATTEMPTS
+            // (ตั้งไว้กว้างสำหรับ Gemini โดยเฉพาะ อยู่แล้ว) ไม่ใช่ ci_sessions.attempts/
+            // MAX_ATTEMPTS ทั่วไป (เพดานแค่ 4) — ถ้าปล่อยให้ general attempts นับทุก
+            // hiccup ชั่วคราว (429/500 ของหน้าต่างเดียว) จะปิดคิวถาวรทั้งที่งบ Gemini
+            // จริงยังเหลือเยอะ (สองงบไม่ผูกกัน = ตายเพราะ blip ที่ไม่เกี่ยวกับ Gemini)
+            const genuinelyExhausted = /ไม่จบใน \d+ รอบ/.test(String((e && e.message) || e));
+            if (genuinelyExhausted) {
+              // งบ Gemini เองก็หมดแล้ว (LISTEN_MAX_ATTEMPTS) และ Whisper ไม่ใช่ทางเลือก
+              // สำหรับไฟล์นี้อยู่แล้ว — นี่คือความล้มเหลวถาวรจริงๆ ไม่ใช่ hiccup ชั่วคราว
+              // เขียนตรง ไม่ผ่าน failStage/classifyFailure เพราะข้อความนี้สร้างเอง
+              // ไม่ใช่รูปแบบ 4xx/429 ที่ classifyFailure รู้จัก จะถูกเดาผิดเป็น transient
+              // v_filecleanup: จบถาวรแล้ว ไม่ใช้ไฟล์นี้อีก — ลบทิ้ง (best-effort)
+              if (row.listen_state && row.listen_state.file_name) {
+                await _geminiDeleteFile(env, row.listen_state.file_name);
+              }
+              await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+                pipeline_stage: 'failed_audio', processing_since: null, next_attempt_at: null,
+                pipeline_error: `${new Date().toISOString()} [transcribe] ไฟล์ใหญ่เกิน Whisper และ Gemini ไม่จบใน ${LISTEN_MAX_ATTEMPTS} รอบ: ${String((e && e.message) || e).slice(0, 300)}`
+              }).catch(() => {});
+              return;
+            }
+            // hiccup ชั่วคราวรายหน้าต่าง (เช่น 500 ของ Gemini ครั้งเดียว) — ปล่อย claim
+            // ให้ tick ถัดไปลองซ้ำหน้าต่างเดิม (file_uri/windows ที่เสร็จแล้วยังอยู่ครบ
+            // ไม่เสียความคืบหน้า) โดยไม่แตะ general attempts เลย
+            console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว — ลอง tick ถัดไป: ${e?.message || e}`);
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+            return;
+          }
           // Gemini ไปต่อไม่ได้จริงๆ → ล้างสถานะทิ้งแล้วให้ Whisper รับช่วง
           // งานต้องไม่ค้างเพราะฝั่งใดฝั่งหนึ่งมีปัญหา
           console.warn(`[listen] ${sessionId} Gemini ล้ม → ใช้ตัวสำรอง Whisper: ${e?.message || e}`);
+          // v_filecleanup: เลิกใช้ไฟล์นี้แล้ว (Whisper รับช่วงต่อจาก audioBytes ในเครื่อง
+          // ไม่ใช้ file_uri) — ลบทิ้งก่อนล้าง state (best-effort)
+          if (row.listen_state && row.listen_state.file_name) {
+            await _geminiDeleteFile(env, row.listen_state.file_name);
+          }
           await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { listen_state: null }).catch(() => {});
           t = null;
         }
@@ -1992,7 +1989,9 @@ async function sweepPending(env) {
     // เรียงตามเวลานัด (ยังไม่เคยนัด = มาก่อน) แล้วค่อยตามลำดับ visit → ไม่มีใครผูกขาด
     rows = await sbSelect(env,
       `ci_sessions?select=id,pipeline_stage,status,processing_since,attempts` +
-      `&and=(or(pipeline_stage.eq.uploaded,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
+      // v_needsgemini (2026-08-17): needs_gemini เดิมไม่มี cron ไหนหยิบเลย — เพิ่มเข้ามา
+      // ให้เข้าคิวเหมือน uploaded (ดู processSession Stage 1 สำหรับตรรกะบังคับ Gemini)
+      `&and=(or(pipeline_stage.eq.uploaded,pipeline_stage.eq.needs_gemini,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
       `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}),` +
       `or(next_attempt_at.is.null,next_attempt_at.lte.${encodeURIComponent(nowIso)}))` +
       `&order=next_attempt_at.asc.nullsfirst,visited_at.asc&limit=1`);
@@ -2026,7 +2025,9 @@ async function _alertIfFailingOften(env) {
 
 // v_echor3: เก็บไฟล์เสียงไว้กี่วันก่อนลบ · ตั้งค่าได้ผ่าน env ถ้าอยากยืด/หด
 // โดยไม่ต้อง deploy ใหม่ · ตั้ง AUDIO_RETENTION_DAYS=0 = ปิดการลบทั้งหมด
-const AUDIO_RETENTION_DAYS = 30;
+// v_retention7 (2026-08-17): 30→7 ตามที่บุชเคาะ — นี่คือค่าสำรองกรณีไม่มี env
+// var ตั้งไว้เลย (ดู wrangler.toml [vars] สำหรับค่าจริงที่ deploy จริง)
+const AUDIO_RETENTION_DAYS = 7;
 
 // กวาดลบไฟล์เสียงที่เกินอายุ — แทนที่การลบทันทีหลังถอดเสร็จแบบเดิม
 // เจตนา: ต้องเก็บนานพอให้กลับไปฟัง ลองโมเดลใหม่ และสร้างชุดทดสอบจากของจริงได้
@@ -2054,6 +2055,30 @@ async function sweepExpiredAudio(env) {
   }
 }
 
+// v_skilllog (2026-08-17): echo_skill_observations/kam_skill_log ไม่มีนโยบายลบ
+// เลยมาก่อน ต่างจากไฟล์เสียงที่มี sweepExpiredAudio อยู่แล้ว — ตอนนี้ยังเล็กมาก
+// (880KB/432KB, ~1,100/~1,000 แถว) ไม่เร่งด่วน แต่โตขึ้นเรื่อยๆ ตาม session ที่
+// วิเคราะห์เสร็จ ควรมีเพดานไว้ก่อนสเกล
+//
+// ตั้งยาวกว่าเสียงมาก (คนละธรรมชาติข้อมูล — นี่คือบันทึก coaching/skill trend
+// ไม่ใช่เสียงดิบลูกค้า ไม่มีเหตุผลเรื่อง privacy ต้องรีบลบเหมือนเสียง) 400 วัน
+// ครอบคลุมเกิน 4 ไตรมาสเผื่อดู skill trend ย้อนหลังข้ามปี — ปรับได้ผ่าน env
+// ถ้าต้องการสั้น/ยาวกว่านี้ (0 = ปิดการลบทั้งหมด เหมือน AUDIO_RETENTION_DAYS)
+const SKILL_LOG_RETENTION_DAYS = 400;
+
+async function sweepExpiredSkillLogs(env) {
+  const days = Number(env.SKILL_LOG_RETENTION_DAYS ?? SKILL_LOG_RETENTION_DAYS);
+  if (!Number.isFinite(days) || days <= 0) return;   // 0 = ปิดการลบ
+  const cutoffIso  = new Date(Date.now() - days * 86400000).toISOString();
+  const cutoffDate = cutoffIso.slice(0, 10);   // kam_skill_log.session_date เป็น DATE ไม่ใช่ timestamp
+  try {
+    await sbDelete(env, 'echo_skill_observations', `observed_at=lt.${encodeURIComponent(cutoffIso)}`);
+  } catch (e) { console.error('[skill-log-sweep] echo_skill_observations ลบไม่สำเร็จ:', e?.message || e); }
+  try {
+    await sbDelete(env, 'kam_skill_log', `session_date=lt.${encodeURIComponent(cutoffDate)}`);
+  } catch (e) { console.error('[skill-log-sweep] kam_skill_log ลบไม่สำเร็จ:', e?.message || e); }
+}
+
 async function handleListModels(env) {
   if (!env.GEMINI_API_KEY) return json({ error: 'ไม่มี GEMINI_API_KEY' }, 400, env);
   try {
@@ -2075,33 +2100,6 @@ async function handleListModels(env) {
 }
 
 
-// ── v_ears P0 (2026-08-14): งานเทียบโมเดลบน cron — **ชั่วคราว ถอดออกเมื่อเคาะแล้ว**
-//
-// ทำไมต้องอยู่บน cron ไม่ใช่ HTTP: แค่ขั้นโหลดไฟล์เสียง 9MB จาก storage แล้ว
-// อัปเข้า Gemini Files API ก็เกิน 100 วินาที ซึ่งเป็นเพดานของคำขอผ่านเว็บของ
-// Cloudflare (ลองแล้วโดน 524 สามรอบ) · cron ได้เวลาเป็นนาทีจึงทำได้
-//
-// สั่งงานด้วย SQL: update ci_sessions set ab_gemini='{"requested":true}' where id=...
-// ทำทีละ 1 แถวต่อ tick และ **แทนที่งานปกติของ tick นั้น** เพราะ Free plan ให้
-// 50 subrequest ต่อ invocation และงานนี้ใช้ ~24 (โหลด+อัป+โพลสถานะ+ถอด+เขียน)
-// เพดานที่วัดได้จริง (7 คลิป, 14 ส.ค.): คำขอตายที่ **128-131 วินาที** เสมอ
-// ตัวที่ชนเพดานคือ "ความยาวคำตอบ" ไม่ใช่ความยาวไฟล์ — output คงที่ ~530 token
-// ต่อนาทีของเสียง · 33.2 นาที = 17,498 token = 100 วิ รอด / 36.1 นาทีขึ้นไป
-// ตายหมด · ฝั่ง input ไม่ใช่ปัญหา (กลืน 49,557 token สบาย)
-// → ทางออกคือให้มันตอบทีละช่วง ไม่ใช่หั่นไฟล์เสียง (ซึ่ง Worker ทำไม่ได้อยู่แล้ว
-//   เพราะถอดรหัส/ประกอบ container ใหม่ไม่ไหวใน CPU 10ms)
-// ⚠ เพดานไม่คงที่ — วัดซ้ำ 14 ส.ค. บ่าย: คลิป 20.2 นาทีที่เคยผ่านใน 65 วิ
-// **โดน 524 ซ้ำสองรอบ** ด้วยคำขอแบบเดียวกันเป๊ะ · ความเร็ว generate ที่วัดได้
-// แกว่ง 76-175 token/วิ (ต่างกันเท่าตัว) ตามภาระฝั่ง Google
-// → ห้ามตั้งขนาดหน้าต่างจาก "วันที่เร็ว" ต้องคิดจากวันที่ช้าสุด:
-//   งบเวลาปลอดภัย 110 วิ × 76 token/วิ ≈ 8,400 token ≈ 16 นาทีของเสียง
-//   จึงตั้ง 12 นาที (≈6,400 token) ให้เหลือที่หายใจ
-// และต่อให้ตั้งดีแค่ไหนก็ยังพลาดได้ → มีตัวหดหน้าต่างอัตโนมัติเมื่อโดน 524
-const AB_WIN_MIN = 12;          // ≈6,400 token ≈ 40-85 วิ แล้วแต่วัน
-const AB_SINGLE_MAX_MIN = 12;   // สั้นกว่านี้ยิงรอบเดียวพอ (20 นาทีพิสูจน์แล้วว่าเสี่ยง)
-const AB_MIN_WIN_SEC = 180;     // หดได้ต่ำสุด 3 นาที — ต่ำกว่านี้แปลว่าปัญหาไม่ใช่ความยาว
-const AB_MAX_ATTEMPTS = 20;     // กันแถวค้างบล็อกคิวตลอดกาล (เผื่อรอบที่ใช้หดหน้าต่าง)
-
 function _abTsToSec(ts) {
   const m = String(ts || '').match(/^(\d+):(\d+)(?::(\d+))?$/);
   if (!m) return null;
@@ -2110,23 +2108,6 @@ function _abTsToSec(ts) {
 function _abSecToTs(sec) {
   const s = Math.max(0, Math.round(sec));
   return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-}
-
-// Gemini คืนได้ทั้ง {"segments":[…]} และ **array เปล่าๆ** (responseMimeType=json
-// บังคับให้เป็น JSON ที่ถูกต้อง แต่ไม่บังคับโครง) — รับทั้งสองแบบ ดีกว่าดัด prompt
-// แล้วหวังว่ามันจะเชื่อ · เผื่อกรณีมีข้อความห่อหน้า/หลัง JSON ด้วย
-function _abParseSegments(raw) {
-  let parsed = null;
-  try { parsed = JSON.parse(raw); } catch (_) {
-    const a = raw.indexOf('['), z = raw.lastIndexOf(']');
-    if (a !== -1 && z > a) { try { parsed = JSON.parse(raw.slice(a, z + 1)); } catch (_) {} }
-    if (!parsed) {
-      const s = raw.indexOf('{'), e = raw.lastIndexOf('}');
-      if (s !== -1 && e > s) { try { parsed = JSON.parse(raw.slice(s, e + 1)); } catch (_) {} }
-    }
-  }
-  if (Array.isArray(parsed)) parsed = { segments: parsed };
-  return (parsed && Array.isArray(parsed.segments)) ? parsed.segments : null;
 }
 
 // ── รูปแบบคำตอบแบบประหยัด (v_ears 14 ส.ค. เย็น) ───────────────────────────
@@ -2148,214 +2129,6 @@ function _abParseCompact(raw) {
     });
   }
   return out.length ? out : null;
-}
-
-function _abPromptCompact(fromSec, toSec) {
-  const win = (fromSec == null) ? '' :
-    `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
-    `ช่วงก่อนหน้าและหลังจากนั้นข้ามไปทั้งหมด ห้ามถอด · ` +
-    `เวลาที่ตอบต้องเป็นเวลาจริงนับจากต้นไฟล์ (ไม่ใช่นับใหม่จากต้นช่วง)`;
-  return `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
-
-บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
-- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
-
-ตอบเป็นข้อความล้วน บรรทัดละหนึ่งท่อน รูปแบบเป๊ะๆ นี้เท่านั้น:
-mm:ss|ผู้พูด|ข้อความ
-
-ผู้พูดใช้ตัวอักษรเดียว: S = พนักงานขาย Freshket, C = คนของร้าน
-ห้ามใส่หัวข้อ ห้ามใส่เลขข้อ ห้ามใส่ JSON ห้ามใส่บรรทัดอื่นนอกจากรูปแบบข้างบน
-
-ความละเอียดที่ต้องการ (สำคัญมาก):
-- ขึ้นบรรทัดใหม่**ทุกครั้งที่เปลี่ยนคนพูด** และอย่างน้อยทุก 10-15 วินาทีถึงจะพูดคนเดียวยาว
-- หนึ่งบรรทัดควรสั้น ประมาณหนึ่งถึงสองประโยค — **ห้ามรวบหลายประโยคยาวๆ เป็นบรรทัดเดียว**
-- ต้องถอดต่อเนื่องตลอดทั้งช่วง ห้ามข้ามช่วงไหน แม้เป็นช่วงที่คุยเรื่องนอกเรื่องหรือเงียบนาน
-- ห้ามสรุปหรือเรียบเรียงใหม่ ต้องเป็นคำพูดจริงที่ได้ยิน
-
-ตัวอย่าง:
-00:03|S|สวัสดีครับพี่ วันนี้มาส่งของครับ
-00:07|C|ค่ะ วางตรงนี้เลย${win}`;
-}
-
-function _abPrompt(fromSec, toSec) {
-  const win = (fromSec == null) ? '' :
-    `\n\n**ถอดเฉพาะช่วง ${_abSecToTs(fromSec)} ถึง ${_abSecToTs(toSec)} เท่านั้น** ` +
-    `ช่วงก่อนหน้าและหลังจากนั้นข้ามไปทั้งหมด ห้ามถอด · ` +
-    `ts ที่ตอบต้องเป็นเวลาจริงนับจากต้นไฟล์ (ไม่ใช่นับใหม่จากต้นช่วง)`;
-  return `ถอดเสียงบทสนทนาภาษาไทยนี้แบบคำต่อคำ (verbatim) พร้อมระบุคนพูด
-
-บริบท: พนักงานขายของ Freshket (ขายวัตถุดิบอาหารให้ร้านอาหาร) คุยกับคนของร้านอาหาร ณ ร้าน อาจมีเสียงรบกวน
-- speaker: "Sales" = ฝั่ง Freshket, "ลูกค้า" = ฝั่งร้าน
-- ถอดตามที่ได้ยินจริง ห้ามแต่งเติม ห้ามสรุป · ท่อนที่ฟังไม่ออกจริงๆ ใช้ "[ฟังไม่ชัด]"
-
-ตอบ JSON เท่านั้น:
-{"segments":[{"ts":"mm:ss","speaker":"Sales","text":"..."}]}${win}`;
-}
-
-async function _abCallGemini(env, fileUri, fromSec, toSec, fmt) {
-  const t0 = Date.now();
-  const compact = fmt === 'compact';
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
-          { text: compact ? _abPromptCompact(fromSec, toSec) : _abPrompt(fromSec, toSec) }
-        ]}],
-        generationConfig: { temperature: 0, maxOutputTokens: 65536,
-          responseMimeType: compact ? 'text/plain' : 'application/json' }
-      }) });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
-  const d = await r.json();
-  const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const segments = compact ? _abParseCompact(raw) : _abParseSegments(raw);
-  return {
-    segments,
-    elapsed_ms: Date.now() - t0,
-    finish_reason: d?.candidates?.[0]?.finishReason || null,
-    usage: d?.usageMetadata || null,
-    raw_head: segments ? undefined : raw.slice(0, 1200)
-  };
-}
-
-// สั่งงานด้วย SQL:
-//   update ci_sessions set ab_gemini='{"requested":true,"status":"queued"}' where id=…
-// **ต้องมี status:"queued"** — ตัวเลือกแถวกรองด้วย status ถ้าเป็น NULL จะไม่ถูกหยิบ
-//
-// หนึ่ง tick ทำหนึ่งขั้นเท่านั้น (อัปโหลด หรือ หนึ่งหน้าต่าง) ตามแพตเทิร์นเดียว
-// กับ sweepPending — และ **แทนที่งานปกติของ tick นั้น** เพราะ Free plan ให้
-// 50 subrequest ต่อ invocation ส่วนขั้นอัปโหลดใช้ ~24 (โหลด+อัป+โพลสถานะ+เขียน)
-async function sweepAbGemini(env) {
-  const rows = await sbSelect(env,
-    `ci_sessions?ab_gemini->>requested=eq.true&ab_gemini->>status=in.(queued,running)` +
-    `&audio_path=not.is.null&select=id,audio_path,account_name,duration_secs,ab_gemini&limit=1`);
-  const row = rows && rows[0];
-  if (!row) return false;
-  const st = row.ab_gemini || {};
-  const attempts = (st.attempts || 0) + 1;
-  // เขียนกลับแบบ compare-and-set: อ่านสถานะสดก่อนเสมอ ถ้ามีใครแก้ระหว่างที่
-  // tick นี้ทำงานอยู่ (เช่นคนสั่งหยุดด้วย SQL) ให้ยอมแพ้ ไม่เขียนทับ
-  // — เจอจริง 14 ส.ค.: ตั้ง status='parked' ด้วยมือแล้วโดน tick ที่ค้างอยู่
-  //   เขียน {...st} ทับ กลับไปเป็น 'running' แล้ววนลองซ้ำต่อ
-  const save = async (patch) => {
-    const fresh = await sbSelect(env, `ci_sessions?id=eq.${row.id}&select=ab_gemini`);
-    const now = fresh && fresh[0] && fresh[0].ab_gemini;
-    if (now && now.status && now.status !== 'queued' && now.status !== 'running') {
-      console.log(`[ab-gemini] ${row.id} ถูกสั่ง ${now.status} ระหว่างทาง — ไม่เขียนทับ`);
-      return false;
-    }
-    await sbPatch(env, 'ci_sessions', `id=eq.${row.id}`,
-      { ab_gemini: { ...st, ...patch, attempts, updated_at: new Date().toISOString() } });
-    return true;
-  };
-
-  if (attempts > AB_MAX_ATTEMPTS) {
-    await save({ status: 'failed', error: `เกิน ${AB_MAX_ATTEMPTS} รอบแล้วยังไม่จบ — หยุดกันคิวตัน` });
-    return true;
-  }
-
-  try {
-    // ── ขั้นที่ 1: อัปไฟล์เข้า Gemini ครั้งเดียว แล้วใช้ uri ซ้ำทุกหน้าต่าง (ไฟล์อยู่ ~48 ชม.)
-    if (!st.file_uri) {
-      const t0 = Date.now();
-      const fileUri = await _geminiUploadAudio(env, await sbStorageGet(env, row.audio_path), 'audio/webm');
-      const dur = row.duration_secs || 0;
-      const winMin = st.win_min || AB_WIN_MIN;
-      const windows = [];
-      // st.single = true → บังคับยิงรอบเดียวไม่ว่ายาวแค่ไหน (ใช้ตอนทดลองว่ารูปแบบ
-      // คำตอบแบบประหยัดทำให้คลิปยาวรอดโดยไม่ต้องซอยจริงไหม)
-      if (st.single === true || dur / 60 <= AB_SINGLE_MAX_MIN) {
-        windows.push({ from: null, to: null });     // สั้นพอ ยิงรอบเดียว
-      } else {
-        for (let s = 0; s < dur; s += winMin * 60) {
-          windows.push({ from: s, to: Math.min(s + winMin * 60, Math.ceil(dur)) });
-        }
-      }
-      await save({ status: 'running', file_uri: fileUri, upload_ms: Date.now() - t0,
-                   win_min: winMin, windows, next: 0, model: 'gemini-3.1-pro-preview' });
-      console.log(`[ab-gemini] อัปเสร็จ ${row.id} — ${windows.length} หน้าต่าง`);
-      return true;
-    }
-
-    // ── ขั้นที่ 2..N: ถอดทีละหน้าต่าง
-    const windows = st.windows || [];
-    const i = st.next || 0;
-    if (i < windows.length) {
-      const w = windows[i];
-      const res = await _abCallGemini(env, st.file_uri, w.from, w.to, st.fmt);
-      const segs = res.segments || [];
-      // ตัววัดว่ามันเชื่อคำสั่ง "ถอดเฉพาะช่วง" จริงไหม — ถ้าไม่เชื่อ แผนนี้ใช้ไม่ได้
-      let inWin = null;
-      if (w.from != null && segs.length) {
-        const ok = segs.filter(s => {
-          const t = _abTsToSec(s && s.ts);
-          return t != null && t >= w.from - 30 && t <= w.to + 30;
-        }).length;
-        inWin = Math.round(ok / segs.length * 100);
-      }
-      windows[i] = { ...w, status: res.segments ? 'done' : 'parse_failed',
-                     elapsed_ms: res.elapsed_ms, finish_reason: res.finish_reason,
-                     out_tok: res.usage?.candidatesTokenCount ?? null,
-                     in_tok: res.usage?.promptTokenCount ?? null,
-                     seg_count: segs.length, in_window_pct: inWin,
-                     raw_head: res.raw_head, segments: segs };
-      const done = i + 1 >= windows.length;
-      if (!done) {
-        await save({ windows, next: i + 1 });
-        console.log(`[ab-gemini] ${row.id} หน้าต่าง ${i + 1}/${windows.length} เสร็จใน ${Math.round(res.elapsed_ms / 1000)} วิ`);
-        return true;
-      }
-      // ── รวมผลทุกหน้าต่างเป็นบทเดียว (หน้าต่างไม่ซ้อนกัน จึงไม่ต้องกันซ้ำ)
-      const merged = windows.flatMap(x => x.segments || [])
-        .sort((a, b) => (_abTsToSec(a?.ts) ?? 0) - (_abTsToSec(b?.ts) ?? 0));
-      const meta = windows.map(x => ({ from: x.from, to: x.to, status: x.status,
-        elapsed_ms: x.elapsed_ms, out_tok: x.out_tok, in_tok: x.in_tok,
-        seg_count: x.seg_count, in_window_pct: x.in_window_pct, raw_head: x.raw_head }));
-      await save({
-        status: 'done', windows: meta, next: windows.length, segments: merged,
-        total_elapsed_ms: meta.reduce((a, x) => a + (x.elapsed_ms || 0), 0) + (st.upload_ms || 0),
-        total_out_tok: meta.reduce((a, x) => a + (x.out_tok || 0), 0),
-        total_in_tok: meta.reduce((a, x) => a + (x.in_tok || 0), 0)
-      });
-      console.log(`[ab-gemini] เสร็จทั้งคลิป ${row.id} — ${merged.length} ท่อน`);
-      return true;
-    }
-    await save({ status: 'failed', error: 'ไม่มีหน้าต่างให้ทำ (state เพี้ยน)' });
-  } catch (e) {
-    const msg = String(e?.message || e);
-    // ล้มตอนอัป = ตายเลย ยังไม่มีอะไรให้ต่อ
-    if (!st.file_uri) {
-      await save({ status: 'failed', error: msg });
-      console.error('[ab-gemini] อัปไม่สำเร็จ', row.id, msg);
-      return true;
-    }
-    // ── หมดเวลา (524) = คำตอบยาวเกินกว่าที่ฝั่งโน้นจะปั่นทัน "ในวันนี้"
-    // ลองขนาดเดิมซ้ำก็มีแต่จะพังซ้ำ → **ผ่าหน้าต่างนั้นครึ่งหนึ่ง** แล้วไปต่อ
-    // (ทำให้ระบบหาขนาดที่วิ่งไหวของวันนั้นเองโดยไม่ต้องมีคนมาจูน)
-    const windows = st.windows || [];
-    const i = st.next || 0;
-    const w = windows[i];
-    const timedOut = /\b524\b|timeout|timed out/i.test(msg);
-    if (timedOut && w) {
-      const from = w.from == null ? 0 : w.from;
-      const to = w.to == null ? Math.ceil(row.duration_secs || 0) : w.to;
-      const mid = Math.floor((from + to) / 2);
-      if (to - from > AB_MIN_WIN_SEC * 2) {
-        windows.splice(i, 1, { from, to: mid }, { from: mid, to });
-        await save({ status: 'running', windows, error: msg,
-                     note: `หด ${Math.round((to-from)/60)} → ${Math.round((mid-from)/60)} นาที เพราะหมดเวลา` });
-        console.warn(`[ab-gemini] ${row.id} หน้าต่าง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid-from)/60)} นาที`);
-        return true;
-      }
-      await save({ status: 'failed', error: `หดจนถึง ${Math.round((to-from)/60)} นาทีแล้วยังหมดเวลา — ปัญหาไม่ใช่ความยาว: ${msg}` });
-      return true;
-    }
-    // เหตุอื่น (เน็ต/500 ชั่วคราว) — ปล่อยให้ tick ถัดไปลองหน้าต่างเดิมซ้ำ
-    await save({ status: 'running', error: msg });
-    console.error('[ab-gemini] ล้มเหลว', row.id, msg);
-  }
-  return true;
 }
 
 // ── Key SKU → Google Sheets export (v_keyexport, 2026-08-16) ───────────────
@@ -2470,18 +2243,19 @@ async function exportKeySkusToSheet(env) {
 export default {
   async scheduled(event, env, cfCtx) {
     if (!env.SUPABASE_SERVICE_KEY) return;
-    // v_ears P0: ถ้ามีงานเทียบโมเดลค้างอยู่ ให้ tick นี้ทำงานนั้นแทนงานปกติ
-    // (กันแย่งเพดาน 50 subrequest กัน) · ไม่มีงานค้าง = ทำงานปกติตามเดิม
-    cfCtx.waitUntil((async () => {
-      const didAb = await sweepAbGemini(env).catch(e => { console.error('[ab-gemini] sweep error', e); return false; });
-      if (!didAb) await sweepPending(env);
-    })());
+    // v_needsgemini (2026-08-17): เดิมมีด่าน sweepAbGemini (ห้องทดลอง A/B) คั่นหน้า
+    // sweepPending ทุก tick — เคาะโมเดลจบแล้ว (Gemini ชนะ) ถอดออกแล้วตามที่ตั้งใจ
+    // ไว้ตั้งแต่แรก (docs/supabase-migration-ears-ab-2026-08-14.sql) เพราะมันกัน
+    // คิวจริงได้นานสุด ~100 นาที/แถวที่ติดธง และปิดเสียงแจ้งเตือนความล้มเหลวไปด้วย
+    cfCtx.waitUntil(sweepPending(env));
     // v_queue: กวาดไฟล์เสียงหมดอายุวันละครั้งพอ (03:00 UTC = 10 โมงเช้าไทย)
     // ของเดิมยิงคู่กับ sweepPending ทุก tick — งานนั้นใช้ได้ถึง 51 subrequest
     // ในตัวมันเอง จึงแย่งเพดาน 50 ของ invocation เดียวกันกับงานหลักโดยไม่จำเป็น
     const at = new Date(event && event.scheduledTime ? event.scheduledTime : Date.now());
     if (at.getUTCHours() === 3 && at.getUTCMinutes() < 5) {
       cfCtx.waitUntil(sweepExpiredAudio(env));
+      // v_skilllog: เกาะรอบ 03:00 UTC เดียวกัน — ไม่เพิ่ม cron trigger ใหม่
+      cfCtx.waitUntil(sweepExpiredSkillLogs(env));
     }
     // v_keyexport: ส่งออก Key SKU ไป Google Sheets 4 รอบ/วันตามเวลาไทยที่บุชขอ
     if (KEY_EXPORT_UTC_HOURS.includes(at.getUTCHours()) && at.getUTCMinutes() < 5) {
@@ -2497,7 +2271,6 @@ export default {
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, env);
     const url = new URL(request.url);
     if (url.pathname === '/process')           return handleProcess(request, env, cfCtx);
-    if (url.pathname === '/ab-gemini')         return handleAbGeminiTranscribe(request, env); // v_ears P0 — ชั่วคราว
     if (url.pathname === '/transcript')        return handleTranscript(request, env);
     if (url.pathname === '/transcript-gemini') return handleTranscriptGeminiFull(request, env); // v2 path, kept for A/B
     if (url.pathname === '/summarize')     return handleSummarize(request, env);
