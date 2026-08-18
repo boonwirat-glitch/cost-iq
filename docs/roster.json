@@ -1,0 +1,26 @@
+{
+  "_comment": "Canonical KAM/PM/AD roster — the ONE file to edit when someone joins or leaves a portfolio-holding role. Run `node tools/sync_roster.js` after editing this, then `node tools/verify_roster_sync.js` until green. expected_owner mirrors the data warehouse's own commercial_owner field, which only ever uses 'KAM' or 'PM' (no separate 'AD' bucket exists there — Ornpreya and the 2 new AD hires all carry expected_owner='PM', matching how Ornpreya, who is really AD, has always been recorded). tl_name is only used by pm_rep_view.sql's shape; leave it matching tl_email's owner.",
+  "people": [
+    { "name": "Anusorn (Bookbig) Khamphasuk",         "email": "anusorn.k@freshket.co",      "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Chaklid (Dent) Nimraor",                "email": "chaklid.n@freshket.co",      "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Duangruedee (Ning) Bulalom",            "email": "duangruedee.bu@freshket.co", "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Guntinun (Monet) Thanoochan",           "email": "guntinun.t@freshket.co",     "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Intuon (Jane) Yanakit",                 "email": "intuon.y@freshket.co",       "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Napat (To) Kaikaew",                    "email": "napat.k@freshket.co",        "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Natchita (Foam) Bunkong",                "email": "natchita.b@freshket.co",     "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Niracha (Cream) Sangka",                 "email": "niracha.s@freshket.co",      "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Nuttawan (Kwang) Mahaporn",              "email": "nuttawan.ma@freshket.co",    "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Ploynitcha (Nitcha) Rujipiromthagoon",   "email": "ploynitcha.r@freshket.co",   "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Puttipong (Tape) Wanithaweewat",         "email": "puttipong.w@freshket.co",    "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Rinlaphat (Mild) Setthasiriwuti",        "email": "rinlaphat.s@freshket.co",    "tl_email": "nitipat.s@freshket.co",   "tl_name": "Name", "owner_type": "KAM" },
+    { "name": "Siriprapa (Pop) Piapeng",                "email": "siriprapa.p@freshket.co",    "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Warissara (Ply) Chanaboon",              "email": "warissara.c@freshket.co",    "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Treerak (May) Sangjua",                  "email": "treerak.s@freshket.co",      "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "KAM" },
+    { "name": "Panitan (Aom) Promta",                   "email": "panitan.p@freshket.co",      "tl_email": null,                      "tl_name": null,   "owner_type": "PM" },
+    { "name": "Sarawoot (Oh) Kaewkhao",                 "email": "sarawoot.k@freshket.co",     "tl_email": null,                      "tl_name": null,   "owner_type": "PM" },
+    { "name": "Nichamon (Ninew) Kanghae",               "email": "nichamon.k@freshket.co",     "tl_email": null,                      "tl_name": null,   "owner_type": "PM" },
+    { "name": "Ornpreya (Ice) Sukthai",                 "email": "ornpreya.s@freshket.co",     "tl_email": "pavarisa.mu@freshket.co", "tl_name": "Ploy", "owner_type": "PM" },
+    { "name": "Chanitsara (Koi)",                       "email": "chanitsara.d@freshket.co",   "tl_email": null,                      "tl_name": null,   "owner_type": "PM" },
+    { "name": "Kritkanok (Wanmai)",                     "email": "kritkanok.k@freshket.co",    "tl_email": null,                      "tl_name": null,   "owner_type": "PM" }
+  ]
+}

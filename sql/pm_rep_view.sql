@@ -84,7 +84,9 @@ staff_email_map AS (
     STRUCT('Panitan (Aom) Promta'     AS kam_name, 'panitan.p@freshket.co'  AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
     STRUCT('Sarawoot (Oh) Kaewkhao'   AS kam_name, 'sarawoot.k@freshket.co' AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
     STRUCT('Nichamon (Ninew) Kanghae' AS kam_name, 'nichamon.k@freshket.co' AS kam_email, CAST(NULL AS STRING)      AS tl_email, CAST(NULL AS STRING) AS tl_name),
-    STRUCT('Ornpreya (Ice) Sukthai'   AS kam_name, 'ornpreya.s@freshket.co' AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name)
+    STRUCT('Ornpreya (Ice) Sukthai'   AS kam_name, 'ornpreya.s@freshket.co' AS kam_email, 'pavarisa.mu@freshket.co' AS tl_email, 'Ploy' AS tl_name),
+    STRUCT('Chanitsara (Koi)' AS kam_name, 'chanitsara.d@freshket.co' AS kam_email, CAST(NULL AS STRING) AS tl_email, CAST(NULL AS STRING) AS tl_name),
+    STRUCT('Kritkanok (Wanmai)' AS kam_name, 'kritkanok.k@freshket.co' AS kam_email, CAST(NULL AS STRING) AS tl_email, CAST(NULL AS STRING) AS tl_name)
   ])
 ),
 

@@ -28,7 +28,9 @@ WITH kam_list AS (
     STRUCT('Panitan (Aom) Promta' AS kam_name, 'panitan.p@freshket.co' AS kam_email, 'PM' AS expected_owner),
     STRUCT('Sarawoot (Oh) Kaewkhao' AS kam_name, 'sarawoot.k@freshket.co' AS kam_email, 'PM' AS expected_owner),
     STRUCT('Nichamon (Ninew) Kanghae' AS kam_name, 'nichamon.k@freshket.co' AS kam_email, 'PM' AS expected_owner),
-    STRUCT('Ornpreya (Ice) Sukthai' AS kam_name, 'ornpreya.s@freshket.co' AS kam_email, 'PM' AS expected_owner)
+    STRUCT('Ornpreya (Ice) Sukthai' AS kam_name, 'ornpreya.s@freshket.co' AS kam_email, 'PM' AS expected_owner),
+    STRUCT('Chanitsara (Koi)' AS kam_name, 'chanitsara.d@freshket.co' AS kam_email, 'PM' AS expected_owner),
+    STRUCT('Kritkanok (Wanmai)' AS kam_name, 'kritkanok.k@freshket.co' AS kam_email, 'PM' AS expected_owner)
   ])
 ),
 -- v4: join via res_id (เหมือน Q8E) รองรับ account rename
