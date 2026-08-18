@@ -2029,29 +2029,23 @@ function nrrShellHtml() {
     '  <div class="nrr-masthead-nav">' +
     '  <nav class="nrr-appnav" id="nrr-appnav">' +
     '    <a href="#/" data-view="dashboard" class="on">NRR</a>' +
-    // v28: whole-company views — admin only (profile is resolved before
-    // nrrInitApp builds this shell; the router guard also redirects deep links)
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/company" data-view="company">Overview</a>' +
-        '    <a href="#/sales" data-view="sales">Sales</a>'
-      : '') +
+    // v_openall (2026-08-18): Overview/Sales/Today/Commission/Margin opened
+    // to every role per Bush's request — each page scopes its OWN content
+    // to the viewer now (nrr_pulse.js's _nrrPulseScope, nrr_view.js's
+    // viewerKind branching + _nrrCommFullTableScopeFilter), so the nav no
+    // longer needs to hide the tab itself for non-admin/non-tl roles.
+    '    <a href="#/company" data-view="company">Overview</a>' +
+    '    <a href="#/sales" data-view="sales">Sales</a>' +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/pulse" data-view="pulse">Today</a>'
-      : '') +
+    '    <a href="#/pulse" data-view="pulse">Today</a>' +
     // Waived Account feature (2026-07-14): TL requests / Admin approves —
-    // visible to both, RLS + nrrRouteGuard already scope what each sees.
+    // an approval queue, not a data view — stays TL/admin-only, unaffected
+    // by v_openall.
     (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
       ? '    <a href="#/waivers" data-view="waivers">Waivers</a>'
       : '') +
-    (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
-      ? '    <a href="#/commission" data-view="commission">Commission</a>'
-      : '') +
-    // v_gp: แท็บกำไร — admin เท่านั้นในรอบแรก (เงื่อนไขเดียวกับ nrrRouteGuard)
-    // เปิดให้ TL ด้วยการเพิ่ม role check ที่นี่ + ที่ guard
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/margin" data-view="margin">กำไร</a>'
-      : '') +
+    '    <a href="#/commission" data-view="commission">Commission</a>' +
+    '    <a href="#/margin" data-view="margin">กำไร</a>' +
     '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
@@ -3247,15 +3241,23 @@ function nrrRenderCommissionSection() {
     return;
   }
 
-  var rows = isAdmin
+  // v_openall (2026-08-18): was a plain isAdmin/else split — the else branch
+  // assumed the viewer was always a TL with a team to enumerate. Opened to
+  // every role now, so a genuine kam/ad/pm viewer (no team, own portfolio
+  // only) needs its own third branch instead of falling into
+  // nrrListKamsForTeam(own email), which just returns empty for them.
+  var viewerKind = nrrProfile.role === 'admin' ? 'admin' : nrrProfile.role === 'tl' ? 'tl' : 'kam';
+  var rows = viewerKind === 'admin'
     ? nrrListTeams().map(function (t) { return { email: t.email, name: t.name, kind: 'tl' }; })
-    : nrrListKamsForTeam(nrrProfile.email).map(function (k) { return { email: k.email, name: k.name, kind: 'kam' }; });
+    : viewerKind === 'tl'
+    ? nrrListKamsForTeam(nrrProfile.email).map(function (k) { return { email: k.email, name: k.name, kind: 'kam' }; })
+    : [{ email: nrrProfile.email, name: nrrProfile.name || nrrProfile.email, kind: 'kam' }];
 
   document.getElementById('nrr-comm-strip').innerHTML =
     '<div class="nrr-comm-ds">' + tabsHtml +
     '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
-    nrrCommissionHeroHtml(isAdmin, period) +
-    nrrCommissionTrendHtml(isAdmin) +
+    nrrCommissionHeroHtml(viewerKind, period) +
+    nrrCommissionTrendHtml(viewerKind) +
     nrrCommissionRowsHtml(isAdmin, rows, period) +
     nrrCommissionFootnoteHtml() +
     '</div>';
@@ -3378,8 +3380,8 @@ function nrrCommReceiptHtml(steps, sectionsByKey) {
   return '<div class="nrr-comm-receipt">' + rowsHtml + '</div>';
 }
 
-function nrrCommissionHeroHtml(isAdmin, period) {
-  if (isAdmin) {
+function nrrCommissionHeroHtml(viewerKind, period) {
+  if (viewerKind === 'admin') {
     var teams = nrrListTeams();
     var total = 0, snapCount = 0, estCount = 0, statuses = [];
     teams.forEach(function (t) {
@@ -3405,13 +3407,18 @@ function nrrCommissionHeroHtml(isAdmin, period) {
       '<div class="ds-hero-sub">' + sub + '</div></div>';
   }
 
+  // v_openall: 'tl' viewers get the TL commission formula (unchanged); a
+  // plain kam/ad/pm viewer needs the KAM formula instead — this branch used
+  // to be hardcoded 'tl' back when only TLs could ever reach the non-admin
+  // path.
+  var selfKind = viewerKind === 'tl' ? 'tl' : 'kam';
   var mySnap = nrrLatestSnapshotFor(nrrProfile.email);
   var showEst = !mySnap;
   var displayPeriod = mySnap ? mySnap.period_month : period;
   var estBadge = showEst ? nrrCommStampHtml('estimate') : nrrCommStampHtml(mySnap.snapshot_status);
   var amountHtml, subHtml;
   if (showEst) {
-    var est = nrrCommEstimateFor(nrrProfile.email, 'tl', period);
+    var est = nrrCommEstimateFor(nrrProfile.email, selfKind, period);
     amountHtml = nrrFmtGMVExact(est ? est.est : 0);
     subHtml = est
       ? ('NRR ' + est.pct + '% → ' + est.note)
@@ -3429,7 +3436,9 @@ function nrrCommissionHeroHtml(isAdmin, period) {
     '<div class="ds-hero-sub">' + subHtml + '</div></div>';
 }
 
-function nrrCommissionTrendHtml(isAdmin) {
+function nrrCommissionTrendHtml(viewerKind) {
+  var isAdmin = viewerKind === 'admin';
+  var selfKind = viewerKind === 'tl' ? 'tl' : 'kam';
   var trendEmails = isAdmin ? nrrListTeams().map(function (t) { return t.email; }) : [nrrProfile.email];
   var bars = QNRR_CFG.q_months.map(function (m) {
     var v = 0; var has = false; var estUsed = false;
@@ -3440,7 +3449,7 @@ function nrrCommissionTrendHtml(isAdmin) {
       } else {
         // No snapshot for this beneficiary+month → pace-based estimate.
         // Future months return null (no GMV rows yet) and stay pending.
-        var est = nrrCommEstimateFor(email, 'tl', m);
+        var est = nrrCommEstimateFor(email, isAdmin ? 'tl' : selfKind, m);
         if (est) { v += est.est; has = true; estUsed = true; }
       }
     });
@@ -4671,6 +4680,22 @@ function nrrBuildEstimateFullTableRows(periodMonth) {
   return rows;
 }
 
+// v_openall (2026-08-18): this table had NO scope filtering at all before
+// today — any tl/ad/pm who could already reach #/commission (only 'rep' was
+// blocked by the router) saw every OTHER team's/KAM's payout too, org-wide.
+// Confirmed live as a real, pre-existing gap during this round's audit;
+// Bush explicitly asked to close it as part of opening the page further.
+// admin: unfiltered. tl: their own row (as a beneficiary, if any) plus every
+// row their team's KAMs own. Everyone else (kam/ad/pm): only their own row.
+function _nrrCommFullTableScopeFilter(rows) {
+  var p = nrrProfile;
+  if (p.role === 'admin') return rows;
+  if (p.role === 'tl') {
+    return rows.filter(function (r) { return r.team_lead_email === p.email || r.beneficiary_email === p.email; });
+  }
+  return rows.filter(function (r) { return r.beneficiary_email === p.email; });
+}
+
 function nrrRenderCommissionFullTable(periodMonth) {
   var el = document.getElementById('nrr-comm-fulltable-body');
   if (!el) return;
@@ -4689,6 +4714,7 @@ function nrrRenderCommissionFullTable(periodMonth) {
     if (!rows.length && periodMonth === nrrState.period) {
       rows = nrrBuildEstimateFullTableRows(periodMonth);
     }
+    rows = _nrrCommFullTableScopeFilter(rows);
     target.innerHTML = nrrCommissionFullTableHtml(rows);
   });
 }

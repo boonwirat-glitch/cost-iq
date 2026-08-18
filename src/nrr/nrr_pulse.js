@@ -228,13 +228,42 @@ function _nrrPulseCurrentPeriod(rows) {
 // ── Model ────────────────────────────────────────────────────────────────
 // Everything the view needs, computed once per render from already-loaded
 // globals. Returns null if the core movement data isn't loaded yet.
+// v_openall (2026-08-18): Today used to be admin-only (whole-company feed);
+// now every role reaches it, but the underlying rows are still fetched
+// company-wide, so THIS function has to do the scoping the route guard used
+// to do. admin sees everything unchanged; tl sees their own team (matches
+// the exact scope='tl' semantics _qnrrCompute already uses elsewhere); every
+// other role (rep/kam, ad, pm) is a single portfolio-holder and sees only
+// their own accounts (scope='kam', own email) — ad/pm each own a real
+// portfolio same as a KAM (Bush confirmed 2026-08-18), not a company-wide
+// "all AD" bucket, so this is deliberately narrower than _qnrrCompute's own
+// scope='ad' (which serves a different, already-existing AD-leaderboard
+// aggregate feature elsewhere).
+function _nrrPulseScope() {
+  var p = window.nrrProfile;
+  if (!p || p.role === 'admin') return { all: true };
+  if (p.role === 'tl') return { all: false, tlEmail: p.email };
+  return { all: false, kamEmail: p.email };
+}
+
 function nrrPulseModel() {
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded || !qd.allRows) return null;
+  var scope = _nrrPulseScope();
   var lag = _nrrPulseLagDate();
   var yIso = _nrrPulseIsoDay(lag);
   var curPeriod = _nrrPulseCurrentPeriod(qd.allRows);
   var curRows = qd.allRows.filter(function (r) { return r.period_month === curPeriod; });
+  // Expansion-kind items (this dataset) carry latest_kam_email/latest_tl_email
+  // — same fields nrr_logic.js's _rowInScope already keys off of. Sales-kind
+  // items (bulkSalesPipelineData, below) have no email field at all, only a
+  // free-text staff_owner name — Bush explicitly chose to leave those
+  // unscoped (shown to every role) rather than risk a fragile name-match.
+  if (!scope.all) {
+    curRows = curRows.filter(function (r) {
+      return scope.tlEmail ? r.latest_tl_email === scope.tlEmail : r.latest_kam_email === scope.kamEmail;
+    });
+  }
 
   // v50: account_id -> its largest-GMV outlet's res_name, so the "ต้องดูแล"
   // block (sourced from portview.csv, which is account-grain and has NO
@@ -354,12 +383,22 @@ function nrrPulseModel() {
   var newSkuAdded = 0;
   var riskItems = [];
   if (pv && pv.loaded && pv.allRows) {
-    pv.allRows.forEach(function (row) {
+    // portview rows carry kam_email/tl_email directly — same scoping as the
+    // qnrr rows above, filtered before either the SKU-delta count or the
+    // risk queue ever see them.
+    var pvRows = scope.all ? pv.allRows : pv.allRows.filter(function (row) {
+      return scope.tlEmail ? row.tl_email === scope.tlEmail : row.kam_email === scope.kamEmail;
+    });
+    // v_openall: the bare-count fallback is gated the same as the named list
+    // below (scope.all only) — a non-admin role's own sku-delta count would
+    // otherwise still light up the "SKU ใหม่" scene via this path even with
+    // newSkuItems empty, contradicting Bush's "hide entirely" decision.
+    if (scope.all) pvRows.forEach(function (row) {
       // new-SKU count (v1: count only, no names — no portfolio-wide SKU source)
       var added = (row.cur_sku_count || 0) - (row.last_month_sku_count || 0);
       if (added > 0) newSkuAdded += added;
     });
-    riskItems = nrrRiskQueue(pv.allRows, { bigOutletByAcct: acctBigOutlet });
+    riskItems = nrrRiskQueue(pvRows, { bigOutletByAcct: acctBigOutlet });
   }
   var dangerCount = riskItems.length;
   // v48: sum across ALL 156 danger-band accounts (riskItems already holds
@@ -374,7 +413,12 @@ function nrrPulseModel() {
   // staff_owner/first_dollar_date before their SQL was rerun).
   var nsd = window.bulkNewSkusPortfolioData;
   var newSkuItems = [], newSkuGmv = 0;
-  if (nsd && nsd.loaded && nsd.allRows && nsd.allRows.length) {
+  // v_openall: new_skus_portfolio.csv has ZERO owner/account attribution
+  // (item_id, item_name_th, new_gmv, account_count only) — structurally
+  // impossible to scope to one KAM/AD/PM's own portfolio. Bush's call
+  // (2026-08-18): hide this scene for every non-admin role rather than
+  // show a company-wide number under "your" Today board.
+  if (scope.all && nsd && nsd.loaded && nsd.allRows && nsd.allRows.length) {
     newSkuItems = nsd.allRows.map(function (r) {
       return { name: r.item_name_th || r.item_id, gmv: r.new_gmv, accountCount: r.account_count };
     }).sort(function (a, b) { return b.gmv - a.gmv; });
@@ -434,9 +478,14 @@ function _nrrPulseRotControlHtml() {
 // here: the visual is identical whether one or several buttons carry .on).
 function _nrrPulseSceneToggleHtml() {
   var t = nrrPulseState.sceneToggles;
+  // v_openall: 'skus' toggle only makes sense for admin — the data behind it
+  // has no per-KAM/AD/PM attribution at all (see nrrPulseModel), so a
+  // non-admin toggling it on would only ever see an empty section.
+  var isAdmin = window.nrrProfile && window.nrrProfile.role === 'admin';
+  var labels = isAdmin ? NRR_PULSE_SCENE_LABELS : NRR_PULSE_SCENE_LABELS.filter(function (kv) { return kv[0] !== 'skus'; });
   return '<div class="nrr-pulse-scene-toggle-ctrl"><span class="nrr-pulse-rot-lbl">แสดงฉาก</span>' +
     '<div class="seg" id="nrr-pulse-scene-toggle-seg">' +
-    NRR_PULSE_SCENE_LABELS.map(function (kv) {
+    labels.map(function (kv) {
       return '<button type="button"' + (t[kv[0]] ? ' class="on"' : '') + ' data-scenekey="' + kv[0] + '">' + kv[1] + '</button>';
     }).join('') +
     '</div></div>';

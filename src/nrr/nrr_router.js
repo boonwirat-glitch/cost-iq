@@ -52,29 +52,15 @@ function nrrParseHash() {
 function nrrRouteGuard(route) {
   var p = window.nrrProfile;
   if (!p) return route;
-  // Company overview + Sales pipeline (v28) + Pulse signage (v45): whole-
-  // company data — admin only.
-  if ((route.view === 'company' || route.view === 'sales' || route.view === 'pulse') && p.role !== 'admin') {
-    return { view: 'dashboard', param: null, redirect: true };
-  }
-  // Waivers (2026-07-14): TL sees their own team's requests, Admin sees the
-  // full approve/reject queue — rep has no team/portfolio-wide governance
-  // role here.
+  // v_openall (2026-08-18): Overview/Sales/Today/Commission/Margin opened to
+  // every role, per Bush's explicit request — was admin-only (company/sales/
+  // pulse/margin) or TL+admin-only (commission). Waivers stays governance-
+  // only (TL/admin) since it's an approval queue, not a data view. Today and
+  // Commission now render their OWN per-role scope internally (nrr_pulse.js /
+  // nrr_view.js's viewerKind branching) instead of being gated out entirely —
+  // the router no longer needs to know about that, it just lets everyone in.
   if (route.view === 'waivers' && p.role === 'rep') {
     return { view: 'portfolio', param: null, redirect: true };
-  }
-  // Commission tab (2026-07-25): same TL/admin-only scope as Waivers — a
-  // rep already sees their own commission via Portfolio's self-summary,
-  // this tab is the org/team-wide simulator + breakdown view.
-  if (route.view === 'commission' && p.role === 'rep') {
-    return { view: 'portfolio', param: null, redirect: true };
-  }
-  // Margin/GP tab (v_gp, 2026-07-31): ADMIN ONLY เพื่อเริ่มต้น — ไม่ใช่เพราะ
-  // TL ไม่ควรเห็นกำไร แต่เพราะ GP กำลังถูกแนะนำให้ทีมรู้จักแบบค่อยเป็นค่อยไป
-  // และจะเริ่มใช้เป็นตัวชี้วัดจริง Jan 2027 · เปิดให้ TL ได้ด้วยการเพิ่ม
-  // 'tl' ในเงื่อนไขนี้ที่เดียว เมื่อบุชพร้อม
-  if (route.view === 'margin' && p.role !== 'admin') {
-    return { view: 'dashboard', param: null, redirect: true };
   }
   if (p.role === 'rep') {
     if (route.view === 'dashboard') return { view: 'portfolio', param: null, redirect: true };

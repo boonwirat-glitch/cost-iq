@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>window.NRR_BUILD = 'v129';</script>
+<script>window.NRR_BUILD = 'v131';</script>
 <style>
 /* ── nrr_tokens.css — "Fresh Canvas" design tokens ─────────────────────
    Adopted verbatim from the user-supplied Fresh Canvas spec, as the
@@ -4585,29 +4585,15 @@ function nrrParseHash() {
 function nrrRouteGuard(route) {
   var p = window.nrrProfile;
   if (!p) return route;
-  // Company overview + Sales pipeline (v28) + Pulse signage (v45): whole-
-  // company data — admin only.
-  if ((route.view === 'company' || route.view === 'sales' || route.view === 'pulse') && p.role !== 'admin') {
-    return { view: 'dashboard', param: null, redirect: true };
-  }
-  // Waivers (2026-07-14): TL sees their own team's requests, Admin sees the
-  // full approve/reject queue — rep has no team/portfolio-wide governance
-  // role here.
+  // v_openall (2026-08-18): Overview/Sales/Today/Commission/Margin opened to
+  // every role, per Bush's explicit request — was admin-only (company/sales/
+  // pulse/margin) or TL+admin-only (commission). Waivers stays governance-
+  // only (TL/admin) since it's an approval queue, not a data view. Today and
+  // Commission now render their OWN per-role scope internally (nrr_pulse.js /
+  // nrr_view.js's viewerKind branching) instead of being gated out entirely —
+  // the router no longer needs to know about that, it just lets everyone in.
   if (route.view === 'waivers' && p.role === 'rep') {
     return { view: 'portfolio', param: null, redirect: true };
-  }
-  // Commission tab (2026-07-25): same TL/admin-only scope as Waivers — a
-  // rep already sees their own commission via Portfolio's self-summary,
-  // this tab is the org/team-wide simulator + breakdown view.
-  if (route.view === 'commission' && p.role === 'rep') {
-    return { view: 'portfolio', param: null, redirect: true };
-  }
-  // Margin/GP tab (v_gp, 2026-07-31): ADMIN ONLY เพื่อเริ่มต้น — ไม่ใช่เพราะ
-  // TL ไม่ควรเห็นกำไร แต่เพราะ GP กำลังถูกแนะนำให้ทีมรู้จักแบบค่อยเป็นค่อยไป
-  // และจะเริ่มใช้เป็นตัวชี้วัดจริง Jan 2027 · เปิดให้ TL ได้ด้วยการเพิ่ม
-  // 'tl' ในเงื่อนไขนี้ที่เดียว เมื่อบุชพร้อม
-  if (route.view === 'margin' && p.role !== 'admin') {
-    return { view: 'dashboard', param: null, redirect: true };
   }
   if (p.role === 'rep') {
     if (route.view === 'dashboard') return { view: 'portfolio', param: null, redirect: true };
@@ -10436,13 +10422,42 @@ function _nrrPulseCurrentPeriod(rows) {
 // ── Model ────────────────────────────────────────────────────────────────
 // Everything the view needs, computed once per render from already-loaded
 // globals. Returns null if the core movement data isn't loaded yet.
+// v_openall (2026-08-18): Today used to be admin-only (whole-company feed);
+// now every role reaches it, but the underlying rows are still fetched
+// company-wide, so THIS function has to do the scoping the route guard used
+// to do. admin sees everything unchanged; tl sees their own team (matches
+// the exact scope='tl' semantics _qnrrCompute already uses elsewhere); every
+// other role (rep/kam, ad, pm) is a single portfolio-holder and sees only
+// their own accounts (scope='kam', own email) — ad/pm each own a real
+// portfolio same as a KAM (Bush confirmed 2026-08-18), not a company-wide
+// "all AD" bucket, so this is deliberately narrower than _qnrrCompute's own
+// scope='ad' (which serves a different, already-existing AD-leaderboard
+// aggregate feature elsewhere).
+function _nrrPulseScope() {
+  var p = window.nrrProfile;
+  if (!p || p.role === 'admin') return { all: true };
+  if (p.role === 'tl') return { all: false, tlEmail: p.email };
+  return { all: false, kamEmail: p.email };
+}
+
 function nrrPulseModel() {
   var qd = window.bulkQnrrData;
   if (!qd || !qd.loaded || !qd.allRows) return null;
+  var scope = _nrrPulseScope();
   var lag = _nrrPulseLagDate();
   var yIso = _nrrPulseIsoDay(lag);
   var curPeriod = _nrrPulseCurrentPeriod(qd.allRows);
   var curRows = qd.allRows.filter(function (r) { return r.period_month === curPeriod; });
+  // Expansion-kind items (this dataset) carry latest_kam_email/latest_tl_email
+  // — same fields nrr_logic.js's _rowInScope already keys off of. Sales-kind
+  // items (bulkSalesPipelineData, below) have no email field at all, only a
+  // free-text staff_owner name — Bush explicitly chose to leave those
+  // unscoped (shown to every role) rather than risk a fragile name-match.
+  if (!scope.all) {
+    curRows = curRows.filter(function (r) {
+      return scope.tlEmail ? r.latest_tl_email === scope.tlEmail : r.latest_kam_email === scope.kamEmail;
+    });
+  }
 
   // v50: account_id -> its largest-GMV outlet's res_name, so the "ต้องดูแล"
   // block (sourced from portview.csv, which is account-grain and has NO
@@ -10562,12 +10577,22 @@ function nrrPulseModel() {
   var newSkuAdded = 0;
   var riskItems = [];
   if (pv && pv.loaded && pv.allRows) {
-    pv.allRows.forEach(function (row) {
+    // portview rows carry kam_email/tl_email directly — same scoping as the
+    // qnrr rows above, filtered before either the SKU-delta count or the
+    // risk queue ever see them.
+    var pvRows = scope.all ? pv.allRows : pv.allRows.filter(function (row) {
+      return scope.tlEmail ? row.tl_email === scope.tlEmail : row.kam_email === scope.kamEmail;
+    });
+    // v_openall: the bare-count fallback is gated the same as the named list
+    // below (scope.all only) — a non-admin role's own sku-delta count would
+    // otherwise still light up the "SKU ใหม่" scene via this path even with
+    // newSkuItems empty, contradicting Bush's "hide entirely" decision.
+    if (scope.all) pvRows.forEach(function (row) {
       // new-SKU count (v1: count only, no names — no portfolio-wide SKU source)
       var added = (row.cur_sku_count || 0) - (row.last_month_sku_count || 0);
       if (added > 0) newSkuAdded += added;
     });
-    riskItems = nrrRiskQueue(pv.allRows, { bigOutletByAcct: acctBigOutlet });
+    riskItems = nrrRiskQueue(pvRows, { bigOutletByAcct: acctBigOutlet });
   }
   var dangerCount = riskItems.length;
   // v48: sum across ALL 156 danger-band accounts (riskItems already holds
@@ -10582,7 +10607,12 @@ function nrrPulseModel() {
   // staff_owner/first_dollar_date before their SQL was rerun).
   var nsd = window.bulkNewSkusPortfolioData;
   var newSkuItems = [], newSkuGmv = 0;
-  if (nsd && nsd.loaded && nsd.allRows && nsd.allRows.length) {
+  // v_openall: new_skus_portfolio.csv has ZERO owner/account attribution
+  // (item_id, item_name_th, new_gmv, account_count only) — structurally
+  // impossible to scope to one KAM/AD/PM's own portfolio. Bush's call
+  // (2026-08-18): hide this scene for every non-admin role rather than
+  // show a company-wide number under "your" Today board.
+  if (scope.all && nsd && nsd.loaded && nsd.allRows && nsd.allRows.length) {
     newSkuItems = nsd.allRows.map(function (r) {
       return { name: r.item_name_th || r.item_id, gmv: r.new_gmv, accountCount: r.account_count };
     }).sort(function (a, b) { return b.gmv - a.gmv; });
@@ -10642,9 +10672,14 @@ function _nrrPulseRotControlHtml() {
 // here: the visual is identical whether one or several buttons carry .on).
 function _nrrPulseSceneToggleHtml() {
   var t = nrrPulseState.sceneToggles;
+  // v_openall: 'skus' toggle only makes sense for admin — the data behind it
+  // has no per-KAM/AD/PM attribution at all (see nrrPulseModel), so a
+  // non-admin toggling it on would only ever see an empty section.
+  var isAdmin = window.nrrProfile && window.nrrProfile.role === 'admin';
+  var labels = isAdmin ? NRR_PULSE_SCENE_LABELS : NRR_PULSE_SCENE_LABELS.filter(function (kv) { return kv[0] !== 'skus'; });
   return '<div class="nrr-pulse-scene-toggle-ctrl"><span class="nrr-pulse-rot-lbl">แสดงฉาก</span>' +
     '<div class="seg" id="nrr-pulse-scene-toggle-seg">' +
-    NRR_PULSE_SCENE_LABELS.map(function (kv) {
+    labels.map(function (kv) {
       return '<button type="button"' + (t[kv[0]] ? ' class="on"' : '') + ' data-scenekey="' + kv[0] + '">' + kv[1] + '</button>';
     }).join('') +
     '</div></div>';
@@ -14283,29 +14318,23 @@ function nrrShellHtml() {
     '  <div class="nrr-masthead-nav">' +
     '  <nav class="nrr-appnav" id="nrr-appnav">' +
     '    <a href="#/" data-view="dashboard" class="on">NRR</a>' +
-    // v28: whole-company views — admin only (profile is resolved before
-    // nrrInitApp builds this shell; the router guard also redirects deep links)
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/company" data-view="company">Overview</a>' +
-        '    <a href="#/sales" data-view="sales">Sales</a>'
-      : '') +
+    // v_openall (2026-08-18): Overview/Sales/Today/Commission/Margin opened
+    // to every role per Bush's request — each page scopes its OWN content
+    // to the viewer now (nrr_pulse.js's _nrrPulseScope, nrr_view.js's
+    // viewerKind branching + _nrrCommFullTableScopeFilter), so the nav no
+    // longer needs to hide the tab itself for non-admin/non-tl roles.
+    '    <a href="#/company" data-view="company">Overview</a>' +
+    '    <a href="#/sales" data-view="sales">Sales</a>' +
     '    <a href="#/portfolio" data-view="portfolio">Portfolio</a>' +
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/pulse" data-view="pulse">Today</a>'
-      : '') +
+    '    <a href="#/pulse" data-view="pulse">Today</a>' +
     // Waived Account feature (2026-07-14): TL requests / Admin approves —
-    // visible to both, RLS + nrrRouteGuard already scope what each sees.
+    // an approval queue, not a data view — stays TL/admin-only, unaffected
+    // by v_openall.
     (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
       ? '    <a href="#/waivers" data-view="waivers">Waivers</a>'
       : '') +
-    (nrrProfile && (nrrProfile.role === 'tl' || nrrProfile.role === 'admin')
-      ? '    <a href="#/commission" data-view="commission">Commission</a>'
-      : '') +
-    // v_gp: แท็บกำไร — admin เท่านั้นในรอบแรก (เงื่อนไขเดียวกับ nrrRouteGuard)
-    // เปิดให้ TL ด้วยการเพิ่ม role check ที่นี่ + ที่ guard
-    (nrrProfile && nrrProfile.role === 'admin'
-      ? '    <a href="#/margin" data-view="margin">กำไร</a>'
-      : '') +
+    '    <a href="#/commission" data-view="commission">Commission</a>' +
+    '    <a href="#/margin" data-view="margin">กำไร</a>' +
     '  </nav>' +
     '  </div>' +
     '  <div class="nrr-masthead-actions">' +
@@ -15501,15 +15530,23 @@ function nrrRenderCommissionSection() {
     return;
   }
 
-  var rows = isAdmin
+  // v_openall (2026-08-18): was a plain isAdmin/else split — the else branch
+  // assumed the viewer was always a TL with a team to enumerate. Opened to
+  // every role now, so a genuine kam/ad/pm viewer (no team, own portfolio
+  // only) needs its own third branch instead of falling into
+  // nrrListKamsForTeam(own email), which just returns empty for them.
+  var viewerKind = nrrProfile.role === 'admin' ? 'admin' : nrrProfile.role === 'tl' ? 'tl' : 'kam';
+  var rows = viewerKind === 'admin'
     ? nrrListTeams().map(function (t) { return { email: t.email, name: t.name, kind: 'tl' }; })
-    : nrrListKamsForTeam(nrrProfile.email).map(function (k) { return { email: k.email, name: k.name, kind: 'kam' }; });
+    : viewerKind === 'tl'
+    ? nrrListKamsForTeam(nrrProfile.email).map(function (k) { return { email: k.email, name: k.name, kind: 'kam' }; })
+    : [{ email: nrrProfile.email, name: nrrProfile.name || nrrProfile.email, kind: 'kam' }];
 
   document.getElementById('nrr-comm-strip').innerHTML =
     '<div class="nrr-comm-ds">' + tabsHtml +
     '<div class="nrr-stale-host" id="nrr-comm-stale-pill"></div>' +
-    nrrCommissionHeroHtml(isAdmin, period) +
-    nrrCommissionTrendHtml(isAdmin) +
+    nrrCommissionHeroHtml(viewerKind, period) +
+    nrrCommissionTrendHtml(viewerKind) +
     nrrCommissionRowsHtml(isAdmin, rows, period) +
     nrrCommissionFootnoteHtml() +
     '</div>';
@@ -15632,8 +15669,8 @@ function nrrCommReceiptHtml(steps, sectionsByKey) {
   return '<div class="nrr-comm-receipt">' + rowsHtml + '</div>';
 }
 
-function nrrCommissionHeroHtml(isAdmin, period) {
-  if (isAdmin) {
+function nrrCommissionHeroHtml(viewerKind, period) {
+  if (viewerKind === 'admin') {
     var teams = nrrListTeams();
     var total = 0, snapCount = 0, estCount = 0, statuses = [];
     teams.forEach(function (t) {
@@ -15659,13 +15696,18 @@ function nrrCommissionHeroHtml(isAdmin, period) {
       '<div class="ds-hero-sub">' + sub + '</div></div>';
   }
 
+  // v_openall: 'tl' viewers get the TL commission formula (unchanged); a
+  // plain kam/ad/pm viewer needs the KAM formula instead — this branch used
+  // to be hardcoded 'tl' back when only TLs could ever reach the non-admin
+  // path.
+  var selfKind = viewerKind === 'tl' ? 'tl' : 'kam';
   var mySnap = nrrLatestSnapshotFor(nrrProfile.email);
   var showEst = !mySnap;
   var displayPeriod = mySnap ? mySnap.period_month : period;
   var estBadge = showEst ? nrrCommStampHtml('estimate') : nrrCommStampHtml(mySnap.snapshot_status);
   var amountHtml, subHtml;
   if (showEst) {
-    var est = nrrCommEstimateFor(nrrProfile.email, 'tl', period);
+    var est = nrrCommEstimateFor(nrrProfile.email, selfKind, period);
     amountHtml = nrrFmtGMVExact(est ? est.est : 0);
     subHtml = est
       ? ('NRR ' + est.pct + '% → ' + est.note)
@@ -15683,7 +15725,9 @@ function nrrCommissionHeroHtml(isAdmin, period) {
     '<div class="ds-hero-sub">' + subHtml + '</div></div>';
 }
 
-function nrrCommissionTrendHtml(isAdmin) {
+function nrrCommissionTrendHtml(viewerKind) {
+  var isAdmin = viewerKind === 'admin';
+  var selfKind = viewerKind === 'tl' ? 'tl' : 'kam';
   var trendEmails = isAdmin ? nrrListTeams().map(function (t) { return t.email; }) : [nrrProfile.email];
   var bars = QNRR_CFG.q_months.map(function (m) {
     var v = 0; var has = false; var estUsed = false;
@@ -15694,7 +15738,7 @@ function nrrCommissionTrendHtml(isAdmin) {
       } else {
         // No snapshot for this beneficiary+month → pace-based estimate.
         // Future months return null (no GMV rows yet) and stay pending.
-        var est = nrrCommEstimateFor(email, 'tl', m);
+        var est = nrrCommEstimateFor(email, isAdmin ? 'tl' : selfKind, m);
         if (est) { v += est.est; has = true; estUsed = true; }
       }
     });
@@ -16925,6 +16969,22 @@ function nrrBuildEstimateFullTableRows(periodMonth) {
   return rows;
 }
 
+// v_openall (2026-08-18): this table had NO scope filtering at all before
+// today — any tl/ad/pm who could already reach #/commission (only 'rep' was
+// blocked by the router) saw every OTHER team's/KAM's payout too, org-wide.
+// Confirmed live as a real, pre-existing gap during this round's audit;
+// Bush explicitly asked to close it as part of opening the page further.
+// admin: unfiltered. tl: their own row (as a beneficiary, if any) plus every
+// row their team's KAMs own. Everyone else (kam/ad/pm): only their own row.
+function _nrrCommFullTableScopeFilter(rows) {
+  var p = nrrProfile;
+  if (p.role === 'admin') return rows;
+  if (p.role === 'tl') {
+    return rows.filter(function (r) { return r.team_lead_email === p.email || r.beneficiary_email === p.email; });
+  }
+  return rows.filter(function (r) { return r.beneficiary_email === p.email; });
+}
+
 function nrrRenderCommissionFullTable(periodMonth) {
   var el = document.getElementById('nrr-comm-fulltable-body');
   if (!el) return;
@@ -16943,6 +17003,7 @@ function nrrRenderCommissionFullTable(periodMonth) {
     if (!rows.length && periodMonth === nrrState.period) {
       rows = nrrBuildEstimateFullTableRows(periodMonth);
     }
+    rows = _nrrCommFullTableScopeFilter(rows);
     target.innerHTML = nrrCommissionFullTableHtml(rows);
   });
 }
