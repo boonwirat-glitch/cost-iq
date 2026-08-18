@@ -1527,6 +1527,10 @@ select.nrr-search { appearance: auto; cursor: pointer; }
    its own opaque var(--bg) background). */
 body.nrr-pulse-on { background: #0E2A21; }
 .nrr-pulseboard { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 24px; height: calc(100vh - 220px); min-height: 520px; }
+/* v_pulselist (2026-08-18): list mode stacks every section and lets the PAGE
+   scroll — the fixed viewport-height sizing above is a signage-only
+   assumption (one full-screen scene at a time), wrong here. */
+.nrr-pulseboard.nrr-pulse-list-mode { height: auto; min-height: 0; }
 .nrr-pulse-loading { padding: 60px 0; text-align: center; color: var(--pc-ink-dim); font-size: 16px; }
 
 .nrr-pulse-dateline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex: none; }
@@ -1536,7 +1540,7 @@ body.nrr-pulse-on { background: #0E2A21; }
    only ever sees 2 top-level children. v_market1: the scene-visibility
    toggle control joins the same group. */
 .nrr-pulse-dateline-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.nrr-pulse-rot-ctrl, .nrr-pulse-scene-toggle-ctrl { display: flex; align-items: center; gap: 8px; }
+.nrr-pulse-rot-ctrl, .nrr-pulse-scene-toggle-ctrl, .nrr-pulse-mode-ctrl { display: flex; align-items: center; gap: 8px; }
 .nrr-pulse-rot-lbl { font-size: 12.5px; font-weight: 700; color: var(--pc-ink-dim); white-space: nowrap; }
 /* v_market1: reuses the app's existing generic .seg segmented-control (see
    nrr_base.css) for the new scene-visibility toggles instead of inventing a
@@ -1549,7 +1553,7 @@ body.nrr-pulse-on { background: #0E2A21; }
 /* Hidden once genuinely fullscreen — a real TV screen shouldn't show
    interactive chrome, only the fs-exit button (kept, mirrors the pre-v56
    behavior) needs to stay reachable there. */
-.nrr-pulse-fs-active .nrr-pulse-rot-ctrl, .nrr-pulse-fs-active .nrr-pulse-scene-toggle-ctrl { display: none; }
+.nrr-pulse-fs-active .nrr-pulse-rot-ctrl, .nrr-pulse-fs-active .nrr-pulse-scene-toggle-ctrl, .nrr-pulse-fs-active .nrr-pulse-mode-ctrl { display: none; }
 .nrr-pulse-fs-btn {
   padding: 9px 16px; border-radius: var(--r-pill); border: 1px solid var(--pc-line);
   background: transparent; color: var(--pc-ink-dim); font-size: 13px; font-weight: 700;
@@ -1779,6 +1783,29 @@ body.nrr-pulse-on { background: #0E2A21; }
 .nrr-pulse-risk-amt-wrap { flex: none; text-align: right; }
 .nrr-pulse-risk-amt { font-family: var(--font-num); font-size: 16px; font-weight: 700; color: var(--pc-terracotta); }
 .nrr-pulse-risk-amt-lbl { font-size: 15px; font-weight: 500; color: var(--pc-ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── List mode (v_pulselist, 2026-08-18) ──────────────────────────────────
+   Default view — every section stacked at once, page scrolls normally, no
+   rotation. Reuses the scene row classes above completely untouched
+   (.nrr-pulse-spotlight-row / .nrr-pulse-arr-row / .nrr-pulse-risk-row) —
+   only the section-wrapper chrome here is new. Each section is its own dark
+   card (one level lighter than the page background) instead of a full-
+   screen panel, since up to 4 of these now share one page. */
+.nrr-pulse-list-board { display: flex; flex-direction: column; gap: 20px; }
+.nrr-pulse-list-section {
+  background: var(--pc-bg2); border-radius: var(--r-lg); padding: 22px 26px;
+  border-left: 8px solid var(--pc-line);
+}
+.nrr-pulse-list-section-skus { border-left-color: var(--pc-mango); }
+.nrr-pulse-list-section-risk { border-left-color: var(--pc-terracotta); }
+.nrr-pulse-list-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.nrr-pulse-list-section-title { font-size: 19px; font-weight: 800; color: var(--pc-ink); }
+.nrr-pulse-list-section-tally { font-family: var(--font-num); font-size: 14px; font-weight: 700; color: var(--pc-ink-dim); white-space: nowrap; }
+.nrr-pulse-list-section-caption { font-size: 13px; font-weight: 600; color: var(--pc-ink-dim); margin: -2px 0 10px; line-height: 1.4; }
+/* Deliberately NO overflow:hidden, unlike .nrr-pulse-list/.nrr-pulse-
+   spotlight-list above (built for a fixed-height rotating scene) — list mode
+   wants every row visible and the page to scroll, never an inner clip. */
+.nrr-pulse-list-rows { display: flex; flex-direction: column; gap: 4px; }
 
 /* ── Fullscreen tier (v_signage7, 2026-07-15) ─────────────────────────────
    Every rule above this point is the EMBEDDED tier — sized for the Pulse

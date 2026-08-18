@@ -23,9 +23,15 @@ var NRR_PULSE_ROT_MS = 8000;                // default: advance to the next scen
 // v_market1 (2026-07-21): sceneToggles lets an admin hide a scene from
 // rotation entirely (e.g. skus off by default per explicit request) — same
 // session-only convention as rotMs above (no localStorage anywhere in /nrr).
+// v_pulselist (2026-08-18): default view flipped from the rotating signage
+// board to a plain full list — Bush's explicit ask ("ไม่ต้องหมุนๆ วนๆ...ขอเป็น
+// list ที่ผมตื่นมาแล้วกวาดตาดูได้ทุกเช้า"). Signage mode is kept intact (real TV
+// kiosk use-case still needs it) behind a mode toggle, just no longer default.
+// Session-only, same no-localStorage convention as every other Pulse control.
 var nrrPulseState = { sceneIdx: 0, rotIdx: 0, model: null, rotMs: NRR_PULSE_ROT_MS, activeScenes: [], tvMode: false,
-  sceneToggles: { wins: true, month: true, skus: false, risk: true } };
+  mode: 'list', sceneToggles: { wins: true, month: true, skus: false, risk: true } };
 var NRR_PULSE_SCENE_LABELS = [['wins', 'ชนะวันนี้'], ['month', 'เดือนนี้'], ['skus', 'SKU ใหม่'], ['risk', 'ต้องดูแล']];
+var NRR_PULSE_MODE_CHOICES = [['list', 'รายการ'], ['signage', 'หมุนฉาก']];
 var _nrrPulseRotTimer = null;
 var _nrrPulseRefreshTimer = null;
 var _nrrPulseSceneSubTimer = null;   // faster internal list-cycling WHILE a list-heavy scene (skus/risk) is showing
@@ -404,6 +410,17 @@ window.nrrPulseModel = nrrPulseModel;
 // /nrr yet, and the user explicitly doesn't want this persisted), hidden
 // once fullscreen via the same .nrr-pulse-fs-active class the fs button
 // already toggles (a real TV screen shouldn't show interactive chrome).
+// v_pulselist: the primary switch — list (default, full sweep, no rotation)
+// vs signage (the original rotating full-screen TV board). Always shown
+// (unlike rot/scene-toggle controls, which hide once genuinely fullscreen —
+// see .nrr-pulse-fs-active rule in nrr_components.css) so the mode is always
+// reachable even mid-fullscreen.
+function _nrrPulseModeControlHtml() {
+  return '<div class="nrr-pulse-mode-ctrl"><span class="nrr-pulse-rot-lbl">รูปแบบ</span>' +
+    _nrrCoSegHtml('nrr-pulse-mode-seg', nrrPulseState.mode, NRR_PULSE_MODE_CHOICES, 'pulsemode') +
+    '</div>';
+}
+
 function _nrrPulseRotControlHtml() {
   return '<div class="nrr-pulse-rot-ctrl"><span class="nrr-pulse-rot-lbl">ความเร็วหมุน</span>' +
     _nrrCoSegHtml('nrr-pulse-rot-seg', String(nrrPulseState.rotMs), NRR_PULSE_ROT_CHOICES, 'rotms') +
@@ -434,8 +451,9 @@ function _nrrPulseDatelineHtml(m) {
     '<div><div class="nrr-pulse-dateline-main">เช้าวัน' + dow + ' · ' + nrrEsc(dateTh) + '</div>' +
     '<div class="nrr-pulse-dateline-sub">ภาพรวม portfolio · ข้อมูลถึงเมื่อวาน · อัปเดต ' + upd + '</div></div>' +
     '<div class="nrr-pulse-dateline-controls">' +
+    _nrrPulseModeControlHtml() +
     _nrrPulseSceneToggleHtml() +
-    _nrrPulseRotControlHtml() +
+    (nrrPulseState.mode === 'signage' ? _nrrPulseRotControlHtml() : '') +
     '<button type="button" class="nrr-pulse-fs-btn" id="nrr-pulse-fs-btn">' +
     (nrrPulseState.tvMode ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)') + '</button>' +
     '</div>' +
@@ -467,8 +485,9 @@ function _nrrPulseSetTvMode(on) {
   if (btn) btn.textContent = on ? '⤡ ออกจากเต็มจอ' : '⤢ เปิดเต็มจอ (สำหรับจอทีวี)';
   // v56/v65: re-show the current scene immediately so any layout-dependent
   // sizing updates the instant TV mode toggles, not just on the next
-  // rotation tick.
-  if (nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
+  // rotation tick. v_pulselist: only meaningful in signage mode — list mode
+  // has no single "active scene" concept, every section is already visible.
+  if (nrrPulseState.mode === 'signage' && nrrPulseState.model && nrrPulseState.activeScenes.length) _nrrPulseShowScene(nrrPulseState.sceneIdx);
   if (on) _nrrPulseFitToScreen();
   else { _nrrPulseClearFitCorrection(); _nrrPulseMaybeShowFitNote(false); }
 }
@@ -495,7 +514,12 @@ function _nrrPulseSetTvMode(on) {
 var NRR_PULSE_FIT_TOLERANCE = 0.04; // ignore <4% mismatches -- ordinary browser noise, not worth a transform
 function _nrrPulseFitToScreen() {
   try {
-    if (!nrrPulseState.tvMode) return;
+    // v_pulselist: this empirical scale-correction assumes the WHOLE board
+    // fits within one non-scrolling screen (the signage design's whole
+    // premise) — list mode is a normal scrollable page, so getBoundingClientRect()
+    // would measure the full scrollable content height, not the viewport,
+    // and the sx/sy math below would be comparing against the wrong basis.
+    if (!nrrPulseState.tvMode || nrrPulseState.mode !== 'signage') return;
     var page = document.querySelector('.nrr-pulse-page');
     if (!page) return;
     // Clear any prior correction before measuring -- repeated calls (resize,
@@ -777,6 +801,66 @@ function _nrrPulseSceneRiskHtml(m) {
     '</div>';
 }
 
+// ── List mode (v_pulselist 2026-08-18) ──────────────────────────────────────
+// Same four blocks as the signage scenes above, but ALL shown at once,
+// stacked in one scrollable page — no rotation, no per-scene cap, no
+// sub-rotation window. Reuses the exact same row-rendering helpers
+// (_nrrPulseSpotlightRowsHtml/_nrrPulseSkuRowsHtml/_nrrPulseRiskRowsHtml)
+// with max=Infinity so _nrrPulseWindow's own "items.length <= max" check
+// always returns the FULL list untouched, in original rank order — a KAM
+// scrolling this page sees literally everything, not just the top N that
+// used to be all that fit on a single TV glance.
+function _nrrPulseListWinsHtml(m) {
+  var rowsHtml = _nrrPulseSpotlightRowsHtml(m.todayItems, Infinity, 'todayGmv', '— ยังไม่มีร้านใหม่วันนี้ —');
+  return '<div class="nrr-pulse-list-section" data-section="wins">' +
+    '<div class="nrr-pulse-list-section-head">' +
+    '<span class="nrr-pulse-list-section-title">ร้านใหม่วันนี้</span>' +
+    '<span class="nrr-pulse-list-section-tally">' + m.todayCount + ' ร้าน · ' + nrrFmtGMV(m.todayGmv) + '</span>' +
+    '</div>' +
+    '<div class="nrr-pulse-list-rows">' + rowsHtml + '</div>' +
+    '</div>';
+}
+function _nrrPulseListMonthHtml(m) {
+  var rowsHtml = _nrrPulseSpotlightRowsHtml(m.monthItems, Infinity, 'gmv', '— ยังไม่มีร้านใหม่เดือนนี้ —');
+  return '<div class="nrr-pulse-list-section" data-section="month">' +
+    '<div class="nrr-pulse-list-section-head">' +
+    '<span class="nrr-pulse-list-section-title">ร้านใหม่สะสมเดือนนี้</span>' +
+    '<span class="nrr-pulse-list-section-tally">' + m.newStoreCount + ' ร้าน · ' + nrrFmtGMV(m.newStoreGmv) + '</span>' +
+    '</div>' +
+    '<div class="nrr-pulse-list-rows">' + rowsHtml + '</div>' +
+    '</div>';
+}
+function _nrrPulseListSkusHtml(m) {
+  var body;
+  if (!m.newSkuItems.length) {
+    body = '<div class="nrr-pulse-list-section-caption">จำนวน SKU ที่ร้านต่างๆ ซื้อเพิ่มเดือนนี้ (นับรวมทั้ง portfolio): +' + m.newSkuAdded.toLocaleString() + '</div>';
+  } else {
+    body = '<div class="nrr-pulse-list-section-caption">สินค้าที่ Freshket ขายได้เป็นครั้งแรกเดือนนี้ — ไม่เคยมีร้านไหนซื้อมาก่อนเลย</div>' +
+      '<div class="nrr-pulse-list-rows">' + _nrrPulseSkuRowsHtml(m.newSkuItems, Infinity) + '</div>';
+  }
+  return '<div class="nrr-pulse-list-section nrr-pulse-list-section-skus" data-section="skus">' +
+    '<div class="nrr-pulse-list-section-head">' +
+    '<span class="nrr-pulse-list-section-title">สินค้าใหม่ที่ขายได้</span>' +
+    (m.newSkuItems.length ? '<span class="nrr-pulse-list-section-tally">' + m.newSkuCount + ' SKU · ' + nrrFmtGMV(m.newSkuGmv) + '</span>' : '') +
+    '</div>' + body + '</div>';
+}
+function _nrrPulseListRiskHtml(m) {
+  return '<div class="nrr-pulse-list-section nrr-pulse-list-section-risk" data-section="risk">' +
+    '<div class="nrr-pulse-list-section-head">' +
+    '<span class="nrr-pulse-list-section-title">ต้องดูแล — เงียบ / ยอดตก</span>' +
+    '<span class="nrr-pulse-list-section-tally">' + m.dangerCount + ' ร้าน · −' + nrrFmtGMV(m.riskTotal) + '</span>' +
+    '</div>' +
+    '<div class="nrr-pulse-list-section-caption">ยอดวิ่ง (run-rate) ต่ำกว่าฐานไตรมาส (มิ.ย.) หรือหยุดสั่งซื้อไปแล้ว</div>' +
+    '<div class="nrr-pulse-list-rows">' + _nrrPulseRiskRowsHtml(m.risk, Infinity) + '</div>' +
+    '</div>';
+}
+var _NRR_PULSE_LIST_HTML_BY_KEY = { wins: _nrrPulseListWinsHtml, month: _nrrPulseListMonthHtml, skus: _nrrPulseListSkusHtml, risk: _nrrPulseListRiskHtml };
+function _nrrPulseRenderListBoard(m, scenes) {
+  return '<div class="nrr-pulse-list-board">' +
+    scenes.map(function (key) { return _NRR_PULSE_LIST_HTML_BY_KEY[key](m); }).join('') +
+    '</div>';
+}
+
 // Show exactly one scene (fade via the .active class in CSS), fill its list
 // if it has one, arm/disarm the faster internal sub-rotation accordingly, and
 // re-trigger the count-up animation on that scene's own number(s) each time
@@ -871,21 +955,46 @@ function _nrrPulseRender() {
   }
   var scenes = _nrrPulseActiveScenes(m);
   nrrPulseState.activeScenes = scenes;
-  // keep showing "the same moment" across a data refresh where possible,
-  // clamped in case the previous scene got dropped for being empty now.
-  var keepIdx = Math.min(nrrPulseState.sceneIdx, scenes.length - 1);
-  var sceneHtmlByKey = { wins: _nrrPulseSceneWinsHtml, month: _nrrPulseSceneMonthHtml, skus: _nrrPulseSceneSkusHtml, risk: _nrrPulseSceneRiskHtml };
-  var sceneAreaHtml = scenes.map(function (key) { return sceneHtmlByKey[key](m); }).join('');
+  var isList = nrrPulseState.mode === 'list';
+  var boardAreaHtml;
+  if (isList) {
+    // v_pulselist: every active section stacked at once, full uncapped
+    // lists, normal page scroll — see _nrrPulseRenderListBoard.
+    boardAreaHtml = _nrrPulseRenderListBoard(m, scenes);
+  } else {
+    // keep showing "the same moment" across a data refresh where possible,
+    // clamped in case the previous scene got dropped for being empty now.
+    var sceneHtmlByKey = { wins: _nrrPulseSceneWinsHtml, month: _nrrPulseSceneMonthHtml, skus: _nrrPulseSceneSkusHtml, risk: _nrrPulseSceneRiskHtml };
+    var sceneAreaHtml = scenes.map(function (key) { return sceneHtmlByKey[key](m); }).join('');
+    boardAreaHtml = '<div class="nrr-pulse-scene-area" id="nrr-pulse-scene-area">' + sceneAreaHtml + '</div>';
+  }
   page.innerHTML =
-    '<div class="nrr-pulseboard">' +
+    '<div class="nrr-pulseboard' + (isList ? ' nrr-pulse-list-mode' : '') + '">' +
     _nrrPulseDatelineHtml(m) +
     (typeof nrrStalePortviewBannerHtml === 'function' ? nrrStalePortviewBannerHtml() : '') +
     (typeof nrrStaleBulkHistoryBannerHtml === 'function' ? nrrStaleBulkHistoryBannerHtml() : '') +
-    '<div class="nrr-pulse-scene-area" id="nrr-pulse-scene-area">' + sceneAreaHtml + '</div>' +
+    boardAreaHtml +
     '</div>';
-  _nrrPulseShowScene(keepIdx < 0 ? 0 : keepIdx);
+  if (!isList) {
+    var keepIdx = Math.min(nrrPulseState.sceneIdx, scenes.length - 1);
+    _nrrPulseShowScene(keepIdx < 0 ? 0 : keepIdx);
+  }
   var fsBtn = document.getElementById('nrr-pulse-fs-btn');
   if (fsBtn) fsBtn.addEventListener('click', _nrrPulseToggleFullscreen);
+  var modeSeg = document.getElementById('nrr-pulse-mode-seg');
+  if (modeSeg) modeSeg.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-pulsemode]');
+    if (!btn) return;
+    var mode = btn.dataset.pulsemode;
+    if (!mode || mode === nrrPulseState.mode) return;
+    nrrPulseState.mode = mode;
+    nrrPulseState.sceneIdx = 0;
+    nrrPulseState.rotIdx = 0;
+    // full re-render (not just a class toggle) — the two modes build
+    // entirely different DOM shapes (rotating single-scene vs stacked list).
+    _nrrPulseArmTimers();
+    _nrrPulseRender();
+  });
   var rotSeg = document.getElementById('nrr-pulse-rot-seg');
   if (rotSeg) rotSeg.addEventListener('click', function (e) {
     var btn = e.target.closest('button[data-rotms]');
@@ -923,10 +1032,15 @@ function _nrrPulseRender() {
 // leaks when the user (or a wall TV kiosk) navigates away.
 function _nrrPulseArmTimers() {
   _nrrPulseClearTimers();
-  _nrrPulseRotTimer = setInterval(function () {
-    if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
-    _nrrPulseShowScene(nrrPulseState.sceneIdx + 1);
-  }, nrrPulseState.rotMs);
+  // v_pulselist: scene-to-scene rotation only makes sense in signage mode —
+  // list mode shows every section at once, nothing to "advance" to. Data
+  // refresh keeps running either way (the whole point is fresh numbers).
+  if (nrrPulseState.mode === 'signage') {
+    _nrrPulseRotTimer = setInterval(function () {
+      if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
+      _nrrPulseShowScene(nrrPulseState.sceneIdx + 1);
+    }, nrrPulseState.rotMs);
+  }
   _nrrPulseRefreshTimer = setInterval(function () {
     if (!nrrCurrentRoute || nrrCurrentRoute.view !== 'pulse') { _nrrPulseClearTimers(); return; }
     Promise.all([
