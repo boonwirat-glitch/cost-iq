@@ -46,7 +46,11 @@ check('ไม่มี GEMINI_API_KEY ก็ยังทำงานได้ (�
 
 console.log('\n── 2. Gemini ล้ม = ต้องตกไป Whisper งานห้ามค้าง ──');
 check('มี try/catch ครอบเส้น Gemini แล้วปล่อยให้ t เป็น null',
-  /catch \(e\) \{[\s\S]{0,2500}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
+  // v_hiccupbudget (2026-08-19): cap widened 2500->4200 — the new hiccup-budget
+  // comment block + listen_state patch pushed "Gemini ล้ม..." further from
+  // "catch (e) {" (measured distance ~3911 chars); same false-regression class
+  // as every prior harness regex touched by a nearby source edit this project.
+  /catch \(e\) \{[\s\S]{0,4200}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
 // v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอย — เมื่องบ Gemini
 // เอง (LISTEN_MAX_ATTEMPTS) หมดจริงถึงปิดถาวร ส่วน hiccup ชั่วคราวปล่อยให้ tick
 // ถัดไปลองซ้ำ ไม่แตะ general attempts (เพดานแค่ 4) เพื่อไม่ให้ blip ที่ไม่เกี่ยวกับ
@@ -54,8 +58,23 @@ check('มี try/catch ครอบเส้น Gemini แล้วปล่อ
 check('needs_gemini: งบ Gemini หมดจริงถึงปิดถาวร (ไม่ผ่าน classifyFailure ที่จะเดาผิด)',
   /const genuinelyExhausted = \/ไม่จบใน \\d\+ รอบ\//.test(STAGE1) &&
   /pipeline_stage: 'failed_audio', processing_since: null, next_attempt_at: null/.test(STAGE1));
-check('needs_gemini: hiccup ชั่วคราวไม่แตะ general attempts — แค่ปล่อย claim ให้ tick ถัดไป',
-  /hiccup ชั่วคราวรายหน้าต่าง[\s\S]{0,500}processing_since: null \}\)\.catch/.test(STAGE1));
+// v_hiccupbudget (2026-08-19): a hiccup with no Whisper fallback for this
+// session (forcedGemini) used to release the claim WITHOUT ever persisting
+// listen_state.attempts — since runListenStep's own exhaustion throw only
+// fires off the PERSISTED attempts count, a window that hiccups the same
+// way every tick (not a 524, so never hits the timeout-split save() either)
+// could loop forever: LISTEN_MAX_ATTEMPTS never actually triggered because
+// the counter it reads never moved. Confirmed live: a real session sat at
+// listen_state.attempts=5 for 22+ hours while processing_since kept
+// advancing every single cron tick — proof the sweep was retrying it
+// constantly, yet the persisted attempt count never budged once. Fixed by
+// bumping+persisting listen_state.attempts on every hiccup too, so repeated
+// hiccups on the same window genuinely count toward the cap and the session
+// eventually reaches a real terminal state instead of silent forever-retry.
+check('needs_gemini: hiccup ยังไม่แตะ general (ci_sessions) attempts แต่ต้องขยับ listen_state.attempts จริง',
+  /hiccupAttempts = \(\(row\.listen_state[\s\S]{0,300}\+ 1;/.test(STAGE1) &&
+  /listen_state: \{ \.\.\.\(row\.listen_state \|\| \{\}\), attempts: hiccupAttempts/.test(STAGE1) &&
+  !/hiccup ชั่วคราวรายหน้าต่าง[\s\S]{0,900}ci_sessions\.attempts \+\+/.test(STAGE1));
 check('ล้างสถานะระหว่างทางทิ้งก่อนส่งต่อให้ Whisper (ไม่งั้นค้างครึ่งๆ)',
   /listen_state: null \}\)\.catch/.test(STAGE1));
 check('t เป็น null เมื่อไหร่ = เรียก Whisper เสมอ',

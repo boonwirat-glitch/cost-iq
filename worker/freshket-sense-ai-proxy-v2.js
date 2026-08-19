@@ -1778,8 +1778,27 @@ async function processSession(sessionId, origin, env) {
             // hiccup ชั่วคราวรายหน้าต่าง (เช่น 500 ของ Gemini ครั้งเดียว) — ปล่อย claim
             // ให้ tick ถัดไปลองซ้ำหน้าต่างเดิม (file_uri/windows ที่เสร็จแล้วยังอยู่ครบ
             // ไม่เสียความคืบหน้า) โดยไม่แตะ general attempts เลย
-            console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว — ลอง tick ถัดไป: ${e?.message || e}`);
-            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null }).catch(() => {});
+            //
+            // v_hiccupbudget (2026-08-19): เดิมจุดนี้ไม่เคยเขียน listen_state.attempts
+            // เลย — ตัวเลขนี้ถูกอัปเดตเฉพาะตอน runListenStep ไปถึง save() ของมันเอง
+            // (อัปโหลดไฟล์เสร็จ/ถอดจบหน้าต่าง/หมดเวลาแล้วผ่าครึ่ง) ถ้า error ที่โดน catch
+            // ตรงนี้ไม่ใช่ 524 (เช่น Gemini ตอบ 500/ตอบมาอ่านไม่ออกซ้ำๆ ที่หน้าต่างเดียวกัน)
+            // จะ throw ตรงจาก _listenCall/runListenStep โดยไม่แตะ listen_state เลย —
+            // attempts ที่เก็บใน DB เลยแช่นิ่งตลอดกาล ทำให้ genuinelyExhausted (เช็คจาก
+            // ข้อความ "ไม่จบใน N รอบ" ที่ runListenStep โยนก็ต่อเมื่อ st.attempts>20)
+            // ไม่มีทางถูก trigger เลย — วนซ้ำหน้าต่างเดิม hiccup ไปเรื่อยๆ ไม่จบไม่สิ้น
+            // ไม่มีใครเห็น ไม่มีที่ไหนบันทึก (เจอจริงจาก session ของ Tape ที่ค้าง 22+ ชม.
+            // แม้ cron จะ claim ใหม่ทุก tick — processing_since ขยับทุก 5 นาทีจริง แต่
+            // listen_state.attempts ไม่ขยับเลยสักครั้งเดียว) แก้โดยนับ attempt นี้เข้าไป
+            // ในงบจริง แม้จะยังไม่ใช่ progress ก็ตาม — ให้ hiccup ที่เกิดซ้ำๆ ที่หน้าต่าง
+            // เดิมในที่สุดชนเพดาน LISTEN_MAX_ATTEMPTS แล้วจบแบบเห็นได้ (failed_audio)
+            // แทนที่จะค้างเงียบตลอดกาล
+            const hiccupAttempts = ((row.listen_state && row.listen_state.attempts) || 0) + 1;
+            console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว (ครั้งที่ ${hiccupAttempts}/${LISTEN_MAX_ATTEMPTS}) — ลอง tick ถัดไป: ${e?.message || e}`);
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+              processing_since: null,
+              listen_state: { ...(row.listen_state || {}), attempts: hiccupAttempts, updated_at: new Date().toISOString() }
+            }).catch(() => {});
             return;
           }
           // Gemini ไปต่อไม่ได้จริงๆ → ล้างสถานะทิ้งแล้วให้ Whisper รับช่วง
