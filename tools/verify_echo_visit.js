@@ -631,6 +631,57 @@ check('query ล้มเหลว = คืน null เงียบๆ (เช�
   /async function _checkRecentDuplicateCheckin[\s\S]{0,600}catch \(_\) \{ return null; \}/.test(ci) &&
   /async function _checkLocationMismatch[\s\S]{0,900}catch \(_\) \{ return null; \}/.test(ci));
 
+// v_deadcapture (2026-08-20): 5 จาก 20 การอัดยาวได้ไฟล์แทบว่าง (25%) โดยนาฬิกา
+// บนจอยังนับครบ · ต้นเหตุ: _recorder.stop() เคยมีแค่ใน stopRecording()/cancel()
+// แต่ open() รีเซ็ต _phase='idle' แล้วเรียก _unmount() ที่ไม่เคยหยุด recorder เลย
+// → ตัวอัดเก่าค้างจับไมค์ → กดอัดใหม่ได้ตัวอัดซ้อนสองตัว แล้วตัวจริงตายเงียบๆ
+// ข้อพวกนี้ล็อกไว้ไม่ให้ "ทางออกที่ไม่ปิดไมค์" กลับมาอีก
+console.log('\n── 9. v_deadcapture: ปิดไมค์สนิททุกทางออก + รายงานสาเหตุตรงความจริง ──');
+check('มี _teardownRecorder ทางออกเดียวที่ปิด recorder/track/audioCtx/wakelock ครบ',
+  /function _teardownRecorder\(reason, opts\)/.test(ci) &&
+  /r\.stream\?\.getTracks\(\)\.forEach/.test(ci) &&
+  /_releaseWakeLock\(\);/.test(ci));
+check('idempotent: เคลียร์ _recorder = null ก่อนเรียก stop() (กันเข้าซ้อน/เรียกซ้ำ)',
+  (() => {
+    const i = ci.indexOf('function _teardownRecorder(reason, opts)');
+    if (i < 0) return false;
+    const iNull = ci.indexOf('_recorder = null;', i);
+    const iStop = ci.indexOf('r.stop();', i);
+    return iNull > -1 && iStop > iNull;
+  })());
+check('_unmount() ปิดไมค์ "ก่อน" early-return (นี่คือเส้นที่ open() ใช้)',
+  (() => {
+    const i = ci.indexOf('function _unmount()');
+    if (i < 0) return false;
+    const iTear = ci.indexOf('_teardownRecorder(', i);
+    const iRet  = ci.indexOf('if (!el) return;', i);
+    return iTear > -1 && iRet > iTear;
+  })());
+check('stopRecording() ส่ง keepOnStop:true — การกดหยุดเองต้องยิง pipeline ต่อ',
+  /_teardownRecorder\('user-stop', \{ keepOnStop: true \}\)/.test(ci));
+check('cancel() ไม่ส่ง keepOnStop — ยกเลิกแล้วห้ามยิง pipeline',
+  /_teardownRecorder\('cancel'\)/.test(ci));
+check('startRecording() ปิดไมค์ที่ค้างก่อนขอ getUserMedia ใหม่เสมอ',
+  /if \(_recorder\) _teardownRecorder\('stale-before-start'\)/.test(ci));
+check('visibility guard ใช้ teardown ตัวเดียวกัน (ไม่หยุด track เองแบบเดิม)',
+  /_teardownRecorder\('os-stopped', \{ keepOnStop: true \}\)/.test(ci));
+check('จำ _recMime ไว้ เพราะ _recorder ถูกเคลียร์ก่อน _onStop จะอ่าน mimeType',
+  /let _recMime\s+= '';/.test(ci) &&
+  /_recMime\s+= _recorder\.mimeType \|\| mime \|\| 'audio\/webm';/.test(ci) &&
+  /new Blob\(_chunks, \{ type: _recorder\?\.mimeType \|\| _recMime \|\| 'audio\/webm' \}\)/.test(ci));
+check('เลข "ได้เสียงกี่นาที" คิดจากขนาดไฟล์จริง ไม่ใช่บิตเรตที่สั่ง (เคยเกินจริง ~49%)',
+  /const REC_REAL_BYTES_PER_SEC = 6800;/.test(ci) &&
+  /gotMins = Math\.round\(blobSize \/ REC_REAL_BYTES_PER_SEC \/ 60\)/.test(ci));
+check('ข้อความเลิกบอกว่า "ไฟล์ถูกตัด" และเลิกโทษ rep เรื่องล็อกจอ',
+  (() => {
+    // ต้องตัดบรรทัดคอมเมนต์ทิ้งก่อน — คอมเมนต์ v_deadcapture อ้างถึงข้อความเก่า
+    // แบบใส่เครื่องหมายคำพูดไว้อธิบายว่าเอาอะไรออก ถ้าเทียบทั้งไฟล์จะจับตัวเองพลาด
+    const code = ci.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+    return /ไมค์ไม่ได้รับเสียงตลอดการอัด/.test(code) &&
+           !/ครั้งหน้าลองไม่ล็อกจอ/.test(code) &&
+           !/ไฟล์เสียงไม่สมบูรณ์/.test(code);
+  })());
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

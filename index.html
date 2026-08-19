@@ -1,4 +1,4 @@
-<!-- Freshket Sense v265: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v266: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1338,7 +1338,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v265',
+      version: 'v266',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51046,6 +51046,10 @@ const CI = (() => {
   let _showPicker  = false; // show account picker section in record screen // 'kam' | 'sales'
   let _floatTimer  = null; // minimize timer ref
   let _audioCtx    = null; // AudioContext keep-alive — prevents iOS from suspending audio session
+  // v_deadcapture (2026-08-20): จำ mimeType ไว้ต่างหาก เพราะ _teardownRecorder()
+  // เคลียร์ _recorder เป็น null ก่อน _onStop() จะได้อ่าน — ไม่งั้น blob จะกลาย
+  // เป็น 'audio/webm' เปล่าแทนที่จะเป็นค่าจริงที่ _bestMime() เลือกไว้
+  let _recMime     = '';
   let _sessionId   = null; // ci_sessions UUID after save
   let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // today|week|month|quarter|all — ใช้ร่วมทุก role
@@ -51523,6 +51527,10 @@ body:not(.echo-active) { background:unset; }
   }
 
   function _unmount() {
+    // v_deadcapture (2026-08-20): ต้องอยู่ "ก่อน" early-return ข้างล่าง เพราะถ้า
+    // sheet ถูกถอดไปแล้ว recorder ก็ยังค้างจับไมค์อยู่ได้ · open() เรียก _unmount()
+    // อยู่แล้ว จุดนี้จึงครอบเส้นที่ทำให้เกิดตัวอัดซ้อนได้ทั้งหมดในที่เดียว
+    _teardownRecorder('unmount');
     const el = document.getElementById('ci-fullsheet');
     if (!el) return;
     el.classList.remove('ci-open');
@@ -52032,6 +52040,10 @@ body:not(.echo-active) { background:unset; }
     document.body.classList.add('echo-active');
     if (_phase !== 'idle' || _startRecBusy) return;
     _startRecBusy = true;
+    // v_deadcapture (2026-08-20): กันชั้นสุดท้าย — ถ้ายังมี recorder ค้างจากเส้นทาง
+    // ที่คาดไม่ถึง ต้องปิดไมค์ให้สนิทก่อนขอ getUserMedia ใหม่เสมอ ไม่งั้นได้ตัวอัด
+    // สองตัวแย่งไมค์กันแล้วตัวจริงตายเงียบๆ ตลอดทั้ง visit
+    if (_recorder) _teardownRecorder('stale-before-start');
     // RECORD-HANG-DIAG: getUserMedia() has zero telemetry today — if it truly
     // hangs (mic held by another process, browser deadlock) the promise never
     // settles and the catch block below never runs, leaving no trace at all.
@@ -52074,6 +52086,7 @@ body:not(.echo-active) { background:unset; }
       // แต่สองคนคนละระยะในห้องมีเสียงรบกวนคือสัญญาณที่ซับซ้อนกว่ามาก 48k ยังนับว่า
       // ประหยัด (80 นาที ≈ 29MB) และเป็นตัวแปรที่ถูกที่สุดที่ยังไม่เคยลองขยับเลย
       _recorder    = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), audioBitsPerSecond: 48000 });
+      _recMime     = _recorder.mimeType || mime || 'audio/webm';   // v_deadcapture
       _chunks      = [];
       _secs        = 0;
       _recorder.ondataavailable = e => { if (e.data?.size > 0) { _chunks.push(e.data); _idbPutChunk(e.data); } };
@@ -52135,13 +52148,10 @@ body:not(.echo-active) { background:unset; }
 
   function stopRecording() {
     if (_phase !== 'recording' || !_recorder) return;
-    clearInterval(_timerRef);
     _durText = _fmt(_secs);
-    _recorder.stop();
-    _recorder.stream.getTracks().forEach(t => t.stop());
-    // Close AudioContext keep-alive
-    try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
-    _releaseWakeLock(); // v587
+    // v_deadcapture: keepOnStop — นี่คือการหยุดที่ตั้งใจ ต้องปล่อยให้ onstop ยิง
+    // _onStop() ต่อไปตามเดิม (teardown จัดการ timer/track/audioCtx/wakelock ให้ครบ)
+    _teardownRecorder('user-stop', { keepOnStop: true });
     // Restore white theme before proc/result screens
     _phase = 'processing';
     _applyRecordingTheme(false);
@@ -52157,19 +52167,55 @@ body:not(.echo-active) { background:unset; }
     // Reset CI fullsheet display if minimized
     const sheet = document.getElementById('ci-fullsheet');
     if (sheet) sheet.style.display = '';
-    clearInterval(_timerRef);
-    if (_recorder && _phase === 'recording') {
-      _recorder.stop();
-      _recorder.stream?.getTracks().forEach(t => t.stop());
-    }
-    // Close AudioContext keep-alive
-    try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
-    _releaseWakeLock(); // v587
+    // v_deadcapture: ยกเลิกแล้วห้ามยิง pipeline — teardown ถอด onstop ให้เอง
+    // (ของเดิมเรียก _recorder.stop() ทั้งที่ onstop ยังผูกอยู่ แล้วรอดมาได้เพราะ
+    //  _chunks ถูกล้างทันก่อน onstop จะยิง — บังเอิญ ไม่ใช่ตั้งใจ)
+    _teardownRecorder('cancel');
     _phase = 'idle';
     _applyRecordingTheme(false);
-    _recorder = null; _chunks = [];
+    _chunks = [];
     _idbClear(); // ยกเลิกโดยตั้งใจ — ไม่ต้องกู้
     _unmount();
+  }
+
+  // ── v_deadcapture (2026-08-20): ปิดไมค์ให้สนิท ทุกทางออก ───────────────────
+  //
+  // บั๊กจริงที่ทำให้ 5 จาก 20 การอัดยาวได้ไฟล์แทบว่างเปล่า (25% · วันที่ 19 ส.ค.
+  // พัง 4 จาก 9) โดยนาฬิกาบนจอยังนับครบ 40-70 นาทีเหมือนปกติ:
+  //   _recorder.stop() เคยมีแค่ใน stopRecording() กับ cancel() เท่านั้น
+  //   แต่ open() รีเซ็ต _phase='idle' แล้วเรียก _unmount() ซึ่งไม่เคยสั่งหยุด
+  //   recorder หรือ track เลย → ตัวอัดเก่าค้างจับไมค์ไว้เงียบๆ → พอกดอัดใหม่
+  //   ด่าน _phase !== 'idle' ก็ผ่านฉลุย เกิด MediaRecorder สองตัวแย่งไมค์ตัวเดียว
+  //   (iOS ทำให้ตัวหนึ่งตาย) แถม _chunks = [] ยังล้างเสียงที่อัดไว้ทิ้งอีก
+  // หลักฐาน production: KAM เช็คอิน 06:11 (ไม่มีการอัดจบ) แล้วเช็คอินร้านเดิมซ้ำ
+  // 06:39 → session ที่สองอัด 72 นาที ได้ไฟล์ 44KB (ปกติต้อง ~5,150-8,910 B/วิ)
+  //
+  // ตัวนี้คือทางออกเดียวที่ทุกเส้นต้องเรียก · idempotent เรียกซ้ำได้ไม่พัง
+  // เจตนา: ไม่แตะ _chunks / IndexedDB เลย — ปล่อยให้ _checkRecoverBuffer() เดิม
+  // เสนอกู้เสียงคืนได้ถ้าออกจากหน้าไปกลางคัน (ส่วน cancel() ที่ตั้งใจทิ้ง
+  // จะเรียก _idbClear() ของมันเองอยู่แล้ว)
+  function _teardownRecorder(reason, opts) {
+    const keepOnStop = !!(opts && opts.keepOnStop);
+    clearInterval(_timerRef); _timerRef = null;
+    const r = _recorder;
+    _recorder = null;               // null ก่อนเรียก stop() — กันเข้าซ้อน/เรียกซ้ำ
+    if (r) {
+      try {
+        // ปิดเพราะออกจากหน้า (open/_unmount) ห้ามให้ onstop ยิง pipeline ซ้ำ
+        // ส่วนการกดหยุดเองต้องปล่อยให้ยิง จึงส่ง keepOnStop:true มา
+        if (!keepOnStop) r.onstop = null;
+        if (r.state !== 'inactive') r.stop();
+      } catch(_) {}
+      try {
+        r.stream?.getTracks().forEach(t => {
+          try { t.onmute = t.onunmute = t.onended = null; } catch(_) {}
+          t.stop();
+        });
+      } catch(_) {}
+    }
+    try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+    _releaseWakeLock();
+    if (r && reason) console.log('[CI rec] teardown:', reason);
   }
 
   // ── Processing steps ───────────────────────────────────────────────────────
@@ -52206,7 +52252,9 @@ body:not(.echo-active) { background:unset; }
 
   // ── Audio → Gemini analyze (single call) ──────────────────────────────────
   async function _onStop() {
-    const blob = new Blob(_chunks, { type: _recorder?.mimeType || 'audio/webm' });
+    // v_deadcapture: _recorder ถูก teardown เคลียร์เป็น null ไปแล้วตอนมาถึงนี่
+    // จึงต้องอ่าน mime จาก _recMime ที่จำไว้ตอนสร้าง ไม่งั้น type จะเพี้ยน
+    const blob = new Blob(_chunks, { type: _recorder?.mimeType || _recMime || 'audio/webm' });
     _chunks = [];
 
     // Guard: ถ้า audio เล็กเกินไปหรือ record น้อยกว่า 5 วินาที ยังไม่มีเสียงพอให้วิเคราะห์
@@ -52251,12 +52299,18 @@ body:not(.echo-active) { background:unset; }
   // เกณฑ์ fatal 0.15 มาจากข้อมูลจริง: ไฟล์ดีอยู่ที่ 0.25-0.51 MB/นาที
   // ไฟล์พังอยู่ที่ 0.0011-0.02 MB/นาที — ห่างกัน 25 เท่า ตัดตรงกลางได้สบาย
   const REC_BYTES_PER_SEC = 48000 / 8;   // ต้องตรงกับ audioBitsPerSecond ตอนอัด
+  // v_deadcapture (2026-08-20): ค่าบนคือ "บิตเรตที่สั่ง" ไม่ใช่ขนาดไฟล์จริงต่อวินาที
+  // วัดจาก production 20 ไฟล์: ของดีอยู่ที่ 5,150-8,910 B/วิ (มี container overhead
+  // ทับอยู่) ค่ากลาง ~6,800 · การใช้ 6,000 คำนวณ "ได้เสียงกี่นาที" ทำให้รายงานเกิน
+  // จริงได้ถึง ~49% จึงแยกค่าคงที่ออกมาเฉพาะสำหรับเลขที่โชว์ให้คนอ่าน
+  // ส่วน ratio ยังคิดบนค่าเดิม เพราะเกณฑ์ 0.15 จับไฟล์พังได้ครบทุกใบอยู่แล้ว
+  const REC_REAL_BYTES_PER_SEC = 6800;
   function _audioLooksTruncated(blobSize, secs) {
     if (!secs || secs < 60) return null;               // สั้นเกินกว่าจะตัดสิน
     const expected = secs * REC_BYTES_PER_SEC;
     if (expected <= 0) return null;
     const ratio = blobSize / expected;
-    const gotMins = Math.round(blobSize / REC_BYTES_PER_SEC / 60);
+    const gotMins = Math.round(blobSize / REC_REAL_BYTES_PER_SEC / 60);
     if (ratio < 0.15) return { fatal: true,  ratio, gotMins };   // ใช้งานไม่ได้จริง
     if (ratio < 0.7)  return { fatal: false, ratio, gotMins };   // ขาดบางช่วง
     return null;
@@ -52348,8 +52402,12 @@ body:not(.echo-active) { background:unset; }
       const _trunc = _audioLooksTruncated(blob.size, ctx.secs);
       const _dead  = !!(_trunc && _trunc.fatal);
       const _stage = _dead ? 'failed_audio' : 'uploaded';
+      // v_deadcapture (2026-08-20): ของเดิมเขียนว่า "ไฟล์เสียงไม่สมบูรณ์" ซึ่งชี้ไป
+      // ทางไฟล์ถูกตัด/อัปโหลดไม่ครบ — ผิดทาง และทำให้ไล่สาเหตุผิดอยู่หลายรอบ
+      // ความจริงคือไมค์ไม่ได้ส่งเสียงเข้ามาเลยตั้งแต่ต้น (ตัวอัดค้าง/ถูก iOS ตัด)
+      // เขียนใหม่ให้ตรงกับสิ่งที่เกิดจริง และบอก rep ว่า visit ยังนับให้ตามปกติ
       const _deadNote = _dead
-        ? `${nowIso} [client] ไฟล์เสียงไม่สมบูรณ์ — ได้เสียงจริง ~${_trunc.gotMins} นาที จากการอัด ${Math.round(ctx.secs / 60)} นาที`
+        ? `${nowIso} [client] ไมค์ไม่ได้รับเสียงตลอดการอัด ${Math.round(ctx.secs / 60)} นาที (ได้ข้อมูลเสียงเกือบเป็นศูนย์ ~${_trunc.gotMins} นาที) — visit นับปกติ แต่วิเคราะห์ไม่ได้`
         : null;
       if (rowId) {
         const { error } = await supa.from('ci_sessions')
@@ -52387,10 +52445,13 @@ body:not(.echo-active) { background:unset; }
           _checkinCache = null;
           try { localStorage.removeItem('ci_checkin_cache'); } catch(_) {}
         }
-        _setStep('บันทึก visit แล้ว', 'แต่ไฟล์เสียงไม่สมบูรณ์ — วิเคราะห์ไม่ได้', 100);
+        // v_deadcapture (2026-08-20): ของเดิมบอก rep ว่า "ครั้งหน้าลองไม่ล็อกจอ" —
+        // โยนความผิดให้คนใช้ทั้งที่ต้นเหตุจริงคือ recorder ค้างในโค้ดเรา (ดู
+        // _teardownRecorder) · เอาคำแนะนำที่ทำอะไรไม่ได้ออก เหลือแต่ความจริง
+        _setStep('บันทึก visit แล้ว', 'แต่ไมค์ไม่ได้รับเสียง — วิเคราะห์ไม่ได้', 100);
         setTimeout(() => {
           _unmount();
-          _toast('เสียงที่อัดได้จริงมีแค่ ~' + _trunc.gotMins + ' นาที — visit นับปกติ แต่วิเคราะห์ไม่ได้ ครั้งหน้าลองไม่ล็อกจอ');
+          _toast('ไมค์ไม่ได้รับเสียงตลอดการอัด — visit นับปกติ แต่วิเคราะห์ไม่ได้');
         }, 2400);
         return;
       }
@@ -55955,10 +56016,10 @@ ${confBanner}
       // v555: MediaRecorder ถูก OS หยุด — กู้ chunks ที่มีไปวิเคราะห์ทันที
       // เช็ค _chunks.length กัน double-run (ถ้า onstop เคย fire แล้ว chunks ถูกเคลียร์)
       if (_recorder && _recorder.state === 'inactive' && _chunks.length > 0) {
-        clearInterval(_timerRef);
         _durText = _fmt(_secs);
-        try { _recorder.stream?.getTracks().forEach(t => t.stop()); } catch(_) {}
-        try { if (_audioCtx) { _audioCtx.close(); _audioCtx = null; } } catch(_) {}
+        // v_deadcapture: keepOnStop — ด้านล่างเรียก _onStop() เองอยู่แล้ว และ
+        // recorder ตัวนี้ state==='inactive' อยู่แล้ว stop() จึงไม่ยิงซ้ำ
+        _teardownRecorder('os-stopped', { keepOnStop: true });
         _phase = 'processing';
         _applyRecordingTheme(false);
         _showScreen('ci-s-proc');
