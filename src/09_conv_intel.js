@@ -45,6 +45,24 @@ const CI = (() => {
   // เคลียร์ _recorder เป็น null ก่อน _onStop() จะได้อ่าน — ไม่งั้น blob จะกลาย
   // เป็น 'audio/webm' เปล่าแทนที่จะเป็นค่าจริงที่ _bestMime() เลือกไว้
   let _recMime     = '';
+  // ── v_recwatch (2026-08-20): เฝ้าระวังสดระหว่างอัด ─────────────────────────
+  // รอบก่อนพลาดเพราะ "เดา" พฤติกรรม encoder จึงวัดจริงก่อนตั้งค่าทุกตัว:
+  //   สตรีมที่ไม่มีเสียงเลย → 12 วิ ได้ chunk เดียว ขนาด 0 ไบต์  = 0 B/วิ
+  //   สตรีมที่มีเสียงจริง   → 12 วิ ได้ 13 chunk รวม 78,677 ไบต์ = 6,556 B/วิ
+  // (ตรงกับ production ที่ไฟล์ดีอยู่ 5,150-8,910 B/วิ)
+  // สรุป: ไมค์ตาย = "chunk หยุดส่ง" ไม่ใช่ "ส่ง chunk เงียบๆ ต่อไป" → ใช้ช่วงห่าง
+  // ของ chunk เป็นสัญญาณหลัก ซึ่งชัดกว่าและ false-positive ยากกว่าการวัดบิตเรต
+  // ห้องเงียบจริงเข้าเงื่อนไขนี้ไม่ได้ เพราะไมค์จริงเก็บเสียงแวดล้อมตลอดเวลา
+  // (เราปิด noiseSuppression ไว้ตั้งแต่ v_echor3 เสียงแวดล้อมจึงไม่ถูกกรองทิ้ง)
+  const REC_WATCH_TICK_MS   = 5000;    // เช็คทุก 5 วิ
+  const REC_WATCH_START_SEC = 45;      // เผื่อไมค์อุ่นเครื่อง ยังไม่ตัดสินก่อนถึงเวลานี้
+  const REC_WATCH_WINDOW_MS = 30000;   // ดูย้อนหลัง 30 วิ
+  const REC_DEAD_BPS        = 1500;    // ต่ำกว่านี้ = ตาย (ห่างจากไฟล์ดีที่แย่สุด 3.4 เท่า)
+  const REC_NO_CHUNK_MS     = 10000;   // ไม่มี chunk ที่มีเนื้อเลย 10 วิ = ตาย
+  const REC_MUTE_GRACE_MS   = 5000;    // track.muted ชั่ววูบ (สลับ route) ไม่นับว่าตาย
+  let _recBytes = 0, _recLastDataAt = 0, _recZeroChunks = 0;
+  let _recSamples = [], _recWatchRef = null, _recDeadFired = false;
+  let _recMuteTimer = null, _audioKeepSrc = null;
   let _sessionId   = null; // ci_sessions UUID after save
   let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // today|week|month|quarter|all — ใช้ร่วมทุก role
@@ -692,6 +710,21 @@ body:not(.echo-active) { background:unset; }
          19-48 นาทีเหลือ 24-54KB) ข้อความนี้ต้องเตือนไว้ก่อนตั้งแต่เริ่มอัด ไม่ใช่
          บอกทีหลังตอนเจอไฟล์ขาดไปแล้ว -->
     <div class="timer-hint" id="ci-rec-hint">เปิดหน้าจอทิ้งไว้ระหว่างคุย · ถ้าจอล็อกเสียงอาจขาดหาย</div>
+    <!-- v_recwatch (2026-08-20): แถบเตือน "ไมค์ไม่ได้รับเสียง" — ต้องค้างไว้ ไม่ใช่
+         toast ที่หายเอง เพราะจุดตายของบั๊กนี้คือ rep ไม่มีทางรู้เลยจนสาย -->
+    <div id="ci-rec-dead" style="display:none;margin-top:6px;padding:12px 14px;border-radius:12px;
+         background:rgba(255,59,48,.14);border:0.5px solid rgba(255,59,48,.5);max-width:330px;text-align:center">
+      <div style="font-size:var(--text-md);font-weight:var(--fw-semi);color:#FF6B60">ไมค์ไม่ได้รับเสียง</div>
+      <div id="ci-rec-dead-sub" style="font-size:var(--text-sm);color:rgba(255,255,255,.6);margin-top:3px"></div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+        <button onclick="CI.stopRecording()" style="padding:8px 16px;border:0;border-radius:100px;
+                background:#FF3B30;color:#fff;font-size:var(--text-sm);font-weight:var(--fw-semi);
+                font-family:'Noto Sans Thai',sans-serif;cursor:pointer">จบ &amp; วิเคราะห์เท่าที่ได้</button>
+        <button onclick="CI._recDismissDead()" style="padding:8px 14px;border:0.5px solid rgba(255,255,255,.3);
+                border-radius:100px;background:transparent;color:rgba(255,255,255,.7);
+                font-size:var(--text-sm);font-family:'Noto Sans Thai',sans-serif;cursor:pointer">อัดต่อ</button>
+      </div>
+    </div>
   </div>
   <!-- stop + cancel buttons — only during recording -->
   <div id="ci-rec-bottom" style="display:none;padding:0 24px 40px">
@@ -1084,7 +1117,27 @@ body:not(.echo-active) { background:unset; }
       _recMime     = _recorder.mimeType || mime || 'audio/webm';   // v_deadcapture
       _chunks      = [];
       _secs        = 0;
-      _recorder.ondataavailable = e => { if (e.data?.size > 0) { _chunks.push(e.data); _idbPutChunk(e.data); } };
+      // v_recwatch: ต้องนับ "ทุก" chunk รวมขนาด 0 ก่อนถึงตัวกรอง — ของเดิมทิ้ง chunk
+      // ขนาด 0 เงียบๆ ทำให้ระบบแยกไม่ออกเลยว่า "ห้องเงียบ" หรือ "ไมค์ตายไปแล้ว"
+      _recorder.ondataavailable = e => {
+        const sz = (e.data && e.data.size) || 0;
+        _recBytes += sz;
+        if (sz > 0) { _recLastDataAt = Date.now(); _chunks.push(e.data); _idbPutChunk(e.data); }
+        else { _recZeroChunks++; }
+      };
+      // v_recwatch: สัญญาณตรงจาก OS — เชื่อถือได้กว่าการวัดบิตเรต ใช้เป็นด่านแรก
+      _recorder.onerror = ev => _onDeadCapture('recorder-error:' + ((ev && ev.error && ev.error.name) || 'unknown'));
+      try {
+        stream.getAudioTracks().forEach(t => {
+          t.onended  = () => _onDeadCapture('track-ended');
+          t.onmute   = () => {
+            // mute ชั่ววูบตอนสลับ route (เสียบหูฟัง/ตัดสาย) เกิดได้ปกติ ไม่ใช่ตาย
+            clearTimeout(_recMuteTimer);
+            _recMuteTimer = setTimeout(() => { if (t.muted) _onDeadCapture('track-muted'); }, REC_MUTE_GRACE_MS);
+          };
+          t.onunmute = () => { clearTimeout(_recMuteTimer); _recMuteTimer = null; };
+        });
+      } catch(_) {}
       _recorder.onstop = _onStop;
       // v555: เคลียร์ buffer เก่า + เขียน meta ก่อนเริ่ม — กู้คืนได้ถ้าแอพถูก kill
       try { await _idbClear(); } catch(_) {}
@@ -1099,14 +1152,26 @@ body:not(.echo-active) { background:unset; }
       // v_echog1: retry เช็คอินที่ค้างในเครื่อง (จุดกดเช็คอินเน็ตอาจหลุด) —
       // idempotent: มี session_id แล้วจะข้ามเอง · fire-and-forget ไม่บล็อกการอัด
       _syncCheckinToDb().catch(() => {});
-      // AudioContext keep-alive — iOS audio session keep-alive
-      // NOTE: do NOT connect stream to AudioContext (createMediaStreamSource corrupts MediaRecorder signal)
-      // Just having AudioContext in 'running' state is sufficient for iOS keep-alive
+      // ── v_recwatch (2026-08-20): keep-alive ตัวจริง ──────────────────────────
+      // ของเดิมสร้าง AudioContext เปล่าๆ แล้วเขียนคอมเมนต์ว่า "แค่ state เป็น running
+      // ก็พอสำหรับ iOS" — ไม่จริง context ที่ไม่ได้ render อะไรเลยจะถูก iOS พักทันที
+      // การป้องกันที่เราคิดว่ามีมาตลอดจึงไม่เคยมีอยู่จริงสักครั้ง
+      // ต้องให้มัน "เล่น" อะไรสักอย่างจริงๆ ถึงจะยึด audio session ไว้ได้ — ใช้บัฟเฟอร์
+      // ที่เป็นศูนย์ล้วนวนลูป: เงียบสนิท 100% เป็นไปไม่ได้ที่จะดังออกลำโพงหรือย้อน
+      // เข้าไมค์ตัวเอง (ปลอดภัยกว่า oscillator ที่ต้องพึ่งการหรี่ gain)
+      // ⚠ ห้ามใช้ createMediaStreamSource เด็ดขาด — คำเตือนเดิมยังคงมีผล ว่าเคยทำให้
+      // สัญญาณที่ MediaRecorder อัดได้เพี้ยน · ตรงนี้ไม่ได้แตะสตรีมไมค์เลย
       try {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // Resume in case browser suspended it (iOS requires user gesture)
+        const _buf = _audioCtx.createBuffer(1, _audioCtx.sampleRate, _audioCtx.sampleRate);
+        _audioKeepSrc = _audioCtx.createBufferSource();
+        _audioKeepSrc.buffer = _buf;          // ศูนย์ล้วน = ไม่มีเสียงออกจริง
+        _audioKeepSrc.loop   = true;
+        _audioKeepSrc.connect(_audioCtx.destination);
+        _audioKeepSrc.start();
         if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
       } catch(_) {}
+      _startRecWatchdog();
 
       // UI — dark mode transition (silent recording feel)
       _applyRecordingTheme(true);
@@ -1189,9 +1254,76 @@ body:not(.echo-active) { background:unset; }
   // เจตนา: ไม่แตะ _chunks / IndexedDB เลย — ปล่อยให้ _checkRecoverBuffer() เดิม
   // เสนอกู้เสียงคืนได้ถ้าออกจากหน้าไปกลางคัน (ส่วน cancel() ที่ตั้งใจทิ้ง
   // จะเรียก _idbClear() ของมันเองอยู่แล้ว)
+  // ── v_recwatch (2026-08-20): จับ "อัดอยู่แต่ไม่ได้เสียง" ให้ได้ใน ~45 วิ ────
+  // เดิมรู้ตัวตอนกดหยุดเท่านั้น = เสีย visit ทั้ง 40-70 นาทีโดยไม่มีใครรู้
+  function _startRecWatchdog() {
+    clearInterval(_recWatchRef);
+    // ซ่อนแถบเตือนของรอบก่อน ไม่งั้นค้างมาหลอกว่าอัดรอบใหม่ก็พังอีก
+    const box = document.getElementById('ci-rec-dead');
+    if (box) box.style.display = 'none';
+    _recBytes = 0; _recZeroChunks = 0; _recDeadFired = false;
+    _recLastDataAt = Date.now();
+    _recSamples = [{ t: Date.now(), b: 0 }];
+    _recWatchRef = setInterval(_recWatchTick, REC_WATCH_TICK_MS);
+  }
+
+  function _recWatchTick() {
+    if (_phase !== 'recording' || !_recorder) return;
+    // iOS พัก AudioContext เองได้ตลอดเวลา — ปลุกกลับทุกรอบ (ของเดิมสร้างแล้วไม่เคยเช็คซ้ำ)
+    try { if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume().catch(() => {}); } catch(_) {}
+    const now = Date.now();
+    _recSamples.push({ t: now, b: _recBytes });
+    while (_recSamples.length > 2 && now - _recSamples[0].t > REC_WATCH_WINDOW_MS + REC_WATCH_TICK_MS) {
+      _recSamples.shift();
+    }
+    if (_recDeadFired) return;
+    if ((now - _startTime) / 1000 < REC_WATCH_START_SEC) return;
+    // ด่านหลัก: chunk หยุดส่ง (ชัดที่สุดตามที่วัดมา — ดู REC_NO_CHUNK_MS)
+    if (now - _recLastDataAt > REC_NO_CHUNK_MS) { _onDeadCapture('no-chunk'); return; }
+    // ด่านรอง: ยังส่ง chunk อยู่แต่เนื้อแทบไม่มี (เผื่อ encoder บางรุ่นไม่หยุดส่ง)
+    const oldest = _recSamples[0];
+    const dt = (now - oldest.t) / 1000;
+    if (dt >= REC_WATCH_WINDOW_MS / 1000) {
+      const bps = (_recBytes - oldest.b) / dt;
+      if (bps < REC_DEAD_BPS) _onDeadCapture('low-bitrate:' + Math.round(bps) + 'Bps');
+    }
+  }
+
+  function _onDeadCapture(reason) {
+    if (_recDeadFired || _phase !== 'recording') return;
+    _recDeadFired = true;
+    console.warn('[CI rec] dead capture:', reason, { secs: _secs, bytes: _recBytes, zeroChunks: _recZeroChunks });
+    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch(_) {}
+    const box = document.getElementById('ci-rec-dead');
+    if (box) box.style.display = 'block';
+    const sub = document.getElementById('ci-rec-dead-sub');
+    if (sub) sub.textContent = 'ตรวจพบตอน ' + _fmt(_secs) + ' · เสียงช่วงก่อนหน้ายังอยู่ครบ';
+    // ส่งขึ้น telemetry เพื่อให้เห็นของจริงหลังปล่อย ว่ายังเหลือเส้นทางไหนอีกไหม
+    try {
+      if (window.SenseSentinel && typeof window.SenseSentinel.report === 'function') {
+        window.SenseSentinel.report('echo_dead_capture',
+          reason + ' | secs=' + _secs + ' | bytes=' + _recBytes + ' | zeroChunks=' + _recZeroChunks);
+      }
+    } catch(_) {}
+  }
+
+  // ปิดแถบเตือนแต่ยังอัดต่อ — เผื่อไมค์กลับมาเอง (เช่น วางสายแล้ว route คืน)
+  function _recDismissDead() {
+    const box = document.getElementById('ci-rec-dead');
+    if (box) box.style.display = 'none';
+    // ปลดล็อกให้เตือนได้อีกถ้ายังไม่ฟื้นจริง — แต่ต้องรอครบหน้าต่างใหม่ก่อน
+    _recDeadFired = false;
+    _recLastDataAt = Date.now();
+    _recSamples = [{ t: Date.now(), b: _recBytes }];
+  }
+
   function _teardownRecorder(reason, opts) {
     const keepOnStop = !!(opts && opts.keepOnStop);
     clearInterval(_timerRef); _timerRef = null;
+    clearInterval(_recWatchRef); _recWatchRef = null;
+    clearTimeout(_recMuteTimer); _recMuteTimer = null;
+    try { if (_audioKeepSrc) { _audioKeepSrc.stop(); _audioKeepSrc.disconnect(); } } catch(_) {}
+    _audioKeepSrc = null;
     const r = _recorder;
     _recorder = null;               // null ก่อนเรียก stop() — กันเข้าซ้อน/เรียกซ้ำ
     if (r) {
@@ -5415,7 +5547,7 @@ ${confBanner}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _retryCheckinSyncNow, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
+  return { open, startRecording, stopRecording, cancel, _recDismissDead, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _retryCheckinSyncNow, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
 
 })();
 

@@ -682,6 +682,55 @@ check('ข้อความเลิกบอกว่า "ไฟล์ถู�
            !/ไฟล์เสียงไม่สมบูรณ์/.test(code);
   })());
 
+// v_recwatch (2026-08-20): จับ "อัดอยู่แต่ไม่ได้เสียง" ระหว่างอัด ไม่ใช่ตอนกดหยุด
+// ค่าคงที่ทุกตัวมาจากการวัดจริงบนเบราว์เซอร์ (สตรีมเงียบ = 0 B/วิ + chunk หยุดส่ง,
+// สตรีมมีเสียง = 6,556 B/วิ) ห้ามแก้เป็นค่าที่ "เดาว่าน่าจะพอ" โดยไม่วัดใหม่
+console.log('\n── 10. v_recwatch: watchdog + แถบเตือน + keep-alive ตัวจริง ──');
+check('ค่าคงที่ watchdog ครบและตรงกับที่วัดมา',
+  /REC_WATCH_START_SEC = 45/.test(ci) && /REC_WATCH_WINDOW_MS = 30000/.test(ci) &&
+  /REC_DEAD_BPS\s+= 1500/.test(ci) && /REC_NO_CHUNK_MS\s+= 10000/.test(ci));
+check('ondataavailable นับทุก chunk "ก่อน" ตัวกรอง size > 0 (ไม่งั้นแยกเงียบ/ตายไม่ออก)',
+  (() => {
+    const i = ci.indexOf('_recorder.ondataavailable = e => {');
+    if (i < 0) return false;
+    const seg = ci.slice(i, i + 420);
+    return seg.indexOf('_recBytes += sz;') > -1 &&
+           seg.indexOf('_recBytes += sz;') < seg.indexOf('if (sz > 0)');
+  })());
+check('ด่านหลักคือ chunk หยุดส่ง (สัญญาณที่วัดแล้วชัดที่สุด)',
+  /if \(now - _recLastDataAt > REC_NO_CHUNK_MS\) \{ _onDeadCapture\('no-chunk'\); return; \}/.test(ci));
+check('ด่านรองวัดบิตเรตในหน้าต่างย้อนหลัง ไม่ใช่ค่าเฉลี่ยทั้ง session',
+  /const bps = \(_recBytes - oldest\.b\) \/ dt;/.test(ci) &&
+  /if \(bps < REC_DEAD_BPS\) _onDeadCapture/.test(ci));
+check('ยังไม่ตัดสินก่อน 45 วิ (กัน false positive ตอนไมค์อุ่นเครื่อง)',
+  /if \(\(now - _startTime\) \/ 1000 < REC_WATCH_START_SEC\) return;/.test(ci));
+check('ฟังสัญญาณตรงจาก OS: track.onended / onmute (มี grace) / onunmute / recorder.onerror',
+  /t\.onended\s+= \(\) => _onDeadCapture\('track-ended'\)/.test(ci) &&
+  /setTimeout\(\(\) => \{ if \(t\.muted\) _onDeadCapture\('track-muted'\); \}, REC_MUTE_GRACE_MS\)/.test(ci) &&
+  /t\.onunmute = \(\) => \{ clearTimeout\(_recMuteTimer\)/.test(ci) &&
+  /_recorder\.onerror = ev => _onDeadCapture\('recorder-error:'/.test(ci));
+check('เตือนแล้วไม่สแปม (sticky) แต่กด "อัดต่อ" แล้วยังเตือนซ้ำได้ถ้ายังไม่ฟื้น',
+  /if \(_recDeadFired \|\| _phase !== 'recording'\) return;\s*\n\s*_recDeadFired = true;/.test(ci) &&
+  /function _recDismissDead\(\)[\s\S]{0,400}_recDeadFired = false;/.test(ci));
+check('แถบเตือนค้างบนจอ + สั่นเครื่อง + ส่ง telemetry (ไม่ใช่ toast ที่หายเอง)',
+  /id="ci-rec-dead"/.test(ci) && /navigator\.vibrate\(\[200, 100, 200\]\)/.test(ci) &&
+  /SenseSentinel\.report\('echo_dead_capture'/.test(ci));
+check('keep-alive เล่นบัฟเฟอร์ศูนย์ล้วนวนลูปจริง ไม่ใช่ context เปล่าแบบเดิม',
+  /_audioKeepSrc\.buffer = _buf;/.test(ci) && /_audioKeepSrc\.loop\s+= true;/.test(ci) &&
+  /_audioKeepSrc\.connect\(_audioCtx\.destination\);/.test(ci) && /_audioKeepSrc\.start\(\);/.test(ci));
+check('watchdog ปลุก AudioContext ที่ถูก iOS พักกลับมาทุกรอบ',
+  /if \(_audioCtx && _audioCtx\.state !== 'running'\) _audioCtx\.resume\(\)/.test(ci));
+check('teardown เก็บกวาด watchdog + keep-alive + mute timer ครบ (ไม่รั่วข้ามรอบอัด)',
+  (() => {
+    const i = ci.indexOf('function _teardownRecorder(reason, opts)');
+    if (i < 0) return false;
+    const seg = ci.slice(i, i + 900);
+    return /clearInterval\(_recWatchRef\)/.test(seg) && /clearTimeout\(_recMuteTimer\)/.test(seg) &&
+           /_audioKeepSrc\.stop\(\)/.test(seg);
+  })());
+check('ห้ามกลับไปใช้ createMediaStreamSource กับสตรีมไมค์ (เคยทำสัญญาณเพี้ยน)',
+  !/createMediaStreamSource/.test(ci.split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n')));
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
