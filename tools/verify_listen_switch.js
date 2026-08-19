@@ -46,11 +46,11 @@ check('ไม่มี GEMINI_API_KEY ก็ยังทำงานได้ (�
 
 console.log('\n── 2. Gemini ล้ม = ต้องตกไป Whisper งานห้ามค้าง ──');
 check('มี try/catch ครอบเส้น Gemini แล้วปล่อยให้ t เป็น null',
-  // v_hiccupbudget (2026-08-19): cap widened 2500->4200 — the new hiccup-budget
-  // comment block + listen_state patch pushed "Gemini ล้ม..." further from
-  // "catch (e) {" (measured distance ~3911 chars); same false-regression class
-  // as every prior harness regex touched by a nearby source edit this project.
-  /catch \(e\) \{[\s\S]{0,4200}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
+  // v_hiccupvisibility (2026-08-19): cap widened again 4200->6000 (2nd widening
+  // in 2 commits — v_hiccupbudget already bumped 2500->4200, then adding
+  // last_error persistence pushed it to ~4500) — generous headroom this time
+  // since this exact regex has now regressed twice from small nearby edits.
+  /catch \(e\) \{[\s\S]{0,6000}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
 // v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอย — เมื่องบ Gemini
 // เอง (LISTEN_MAX_ATTEMPTS) หมดจริงถึงปิดถาวร ส่วน hiccup ชั่วคราวปล่อยให้ tick
 // ถัดไปลองซ้ำ ไม่แตะ general attempts (เพดานแค่ 4) เพื่อไม่ให้ blip ที่ไม่เกี่ยวกับ

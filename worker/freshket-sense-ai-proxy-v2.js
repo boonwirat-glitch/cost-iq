@@ -1803,10 +1803,17 @@ async function processSession(sessionId, origin, env) {
             // เดิมในที่สุดชนเพดาน LISTEN_MAX_ATTEMPTS แล้วจบแบบเห็นได้ (failed_audio)
             // แทนที่จะค้างเงียบตลอดกาล
             const hiccupAttempts = ((row.listen_state && row.listen_state.attempts) || 0) + 1;
-            console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว (ครั้งที่ ${hiccupAttempts}/${LISTEN_MAX_ATTEMPTS}) — ลอง tick ถัดไป: ${e?.message || e}`);
+            // v_hiccupvisibility (2026-08-19): console.warn alone is only visible via
+            // live `wrangler tail` — which failed to capture ANY output across 4
+            // separate attempts this session (cron-triggered AND HTTP-triggered),
+            // a real tooling gap on this account/setup, not an event-type issue.
+            // Persisting the actual error text here means a hiccup's cause is
+            // queryable straight from ci_sessions afterward — no live tail needed.
+            const hiccupMsg = String((e && e.message) || e).slice(0, 300);
+            console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว (ครั้งที่ ${hiccupAttempts}/${LISTEN_MAX_ATTEMPTS}) — ลอง tick ถัดไป: ${hiccupMsg}`);
             await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
               processing_since: null,
-              listen_state: { ...(row.listen_state || {}), attempts: hiccupAttempts, updated_at: new Date().toISOString() }
+              listen_state: { ...(row.listen_state || {}), attempts: hiccupAttempts, last_error: hiccupMsg, updated_at: new Date().toISOString() }
             }).catch(() => {});
             return;
           }
