@@ -652,8 +652,19 @@ check('มี _teardownRecorder ทางออกเดียวที่ปิ
 // เลิกยิง pipeline เงียบๆ โดยเช็คอื่นทั้งหมดยังเขียว = บั๊กที่หมวดนี้ตั้งใจกันพอดี
 check('teardown ถอด onstop เฉพาะตอนไม่ใช่การกดหยุดเอง (กลับเงื่อนไข = pipeline ตายเงียบ)',
   /if \(!keepOnStop\) r\.onstop = null;/.test(_tearBody));
-check('_unmount ไม่ฆ่าไมค์ของ "งานใหม่" ตอน pipeline ของงานเก่าจบ',
-  /if \(_phase !== 'recording'\) _teardownRecorder\('unmount'\);/.test(ci));
+// เคยแก้ผิดสองรอบตรงนี้: teardown ใน _unmount() แบบไม่มีเงื่อนไข แล้วเปลี่ยนเป็นกัน
+// ด้วย _phase ซึ่งก็ยังกันไม่ได้ เพราะเส้น pipeline เบื้องหลังตั้ง _phase='idle' ไว้
+// ก่อนเรียก _unmount() อยู่แล้ว · สรุป: _unmount ต้องไม่แตะ recorder เลย
+check('_unmount ไม่แตะ recorder เลย (ไม่งั้น pipeline งานเก่าฆ่าไมค์งานใหม่)',
+  (() => {
+    const i = ci.indexOf('function _unmount()');
+    if (i < 0) return false;
+    const body = ci.slice(i, i + 1600);
+    const code = body.split('\n').filter(l => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+    return !/_teardownRecorder\(/.test(code);
+  })());
+check('open() สั่งปิดไมค์เอง (จุดเดียวที่ตั้งใจทิ้งการอัดที่ค้างอยู่)',
+  /function open\(accountGuid\) \{[\s\S]{0,600}_teardownRecorder\('open-account'\);/.test(ci));
 check('ขอไมค์ได้แล้วแต่ตั้ง recorder ไม่สำเร็จ ต้องปิดสตรีมทิ้ง (ไม่งั้นไมค์ค้างแบบเดิม)',
   /_pendingStream = await navigator\.mediaDevices\.getUserMedia/.test(ci) &&
   /_pendingStream\?\.getTracks\(\)\.forEach\(t => t\.stop\(\)\)/.test(ci));
@@ -681,14 +692,8 @@ check('idempotent: เคลียร์ _recorder = null ก่อนเรี�
     const iStop = ci.indexOf('r.stop();', i);
     return iNull > -1 && iStop > iNull;
   })());
-check('_unmount() ปิดไมค์ "ก่อน" early-return (นี่คือเส้นที่ open() ใช้)',
-  (() => {
-    const i = ci.indexOf('function _unmount()');
-    if (i < 0) return false;
-    const iTear = ci.indexOf('_teardownRecorder(', i);
-    const iRet  = ci.indexOf('if (!el) return;', i);
-    return iTear > -1 && iRet > iTear;
-  })());
+// (เดิมข้อนี้ล็อกว่า _unmount() ต้องปิดไมค์ก่อน early-return — ดีไซน์นั้นผิดและถูก
+//  ยกเลิกแล้ว ดูข้อ "_unmount ไม่แตะ recorder เลย" ข้างล่างแทน)
 check('stopRecording() ส่ง keepOnStop:true — การกดหยุดเองต้องยิง pipeline ต่อ',
   /_teardownRecorder\('user-stop', \{ keepOnStop: true \}\)/.test(ci));
 check('cancel() ไม่ส่ง keepOnStop — ยกเลิกแล้วห้ามยิง pipeline',
@@ -782,8 +787,8 @@ check('index.html ที่ส่งจริง build มาจาก src ล�
     const built = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
     const markers = [
       'function _teardownRecorder(reason, opts)',
-      "if (_phase !== 'recording') _teardownRecorder('unmount');",
-      "if (document.visibilityState === 'hidden') return;",
+      "_teardownRecorder('open-account');",
+      'const _tickGap = now - (_recLastTickAt || now);',
       'const REC_KEEPALIVE_ENABLED = false;',
       'REC_DEAD_COOLDOWN_MS = 120000',
       '_pendingStream = await navigator.mediaDevices.getUserMedia'

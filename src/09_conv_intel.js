@@ -549,13 +549,15 @@ body:not(.echo-active) { background:unset; }
     // sheet ถูกถอดไปแล้ว recorder ก็ยังค้างจับไมค์อยู่ได้ · open() เรียก _unmount()
     // อยู่แล้ว จุดนี้จึงครอบเส้นที่ทำให้เกิดตัวอัดซ้อนได้ทั้งหมดในที่เดียว
     //
-    // v_recwatch (2026-08-20) — กันพลาดที่รีวิวจับได้: _unmount() ยังถูกเรียกจาก
-    // "เส้น pipeline ที่ทำงานอยู่เบื้องหลัง" ด้วย (_onStop ไฟล์เล็ก / no_speech /
-    // catch ตอน pipeline ล้ม) ซึ่งอาจจบลงตอนที่ rep เริ่มอัดร้าน "ถัดไป" ไปแล้ว
-    // ถ้าไม่กันไว้ งานเก่าที่ล้มจะไปฆ่าไมค์ของงานใหม่กลางประโยค — กลายเป็นบั๊ก
-    // เดียวกับที่เพิ่งแก้ไปแต่คนละทาง · ตอน open() นั้น _phase ถูกตั้งเป็น 'idle'
-    // ไปแล้วก่อนเรียก _unmount() เส้นที่ต้องการแก้จริงจึงยังทำงานครบเหมือนเดิม
-    if (_phase !== 'recording') _teardownRecorder('unmount');
+    // v_recwatch (2026-08-20) — เคยใส่ teardown ไว้ตรงนี้ ทั้งแบบไม่มีเงื่อนไข และ
+    // แบบกันด้วย `_phase !== 'recording'` · **ผิดทั้งสองแบบ** เอาออกถาวร:
+    //   _unmount() ถูกเรียกจากเส้น pipeline ที่ทำงานอยู่เบื้องหลังด้วย (สำเร็จ /
+    //   ไฟล์เล็ก / no_speech / catch) ซึ่งอาจจบตอน rep เริ่มอัด "ร้านถัดไป" แล้ว
+    //   → จะไปฆ่าไมค์ของงานใหม่กลางประโยค
+    //   และเงื่อนไข _phase ก็กันไม่ได้จริง เพราะทุกเส้นพวกนั้นตั้ง _phase='idle'
+    //   ไว้ "ก่อน" เรียก _unmount() อยู่แล้ว (เช่นเส้นสำเร็จของ _startAsyncPipeline)
+    // การปิดไมค์ต้องสั่งจากจุดที่ "ตั้งใจทิ้งการอัดนั้นจริงๆ" เท่านั้น คือ
+    // open() / cancel() / stopRecording() / visibility guard / ด่านก่อนเริ่มอัดใหม่
     const el = document.getElementById('ci-fullsheet');
     if (!el) return;
     el.classList.remove('ci-open');
@@ -4637,6 +4639,12 @@ ${confBanner}
   }
 
   function open(accountGuid) {
+    // v_recwatch (2026-08-20): จุดเดียวที่ "ตั้งใจทิ้งการอัดที่ค้างอยู่" — rep กดเข้า
+    // ร้านอื่น (หรือร้านเดิม) ระหว่างที่ยังอัดอยู่ · ต้องสั่งปิดไมค์ตรงนี้ ไม่ใช่ฝาก
+    // ไว้กับ _unmount() ข้างล่าง เพราะ _unmount() ถูกใช้ร่วมกับเส้น pipeline
+    // เบื้องหลังที่อาจจบตอน rep กำลังอัดร้านถัดไปอยู่ (ดูคอมเมนต์ใน _unmount)
+    // เสียงที่อัดไว้ไม่ถูกลบ — _mount() จะเรียก _checkRecoverBuffer() เสนอกู้คืนให้
+    _teardownRecorder('open-account');
     // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
     // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row
     // v731: _sessionId belongs to the pipeline — preserve it if pipeline saved a transcript
