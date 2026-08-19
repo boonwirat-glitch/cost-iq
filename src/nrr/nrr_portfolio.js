@@ -172,7 +172,18 @@ function nrrRiskQueue(rows, opts) {
     var runrate = row.runrate_gmv || 0, baseline = pace.baseline_gmv || 0;
     var shortfall = Math.max(0, baseline - runrate);
     var dropPct = Math.max(0, Math.round(100 - pace.pct));
-    var quiet = pace.pct < 50 || (row.churned_gmv || 0) > runrate;
+    // v_quietsplit (2026-08-19): "เงียบ" used to fire off pace.pct<50 OR
+    // churned_gmv>runrate — both are proxies for "in real trouble," NOT for
+    // "literally no purchases." Bush caught this live: บ้านไร่มหาสวัสดิ์ was
+    // tagged "เงียบ" while still spending ฿68K MTD (~฿118K projected, just
+    // 33% of its ฿356K baseline) — checked company-wide, 19 of 50 accounts
+    // in this list (38%) had the same pattern (real, sometimes large, MTD
+    // spend under the old "เงียบ" tag). Bush's call: only a genuine ฿0
+    // this-month account earns "เงียบสนิท"; any real spend, however far
+    // below baseline, gets the same "ต่ำกว่าฐาน X%" treatment as before —
+    // this is a straight activity check (gmv_to_date), not the old pct/churn
+    // proxy, so it can't mislabel an account that's still actually buying.
+    var trulyQuiet = (row.gmv_to_date || 0) === 0;
     var acctName = row.account_name || row.account_id;
     var big = (opts && opts.bigOutletByAcct) ? opts.bigOutletByAcct[row.account_id] : null;
     out.push({
@@ -181,7 +192,7 @@ function nrrRiskQueue(rows, opts) {
       sub: (big && big.name && big.name !== acctName) ? acctName : '',
       kam: row.kam_name || row.kam_email || '',
       risk: shortfall,
-      reason: quiet ? 'เงียบ' : 'ต่ำกว่าฐาน ' + dropPct + '%'
+      reason: trulyQuiet ? 'เงียบสนิท' : 'ต่ำกว่าฐาน ' + dropPct + '%'
     });
   });
   out.sort(function (a, b) { return b.risk - a.risk; });
