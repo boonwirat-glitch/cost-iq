@@ -3935,6 +3935,52 @@ ${confBanner}
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
+  // ── v_falseproof (2026-08-19) — 2 data-integrity gaps Bush caught live: a
+  // rep checked into the same account 3× within ~2hr with no guard at all,
+  // and one of those 3 check-ins' GPS was ~19km from anywhere this same
+  // account had ever been checked into (a genuinely different real place).
+  // Both are soft WARN + confirm, not a hard block (Bush's own call) — a
+  // hard block risks stopping a real "went back for something forgotten"
+  // visit or a large/multi-building account. Query failures return null
+  // (pass through silently) — a broken check must never block a real
+  // check-in, same principle as every other best-effort guard in this file.
+  const CI_DUPE_CHECKIN_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 ชม. (บุชยืนยัน)
+  const CI_LOCATION_MISMATCH_M = 2000; // 2 กม. — ไกลกว่าความคลาดเคลื่อน GPS ปกติมาก
+
+  async function _checkRecentDuplicateCheckin(accountGuid, email) {
+    if (!accountGuid || !email) return null;
+    try {
+      const sinceIso = new Date(Date.now() - CI_DUPE_CHECKIN_WINDOW_MS).toISOString();
+      const { data } = await supa.from('ci_sessions')
+        .select('checked_in_at')
+        .eq('owner_email', email).eq('account_id', accountGuid)
+        .gte('checked_in_at', sinceIso)
+        .order('checked_in_at', { ascending: false }).limit(1);
+      return (data && data[0]) ? data[0].checked_in_at : null;
+    } catch (_) { return null; }
+  }
+
+  // ไม่มีที่อยู่/พิกัดจริงของร้านเก็บไว้ในระบบนี้เลย (เช็คแล้วทั้ง codebase) — แหล่ง
+  // อ้างอิงเดียวที่ทำได้วันนี้โดยไม่ต้องรอ SQL ที่อยู่ร้านจากทีมข้อมูลคือเทียบกับ
+  // "จุดที่เคยเช็คอินร้านนี้มาก่อน" (ทุกคน ไม่ใช่แค่ตัวเอง) เฉลี่ยจาก 5 เช็คอิน
+  // ล่าสุด — บัญชีใหม่ที่ยังไม่มีประวัติคืน null (ไม่มีอะไรให้เทียบ = ปล่อยผ่าน
+  // ไม่ใช่ false positive)
+  async function _checkLocationMismatch(accountGuid, lat, lng) {
+    if (!accountGuid || lat == null || lng == null) return null;
+    try {
+      const { data } = await supa.from('ci_sessions')
+        .select('rep_lat,rep_lng')
+        .eq('account_id', accountGuid)
+        .not('rep_lat', 'is', null).not('rep_lng', 'is', null)
+        .order('checked_in_at', { ascending: false }).limit(5);
+      if (!data || !data.length) return null;
+      const avgLat = data.reduce((s, r) => s + r.rep_lat, 0) / data.length;
+      const avgLng = data.reduce((s, r) => s + r.rep_lng, 0) / data.length;
+      const distM = _haversine(lat, lng, avgLat, avgLng);
+      return distM > CI_LOCATION_MISMATCH_M ? Math.round(distM) : null;
+    } catch (_) { return null; }
+  }
+
   // (v552: duplicate _covisitVerify removed — เหลือตัวเดียวด้านล่าง รองรับทั้ง 2 entry)
 
   function _closeSessionDetail() {
@@ -4441,6 +4487,33 @@ ${confBanner}
         new Promise((_, reject) => setTimeout(() => reject({ code: 'stuck' }), 25000)),
       ]);
       const now = new Date();
+
+      // v_falseproof: ทั้งสองเช็คนี้ต้องทำ "ก่อน" ตั้ง _checkinCache/โชว์ UI สำเร็จ
+      // — ถ้ายกเลิกตรงนี้ต้องไม่มีการค้าง cache/pill/orb ค้างไว้เป็น false success
+      const email = _authEmail();
+      const [dupCheckedInAt, mismatchM] = await Promise.all([
+        _checkRecentDuplicateCheckin(_accountGuid, email),
+        _checkLocationMismatch(_accountGuid, pos.coords.latitude, pos.coords.longitude)
+      ]);
+      if (dupCheckedInAt) {
+        const dupTimeStr = new Date(dupCheckedInAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        if (!confirm('คุณเช็คอินร้านนี้ไปแล้วเมื่อ ' + dupTimeStr + ' (ไม่ถึง 2 ชม.ที่แล้ว)\nยืนยันว่าต้องการเช็คอินซ้ำ?')) {
+          // v_falseproof bugfix (พบระหว่างทดสอบสด): เดิมไม่รีเซ็ต hint กลับ — ค้าง
+          // "กำลังระบุตำแหน่ง..." ตลอดไปทั้งที่ยกเลิกแล้ว ดูเหมือนแอปค้าง
+          if (core) core.classList.remove('orb-snapping');
+          if (hint) hint.textContent = 'กดเพื่อเช็คอิน';
+          return;
+        }
+      }
+      if (mismatchM != null) {
+        const kmStr = (mismatchM / 1000).toFixed(1);
+        if (!confirm('ตำแหน่งที่เช็คอินอยู่ห่างจากที่เคยเช็คอินร้านนี้มาก่อนประมาณ ' + kmStr + ' กม.\nใช่ร้านนี้จริงไหม?')) {
+          if (core) core.classList.remove('orb-snapping');
+          if (hint) hint.textContent = 'กดเพื่อเช็คอิน';
+          return;
+        }
+      }
+
       _checkinCache = {
         rep_lat:       pos.coords.latitude,
         rep_lng:       pos.coords.longitude,

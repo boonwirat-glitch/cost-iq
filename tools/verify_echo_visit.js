@@ -602,6 +602,35 @@ check('worker: หนึ่ง tick ทำหนึ่งขั้นเท่�
   !/\} else \{\s*\n\s*await processSession\(sessionId, null, env\);/.test(worker) &&
   /limit=1/.test(worker));
 
+// v_falseproof (2026-08-19): Bush caught live — same rep checked into the same
+// account 3× within ~2hr with zero guard, and one of those 3 was ~19km from
+// anywhere that same account had ever been checked into before (a genuinely
+// different place). Both are soft warn+confirm, not a hard block (his own
+// call — a real "forgot something, went back" visit or a large/multi-building
+// account shouldn't get silently blocked).
+console.log('\n── 8. v_falseproof: duplicate check-in + location-mismatch warnings ──');
+check('มีเช็ค "เช็คอินร้านเดิมซ้ำภายใน 2 ชม." ก่อนถือว่าเช็คอินสำเร็จ',
+  /CI_DUPE_CHECKIN_WINDOW_MS = 2 \* 60 \* 60 \* 1000/.test(ci) &&
+  /_checkRecentDuplicateCheckin\(_accountGuid, email\)/.test(ci));
+check('มีเช็ค "ตำแหน่งห่างจากที่เคยเช็คอินร้านนี้มาก่อน" (ไม่มีที่อยู่จริงเก็บไว้ในระบบ)',
+  /CI_LOCATION_MISMATCH_M = 2000/.test(ci) &&
+  /_checkLocationMismatch\(_accountGuid, pos\.coords\.latitude, pos\.coords\.longitude\)/.test(ci));
+check('บัญชีที่ยังไม่มีประวัติเช็คอิน = ปล่อยผ่าน ไม่ใช่ false positive',
+  /if \(!data \|\| !data\.length\) return null;/.test(ci));
+check('ทั้งสองเช็คทำก่อนตั้ง _checkinCache/โชว์ UI สำเร็จ (ยกเลิกแล้วต้องไม่ค้าง false success)',
+  (() => {
+    const iChecks = ci.indexOf('_checkRecentDuplicateCheckin(_accountGuid, email)');
+    const iCache = ci.indexOf('_checkinCache = {', iChecks);
+    return iChecks > -1 && iCache > iChecks;
+  })());
+check('ยกเลิกที่เตือน "เช็คอินซ้ำ" → เอา orb-snapping ออก + รีเซ็ต hint + return ทันที',
+  /คุณเช็คอินร้านนี้ไปแล้วเมื่อ[\s\S]{0,450}core\.classList\.remove\('orb-snapping'\);\s*if \(hint\) hint\.textContent = 'กดเพื่อเช็คอิน';\s*return;/.test(ci));
+check('ยกเลิกที่เตือน "ตำแหน่งไม่ตรง" → เอา orb-snapping ออก + รีเซ็ต hint + return ทันที',
+  /ตำแหน่งที่เช็คอินอยู่ห่างจากที่เคยเช็คอินร้านนี้มาก่อน[\s\S]{0,250}core\.classList\.remove\('orb-snapping'\);\s*if \(hint\) hint\.textContent = 'กดเพื่อเช็คอิน';\s*return;/.test(ci));
+check('query ล้มเหลว = คืน null เงียบๆ (เช็คพัง ต้องไม่บล็อกเช็คอินจริง)',
+  /async function _checkRecentDuplicateCheckin[\s\S]{0,600}catch \(_\) \{ return null; \}/.test(ci) &&
+  /async function _checkLocationMismatch[\s\S]{0,900}catch \(_\) \{ return null; \}/.test(ci));
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
