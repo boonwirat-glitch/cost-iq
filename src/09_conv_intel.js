@@ -60,9 +60,14 @@ const CI = (() => {
   const REC_DEAD_BPS        = 1500;    // ต่ำกว่านี้ = ตาย (ห่างจากไฟล์ดีที่แย่สุด 3.4 เท่า)
   const REC_NO_CHUNK_MS     = 10000;   // ไม่มี chunk ที่มีเนื้อเลย 10 วิ = ตาย
   const REC_MUTE_GRACE_MS   = 5000;    // track.muted ชั่ววูบ (สลับ route) ไม่นับว่าตาย
+  const REC_DEAD_COOLDOWN_MS = 120000; // กด "อัดต่อ" แล้วเว้นให้ 2 นาทีก่อนเตือนซ้ำ
+  // ⚠ ยังไม่เปิด — ต้องทดสอบบน iPhone จริงก่อน (เหตุผลเต็มอยู่ตรงจุดที่ใช้งาน)
+  const REC_KEEPALIVE_ENABLED = false;
   let _recBytes = 0, _recLastDataAt = 0, _recZeroChunks = 0;
   let _recSamples = [], _recWatchRef = null, _recDeadFired = false;
-  let _recMuteTimer = null, _audioKeepSrc = null;
+  let _recMuteTimer = null, _audioKeepSrc = null, _recDeadCooldownUntil = 0;
+  let _pendingStream = null;   // สตรีมที่ขอมาแล้วแต่ยังตั้ง recorder ไม่เสร็จ (ดู catch)
+  let _recLastTickAt = 0;      // ใช้จับว่าทิกถูก throttle/พักมา (ดู _recWatchTick)
   let _sessionId   = null; // ci_sessions UUID after save
   let _isOwnRecording = false; // true when TL/Admin records own session — hides Debrief
   let _histFilterMode = 'week'; // today|week|month|quarter|all — ใช้ร่วมทุก role
@@ -543,7 +548,14 @@ body:not(.echo-active) { background:unset; }
     // v_deadcapture (2026-08-20): ต้องอยู่ "ก่อน" early-return ข้างล่าง เพราะถ้า
     // sheet ถูกถอดไปแล้ว recorder ก็ยังค้างจับไมค์อยู่ได้ · open() เรียก _unmount()
     // อยู่แล้ว จุดนี้จึงครอบเส้นที่ทำให้เกิดตัวอัดซ้อนได้ทั้งหมดในที่เดียว
-    _teardownRecorder('unmount');
+    //
+    // v_recwatch (2026-08-20) — กันพลาดที่รีวิวจับได้: _unmount() ยังถูกเรียกจาก
+    // "เส้น pipeline ที่ทำงานอยู่เบื้องหลัง" ด้วย (_onStop ไฟล์เล็ก / no_speech /
+    // catch ตอน pipeline ล้ม) ซึ่งอาจจบลงตอนที่ rep เริ่มอัดร้าน "ถัดไป" ไปแล้ว
+    // ถ้าไม่กันไว้ งานเก่าที่ล้มจะไปฆ่าไมค์ของงานใหม่กลางประโยค — กลายเป็นบั๊ก
+    // เดียวกับที่เพิ่งแก้ไปแต่คนละทาง · ตอน open() นั้น _phase ถูกตั้งเป็น 'idle'
+    // ไปแล้วก่อนเรียก _unmount() เส้นที่ต้องการแก้จริงจึงยังทำงานครบเหมือนเดิม
+    if (_phase !== 'recording') _teardownRecorder('unmount');
     const el = document.getElementById('ci-fullsheet');
     if (!el) return;
     el.classList.remove('ci-open');
@@ -1090,7 +1102,11 @@ body:not(.echo-active) { background:unset; }
       //   autoGainControl  → ดันเสียงรบกวนขึ้นมาตอนไม่มีใครพูด
       //   echoCancellation → ออกแบบมาเพื่อตัดเสียงลำโพงตัวเอง ไม่มีประโยชน์ที่นี่
       // ขอปิดทั้ง 3 ตัว · เบราว์เซอร์ไหนไม่รองรับจะเมินค่าที่ขอไปเฉยๆ ไม่ error
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // v_recwatch (2026-08-20): เก็บ ref ไว้นอก try ด้วย — ถ้าโค้ดหลังจากนี้โยน error
+      // (เช่น new MediaRecorder ไม่รับ mime) สตรีมที่ขอมาแล้วจะค้างจับไมค์ต่อไปเงียบๆ
+      // และ _recorder ยัง null อยู่ ด่าน 'stale-before-start' จึงจับไม่ได้ = ไมค์ค้าง
+      // แบบเดียวกับบั๊กที่เพิ่งแก้ · catch ข้างล่างต้องปิดสตรีมนี้ให้ได้เสมอ
+      _pendingStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -1099,6 +1115,7 @@ body:not(.echo-active) { background:unset; }
           sampleRate:       48000
         }
       });
+      const stream = _pendingStream;
       _gumSettled = true; clearTimeout(_gumWatchdog);
       // บันทึกว่าได้ค่าที่ขอจริงไหม — บางรุ่นเมินเงียบๆ ต้องรู้ตอนไล่คุณภาพเสียง
       try {
@@ -1161,14 +1178,27 @@ body:not(.echo-active) { background:unset; }
       // เข้าไมค์ตัวเอง (ปลอดภัยกว่า oscillator ที่ต้องพึ่งการหรี่ gain)
       // ⚠ ห้ามใช้ createMediaStreamSource เด็ดขาด — คำเตือนเดิมยังคงมีผล ว่าเคยทำให้
       // สัญญาณที่ MediaRecorder อัดได้เพี้ยน · ตรงนี้ไม่ได้แตะสตรีมไมค์เลย
+      //
+      // ⚠ ปิดไว้ก่อน (REC_KEEPALIVE_ENABLED = false) — รีวิวชี้ความเสี่ยงที่ผมยืนยัน
+      // เองไม่ได้จากเครื่องนี้: การต่อ source เข้า destination ทำให้หน้าเว็บกลายเป็น
+      // "ตัวเล่นเสียง" ด้วย ซึ่งบน iOS จะดัน AVAudioSession เป็นโหมด play-and-record
+      // แล้วระบบอาจเปิด voice-processing/echo-cancellation และลด sample rate เหลือ
+      // 16kHz โดยอัตโนมัติ = สวนทางกับที่เราตั้งใจขอ 48kHz + ปิด EC ไว้ตั้งแต่ v_echor3
+      // ผลคืออาจทำ "คุณภาพเสียงของทุกคน" แย่ลง เพื่อแลกกับการกันปัญหาที่ยังพิสูจน์
+      // ไม่ได้ว่าเคยเกิดจริง (ต้นเหตุจริงของ 5 เคสคือ recorder ค้าง ไม่ใช่ iOS พัก
+      // audio session) · ตอนนี้มี watchdog คอยจับให้แล้ว จึงไม่คุ้มเสี่ยงลงทุกเครื่อง
+      // วิธีเปิด: ตั้งเป็น true แล้วอัดจริงบน iPhone 1 คลิป เทียบ [CI mic] ว่า
+      // sampleRate ยังเป็น 48000 และ bytes/วินาที ยังอยู่ในย่าน 5,150-8,910
       try {
         _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const _buf = _audioCtx.createBuffer(1, _audioCtx.sampleRate, _audioCtx.sampleRate);
-        _audioKeepSrc = _audioCtx.createBufferSource();
-        _audioKeepSrc.buffer = _buf;          // ศูนย์ล้วน = ไม่มีเสียงออกจริง
-        _audioKeepSrc.loop   = true;
-        _audioKeepSrc.connect(_audioCtx.destination);
-        _audioKeepSrc.start();
+        if (REC_KEEPALIVE_ENABLED) {
+          const _buf = _audioCtx.createBuffer(1, _audioCtx.sampleRate, _audioCtx.sampleRate);
+          _audioKeepSrc = _audioCtx.createBufferSource();
+          _audioKeepSrc.buffer = _buf;          // ศูนย์ล้วน = ไม่มีเสียงออกจริง
+          _audioKeepSrc.loop   = true;
+          _audioKeepSrc.connect(_audioCtx.destination);
+          _audioKeepSrc.start();
+        }
         if (_audioCtx.state === 'suspended') _audioCtx.resume().catch(() => {});
       } catch(_) {}
       _startRecWatchdog();
@@ -1188,6 +1218,11 @@ body:not(.echo-active) { background:unset; }
       _gumSettled = true; clearTimeout(_gumWatchdog);
       _phase = 'idle';
       _startRecBusy = false;
+      // v_recwatch: ปิดไมค์ที่ขอมาได้แล้วแต่ตั้ง recorder ไม่สำเร็จ — ไม่งั้นค้างจับไมค์
+      // ไว้ทั้งที่ผู้ใช้เห็นแค่ toast ว่าเปิดไมค์ไม่ได้ แล้วกดอัดใหม่ = ซ้อนกันอีก
+      try { _pendingStream?.getTracks().forEach(t => t.stop()); } catch(_) {}
+      _pendingStream = null;
+      if (_recorder) _teardownRecorder('start-failed');   // ล้มหลังสร้าง recorder แล้ว
       // RECORD-HANG-DIAG: this catch never wrote to app_errors before — only a
       // toast the rep could dismiss/miss, leaving zero trace for diagnosis later
       try { window.SenseSentinel?.report('ci_record_start_fail', (err?.name || 'Error') + ':' + (err?.message || 'unknown')); } catch(_) {}
@@ -1263,15 +1298,31 @@ body:not(.echo-active) { background:unset; }
     if (box) box.style.display = 'none';
     _recBytes = 0; _recZeroChunks = 0; _recDeadFired = false;
     _recLastDataAt = Date.now();
+    _recLastTickAt = Date.now();
+    _recDeadCooldownUntil = 0;
     _recSamples = [{ t: Date.now(), b: 0 }];
     _recWatchRef = setInterval(_recWatchTick, REC_WATCH_TICK_MS);
   }
 
   function _recWatchTick() {
     if (_phase !== 'recording' || !_recorder) return;
+    // เดิมเขียนว่า `if (document.visibilityState === 'hidden') return;` แล้วเทสต์จริง
+    // จับได้ว่าพัง: บางสภาพแวดล้อมรายงาน hidden ทั้งที่แอปกำลังถูกใช้อยู่จริง
+    // (เจอกับ preview pane ตรงๆ — watchdog เงียบสนิททั้งรอบ) = ปิดตาข่ายนิรภัยทิ้ง
+    // ทั้งอัน ซึ่งอันตรายกว่าปัญหาที่จะกัน · เปลี่ยนมาวัด "อาการ" แทนการเชื่อธง:
+    // ถ้าทิกนี้มาช้ากว่ากำหนดมาก แปลว่าเพิ่งถูกพัก/throttle มา (พับแอป จอดับ)
+    // ช่วงที่หายไปจึงเชื่อถือไม่ได้ → ตั้งฐานใหม่แล้วรอรอบหน้า วิธีนี้ไม่ขึ้นกับว่า
+    // เบราว์เซอร์รายงาน visibility ถูกหรือไม่
+    const now = Date.now();
+    const _tickGap = now - (_recLastTickAt || now);
+    _recLastTickAt = now;
+    if (_tickGap > REC_WATCH_TICK_MS * 3) {
+      _recLastDataAt = now;
+      _recSamples = [{ t: now, b: _recBytes }];
+      return;
+    }
     // iOS พัก AudioContext เองได้ตลอดเวลา — ปลุกกลับทุกรอบ (ของเดิมสร้างแล้วไม่เคยเช็คซ้ำ)
     try { if (_audioCtx && _audioCtx.state !== 'running') _audioCtx.resume().catch(() => {}); } catch(_) {}
-    const now = Date.now();
     _recSamples.push({ t: now, b: _recBytes });
     while (_recSamples.length > 2 && now - _recSamples[0].t > REC_WATCH_WINDOW_MS + REC_WATCH_TICK_MS) {
       _recSamples.shift();
@@ -1283,6 +1334,12 @@ body:not(.echo-active) { background:unset; }
     // ด่านรอง: ยังส่ง chunk อยู่แต่เนื้อแทบไม่มี (เผื่อ encoder บางรุ่นไม่หยุดส่ง)
     const oldest = _recSamples[0];
     const dt = (now - oldest.t) / 1000;
+    // ตัวอย่างเก่าเกินไป = เพิ่งผ่านช่วงที่ทิกถูกหยุด (พับแอป/จอดับ) การเฉลี่ยคร่อม
+    // ช่วงนั้นจะได้บิตเรตต่ำปลอมๆ — ตั้งฐานใหม่แล้วรอรอบหน้าแทนที่จะตัดสินตอนนี้
+    if (dt > (REC_WATCH_WINDOW_MS / 1000) * 3) {
+      _recSamples = [{ t: now, b: _recBytes }];
+      return;
+    }
     if (dt >= REC_WATCH_WINDOW_MS / 1000) {
       const bps = (_recBytes - oldest.b) / dt;
       if (bps < REC_DEAD_BPS) _onDeadCapture('low-bitrate:' + Math.round(bps) + 'Bps');
@@ -1291,6 +1348,9 @@ body:not(.echo-active) { background:unset; }
 
   function _onDeadCapture(reason) {
     if (_recDeadFired || _phase !== 'recording') return;
+    // กด "อัดต่อ" แล้วต้องไม่เด้งซ้ำทุก 10 วิ — ไมค์ที่ตายจริงจะเข้าเงื่อนไขตลอดเวลา
+    // ถ้าไม่มีช่วงพัก rep จะโดนรบกวนทั้ง visit จนต้องเลิกสนใจแถบเตือนไปเลย
+    if (_recDeadCooldownUntil && Date.now() < _recDeadCooldownUntil) return;
     _recDeadFired = true;
     console.warn('[CI rec] dead capture:', reason, { secs: _secs, bytes: _recBytes, zeroChunks: _recZeroChunks });
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch(_) {}
@@ -1311,8 +1371,9 @@ body:not(.echo-active) { background:unset; }
   function _recDismissDead() {
     const box = document.getElementById('ci-rec-dead');
     if (box) box.style.display = 'none';
-    // ปลดล็อกให้เตือนได้อีกถ้ายังไม่ฟื้นจริง — แต่ต้องรอครบหน้าต่างใหม่ก่อน
+    // ปลดล็อกให้เตือนได้อีกถ้ายังไม่ฟื้นจริง — แต่เว้นช่วงพักก่อน ไม่งั้นเด้งซ้ำทันที
     _recDeadFired = false;
+    _recDeadCooldownUntil = Date.now() + REC_DEAD_COOLDOWN_MS;
     _recLastDataAt = Date.now();
     _recSamples = [{ t: Date.now(), b: _recBytes }];
   }
@@ -1379,6 +1440,18 @@ body:not(.echo-active) { background:unset; }
 
   // ── Audio → Gemini analyze (single call) ──────────────────────────────────
   async function _onStop() {
+    // v_recwatch (2026-08-20): OS หยุด recorder เองได้ (track ตาย / onerror) แล้ว
+    // onstop จะยิงมาที่นี่ทั้งที่ _phase ยังเป็น 'recording' — ถ้าไม่ปรับสถานะให้ตรง
+    // นาฬิกาจะเดินต่อและแถบเตือนยังชวนให้กด "จบ & วิเคราะห์" ซ้อนกับ pipeline ที่
+    // กำลังทำงานอยู่แล้ว ทำให้ progress กระโดดกลับไป 14%
+    if (_phase === 'recording') {
+      _durText = _fmt(_secs);
+      _teardownRecorder('os-forced', { keepOnStop: true });
+      _phase = 'processing';
+      _applyRecordingTheme(false);
+      _showScreen('ci-s-proc');
+      _setStep('กำลังวิเคราะห์...', 'การบันทึกถูกหยุดโดยระบบ — ใช้เสียงที่มี', 14);
+    }
     // v_deadcapture: _recorder ถูก teardown เคลียร์เป็น null ไปแล้วตอนมาถึงนี่
     // จึงต้องอ่าน mime จาก _recMime ที่จำไว้ตอนสร้าง ไม่งั้น type จะเพี้ยน
     const blob = new Blob(_chunks, { type: _recorder?.mimeType || _recMime || 'audio/webm' });
@@ -1389,7 +1462,12 @@ body:not(.echo-active) { background:unset; }
       _phase = 'idle';
       _idbClear();
       _unmount();
-      _toast('กรุณาบันทึกอย่างน้อย 5 วินาทีก่อนกด stop');
+      // v_recwatch (2026-08-20): เคสไมค์ตายจะเข้าเงื่อนไขนี้ด้วย (อัดไป 45 นาทีแต่
+      // ได้ไบต์นิดเดียว) แล้วเด้งข้อความ "บันทึกอย่างน้อย 5 วินาที" ซึ่งงงมาก
+      // ต้องแยกสองกรณีออกจากกันให้ชัด
+      _toast(_recDeadFired || _secs >= 60
+        ? 'ไมค์ไม่ได้รับเสียง จึงไม่มีอะไรให้วิเคราะห์ — visit ยังนับปกติ'
+        : 'กรุณาบันทึกอย่างน้อย 5 วินาทีก่อนกด stop');
       return;
     }
     _startAsyncPipeline(blob);
@@ -5139,6 +5217,15 @@ ${confBanner}
       if (el) {
         _secs = Math.floor((Date.now() - _startTime) / 1000);
         el.textContent = _fmt(_secs);
+      }
+      // v_recwatch (2026-08-20): ตั้งฐานเวลาของ watchdog ใหม่ทุกครั้งที่กลับมาหน้าจอ
+      // ตอนอยู่เบื้องหลัง iOS หยุดทั้ง timer และ chunk — ถ้าไม่รีเซ็ต ทิกแรกหลังกลับมา
+      // จะเห็น "ไม่มี chunk มานานมาก" แล้วเตือนทันทีทั้งที่ไมค์อาจกลับมาปกติแล้ว
+      // (เป็น false positive ที่จะเจอบ่อยที่สุด เพราะสลับแอป/ดับจอคือเรื่องปกติ)
+      // ถ้าไมค์ตายจริง ทิกถัดๆ ไปก็ยังจับได้ใน ~10 วิอยู่ดี ไม่ได้ปิดการตรวจ
+      if (_recorder && _recorder.state === 'recording') {
+        _recLastDataAt = Date.now();
+        _recSamples = [{ t: Date.now(), b: _recBytes }];
       }
       // v555: MediaRecorder ถูก OS หยุด — กู้ chunks ที่มีไปวิเคราะห์ทันที
       // เช็ค _chunks.length กัน double-run (ถ้า onstop เคย fire แล้ว chunks ถูกเคลียร์)

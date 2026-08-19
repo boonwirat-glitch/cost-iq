@@ -637,10 +637,42 @@ check('query ล้มเหลว = คืน null เงียบๆ (เช�
 // → ตัวอัดเก่าค้างจับไมค์ → กดอัดใหม่ได้ตัวอัดซ้อนสองตัว แล้วตัวจริงตายเงียบๆ
 // ข้อพวกนี้ล็อกไว้ไม่ให้ "ทางออกที่ไม่ปิดไมค์" กลับมาอีก
 console.log('\n── 9. v_deadcapture: ปิดไมค์สนิททุกทางออก + รายงานสาเหตุตรงความจริง ──');
+// ผูกกับ "เนื้อในฟังก์ชัน" ไม่ใช่ทั้งไฟล์ — รีวิวชี้ว่าถ้าเช็คทั้งไฟล์ ใครย้าย
+// _releaseWakeLock() ออกไปไว้ที่ cancel() แทน เช็คก็ยังเขียวทั้งที่ teardown พังแล้ว
+const _tearBody = (() => {
+  const i = ci.indexOf('function _teardownRecorder(reason, opts)');
+  return i < 0 ? '' : ci.slice(i, i + 1400);
+})();
 check('มี _teardownRecorder ทางออกเดียวที่ปิด recorder/track/audioCtx/wakelock ครบ',
-  /function _teardownRecorder\(reason, opts\)/.test(ci) &&
-  /r\.stream\?\.getTracks\(\)\.forEach/.test(ci) &&
-  /_releaseWakeLock\(\);/.test(ci));
+  !!_tearBody &&
+  /r\.stream\?\.getTracks\(\)\.forEach/.test(_tearBody) &&
+  /_audioCtx\.close\(\)/.test(_tearBody) &&
+  /_releaseWakeLock\(\);/.test(_tearBody));
+// ข้อที่รีวิวบอกว่า "ขาดแล้วอันตรายที่สุด": ถ้ากลับเงื่อนไขนี้ stopRecording() จะ
+// เลิกยิง pipeline เงียบๆ โดยเช็คอื่นทั้งหมดยังเขียว = บั๊กที่หมวดนี้ตั้งใจกันพอดี
+check('teardown ถอด onstop เฉพาะตอนไม่ใช่การกดหยุดเอง (กลับเงื่อนไข = pipeline ตายเงียบ)',
+  /if \(!keepOnStop\) r\.onstop = null;/.test(_tearBody));
+check('_unmount ไม่ฆ่าไมค์ของ "งานใหม่" ตอน pipeline ของงานเก่าจบ',
+  /if \(_phase !== 'recording'\) _teardownRecorder\('unmount'\);/.test(ci));
+check('ขอไมค์ได้แล้วแต่ตั้ง recorder ไม่สำเร็จ ต้องปิดสตรีมทิ้ง (ไม่งั้นไมค์ค้างแบบเดิม)',
+  /_pendingStream = await navigator\.mediaDevices\.getUserMedia/.test(ci) &&
+  /_pendingStream\?\.getTracks\(\)\.forEach\(t => t\.stop\(\)\)/.test(ci));
+// เทสต์จริงจับได้ว่าเวอร์ชันแรกที่ใช้ document.visibilityState พัง — บางที่รายงาน
+// hidden ทั้งที่แอปถูกใช้อยู่ = watchdog เงียบทั้งรอบ · ต้องวัดอาการ ไม่ใช่เชื่อธง
+check('watchdog ข้ามรอบที่เพิ่งถูก throttle โดยวัดจากช่วงห่างของทิกเอง (ไม่พึ่ง visibilityState)',
+  (() => {
+    // ตัดคอมเมนต์ก่อนเทียบ — คอมเมนต์อธิบายว่า "เดิมเคยเขียนแบบไหนแล้วพัง" จะไป
+    // ชนกับเงื่อนไขปฏิเสธเอง (โดนกับดักนี้เป็นครั้งที่สองในรอบเดียว)
+    const code = ci.split('\n').filter(l => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+    return /const _tickGap = now - \(_recLastTickAt \|\| now\);/.test(code) &&
+           /if \(_tickGap > REC_WATCH_TICK_MS \* 3\)/.test(code) &&
+           !/visibilityState === 'hidden'/.test(code);
+  })());
+check('OS หยุด recorder เอง = ปรับ _phase ให้ตรงก่อนเข้า pipeline',
+  /async function _onStop\(\)[\s\S]{0,700}if \(_phase === 'recording'\) \{[\s\S]{0,300}_teardownRecorder\('os-forced'/.test(ci));
+check('keep-alive ยังปิดอยู่จนกว่าจะทดสอบบน iPhone จริง (กันทำเสียงทุกคนแย่ลง)',
+  /const REC_KEEPALIVE_ENABLED = false;/.test(ci) &&
+  /if \(REC_KEEPALIVE_ENABLED\) \{/.test(ci));
 check('idempotent: เคลียร์ _recorder = null ก่อนเรียก stop() (กันเข้าซ้อน/เรียกซ้ำ)',
   (() => {
     const i = ci.indexOf('function _teardownRecorder(reason, opts)');
@@ -709,9 +741,13 @@ check('ฟังสัญญาณตรงจาก OS: track.onended / onmute 
   /setTimeout\(\(\) => \{ if \(t\.muted\) _onDeadCapture\('track-muted'\); \}, REC_MUTE_GRACE_MS\)/.test(ci) &&
   /t\.onunmute = \(\) => \{ clearTimeout\(_recMuteTimer\)/.test(ci) &&
   /_recorder\.onerror = ev => _onDeadCapture\('recorder-error:'/.test(ci));
-check('เตือนแล้วไม่สแปม (sticky) แต่กด "อัดต่อ" แล้วยังเตือนซ้ำได้ถ้ายังไม่ฟื้น',
-  /if \(_recDeadFired \|\| _phase !== 'recording'\) return;\s*\n\s*_recDeadFired = true;/.test(ci) &&
-  /function _recDismissDead\(\)[\s\S]{0,400}_recDeadFired = false;/.test(ci));
+check('เตือนแล้วไม่สแปม: sticky + กด "อัดต่อ" ได้ช่วงพัก 2 นาทีก่อนเตือนซ้ำ',
+  /if \(_recDeadFired \|\| _phase !== 'recording'\) return;/.test(ci) &&
+  /REC_DEAD_COOLDOWN_MS = 120000/.test(ci) &&
+  /if \(_recDeadCooldownUntil && Date\.now\(\) < _recDeadCooldownUntil\) return;/.test(ci) &&
+  /function _recDismissDead\(\)[\s\S]{0,500}_recDeadCooldownUntil = Date\.now\(\) \+ REC_DEAD_COOLDOWN_MS;/.test(ci));
+check('ไมค์ตายแล้วกดจบ ต้องไม่ขึ้น "บันทึกอย่างน้อย 5 วินาที" ทั้งที่อัดไป 45 นาที',
+  /_toast\(_recDeadFired \|\| _secs >= 60\s*\n?\s*\? 'ไมค์ไม่ได้รับเสียง จึงไม่มีอะไรให้วิเคราะห์/.test(ci));
 check('แถบเตือนค้างบนจอ + สั่นเครื่อง + ส่ง telemetry (ไม่ใช่ toast ที่หายเอง)',
   /id="ci-rec-dead"/.test(ci) && /navigator\.vibrate\(\[200, 100, 200\]\)/.test(ci) &&
   /SenseSentinel\.report\('echo_dead_capture'/.test(ci));
@@ -727,6 +763,34 @@ check('teardown เก็บกวาด watchdog + keep-alive + mute timer ค�
     const seg = ci.slice(i, i + 900);
     return /clearInterval\(_recWatchRef\)/.test(seg) && /clearTimeout\(_recMuteTimer\)/.test(seg) &&
            /_audioKeepSrc\.stop\(\)/.test(seg);
+  })());
+check('กลับมาจากเบื้องหลัง = ตั้งฐาน watchdog ใหม่ (กัน false positive ที่จะเจอบ่อยสุด)',
+  (() => {
+    const i = ci.indexOf('function _initVisibilityGuard()');
+    if (i < 0) return false;
+    const seg = ci.slice(i, i + 2200);
+    return /_recorder\.state === 'recording'/.test(seg) &&
+           /_recLastDataAt = Date\.now\(\);/.test(seg) &&
+           /_recSamples = \[\{ t: Date\.now\(\), b: _recBytes \}\]/.test(seg);
+  })());
+// v_recwatch (2026-08-20): ช่องโหว่เชิงกระบวนการที่รีวิวจับได้ และอันตรายเงียบที่สุด
+// — harness ทั้งไฟล์นี้อ่านแต่ src/ แต่ของที่ผู้ใช้โหลดจริงคือ index.html ที่ build
+// มาแล้ว ถ้าลืมรัน build.py จะ commit src ที่ถูกต้องแต่ผู้ใช้ไม่ได้อะไรเลย และ
+// harness ก็ยังเขียวสนิท (เคยเกิดจริงในรอบนี้) จึงต้องเทียบของที่ "ส่งจริง" ด้วย
+check('index.html ที่ส่งจริง build มาจาก src ล่าสุดแล้ว (ไม่ใช่ของค้างรอบก่อน)',
+  (() => {
+    const built = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const markers = [
+      'function _teardownRecorder(reason, opts)',
+      "if (_phase !== 'recording') _teardownRecorder('unmount');",
+      "if (document.visibilityState === 'hidden') return;",
+      'const REC_KEEPALIVE_ENABLED = false;',
+      'REC_DEAD_COOLDOWN_MS = 120000',
+      '_pendingStream = await navigator.mediaDevices.getUserMedia'
+    ];
+    const missing = markers.filter(m => built.indexOf(m) < 0);
+    if (missing.length) console.log('      ↳ index.html ขาด: ' + missing[0]);
+    return missing.length === 0;
   })());
 check('ห้ามกลับไปใช้ createMediaStreamSource กับสตรีมไมค์ (เคยทำสัญญาณเพี้ยน)',
   !/createMediaStreamSource/.test(ci.split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n')));
