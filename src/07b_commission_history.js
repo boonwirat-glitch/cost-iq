@@ -404,8 +404,10 @@ window.closeCommissionHistory = closeCommissionHistory;
   function schedulePortviewRefresh(){
     try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
     setTimeout(function(){
-      try{ if(typeof renderPortviewTargetBar==='function') renderPortviewTargetBar(); }catch(e){}
-      try{ if(document.getElementById('scr-portview')&&document.getElementById('scr-portview').classList.contains('on')){ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); if(typeof renderPortviewList==='function')renderPortviewList(); } }catch(e){}
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง (เดิมเรียกตรงแม้จะมี setTimeout ห่อไว้แล้ว
+      // แต่ไม่ได้ share timer กับจุดอื่น เรียกซ้อนกับจุดอื่นได้ = ต้นเหตุ render storm)
+      try{ if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); }catch(e){}
+      try{ if(document.getElementById('scr-portview')&&document.getElementById('scr-portview').classList.contains('on')){ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); if(typeof schedulePortviewListRender==='function')schedulePortviewListRender(); } }catch(e){}
     },120);
   }
   try{

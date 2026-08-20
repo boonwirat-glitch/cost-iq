@@ -766,6 +766,30 @@ function schedulePortviewListRender(delay){
   window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
+
+// v_renderstorm (2026-08-20): บุชรายงาน PWA ปิดตัวเองทันทีตอนเปิดหน้า Portfolio —
+// ตามด้วย admin account เท่านั้น (เห็นทุกบัญชีทั้งบริษัท) · ตรวจ app_errors เจอ
+// 'render_storm' (renderPortviewTargetBar / renderTeamviewKamList ยิงซ้ำ ≥7 ครั้ง
+// ใน 10 วิ) เกิดซ้ำทุกวันตั้งแต่ 13 ส.ค. ข้ามหลายเวอร์ชัน — สาเหตุ: มีอย่างน้อย
+// 6 ไฟล์ที่ต่างคนต่างเรียกวาดตรงๆ ทันทีที่ข้อมูลของตัวเองโหลดเสร็จ (commission
+// engine/cockpit/history, qnrr view, nrr target, data pipeline) ไม่มีใครรวมคำสั่งกัน
+// ตอนบูตครั้งแรก ถ้าหลายระบบโหลดเสร็จไล่เลี่ยกัน (มีโอกาสสูงกว่าสำหรับ admin
+// เพราะต้องรอข้อมูลมากกว่า KAM ทั่วไปที่มีแค่พอร์ตตัวเอง) จะวาดซ้ำซ้อนกันหลายรอบ
+// แต่ละรอบวาดข้อมูลทุกบัญชีทั้งบริษัท จน CPU/memory พุ่งจน iOS ฆ่า WKWebView ทิ้ง
+//
+// ให้จุดที่ถูกเรียกจาก "ข้อมูลพื้นหลังเพิ่งโหลดเสร็จ" ผ่านตัวรวมคำสั่งนี้แทนการ
+// เรียกตรง — ไม่แตะจุดที่ผู้ใช้กดเอง (เช่นล้างช่องค้นหา/สลับมุมมอง) เพราะจุดนั้น
+// ต้องวาดทันทีไม่ควรหน่วง ยาวกว่า schedulePortviewListRender (140ms) เพราะฟังก์ชัน
+// เหล่านี้หนักกว่า (คำนวณ target/pace ทุกบัญชี) และต้องรวมคำสั่งที่มาห่างกันกว่าเดิม
+let _tgtBarRenderTimer=null, _tvKamListRenderTimer=null;
+function scheduleRenderPortviewTargetBar(delay){
+  clearTimeout(_tgtBarRenderTimer);
+  _tgtBarRenderTimer=setTimeout(()=>{_tgtBarRenderTimer=null;try{if(typeof renderPortviewTargetBar==='function')renderPortviewTargetBar();}catch(e){}},delay==null?500:delay);
+}
+function scheduleRenderTeamviewKamList(delay){
+  clearTimeout(_tvKamListRenderTimer);
+  _tvKamListRenderTimer=setTimeout(()=>{_tvKamListRenderTimer=null;try{if(typeof renderTeamviewKamList==='function')renderTeamviewKamList();}catch(e){}},delay==null?500:delay);
+}
 function _senseHydrateVisiblePortfolio(reason,opts){
   opts=opts||{};
   const delay=opts.delay==null?260:opts.delay;
@@ -786,7 +810,10 @@ function _senseHydrateVisiblePortfolio(reason,opts){
   }
   if(onTv){
     try{ if(typeof renderTeamviewSummary==='function')renderTeamviewSummary(); }catch(e){}
-    try{ setTimeout(()=>{if(typeof renderTeamviewKamList==='function')renderTeamviewKamList();},delay); }catch(e){}
+    // v_renderstorm: ผ่านตัวรวมคำสั่งแทน setTimeout ของตัวเอง — ฟังก์ชันนี้ถูกเรียกจาก
+    // หลายจุดตอนบูต (แต่ละครั้งเปิด setTimeout อิสระ ไม่รวมกัน) เป็นหนึ่งในต้นเหตุ
+    // render storm ที่เจอใน app_errors (admin เท่านั้น — เห็นข้อมูลทุกบัญชี)
+    try{ if(typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList(delay); }catch(e){}
     did=true;
   }
   _senseLog('[v206d hydrate]',reason,{onPv,onTv,delay,full:!!opts.full});
@@ -2452,9 +2479,10 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
         // ingestCSVText callback already calls renderTeamview() — this is a safety-net
         // for cases where the tab wasn't active during the callback.
         try{
-          if(typeof renderTeamviewKamList==='function' &&
+          // v_renderstorm: safety-net หลัง background fetch เสร็จ — ผ่านตัวรวมคำสั่งแทน
+          if(typeof scheduleRenderTeamviewKamList==='function' &&
              document.getElementById('scr-teamview')?.classList.contains('on'))
-            renderTeamviewKamList();
+            scheduleRenderTeamviewKamList();
         }catch(e){}
       });
     } else {

@@ -587,8 +587,10 @@ function handleFileUpload(type,input){
           if(!_bundlePreWarming){
             if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('bulk-skus-ready',{delay:420});
             else {
-              if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
-              if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+              // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็น callback ตอนข้อมูล
+              // เพิ่งโหลดเสร็จ ไม่ใช่ user คลิก จึงเป็นจุดที่ทำให้เกิด render storm ได้
+              if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof schedulePortviewListRender==='function')schedulePortviewListRender();
+              if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList();
             }
           }
           // v_key self-review fix: same "screen already open, data landed late" gap as the
@@ -607,8 +609,9 @@ function handleFileUpload(type,input){
         const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+totalAccounts;b.className='dp-slot-badge ok';}
         // toast removed v205a — bulk ingest noise
         if(!_bundlePreWarming){
-          if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
-          if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+          // v_renderstorm: เหมือนจุดข้างบน — callback ตอนข้อมูลโหลดเสร็จ ผ่านตัวรวมคำสั่ง
+          if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof schedulePortviewListRender==='function')schedulePortviewListRender();
+          if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList();
         }
         _done();
       }
@@ -789,7 +792,8 @@ function handleFileUpload(type,input){
       if(_senseDebugOn())showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
       // v205b: portviewBulkData now has tlEmail — re-render target bar so Case B can use real tlEmail
       // (init check at t=1500ms may have run before portview was ready → accounts=[] → Case B failed → baseline)
-      if(typeof renderPortviewTargetBar==='function'){setTimeout(()=>renderPortviewTargetBar(),150);}
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็น callback ตอนข้อมูลโหลดเสร็จ
+      if(typeof scheduleRenderPortviewTargetBar==='function'){scheduleRenderPortviewTargetBar();}
       // ── Smart Splash: drive progress bar (portview = 45%) ──────────────
       if(typeof window._splashProgress==='function')
         window._splashProgress(45,'คำนวณ baseline 3 เดือน...');

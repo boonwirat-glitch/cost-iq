@@ -1,4 +1,4 @@
-<!-- Freshket Sense v272: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v273: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v272',
+      version: 'v273',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -16083,8 +16083,10 @@ function handleFileUpload(type,input){
           if(!_bundlePreWarming){
             if(typeof _senseHydrateVisiblePortfolio==='function')_senseHydrateVisiblePortfolio('bulk-skus-ready',{delay:420});
             else {
-              if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
-              if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+              // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็น callback ตอนข้อมูล
+              // เพิ่งโหลดเสร็จ ไม่ใช่ user คลิก จึงเป็นจุดที่ทำให้เกิด render storm ได้
+              if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof schedulePortviewListRender==='function')schedulePortviewListRender();
+              if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList();
             }
           }
           // v_key self-review fix: same "screen already open, data landed late" gap as the
@@ -16103,8 +16105,9 @@ function handleFileUpload(type,input){
         const b=document.getElementById('badge-bulk-skus');if(b){b.textContent='✓ '+totalAccounts;b.className='dp-slot-badge ok';}
         // toast removed v205a — bulk ingest noise
         if(!_bundlePreWarming){
-          if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof renderPortviewList==='function')renderPortviewList();
-          if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function')renderTeamviewKamList();
+          // v_renderstorm: เหมือนจุดข้างบน — callback ตอนข้อมูลโหลดเสร็จ ผ่านตัวรวมคำสั่ง
+          if(document.getElementById('scr-portview')?.classList.contains('on')&&typeof schedulePortviewListRender==='function')schedulePortviewListRender();
+          if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList();
         }
         _done();
       }
@@ -16285,7 +16288,8 @@ function handleFileUpload(type,input){
       if(_senseDebugOn())showToast('portview.csv โหลดแล้ว — '+portviewBulkData.length+' accounts','✓');
       // v205b: portviewBulkData now has tlEmail — re-render target bar so Case B can use real tlEmail
       // (init check at t=1500ms may have run before portview was ready → accounts=[] → Case B failed → baseline)
-      if(typeof renderPortviewTargetBar==='function'){setTimeout(()=>renderPortviewTargetBar(),150);}
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็น callback ตอนข้อมูลโหลดเสร็จ
+      if(typeof scheduleRenderPortviewTargetBar==='function'){scheduleRenderPortviewTargetBar();}
       // ── Smart Splash: drive progress bar (portview = 45%) ──────────────
       if(typeof window._splashProgress==='function')
         window._splashProgress(45,'คำนวณ baseline 3 เดือน...');
@@ -30400,6 +30404,30 @@ function schedulePortviewListRender(delay){
   window._pvWasCollapsed=(window._pvLastCollapseMs||0)>0;
   _pvRenderTimer=setTimeout(()=>{_pvRenderTimer=null;renderPortviewList();},delay==null?140:delay);
 }
+
+// v_renderstorm (2026-08-20): บุชรายงาน PWA ปิดตัวเองทันทีตอนเปิดหน้า Portfolio —
+// ตามด้วย admin account เท่านั้น (เห็นทุกบัญชีทั้งบริษัท) · ตรวจ app_errors เจอ
+// 'render_storm' (renderPortviewTargetBar / renderTeamviewKamList ยิงซ้ำ ≥7 ครั้ง
+// ใน 10 วิ) เกิดซ้ำทุกวันตั้งแต่ 13 ส.ค. ข้ามหลายเวอร์ชัน — สาเหตุ: มีอย่างน้อย
+// 6 ไฟล์ที่ต่างคนต่างเรียกวาดตรงๆ ทันทีที่ข้อมูลของตัวเองโหลดเสร็จ (commission
+// engine/cockpit/history, qnrr view, nrr target, data pipeline) ไม่มีใครรวมคำสั่งกัน
+// ตอนบูตครั้งแรก ถ้าหลายระบบโหลดเสร็จไล่เลี่ยกัน (มีโอกาสสูงกว่าสำหรับ admin
+// เพราะต้องรอข้อมูลมากกว่า KAM ทั่วไปที่มีแค่พอร์ตตัวเอง) จะวาดซ้ำซ้อนกันหลายรอบ
+// แต่ละรอบวาดข้อมูลทุกบัญชีทั้งบริษัท จน CPU/memory พุ่งจน iOS ฆ่า WKWebView ทิ้ง
+//
+// ให้จุดที่ถูกเรียกจาก "ข้อมูลพื้นหลังเพิ่งโหลดเสร็จ" ผ่านตัวรวมคำสั่งนี้แทนการ
+// เรียกตรง — ไม่แตะจุดที่ผู้ใช้กดเอง (เช่นล้างช่องค้นหา/สลับมุมมอง) เพราะจุดนั้น
+// ต้องวาดทันทีไม่ควรหน่วง ยาวกว่า schedulePortviewListRender (140ms) เพราะฟังก์ชัน
+// เหล่านี้หนักกว่า (คำนวณ target/pace ทุกบัญชี) และต้องรวมคำสั่งที่มาห่างกันกว่าเดิม
+let _tgtBarRenderTimer=null, _tvKamListRenderTimer=null;
+function scheduleRenderPortviewTargetBar(delay){
+  clearTimeout(_tgtBarRenderTimer);
+  _tgtBarRenderTimer=setTimeout(()=>{_tgtBarRenderTimer=null;try{if(typeof renderPortviewTargetBar==='function')renderPortviewTargetBar();}catch(e){}},delay==null?500:delay);
+}
+function scheduleRenderTeamviewKamList(delay){
+  clearTimeout(_tvKamListRenderTimer);
+  _tvKamListRenderTimer=setTimeout(()=>{_tvKamListRenderTimer=null;try{if(typeof renderTeamviewKamList==='function')renderTeamviewKamList();}catch(e){}},delay==null?500:delay);
+}
 function _senseHydrateVisiblePortfolio(reason,opts){
   opts=opts||{};
   const delay=opts.delay==null?260:opts.delay;
@@ -30420,7 +30448,10 @@ function _senseHydrateVisiblePortfolio(reason,opts){
   }
   if(onTv){
     try{ if(typeof renderTeamviewSummary==='function')renderTeamviewSummary(); }catch(e){}
-    try{ setTimeout(()=>{if(typeof renderTeamviewKamList==='function')renderTeamviewKamList();},delay); }catch(e){}
+    // v_renderstorm: ผ่านตัวรวมคำสั่งแทน setTimeout ของตัวเอง — ฟังก์ชันนี้ถูกเรียกจาก
+    // หลายจุดตอนบูต (แต่ละครั้งเปิด setTimeout อิสระ ไม่รวมกัน) เป็นหนึ่งในต้นเหตุ
+    // render storm ที่เจอใน app_errors (admin เท่านั้น — เห็นข้อมูลทุกบัญชี)
+    try{ if(typeof scheduleRenderTeamviewKamList==='function')scheduleRenderTeamviewKamList(delay); }catch(e){}
     did=true;
   }
   _senseLog('[v206d hydrate]',reason,{onPv,onTv,delay,full:!!opts.full});
@@ -32086,9 +32117,10 @@ async function __legacyRenderTeamviewKamListFallbackAsync(){
         // ingestCSVText callback already calls renderTeamview() — this is a safety-net
         // for cases where the tab wasn't active during the callback.
         try{
-          if(typeof renderTeamviewKamList==='function' &&
+          // v_renderstorm: safety-net หลัง background fetch เสร็จ — ผ่านตัวรวมคำสั่งแทน
+          if(typeof scheduleRenderTeamviewKamList==='function' &&
              document.getElementById('scr-teamview')?.classList.contains('on'))
-            renderTeamviewKamList();
+            scheduleRenderTeamviewKamList();
         }catch(e){}
       });
     } else {
@@ -39342,7 +39374,9 @@ function closeTargetSetup() {
   _commRulePending = {};
   // Refresh target-dependent views after save
   setTimeout(() => {
-    try{ renderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
+    // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็นหนึ่งในหลายจุดที่ต่างคน
+    // ต่างเรียกวาด target bar/kam list ตรงๆ พอมาตรงกับจุดอื่นตอนบูต = render storm
+    try{ if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
     // Sales TL: refresh Sales teamview; KAM TL/Admin: refresh KAM teamview
     const _closeRole = typeof isSalesTLRole === 'function' && isSalesTLRole(
       currentUserProfile && currentUserProfile.role
@@ -39351,7 +39385,7 @@ function closeTargetSetup() {
       try{ if(typeof renderSalesTeamview==='function') renderSalesTeamview(); }catch(e){ console.warn('[target refresh] sales teamview', e); }
     } else {
       try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
-      try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+      try{ if(typeof scheduleRenderTeamviewKamList==='function') scheduleRenderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
     }
   }, 100);
 }
@@ -46031,8 +46065,10 @@ async function renderPortviewTargetBar() {
     // v224e: re-render teamview KAM list so each KAM's pace% uses real target, not baseline
     // (fixes "stuck at baseline" case where KAM cards never updated after targets loaded)
     try{
-      if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function'){
-        setTimeout(()=>{try{renderTeamviewKamList();}catch(e){}},50);
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทน setTimeout ตรงๆ — จุดนี้อยู่ในเส้นทาง
+      // "targets เพิ่งโหลดเสร็จ" ที่ยิงพร้อมกับอีกหลายจุดตอนบูตของ admin ได้
+      if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function'){
+        scheduleRenderTeamviewKamList();
       }
     }catch(e){}
   }
@@ -46698,14 +46734,17 @@ setTimeout(async function _tgtInitCheck() {
       setTimeout(_waitAndRenderBars, 400); return;
     }
     _injectPortviewBarEl();
-    renderPortviewTargetBar();
+    // v_renderstorm: จุดนี้คือ boot sequence ของ admin ที่ต้องรอ allCriticalReady —
+    // มักตรงกับอีกหลายจุด (commission engine/cockpit/history, qnrr view) ที่โหลด
+    // เสร็จไล่เลี่ยกันตอนบูต ผ่านตัวรวมคำสั่งแทนเรียกตรง (ดู app_errors: render_storm)
+    if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); else renderPortviewTargetBar();
     renderPortviewNRRBar();
     _tgtInjectAdminBtn();
     try{
       const tv=document.getElementById('scr-teamview');
       if(tv && tv.classList.contains('on')){
         if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
-        if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+        if(typeof scheduleRenderTeamviewKamList==='function') scheduleRenderTeamviewKamList(); else renderTeamviewKamList();
       }
     }catch(e){ console.warn('[target init] teamview refresh', e); }
     _tgtInjectTeamviewTargetRows();
@@ -46719,6 +46758,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   const _prev = window.renderPortviewList;
   window.renderPortviewList = function() {
     _prev && _prev.apply(this, arguments);
+    // v_renderstorm: จุดนี้เป็นปฏิกิริยาต่อ renderPortviewList (ซึ่งมักผ่าน debounce ของ
+    // มันเอง — schedulePortviewListRender — อยู่แล้ว เช่นตอนพิมพ์ค้นหา) จึงคงดีเลย์สั้น
+    // 80ms ไว้เหมือนเดิม ไม่ผ่านตัวรวมคำสั่งร่วมกับจุด boot อื่น เพราะ delay ที่ต่างกัน
+    // จะไปแย่ง timer เดียวกันจนพังทั้งสองแบบ (ตอบสนองช้าตอนพิมพ์ + คุมพายุตอนบูตไม่ได้)
     _injectPortviewBarEl(); setTimeout(() => { renderPortviewTargetBar(); renderPortviewNRRBar(); }, 80);
   };
 }
@@ -50411,8 +50454,10 @@ window.closeCommissionHistory = closeCommissionHistory;
   function schedulePortviewRefresh(){
     try{window._freshketHandoverLoadedAt=Date.now();}catch(e){}
     setTimeout(function(){
-      try{ if(typeof renderPortviewTargetBar==='function') renderPortviewTargetBar(); }catch(e){}
-      try{ if(document.getElementById('scr-portview')&&document.getElementById('scr-portview').classList.contains('on')){ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); if(typeof renderPortviewList==='function')renderPortviewList(); } }catch(e){}
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง (เดิมเรียกตรงแม้จะมี setTimeout ห่อไว้แล้ว
+      // แต่ไม่ได้ share timer กับจุดอื่น เรียกซ้อนกับจุดอื่นได้ = ต้นเหตุ render storm)
+      try{ if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); }catch(e){}
+      try{ if(document.getElementById('scr-portview')&&document.getElementById('scr-portview').classList.contains('on')){ if(typeof renderPortviewSummary==='function')renderPortviewSummary(); if(typeof schedulePortviewListRender==='function')schedulePortviewListRender(); } }catch(e){}
     },120);
   }
   try{
@@ -60864,14 +60909,16 @@ function _qnrrEnsureLoaded() {
     try {
       var _bar = document.getElementById('tgt-portview-bar');
       if (_bar) _bar._lastRenderMs = 0; // bypass anti-flicker debounce for this authoritative repaint
-      if (typeof renderPortviewTargetBar === 'function') renderPortviewTargetBar();
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — เส้น self-heal นี้มาพร้อมกับอีกหลาย
+      // จุดที่โหลดข้อมูลเสร็จตอนบูตของ admin ได้ (ต้นเหตุ render storm ที่เจอใน app_errors)
+      if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar();
     } catch (e) {}
     try { if (typeof window._commRenderKamSelfStrip === 'function') window._commRenderKamSelfStrip(); } catch (e) {}
     try { if (typeof window._commGatedRender === 'function') window._commGatedRender(); } catch (e) {}
     try { if (typeof _qnrrRender === 'function') _qnrrRender(); } catch (e) {}
     try {
-      if (document.getElementById('scr-teamview')?.classList.contains('on') && typeof renderTeamviewKamList === 'function') {
-        renderTeamviewKamList();
+      if (document.getElementById('scr-teamview')?.classList.contains('on') && typeof scheduleRenderTeamviewKamList === 'function') {
+        scheduleRenderTeamviewKamList();
       }
     } catch (e) {}
   });

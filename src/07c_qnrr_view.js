@@ -520,14 +520,16 @@ function _qnrrEnsureLoaded() {
     try {
       var _bar = document.getElementById('tgt-portview-bar');
       if (_bar) _bar._lastRenderMs = 0; // bypass anti-flicker debounce for this authoritative repaint
-      if (typeof renderPortviewTargetBar === 'function') renderPortviewTargetBar();
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — เส้น self-heal นี้มาพร้อมกับอีกหลาย
+      // จุดที่โหลดข้อมูลเสร็จตอนบูตของ admin ได้ (ต้นเหตุ render storm ที่เจอใน app_errors)
+      if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar();
     } catch (e) {}
     try { if (typeof window._commRenderKamSelfStrip === 'function') window._commRenderKamSelfStrip(); } catch (e) {}
     try { if (typeof window._commGatedRender === 'function') window._commGatedRender(); } catch (e) {}
     try { if (typeof _qnrrRender === 'function') _qnrrRender(); } catch (e) {}
     try {
-      if (document.getElementById('scr-teamview')?.classList.contains('on') && typeof renderTeamviewKamList === 'function') {
-        renderTeamviewKamList();
+      if (document.getElementById('scr-teamview')?.classList.contains('on') && typeof scheduleRenderTeamviewKamList === 'function') {
+        scheduleRenderTeamviewKamList();
       }
     } catch (e) {}
   });

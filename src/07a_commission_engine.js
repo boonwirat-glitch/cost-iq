@@ -1885,7 +1885,9 @@ function closeTargetSetup() {
   _commRulePending = {};
   // Refresh target-dependent views after save
   setTimeout(() => {
-    try{ renderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
+    // v_renderstorm: ผ่านตัวรวมคำสั่งแทนเรียกตรง — จุดนี้เป็นหนึ่งในหลายจุดที่ต่างคน
+    // ต่างเรียกวาด target bar/kam list ตรงๆ พอมาตรงกับจุดอื่นตอนบูต = render storm
+    try{ if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); }catch(e){ console.warn('[target refresh] portview', e); }
     // Sales TL: refresh Sales teamview; KAM TL/Admin: refresh KAM teamview
     const _closeRole = typeof isSalesTLRole === 'function' && isSalesTLRole(
       currentUserProfile && currentUserProfile.role
@@ -1894,7 +1896,7 @@ function closeTargetSetup() {
       try{ if(typeof renderSalesTeamview==='function') renderSalesTeamview(); }catch(e){ console.warn('[target refresh] sales teamview', e); }
     } else {
       try{ if(typeof renderTeamviewSummary==='function') renderTeamviewSummary(); }catch(e){ console.warn('[target refresh] team summary', e); }
-      try{ if(typeof renderTeamviewKamList==='function') renderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
+      try{ if(typeof scheduleRenderTeamviewKamList==='function') scheduleRenderTeamviewKamList(); }catch(e){ console.warn('[target refresh] team list', e); }
     }
   }, 100);
 }

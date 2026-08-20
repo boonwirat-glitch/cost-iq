@@ -835,8 +835,10 @@ async function renderPortviewTargetBar() {
     // v224e: re-render teamview KAM list so each KAM's pace% uses real target, not baseline
     // (fixes "stuck at baseline" case where KAM cards never updated after targets loaded)
     try{
-      if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof renderTeamviewKamList==='function'){
-        setTimeout(()=>{try{renderTeamviewKamList();}catch(e){}},50);
+      // v_renderstorm: ผ่านตัวรวมคำสั่งแทน setTimeout ตรงๆ — จุดนี้อยู่ในเส้นทาง
+      // "targets เพิ่งโหลดเสร็จ" ที่ยิงพร้อมกับอีกหลายจุดตอนบูตของ admin ได้
+      if(document.getElementById('scr-teamview')?.classList.contains('on')&&typeof scheduleRenderTeamviewKamList==='function'){
+        scheduleRenderTeamviewKamList();
       }
     }catch(e){}
   }
@@ -1502,14 +1504,17 @@ setTimeout(async function _tgtInitCheck() {
       setTimeout(_waitAndRenderBars, 400); return;
     }
     _injectPortviewBarEl();
-    renderPortviewTargetBar();
+    // v_renderstorm: จุดนี้คือ boot sequence ของ admin ที่ต้องรอ allCriticalReady —
+    // มักตรงกับอีกหลายจุด (commission engine/cockpit/history, qnrr view) ที่โหลด
+    // เสร็จไล่เลี่ยกันตอนบูต ผ่านตัวรวมคำสั่งแทนเรียกตรง (ดู app_errors: render_storm)
+    if(typeof scheduleRenderPortviewTargetBar==='function') scheduleRenderPortviewTargetBar(); else renderPortviewTargetBar();
     renderPortviewNRRBar();
     _tgtInjectAdminBtn();
     try{
       const tv=document.getElementById('scr-teamview');
       if(tv && tv.classList.contains('on')){
         if(typeof renderTeamviewSummary==='function') renderTeamviewSummary();
-        if(typeof renderTeamviewKamList==='function') renderTeamviewKamList();
+        if(typeof scheduleRenderTeamviewKamList==='function') scheduleRenderTeamviewKamList(); else renderTeamviewKamList();
       }
     }catch(e){ console.warn('[target init] teamview refresh', e); }
     _tgtInjectTeamviewTargetRows();
@@ -1523,6 +1528,10 @@ if (_origRPL_tgt && !window._tgtPortviewHooked) {
   const _prev = window.renderPortviewList;
   window.renderPortviewList = function() {
     _prev && _prev.apply(this, arguments);
+    // v_renderstorm: จุดนี้เป็นปฏิกิริยาต่อ renderPortviewList (ซึ่งมักผ่าน debounce ของ
+    // มันเอง — schedulePortviewListRender — อยู่แล้ว เช่นตอนพิมพ์ค้นหา) จึงคงดีเลย์สั้น
+    // 80ms ไว้เหมือนเดิม ไม่ผ่านตัวรวมคำสั่งร่วมกับจุด boot อื่น เพราะ delay ที่ต่างกัน
+    // จะไปแย่ง timer เดียวกันจนพังทั้งสองแบบ (ตอบสนองช้าตอนพิมพ์ + คุมพายุตอนบูตไม่ได้)
     _injectPortviewBarEl(); setTimeout(() => { renderPortviewTargetBar(); renderPortviewNRRBar(); }, 80);
   };
 }
