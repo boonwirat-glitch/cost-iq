@@ -1178,7 +1178,13 @@ async function _callOneModel(provider, model, env, payload) {
       // Gemini 3.x คิดในใจก่อนตอบ และ "ความคิด" กินโควตา maxOutputTokens ด้วย
       // ผู้เรียกที่ขอน้อยๆ (SKU matcher ขอ ~20) จะได้คำตอบว่าง finishReason=MAX_TOKENS
       // (เจอจริงตอนยิงทดสอบ 2026-08-08) → ตั้งพื้น 2048 เฉพาะฝั่ง gemini
-      const gcfg = { maxOutputTokens: Math.max(maxTokens || 2000, 2048), temperature: 0.2 };
+      //
+      // v_thinkfix (2026-08-20): พื้น 2048 ไม่พอสำหรับ prompt ยาว + ขอ JSON หลาย
+      // field (เช่น KAM Brief) — เจอจริง: "ความคิด" กินไปเกือบหมด เหลือให้ตอบแค่
+      // ~150 token ตอบได้ field เดียวแล้วขาดกลางประโยค JSON ไม่ปิดวงเล็บ ฝั่ง client
+      // parse ไม่ออกเลยทั้งที่ AI ตอบมาจริง (response ไม่ใช่ error แต่ถูกตัดทิ้ง)
+      // → ยกพื้นเป็น 4096 ให้มีที่ว่างพอทั้งความคิด+คำตอบจริง
+      const gcfg = { maxOutputTokens: Math.max(maxTokens || 2000, 4096), temperature: 0.2 };
       if (jsonMode) gcfg.responseMimeType = 'application/json';
       res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`,
@@ -1219,6 +1225,16 @@ async function _callOneModel(provider, model, env, payload) {
     // (เช่น Gemini ตอบ 200 พร้อม promptFeedback ว่าโดนบล็อก) ต้องนับเป็นล้มเหลว
     const why = d?.promptFeedback?.blockReason || d?.candidates?.[0]?.finishReason || d?.stop_reason || 'ไม่มีเนื้อความ';
     return { ok: false, status: 502, text: '', errMsg: `${model}: ตอบกลับว่าง (${why})` };
+  }
+  // v_thinkfix (2026-08-20): text ไม่ว่างแต่โดนตัดกลางคัน (finishReason=MAX_TOKENS)
+  // เดิมไหลผ่านเป็น ok:true เพราะเช็คแค่ "!text" — ฝั่ง client ที่ขอ JSON โครงหลาย
+  // field เจอ text ที่ขาดวงเล็บปิด parse ไม่ออกเลย แต่ error ที่เห็นคือ "ไม่มี JSON"
+  // ทำให้ไล่ผิดทางว่า AI ไม่ตอบ ทั้งที่จริงตอบมาแล้วแค่ถูกตัด — นับเป็นล้มเหลว
+  // แทน ให้เข้า retry/fallback chain เดิม (ลองรุ่นถัดไป) แทนที่จะส่ง JSON ค้างๆ
+  // ไปให้ client เอง (ไม่เช็คกับ Anthropic เพราะยังไม่เคยเจอเคสนี้ฝั่ง Claude)
+  const finishReason = provider === 'gemini' ? d?.candidates?.[0]?.finishReason : null;
+  if (finishReason === 'MAX_TOKENS') {
+    return { ok: false, status: 502, text: '', errMsg: `${model}: ตอบถูกตัดกลางคัน (MAX_TOKENS) — ${text.length} ตัวอักษรที่ได้มาไม่ใช้` };
   }
   return { ok: true, status: 200, text, errMsg: '' };
 }

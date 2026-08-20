@@ -166,6 +166,35 @@ if (!missing.length) {
         (WK.match(/pipeline_error:\s*null/g) || []).length >= 3);
     }
 
+    // ── 3f. v_thinkfix: gemini ตอบมาแล้วแต่ถูกตัดกลางคัน (MAX_TOKENS) ────────
+    // บั๊กจริง 2026-08-20: "ความคิด" ของ Gemini 3.x กินโควตาไปเกือบหมด KAM Brief
+    // (ขอ JSON 4 field) ได้ text แค่ field เดียวแล้วขาด — ของเดิมเช็คแค่ "!text"
+    // จึงปล่อยผ่านเป็น ok:true ทั้งที่ JSON ไม่ปิดวงเล็บ client parse ไม่ออกเลย
+    {
+      check('maxOutputTokens พื้นยกจาก 2048 → 4096 (พื้นเดิมไม่พอเมื่อ prompt ยาว)',
+        /maxOutputTokens: Math\.max\(maxTokens \|\| 2000, 4096\)/.test(WK));
+
+      const truncated = async () => ({
+        ok: true, status: 200,
+        text: async () => JSON.stringify({
+          candidates: [{ content: { parts: [{ text: '{"paceInsight":"ยอดสั่งซื้อ...' }] }, finishReason: 'MAX_TOKENS' }]
+        })
+      });
+      r = await read(await run(truncated)(body('gemini'), ENV));
+      check('gemini ตอบไม่ว่างแต่ finishReason=MAX_TOKENS → ต้องนับเป็นล้มเหลว ไม่ใช่ ok:true',
+        r.status >= 400 && r.body.text !== '{"paceInsight":"ยอดสั่งซื้อ...' &&
+        typeof r.body.error === 'string',
+        JSON.stringify(r));
+
+      // ต้องยังไล่ chain ต่อได้ตามปกติ — รุ่นแรกโดนตัด รุ่นถัดไปตอบเต็ม ต้องสำเร็จ
+      let calls2 = 0;
+      const firstTruncated = async (...a) => { calls2++; return calls2 === 1 ? truncated(...a) : okGemini(...a); };
+      r = await read(await run(firstTruncated)(body('gemini'), ENV));
+      check('MAX_TOKENS ที่รุ่นแรก → ไล่ไปรุ่นถัดไปในเชนเดียวกัน ไม่ใช่ข้ามค่ายทันที',
+        r.status === 200 && r.body.text === 'สวัสดี' && calls2 >= 2,
+        `เรียก ${calls2} ครั้ง · ${JSON.stringify(r)}`);
+    }
+
     // ── 4. ฝั่ง client ต้องไม่กลืนค่าว่าง ────────────────────────────────
     const callAiSrc = CI.slice(CI.indexOf('async function callAI(opts){'),
                                CI.indexOf('function setAiProvider('));
