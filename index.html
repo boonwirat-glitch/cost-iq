@@ -1,4 +1,4 @@
-<!-- Freshket Sense v271: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v272: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1091,10 +1091,19 @@ input:focus,textarea:focus{box-shadow:0 0 0 3px var(--tk-ok-dim)!important;trans
 .kam-loading-star-ring{position:absolute;inset:-8px;border-radius:50%;border:1.5px solid transparent;border-top-color:var(--tk-accent-solid);border-right-color:var(--tk-accent-dim-3);animation:kam-ring-spin 1.2s linear infinite}
 .kam-loading-star-ring2{position:absolute;inset:-16px;border-radius:50%;border:1px solid transparent;border-bottom-color:var(--tk-accent-dim-2);animation:kam-ring-spin 2s linear infinite reverse}
 @keyframes kam-ring-spin{to{transform:rotate(360deg)}}
+/* v_pwacrash (2026-08-20): บุชรายงาน PWA เด้งออกปิดตัวทันทีหลังกดปุ่ม AI summary
+   (มีมาตั้งแต่ก่อนแก้ JSON truncation — คนละบั๊กกัน) เจอจาก animation นี้: เดิม
+   ซ้อน drop-shadow 3 ชั้น (16/32/48px) พร้อม scale+rotate วนทุก 2 วิ "ไม่มีที่สิ้นสุด"
+   ตลอดเวลาที่รอ AI ตอบ — animate filter พร้อม transform บังคับให้ WebKit re-raster
+   ทุกเฟรม (cache bitmap เดิมไว้ไม่ได้เพราะ transform เปลี่ยนตลอด) เป็นสาเหตุ
+   ที่รู้จักกันดีว่าทำให้ WKWebView โดน iOS ฆ่าทิ้งเมื่อภาระ GPU สูงต่อเนื่องนานๆ
+   (ก่อนแก้ truncation รอบก่อน AI อาจค้าง/retry นาน 10-20+ วิ = animation
+   นี้วิ่งยาวนานกว่าที่ควร) ลดเหลือ drop-shadow ชั้นเดียว บลอร์เล็กลงมาก —
+   ยังเห็นเอฟเฟกต์ breathing แต่ภาระ compositor ลดลงมาก */
 .kam-loading-star{animation:kam-star-breathe 2s ease-in-out infinite}
 @keyframes kam-star-breathe{
-  0%,100%{transform:scale(1) rotate(0deg);filter:drop-shadow(0 0 6px var(--tk-accent-solid)) drop-shadow(0 0 12px var(--tk-accent-dim-3))}
-  50%{transform:scale(1.2) rotate(45deg);filter:drop-shadow(0 0 16px var(--tk-accent)) drop-shadow(0 0 32px var(--tk-accent-solid)) drop-shadow(0 0 48px var(--tk-accent-dim-2))}
+  0%,100%{transform:scale(1) rotate(0deg);filter:drop-shadow(0 0 5px var(--tk-accent-solid))}
+  50%{transform:scale(1.15) rotate(45deg);filter:drop-shadow(0 0 10px var(--tk-accent))}
 }
 .kam-loading-step{font-size:var(--text-md);color:rgba(180,200,255,.85);font-weight:var(--fw-medium);margin-bottom:4px;min-height:18px;transition:opacity .3s}
 .kam-loading-sub{font-size:var(--text-xs);color:rgba(180,200,255,.6)}
@@ -1338,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v271',
+      version: 'v272',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
