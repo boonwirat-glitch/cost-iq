@@ -1451,10 +1451,17 @@ Guardrails:
       if(txt[i]==='{'){if(depth===0)st=i;depth++;}
       else if(txt[i]==='}'){depth--;if(depth===0){en=i;break;}}
     }
-    if(st===-1||en===-1)throw new Error('No JSON in response');
+    // v_thinkfix (2026-08-20): เดิม st===-1||en===-1 โยน error ทันที — เจอจริงว่า
+    // Gemini ตอบ JSON มาจริงแต่ถูกตัดกลางคัน (thinking กินโควตา, งบ worker กันไว้
+    // แล้วแต่ยังเผื่อกรณีหลุดมาได้) วงเล็บปิดเลยไม่มี ทั้งที่ field แรกสมบูรณ์ดี
+    // ตัวกู้ข้อความด้วย regex ข้างล่างมีอยู่แล้วแต่ไปไม่ถึงเพราะเช็คนี้ตัดจบก่อน —
+    // ปล่อยให้ไปลองกู้ด้วย raw text แทนที่จะโยนทิ้งทันที
     let brief;
-    const _slice=txt.slice(st,en+1);
-    try{brief=JSON.parse(_slice);}
+    const _slice=(st>-1&&en>-1)?txt.slice(st,en+1):(st>-1?txt.slice(st):txt);
+    try{
+      if(st===-1||en===-1)throw new Error('No JSON in response');
+      brief=JSON.parse(_slice);
+    }
     catch(e2){
       try{brief=JSON.parse(_slice.replace(/[\x00-\x1f\u2028\u2029]/g,' '));}
       catch(e3){
@@ -1509,6 +1516,10 @@ Guardrails:
     if(talkWrap)talkWrap.style.display='block';
     renderKamSignalBar();
     console.error('KAM briefing error:',e);
+    // v_thinkfix (2026-08-20): เดิม error ตกไปที่ console.error อย่างเดียว — ปุ่มรีเซ็ต
+    // กลับเป็น "Brief" เฉยๆ ไม่มีอะไรบอกเลยว่าล้ม (บุชรายงานว่า "กดแล้วมี animation
+    // แต่ไม่มีอะไรคายออกมา") ต้องมีสัญญาณให้เห็นเสมอไม่ว่าสาเหตุจะเป็นอะไร
+    showToast('สรุป AI ไม่สำเร็จ — ลองกด Brief ใหม่อีกครั้ง','⚠');
     const _existSumErr=document.getElementById('dc-tm-summary-card');
     if(_existSumErr)_existSumErr.remove();
   }
@@ -1590,12 +1601,21 @@ Guardrails:
       if(txt[i]==='{'){if(depth===0)st=i;depth++;}
       else if(txt[i]==='}'){depth--;if(depth===0){en=i;break;}}
     }
-    if(st===-1||en===-1){console.error('LM response (no JSON found):',txt.slice(0,500));throw new Error('No JSON');}
+    // v_thinkfix (2026-08-20): เหมือน generateKamBriefing — ห้ามโยนทิ้งทันทีถ้าไม่มี
+    // วงเล็บปิด (Gemini ตอบมาจริงแต่ถูกตัดกลางคัน) ให้ลองกู้ field ที่สมบูรณ์ก่อน
     let brief;
-    try{brief=JSON.parse(txt.slice(st,en+1));}
+    const _slice=(st>-1&&en>-1)?txt.slice(st,en+1):(st>-1?txt.slice(st):txt);
+    try{
+      if(st===-1||en===-1){console.error('LM response (no JSON found):',txt.slice(0,500));throw new Error('No JSON');}
+      brief=JSON.parse(_slice);
+    }
     catch(e2){
-      try{brief=JSON.parse(txt.slice(st,en+1).replace(/[\x00-\x1f]/g,' '));}
-      catch(e3){console.error('LM parse fail:',txt.slice(st,en+1).slice(0,300));throw e3;}
+      try{brief=JSON.parse(_slice.replace(/[\x00-\x1f]/g,' '));}
+      catch(e3){
+        const _rx=k=>{const m=_slice.match(new RegExp('"'+k+'"\\s*:\\s*"([\\s\\S]*?)"\\s*[,}]'));return m?m[1].replace(/[\x00-\x1f]/g,' ').trim():null;};
+        brief={gmvInsight:_rx('gmvInsight'),outletInsight:_rx('outletInsight'),skuInsight:_rx('skuInsight'),costInsight:_rx('costInsight'),summary:_rx('summary')};
+        if(!brief.gmvInsight&&!brief.skuInsight&&!brief.costInsight){console.error('LM parse fail:',_slice.slice(0,300));throw e3;}
+      }
     }
     // Inject per-card insights (consistent wrapper — same as v51 injectInsight)
     const injectInsight=(id,text)=>{
@@ -1632,6 +1652,8 @@ Guardrails:
     if(insLabel)insLabel.textContent=_getSummaryInsightLabel(false);
     if(btn)btn.classList.remove('done');
     console.error('Last month summary error:',e);
+    // v_thinkfix (2026-08-20): เหมือน generateKamBriefing — เดิมเงียบสนิท
+    showToast('สรุป AI ไม่สำเร็จ — ลองกด Brief ใหม่อีกครั้ง','⚠');
   }
 }
 
