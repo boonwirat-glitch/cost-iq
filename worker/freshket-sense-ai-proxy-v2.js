@@ -413,6 +413,49 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
     throw new Error('Groq transcribe failed: ' + (e?.message || 'unknown'));
   }
 
+  // v_transcribegap (2026-08-20): Groq บางครั้งตอบ 200 OK แต่ transcript หยุด
+  // กลางคันเงียบๆ — ไม่ error ไม่ reject แค่ segments สุดท้ายจบก่อนความยาวคลิป
+  // จริงมาก เจอจากข้อมูลจริง: สุ่ม 20 session ยาว (>15 นาที) ที่ใช้ whisper_fallback
+  // 3 ใน 20 (15%) ขาดไปเกิน 10% ของความยาว — หนักสุดขาดไป 37% (2501 วิ เหลือแค่
+  // 1570 วิ) และ 27% (2829 วิ เหลือแค่ 2070 วิ) เนื้อหาบทสนทนาจริงหายไปเงียบๆ
+  // ก่อนถึงขั้น analyze ด้วยซ้ำ — pipeline_stage ยังขึ้น 'analyzed' ปกติ ทั้งที่
+  // ไม่ครบ ไม่มีทางรู้เลยถ้าไม่เทียบ duration_secs กับ segment สุดท้ายเอง
+  //
+  // แก้: เทียบ timestamp ท่อนสุดท้ายกับความยาวคลิปจริง ถ้าขาดเกินเกณฑ์ ลองใหม่
+  // อีก "ครั้งเดียว" (ไม่ใช่ 3 — โควตา Groq คิดเป็นวินาทีเสียง ตามบทเรียน 12 ส.ค.
+  // ข้างบน) แล้วเลือกผลที่ครอบคลุมมากกว่า ไม่มีทางกู้ท่อนที่หายมาได้ถ้าลองซ้ำแล้ว
+  // ยังขาดเหมือนเดิม แต่อย่างน้อยก็ไม่ปล่อยผ่านเงียบๆ โดยไม่ลองเลยสักครั้ง
+  const GROQ_GAP_FLOOR_SEC = 60;     // ต่ำกว่านี้ถือเป็นความเงียบท้ายคลิปปกติ
+  const GROQ_GAP_RATIO = 0.10;       // หรือเกิน 10% ของความยาวคลิป แล้วแต่ค่าไหนมากกว่า
+  function _lastSegEnd(gd) {
+    const segs = gd?.segments || [];
+    return segs.length ? Math.max(...segs.map(s => s.end || 0)) : 0;
+  }
+  const _gapThreshold = Math.max(GROQ_GAP_FLOOR_SEC, (duration_secs || 0) * GROQ_GAP_RATIO);
+  const _firstGap = (duration_secs || 0) - _lastSegEnd(groqData);
+  if (_firstGap > _gapThreshold) {
+    console.warn(`[transcribe] ท่อนสุดท้ายจบที่ ${_lastSegEnd(groqData).toFixed(0)}s แต่คลิปยาว ${duration_secs}s (ขาด ${_firstGap.toFixed(0)}s) — ลองใหม่อีกครั้ง`);
+    try {
+      const retryRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.GROQ_API_KEY}` },
+        body: groqForm
+      });
+      if (retryRes.ok) {
+        const retryData = await retryRes.json();
+        const _retryGap = (duration_secs || 0) - _lastSegEnd(retryData);
+        if (_retryGap < _firstGap) {
+          console.warn(`[transcribe] รอบสองครอบคลุมมากกว่า (ขาดเหลือ ${_retryGap.toFixed(0)}s) — ใช้ผลรอบสองแทน`);
+          groqData = retryData;
+        } else {
+          console.warn(`[transcribe] รอบสองไม่ได้ดีขึ้น (ขาด ${_retryGap.toFixed(0)}s) — ใช้ผลรอบแรกต่อ`);
+        }
+      }
+    } catch (e) {
+      console.warn('[transcribe] ลองใหม่รอบสองล้มเหลว — ใช้ผลรอบแรกต่อ:', e?.message || e);
+    }
+  }
+
   // Whisper hallucination guard: drop segments Whisper itself flags as
   // probably-not-speech AND low-confidence (its classic invent-text-on-
   // silence failure mode — restaurant background noise triggers it).
