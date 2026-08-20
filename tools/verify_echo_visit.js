@@ -778,6 +778,33 @@ check('กลับมาจากเบื้องหลัง = ตั้ง�
            /_recLastDataAt = Date\.now\(\);/.test(seg) &&
            /_recSamples = \[\{ t: Date\.now\(\), b: _recBytes \}\]/.test(seg);
   })());
+console.log('\n── 11. v_uiguard: ครึ่งหลังของบั๊กเดียวกัน (จอ/บัฟเฟอร์/คลื่นที่โกหก) ──');
+check('_unmount ไม่ถอดหน้าจอ/หยุดนาฬิกา ถ้ายังมีการอัดไหลอยู่จริง',
+  (() => {
+    const i = ci.indexOf('function _unmount()');
+    if (i < 0) return false;
+    const body = ci.slice(i, i + 2000);
+    const iGuard = body.indexOf("if (_recorder && _recorder.state === 'recording') return;");
+    const iEl    = body.indexOf("getElementById('ci-fullsheet')");
+    return iGuard > -1 && iEl > iGuard;   // ต้องกันก่อนแตะ DOM
+  })());
+check('ถามก่อนล้างเสียงที่ยังกู้ได้ ตอนเริ่มอัดรอบใหม่ (เดิมล้างเงียบๆ)',
+  /async function _idbRecoverable\(\)/.test(ci) &&
+  /const _stale = await _idbRecoverable\(\);/.test(ci) &&
+  /มีเสียงที่ยังไม่ได้วิเคราะห์ค้างอยู่/.test(ci));
+check('ไม่ยืนยัน = ไม่เริ่มอัด และปิดไมค์ที่เพิ่งขอมาทิ้ง (ห้ามค้าง)',
+  /_teardownRecorder\('keep-stale-buffer'\);[\s\S]{0,200}_startRecBusy = false;[\s\S]{0,200}return;/.test(ci));
+check('เกณฑ์ "กู้ได้" ตรงกับ _checkRecoverBuffer (5 วิ + ไม่เกิน 24 ชม.)',
+  /_idbRecoverable[\s\S]{0,420}24 \* 3600 \* 1000[\s\S]{0,200}chunks\.length < 5/.test(ci));
+check('คลื่นเสียงผูกกับไบต์จริง ไม่ใช่ Math.sin ล้วน (จอต้องไม่โกหก)',
+  /const bps = \(_recBytes - _wLastBytes\)/.test(ci) &&
+  /const h = 6 \+ s \* 26 \* lv;/.test(ci));
+check('คลื่นไม่ใช้ AnalyserNode/createMediaStreamSource (เคยทำสัญญาณเพี้ยน)',
+  (() => {
+    const code = ci.split('\n').filter(l => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+    return !/createAnalyser|createMediaStreamSource/.test(code);
+  })());
+
 // v_recwatch (2026-08-20): ช่องโหว่เชิงกระบวนการที่รีวิวจับได้ และอันตรายเงียบที่สุด
 // — harness ทั้งไฟล์นี้อ่านแต่ src/ แต่ของที่ผู้ใช้โหลดจริงคือ index.html ที่ build
 // มาแล้ว ถ้าลืมรัน build.py จะ commit src ที่ถูกต้องแต่ผู้ใช้ไม่ได้อะไรเลย และ

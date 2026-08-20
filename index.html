@@ -1,4 +1,4 @@
-<!-- Freshket Sense v269: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v270: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1338,7 +1338,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v269',
+      version: 'v270',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -51563,6 +51563,15 @@ body:not(.echo-active) { background:unset; }
     //   ไว้ "ก่อน" เรียก _unmount() อยู่แล้ว (เช่นเส้นสำเร็จของ _startAsyncPipeline)
     // การปิดไมค์ต้องสั่งจากจุดที่ "ตั้งใจทิ้งการอัดนั้นจริงๆ" เท่านั้น คือ
     // open() / cancel() / stopRecording() / visibility guard / ด่านก่อนเริ่มอัดใหม่
+    //
+    // v_uiguard (2026-08-20): ครึ่งหลังของบั๊กเดียวกัน — v269 กันไม่ให้งานเก่าไปปิด
+    // "ไมค์" ของงานใหม่แล้ว แต่ยังถอด "หน้าจอ" กับหยุดนาฬิกาของงานใหม่ได้อยู่
+    // (pipeline ร้านก่อนหน้าทำเสร็จตอน rep กำลังอัดร้านถัดไป → จอหายทั้งที่ยังอัด
+    //  อยู่เบื้องหลัง แล้วไม่มีปุ่มให้กดจบด้วย) · ถ้ามีการอัดที่ยังไหลอยู่จริง
+    // แปลว่า sheet บนจอเป็นของการอัดนั้น ไม่ใช่ของงานที่เพิ่งจบ — ห้ามแตะ
+    // เส้นที่ปิด sheet อย่างถูกต้องทุกเส้นผ่าน teardown มาก่อนแล้ว (_recorder = null)
+    // จึงไม่ติดเงื่อนไขนี้
+    if (_recorder && _recorder.state === 'recording') return;
     const el = document.getElementById('ci-fullsheet');
     if (!el) return;
     el.classList.remove('ci-open');
@@ -51841,14 +51850,31 @@ body:not(.echo-active) { background:unset; }
       wf.appendChild(b);
     }
     let t = 0;
+    // v_uiguard (2026-08-20): คลื่นนี้เคยเป็น Math.sin() ล้วน ไม่ผูกกับเสียงจริงเลย
+    // จึงยังกระเพื่อมสวยงามอยู่แม้ไมค์ตายสนิท — เป็น "จอที่โกหก" ชนิดเดียวกับนาฬิกา
+    // ที่เดินต่อทั้งที่ไม่ได้อัดอะไร ซึ่งคือเหตุผลที่บั๊กเดิมไม่มีใครจับได้เป็นสัปดาห์
+    // ตอนนี้ผูกความสูงกับ "ไบต์เสียงที่เข้ามาจริง" (_recBytes ที่ watchdog นับอยู่แล้ว)
+    // ไมค์เงียบ → แท่งแบนราบเอง ไม่ต้องรอ watchdog ครบ 45 วิ ก็เห็นด้วยตาว่าผิดปกติ
+    // ⚠ เจตนาไม่ใช้ AnalyserNode/createMediaStreamSource เพราะเคยทำสัญญาณที่อัดได้เพี้ยน
+    let _wLastBytes = 0, _wLastAt = Date.now(), _wLevel = 1;
     _waveRef = setInterval(() => {
       t += 0.14;
+      const now = Date.now();
+      if (now - _wLastAt >= 500) {
+        const bps = (_recBytes - _wLastBytes) / ((now - _wLastAt) / 1000);
+        _wLastBytes = _recBytes; _wLastAt = now;
+        // 6,800 B/วิ = ย่านปกติที่วัดได้จาก production · ขยับเข้าหาค่าใหม่แบบนุ่มๆ
+        // ไม่กระตุก และคงพื้นไว้ 0.12 เพื่อให้ยังเห็นว่าแอปไม่ค้าง
+        const target = _phase === 'recording' ? Math.max(0, Math.min(1, bps / 6800)) : 1;
+        _wLevel += (target - _wLevel) * 0.5;
+      }
+      const lv = 0.12 + _wLevel * 0.88;
       const bars = wf.querySelectorAll('.ci-wb');
       bars.forEach((b, i) => {
         // All bars same max height (32px), independent phase → every bar ripples visibly
         const s = (1 + Math.sin(t + phases[i])) / 2; // 0..1, smooth single freq
-        const h = 6 + s * 26; // min 6px, max 32px — every bar moves meaningfully
-        const op = 0.28 + s * 0.52; // min 0.28, max 0.80
+        const h = 6 + s * 26 * lv; // min 6px — แอมพลิจูดตามเสียงจริง
+        const op = 0.28 + s * 0.52 * lv;
         b.style.height = h.toFixed(1) + 'px';
         b.style.opacity = op.toFixed(2);
       });
@@ -51944,6 +51970,20 @@ body:not(.echo-active) { background:unset; }
   }
 
   // ── Recovery — เช็ค buffer ค้างตอนเปิด Echo (rep เท่านั้น, idle เท่านั้น) ──
+  // v_uiguard (2026-08-20): ใช้เกณฑ์เดียวกับ _checkRecoverBuffer เพื่อตอบว่า "ตอนนี้
+  // มีเสียงที่กู้ได้ค้างอยู่จริงไหม" — ใช้ก่อนล้าง buffer ตอนเริ่มอัดรอบใหม่
+  // (ถ้าเคยกด "ทิ้ง" ที่แถบกู้ไปแล้ว buffer จะว่าง ฟังก์ชันนี้คืน 0 จึงไม่ถามซ้ำ)
+  async function _idbRecoverable() {
+    try {
+      const meta = await _idbGetMeta();
+      if (!meta) return null;
+      if (Date.now() - (meta.started_at || 0) > 24 * 3600 * 1000) return null;
+      const chunks = await _idbGetChunks();
+      if (!chunks || chunks.length < 5) return null;
+      return { secs: chunks.length, name: meta.account_name || '' };  // timeslice 1 วิ = 1 chunk
+    } catch (_) { return null; }
+  }
+
   async function _checkRecoverBuffer() {
     if (_phase !== 'idle' || _sessionId || _canDebrief()) return; // v728: ไม่ recover ถ้ามี session active อยู่
     const meta = await _idbGetMeta();
@@ -52163,6 +52203,21 @@ body:not(.echo-active) { background:unset; }
         });
       } catch(_) {}
       _recorder.onstop = _onStop;
+      // v_uiguard (2026-08-20): ของเดิมล้าง buffer ทิ้งเงียบๆ ทุกครั้งที่เริ่มอัด แม้มี
+      // เสียงที่ยังไม่ได้วิเคราะห์ค้างอยู่ · แถบ "พบการบันทึกค้าง" ขึ้นให้เห็นก่อนจริง
+      // แต่ถ้า rep กดอัดร้านใหม่เลย เสียง visit ก่อนหน้าหายถาวรโดยไม่มีใครรู้ตัว
+      // ถามก่อนเสมอ และถ้าไม่ยืนยันก็ไม่เริ่มอัด (ปิดไมค์ที่เพิ่งขอมาให้เรียบร้อย)
+      const _stale = await _idbRecoverable();
+      if (_stale && !confirm(
+            'มีเสียงที่ยังไม่ได้วิเคราะห์ค้างอยู่ ' + _fmt(_stale.secs) + ' นาที' +
+            (_stale.name ? '\n(' + _stale.name + ')' : '') +
+            '\n\nถ้าเริ่มอัดใหม่ เสียงชุดนั้นจะหายถาวร\nกดยกเลิกเพื่อกลับไปกด "วิเคราะห์ต่อ" ที่แถบด้านบนก่อน')) {
+        _teardownRecorder('keep-stale-buffer');   // ยังไม่ start() แต่ไมค์เปิดแล้ว
+        _phase = 'idle';
+        _startRecBusy = false;
+        _toast('ยังไม่เริ่มอัดใหม่ — กด "วิเคราะห์ต่อ" ที่แถบด้านบนก่อน');
+        return;
+      }
       // v555: เคลียร์ buffer เก่า + เขียน meta ก่อนเริ่ม — กู้คืนได้ถ้าแอพถูก kill
       try { await _idbClear(); } catch(_) {}
       _idbSetMeta({ account_guid: _accountGuid, account_name: _accountName, account_seg: _accountSeg,
