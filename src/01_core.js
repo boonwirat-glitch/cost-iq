@@ -1440,7 +1440,25 @@ async function checkSession() {
     // โทเคนหมดอายุ (นอนข้ามคืน) ทำให้ getSession() ยิง refresh ผ่านเน็ตภายใต้
     // navigator.locks · ถ้าค้าง โค้ดใต้บรรทัดนี้จะไม่มีวันรัน = ผ้าคลุม boot
     // อยู่ค้างถาวร · หมดเวลา = คืน null = ตกไปเส้นทาง "ไม่มี session" ข้างล่าง
-    const _cs = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot)');
+    //
+    // v_bootauth (2026-08-20): บุชรายงาน "PWA auto logout เสมอถ้าผ่านไปสักพัก
+    // ไม่รู้นานแค่ไหน" — ตรงกับ v_authfix (14 ส.ค.) เป๊ะ แต่ตอนนั้นแก้แค่
+    // _pwaSilentSessionCheck() (เคส "แอปยังไม่ถูกฆ่า แค่พักจอ") ไม่ได้แก้จุดนี้
+    // ที่เป็นการ boot เย็นทุกครั้งที่เปิด PWA ใหม่หลังถูกฆ่า (พบบ่อยกว่ามาก
+    // เพราะ iOS ฆ่า WKWebView เบื้องหลังได้ทุกเมื่อ ยิ่งมี render storm ให้เหตุผล
+    // เพิ่มด้วย) · เดิม timeout ครั้งแรกแปลงเป็น null แล้วเด้ง login ทันที ทั้งที่
+    // token ใน localStorage อาจยังดีอยู่ครบ แค่เน็ตยังไม่พร้อมตอนวิทยุมือถือ
+    // เพิ่งตื่น — ใช้ pattern เดียวกับ _pwaSilentSessionCheck: "ไม่รู้" ต้องลองอีก
+    // ครั้งก่อน ไม่ใช่ประทับตราว่า "ล็อกเอาต์แล้ว" จากความเงียบรอบแรก
+    let _cs = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot-1)');
+    if (_authUnknown(_cs)) {
+      console.warn('[checkSession] รอบแรกตอบไม่ได้ (เน็ต) — รอแล้วลองอีกครั้งก่อนเด้ง login');
+      await new Promise(r => setTimeout(r, 2500));
+      _cs = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot-2)');
+      if (_authUnknown(_cs)) {
+        console.warn('[checkSession] รอบสองก็ตอบไม่ได้ — จำเป็นต้องเด้ง login กันผ้าคลุม boot ค้าง');
+      }
+    }
     const session = _cs && _cs.data && _cs.data.session;
     // Fix v194 Guard B: set flag BEFORE await to block onAuthStateChange(INITIAL_SESSION)
     // from racing into hideLoginOverlay() while checkSession is still handling it.

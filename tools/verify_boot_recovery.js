@@ -193,4 +193,22 @@ console.log('\n[v_authfix] แยก "ไม่รู้" ออกจาก "�
     ctx2.f(ctx2.U) === true && ctx2.f(null) === false && ctx2.f({ data: { session: null } }) === false);
 }
 
+// ── v_bootauth (2026-08-20): checkSession() (cold boot) ก็ต้องแยก "ไม่รู้" ด้วย ──
+// v_authfix ข้างบนแก้แค่ _pwaSilentSessionCheck (แอปยังไม่ถูกฆ่า แค่พักจอ) —
+// checkSession() คือเส้น "เปิด PWA ใหม่หลังถูกฆ่า" ซึ่งเกิดบ่อยกว่ามาก (iOS ฆ่า
+// WKWebView เบื้องหลังได้ทุกเมื่อ) เดิม timeout ครั้งแรกแปลงเป็น null แล้วเด้ง
+// login ทันที ทั้งที่ token ใน localStorage อาจยังดีอยู่ครบ
+console.log('\n[v_bootauth] checkSession() (cold boot) ก็ต้องลองซ้ำก่อนเด้ง login');
+{
+  const core = fs.readFileSync(path.join(__dirname, '..', 'src', '01_core.js'), 'utf8');
+  const csBlock2 = (core.match(/async function checkSession\(\)[\s\S]*?\n\}/) || [''])[0];
+  check('checkSession: รอบแรกตอบไม่ได้ (unknown) → ลองรอบสองก่อน ไม่เด้ง login ทันที',
+    /let _cs = await _withTimeout\(supa\.auth\.getSession\(\), SENSE_AUTH_TIMEOUT_MS, 'getSession\(boot-1\)'\);\s*\n\s*if \(_authUnknown\(_cs\)\) \{/.test(csBlock2));
+  check('checkSession: รอบสองมี grace delay ก่อนยิงซ้ำ (ให้เวลาวิทยุมือถือตื่น)',
+    /setTimeout\(r, 2500\)/.test(csBlock2) && /getSession\(boot-2\)/.test(csBlock2));
+  check('checkSession: unknown ทั้งสองรอบแล้วค่อยตกไปเส้นทาง login (ไม่ใช่รอบแรกรอบเดียว)',
+    csBlock2.indexOf("getSession(boot-2)") > csBlock2.indexOf("getSession(boot-1)") &&
+    csBlock2.indexOf('_showLoginOverlayClean()') > csBlock2.indexOf("getSession(boot-2)"));
+}
+
 process.exit(fail ? 1 : 0);
