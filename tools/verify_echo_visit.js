@@ -827,6 +827,101 @@ check('index.html ที่ส่งจริง build มาจาก src ล�
 check('ห้ามกลับไปใช้ createMediaStreamSource กับสตรีมไมค์ (เคยทำสัญญาณเพี้ยน)',
   !/createMediaStreamSource/.test(ci.split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n')));
 
+// ── v_reviewsteps (2026-08-20): ETA จริงสำหรับ "รอรีวิว" ในหน้า TL/Admin ────────
+// บุชขอ: หน้าประวัติของ TL/Admin ต้องบอกว่ากำลังประมวลผลอยู่หรือรอคนกดรีวิว
+// แยกกัน + บอกเวลาโดยประมาณจากตาราง cron จริง ไม่ใช่ป้าย "รอรีวิว" เดียวคลุมหมด
+console.log('\n── 12. v_reviewsteps: แยก "กำลังประมวลผล" ออกจาก "รอคนรีวิว" + ETA จริง ──');
+check('มี _reviewEtaText / _reviewStepInfo / _reviewStepBarHtml ครบ',
+  /function _reviewEtaText\(nowMs\)/.test(ci) &&
+  /function _reviewStepInfo\(s\)/.test(ci) &&
+  /function _reviewStepBarHtml\(info\)/.test(ci));
+check('ป้ายล้มถาวร (failed_audio/failed_system/no_speech) ต้องไม่ใช้คำว่า "รอรีวิว" อีก',
+  (() => {
+    // คอมเมนต์อธิบายที่มา (รวมของ v566 เดิม) มีคำว่า "รอรีวิว" ปนอยู่โดยตั้งใจ —
+    // เช็คนี้สนใจแค่โค้ดที่รัน ไม่ใช่คอมเมนต์ ต้องกรองออกก่อนเหมือนเช็คอื่นในไฟล์นี้
+    const code = ci.split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n');
+    return !/รอรีวิว/.test(code);
+  })(),
+  'เจอคำว่า "รอรีวิว" หลงเหลืออยู่นอกคอมเมนต์ — ของเดิมถูกแทนด้วยแถบขั้นตอนทั้งหมดแล้ว');
+check('copy ใช้ "พร้อมให้รีวิว" ไม่ใช่ "รอ TL เปิดดู" (Admin ก็รีวิวได้ ไม่ใช่ TL อย่างเดียว)',
+  /'พร้อมให้รีวิว'/.test(ci));
+check('_renderTLTeamFeed มีเส้น short-circuit สำหรับ failed_audio/failed_system/no_speech ก่อนถึงการ์ดปกติ',
+  /pipeline_stage === 'failed_audio' \|\| s\.pipeline_stage === 'failed_system' \|\| s\.pipeline_stage === 'no_speech'/.test(ci));
+
+// รันจริง: ประกอบเฉพาะฟังก์ชันที่ต้องใช้ในแซนด์บ็อกซ์ ยืนยันพฤติกรรมจริง ไม่ใช่แค่ grep
+{
+  const vm = require('vm');
+  const grab = (name) => {
+    const i = ci.indexOf(`function ${name}(`);
+    if (i < 0) return '';
+    let depth = 0, started = false, j = i;
+    for (; j < ci.length; j++) {
+      if (ci[j] === '{') { depth++; started = true; }
+      else if (ci[j] === '}') { depth--; if (started && depth === 0) { j++; break; } }
+    }
+    return ci.slice(i, j);
+  };
+  const REVIEW_STEP_LABELS_SRC = (ci.match(/const REVIEW_STEP_LABELS = \[[^\]]*\];/) || [''])[0];
+  const src = [REVIEW_STEP_LABELS_SRC, grab('_reviewEtaText'), grab('_reviewStepInfo'), grab('_reviewStepBarHtml')].join('\n');
+  const ctx = {};
+  vm.createContext(ctx);
+  try {
+    vm.runInContext(src + '\nthis.eta=_reviewEtaText; this.info=_reviewStepInfo; this.bar=_reviewStepBarHtml;', ctx);
+
+    // ในเวลาทำการ (14:00 ไทย = 07:00 UTC) → ต้องบอก "ภายใน ~5 นาที"
+    const inHours = Date.UTC(2026, 7, 20, 7, 0, 0); // 07:00 UTC = 14:00 Thai
+    check('รันจริง: ในเวลาทำการ (14:00 ไทย) → "ภายใน ~5 นาที"',
+      ctx.eta(inHours) === 'ภายใน ~5 นาที', 'ได้ ' + JSON.stringify(ctx.eta(inHours)));
+
+    // นอกเวลาทำการตอนกลางคืน (23:40 ไทย = 16:40 UTC) → ต้องเลื่อนไปพรุ่งนี้ 9:05
+    const lateNight = Date.UTC(2026, 7, 19, 16, 40, 0); // 16:40 UTC = 23:40 Thai (19 ส.ค.)
+    check('รันจริง: หลัง 23:00 ไทย → เลื่อนไป "พรุ่งนี้ ~09:05 น."',
+      ctx.eta(lateNight) === 'พรุ่งนี้ ~09:05 น.', 'ได้ ' + JSON.stringify(ctx.eta(lateNight)));
+
+    // ก่อนเวลาทำการตอนเช้ามืด (03:00 ไทย = 20:00 UTC วันก่อนหน้า) → รอบถัดไปคือ "วันนี้" ไม่ใช่พรุ่งนี้
+    const preDawn = Date.UTC(2026, 7, 19, 20, 0, 0); // 20:00 UTC (19 ส.ค.) = 03:00 Thai (20 ส.ค.)
+    check('รันจริง: ตี 3 ไทย (ยังไม่ถึง 9 โมง) → เลื่อนไป "วันนี้ ~09:05 น." ไม่ใช่พรุ่งนี้',
+      ctx.eta(preDawn) === 'วันนี้ ~09:05 น.', 'ได้ ' + JSON.stringify(ctx.eta(preDawn)));
+
+    // สถานะ mapping ครบ
+    check('รันจริง: uploaded/needs_gemini → step 0 (ถอดเสียง) มี eta',
+      ctx.info({ pipeline_stage: 'uploaded' }).step === 0 && !!ctx.info({ pipeline_stage: 'uploaded' }).eta &&
+      ctx.info({ pipeline_stage: 'needs_gemini' }).step === 0);
+    check('รันจริง: transcribed → step 1 (วิเคราะห์) มี eta',
+      ctx.info({ pipeline_stage: 'transcribed' }).step === 1 && !!ctx.info({ pipeline_stage: 'transcribed' }).eta);
+    check('รันจริง: analyzed + ไม่มี tl_reviewed_at → step 2 (พร้อมให้รีวิว) ไม่มี eta',
+      ctx.info({ pipeline_stage: 'analyzed' }).step === 2 && ctx.info({ pipeline_stage: 'analyzed' }).eta === null);
+    check('รันจริง: analyzed + มี tl_reviewed_at → step 3 (รีวิวแล้ว) ไม่มี eta',
+      ctx.info({ pipeline_stage: 'analyzed', tl_reviewed_at: '2026-08-20T01:00:00Z' }).step === 3 &&
+      ctx.info({ pipeline_stage: 'analyzed', tl_reviewed_at: '2026-08-20T01:00:00Z' }).eta === null);
+    check('รันจริง: checked_in → null (ไม่มีแถบขั้นตอนเลย — มีการ์ดของตัวเองแยกอยู่แล้ว)',
+      ctx.info({ pipeline_stage: 'checked_in' }) === null);
+    check('รันจริง: failed_audio/failed_system/no_speech → failed:true พร้อมเหตุผลที่ต่างกัน',
+      ctx.info({ pipeline_stage: 'failed_audio' }).failed === true &&
+      ctx.info({ pipeline_stage: 'failed_audio' }).why === 'ไฟล์เสียงใช้ไม่ได้' &&
+      ctx.info({ pipeline_stage: 'failed_system' }).why === 'วิเคราะห์ไม่สำเร็จ' &&
+      ctx.info({ pipeline_stage: 'no_speech' }).why === 'ไม่พบเสียงพูด');
+    check('รันจริง: การ์ด failed ไม่มีแถบขั้นตอนปนอยู่ (แค่ป้ายแดงอันเดียว ไม่ใช่ progress bar)',
+      /rgba\(255,59,48/.test(ctx.bar(ctx.info({ pipeline_stage: 'no_speech' }))) &&
+      !/height:3px/.test(ctx.bar(ctx.info({ pipeline_stage: 'no_speech' }))));
+  } catch (e) {
+    check('รันจริง: แซนด์บ็อกซ์รันได้โดยไม่พัง', false, String(e && e.stack || e));
+  }
+}
+
+// ── v_discreetmode (2026-08-20): แตะเวลาเพื่อย่อเงียบๆ ระหว่างอัด ────────────
+console.log('\n── 13. v_discreetmode: แตะตัวเลขเวลาเพื่อย่อ ไม่ให้ลูกค้าสังเกต ──');
+check('#ci-tval มี onclick เรียก _minimizeFromTimer (จุดกดที่สอง แยกจาก topbar เดิม)',
+  /<div class="timer-val" id="ci-tval" onclick="CI\._minimizeFromTimer\(\)"/.test(ci));
+check('มีคำใบ้ "แตะตัวเลขเวลา" ให้เห็นตั้งแต่เริ่มอัด ไม่ใช่ฟีเจอร์ที่ซ่อนแบบเดา',
+  /id="ci-tap-hint"[^>]*>แตะตัวเลขเวลา เพื่อซ่อนอย่างเงียบๆ</.test(ci));
+check('_minimizeFromTimer สั่นเบาๆ ยืนยัน + เรียก _minimize เดิม (ไม่เขียนโค้ดย่อซ้ำ)',
+  /function _minimizeFromTimer\(\) \{\s*\n\s*if \(_phase !== 'recording'\) return;\s*\n\s*try \{ navigator\.vibrate && navigator\.vibrate\(30\); \} catch\(_\) \{\}\s*\n\s*_minimize\(\);/.test(ci));
+check('_minimizeFromTimer ถูก export ออกไปให้ onclick เรียกได้จริง',
+  /_minimize, _minimizeFromTimer, _switchMainTab/.test(ci));
+check('_minimize เดิมไม่ถูกแตะ — ยังกันด้วย _phase==="recording" เหมือนเดิม ไม่สั่นซ้ำที่จุดกด topbar',
+  /function _minimize\(\) \{\s*\n\s*if \(_phase !== 'recording'\) return;\s*\n\s*const sheet = document\.getElementById\('ci-fullsheet'\);/.test(ci));
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

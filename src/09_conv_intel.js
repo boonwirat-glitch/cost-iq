@@ -78,6 +78,69 @@ const CI = (() => {
   function _fmt(s) {
     return Math.floor(s/60)+':'+(s%60<10?'0':'')+(s%60);
   }
+
+  // ── v_reviewsteps (2026-08-20): ETA จริงสำหรับป้าย "รอรีวิว" ─────────────────
+  // บุชขอ: หน้าประวัติของ TL/Admin (_renderTLTeamFeed) โชว์ "รอรีวิว" เดียวกันทั้ง
+  // สอง session ที่สถานะจริงต่างกันมาก — session ที่ AI ยังไม่วิเคราะห์เสร็จ กับ
+  // session ที่ AI เสร็จแล้วรอแค่คนกดรีวิว — ไม่มีทางแยกออกจากป้ายเดียวเลย แถม
+  // session ที่ pipeline ล้มถาวร (failed_audio/failed_system/no_speech) ก็ตกมา
+  // โชว์ "รอรีวิว" เหมือนกันทั้งที่ไม่มีวันเสร็จ (_renderInlineHistory ฝั่ง rep
+  // เองแยกไว้ถูกต้องแล้วตั้งแต่แรก — ย้าย pattern เดียวกันมาใช้ที่นี่)
+  //
+  // ETA คำนวณจากตาราง cron จริง (wrangler.toml: "*/5 2-15 * * *" = ทุก 5 นาที
+  // ตั้งแต่ 9:00-22:55 เวลาไทย ปิดกลางคืน) ไม่ใช่เลขเดา — ถ้าตอนนี้อยู่ในเวลาทำการ
+  // คาดว่าเสร็จใน ~5 นาที ถ้านอกเวลาทำการ คำนวณ 9:05 ของรอบถัดไป (เผื่อ 5 นาที
+  // ให้ tick แรกทำงาน) "พร้อมให้รีวิว"/"รีวิวแล้ว" ไม่มี ETA เพราะเป็นเวลาคน
+  // (TL หรือ Admin กดปุ่ม "บันทึก + รีวิว" เอง) ไม่ใช่ cron จึงประมาณไม่ได้แม่นๆ
+  function _reviewEtaText(nowMs) {
+    const THAI_OFFSET_MS = 7 * 3600 * 1000;
+    const t = new Date((nowMs == null ? Date.now() : nowMs) + THAI_OFFSET_MS); // "เวลาไทย" อ่านผ่าน getUTC*
+    const h = t.getUTCHours();
+    if (h >= 9 && h < 23) return 'ภายใน ~5 นาที';
+    const next = new Date(t);
+    next.setUTCHours(9, 5, 0, 0);
+    if (h >= 23) next.setUTCDate(next.getUTCDate() + 1); // หลัง 23:00 แล้ว = รอบถัดไปคือพรุ่งนี้
+    const label = next.getUTCDate() === t.getUTCDate() ? 'วันนี้' : 'พรุ่งนี้';
+    const hh = String(next.getUTCHours()).padStart(2, '0');
+    const mm = String(next.getUTCMinutes()).padStart(2, '0');
+    return `${label} ~${hh}:${mm} น.`;
+  }
+
+  // ขั้นที่ session หนึ่งอยู่ ณ ตอนนี้ — คืน index 0-3 (ถอดเสียง/วิเคราะห์/พร้อมรีวิว/รีวิวแล้ว)
+  // หรือ null ถ้าเป็นสถานะที่ไม่ควรมีแถบขั้นตอนเลย (เช็คอินอย่างเดียว / ล้มถาวร)
+  const REVIEW_STEP_LABELS = ['ถอดเสียง', 'วิเคราะห์', 'พร้อมให้รีวิว', 'รีวิวแล้ว'];
+  function _reviewStepInfo(s) {
+    const stage = s.pipeline_stage;
+    if (stage === 'checked_in') return null;
+    if (stage === 'failed_audio' || stage === 'failed_system' || stage === 'no_speech') {
+      const why = stage === 'failed_audio' ? 'ไฟล์เสียงใช้ไม่ได้'
+                : stage === 'failed_system' ? 'วิเคราะห์ไม่สำเร็จ' : 'ไม่พบเสียงพูด';
+      return { failed: true, why };
+    }
+    if (stage === 'uploaded' || stage === 'needs_gemini') return { step: 0, eta: _reviewEtaText() };
+    if (stage === 'transcribed') return { step: 1, eta: _reviewEtaText() };
+    // analyzed (หรือ stage เก่า/ไม่รู้จักที่มี skill_scores จริงแล้ว) — แยกด้วย tl_reviewed_at
+    return s.tl_reviewed_at ? { step: 3, eta: null } : { step: 2, eta: null };
+  }
+
+  function _reviewStepBarHtml(info) {
+    if (!info) return '';
+    if (info.failed) {
+      return `<div style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF3B30;background:rgba(255,59,48,.10);padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;display:inline-block">${info.why}</div>`;
+    }
+    const bars = [0, 1, 2, 3].map(i => {
+      const cls = i < info.step ? 'background:#34C759'
+                : i === info.step ? 'background:#7FB4FF'
+                : 'background:rgba(0,0,0,.08)';
+      return `<div style="flex:1;height:3px;border-radius:3px;${cls}"></div>`;
+    }).join('');
+    const label = REVIEW_STEP_LABELS[info.step];
+    const etaHtml = info.eta ? ` <span style="color:var(--tx3,#AEAEB2)">· คาดว่าเสร็จ ${info.eta}</span>` : '';
+    return `<div style="display:flex;flex-direction:column;gap:5px;width:100%">
+  <div style="display:flex;align-items:center;gap:3px">${bars}</div>
+  <div style="font-size:var(--text-xs);font-family:'Noto Sans Thai',sans-serif;color:${info.step===3?'#34C759':info.step===2?'#FF9500':'#534AB7'};font-weight:var(--fw-medium)">${label}${etaHtml}</div>
+</div>`;
+  }
   function _bestMime() {
     const types = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'];
     for (const t of types) if (MediaRecorder.isTypeSupported(t)) return t;
@@ -606,6 +669,16 @@ body:not(.echo-active) { background:unset; }
     if (_tbIcon) _tbIcon.style.display = 'none';
   }
 
+  // v_discreetmode (2026-08-20): จุดกดที่สองสำหรับ _minimize() เดิม — แตะตัวเลข
+  // เวลากลางจอตอนอัด สั่นเบาๆ ยืนยันว่ากดโดนจริง (จอดับตอนนั้นไม่มี toast/label
+  // ให้เห็นว่าเกิดอะไรขึ้น การสั่นคือ feedback เดียวที่ทันเวลา) ไม่แตะ _minimize()
+  // เดิมเพราะจุดกดจาก topbar ("ย่อ") ไม่ควรสั่นซ้ำ — มันเห็น label ยืนยันอยู่แล้ว
+  function _minimizeFromTimer() {
+    if (_phase !== 'recording') return;
+    try { navigator.vibrate && navigator.vibrate(30); } catch(_) {}
+    _minimize();
+  }
+
   // v601: re-apply body scroll lock (overflow:hidden) when expanding sheet back from minimized
   function _reapplyBodyLock() {
     try {
@@ -727,12 +800,18 @@ body:not(.echo-active) { background:unset; }
   <!-- active recording center — wave + timer -->
   <div id="ci-rec-active" style="display:none;flex-direction:column;align-items:center;padding:20px 24px 8px;gap:12px">
     <div class="ci-wave-wrap" id="ci-wf"></div>
-    <div class="timer-val" id="ci-tval">0:00</div>
+    <!-- v_discreetmode (2026-08-20): บุชขอ — ระหว่างอัด แตะที่ตัวเลขเวลาเพื่อย่อ
+         ทันทีเหลือแค่ pill ลอย (ของเดิม _minimize() มีอยู่แล้ว แต่จุดกดเดียวซ่อน
+         อยู่ในมุมซ้ายบนที่ใช้ร่วมกับปุ่ม "ยกเลิก" — น้องๆ ไม่รู้ว่ามี หรือกลัวกดพลาด
+         เสียการอัด) เพิ่มจุดกดที่สอง ชัดเจนกว่า ไม่ต้องเพิ่มปุ่มใหม่ในแถวล่างที่
+         แน่นอยู่แล้ว (จบ&วิเคราะห์ / ยกเลิก) — สั่นเบาๆ ยืนยันว่ากดโดนจริง -->
+    <div class="timer-val" id="ci-tval" onclick="CI._minimizeFromTimer()" style="cursor:pointer">0:00</div>
     <!-- v_screenlock (2026-08-17): ข้อความเดิม "ทำงานอยู่เบื้องหลัง" หลอกว่าปิดจอ
          ได้ปลอดภัย — จริงๆ iOS ตัดไมค์ทันทีที่ล็อกจอ (เหตุการณ์จริง 11 ส.ค. เสียง
          19-48 นาทีเหลือ 24-54KB) ข้อความนี้ต้องเตือนไว้ก่อนตั้งแต่เริ่มอัด ไม่ใช่
          บอกทีหลังตอนเจอไฟล์ขาดไปแล้ว -->
     <div class="timer-hint" id="ci-rec-hint">เปิดหน้าจอทิ้งไว้ระหว่างคุย · ถ้าจอล็อกเสียงอาจขาดหาย</div>
+    <div class="timer-hint" id="ci-tap-hint" style="color:#7FB4FF;opacity:.8">แตะตัวเลขเวลา เพื่อซ่อนอย่างเงียบๆ</div>
     <!-- v_recwatch (2026-08-20): แถบเตือน "ไมค์ไม่ได้รับเสียง" — ต้องค้างไว้ ไม่ใช่
          toast ที่หายเอง เพราะจุดตายของบั๊กนี้คือ rep ไม่มีทางรู้เลยจนสาย -->
     <div id="ci-rec-dead" style="display:none;margin-top:6px;padding:12px 14px;border-radius:12px;
@@ -3753,8 +3832,27 @@ body:not(.echo-active) { background:unset; }
 </div>`;
       }
 
+      // v_reviewsteps (2026-08-20): pipeline ล้มถาวรต้องไม่โผล่เป็น "รอรีวิว" —
+      // ของเดิมตกมาโชว์ป้ายเดียวกับ session ที่กำลังทำงานปกติ ทั้งที่ไม่มีวันเสร็จ
+      // (_renderInlineHistory ฝั่ง rep แยกไว้ถูกต้องอยู่แล้ว ย้าย pattern มาที่นี่)
+      if (s.pipeline_stage === 'failed_audio' || s.pipeline_stage === 'failed_system' || s.pipeline_stage === 'no_speech') {
+        const info = _reviewStepInfo(s);
+        return `<div onclick="CI._openSessionDetail('${s.id}')" style="background:rgba(255,255,255,.72);border-radius:var(--r-lg);border:0.5px solid rgba(255,59,48,.28);padding:12px 14px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,56,92,.12);display:flex;align-items:center;justify-content:center;font-size:var(--text-2xs);font-weight:var(--fw-semi);color:var(--ac,#FF385C);flex-shrink:0">${repName.slice(0,2).toUpperCase()}</div>
+      <div>
+        <div style="font-size:var(--text-md);font-weight:var(--fw-medium);color:var(--tx,#1C1C1E);line-height:1.2">${repName}</div>
+        <div style="font-size:var(--text-xs);color:var(--tx3,#AEAEB2);font-family:'Noto Sans Thai',sans-serif">${acctLabel} · ${date}</div>
+      </div>
+    </div>
+    ${_reviewStepBarHtml(info)}
+  </div>
+</div>`;
+      }
+
       const dur      = s.duration_secs ? _fmt(s.duration_secs) : '';
-      const reviewed = !!s.tl_reviewed_at;
+      const stepInfo = _reviewStepInfo(s);
 
       // Skill dots
       const skills = s.skill_scores?.skills || [];
@@ -3771,11 +3869,6 @@ body:not(.echo-active) { background:unset; }
         const col = c==='high'?'#34C759':c==='medium'?'#FF9500':'#FF3B30';
         toneBadge = `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:${col};background:${col}18;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif;letter-spacing:.04em">${c==='high'?'Confident':c==='medium'?'Steady':'Hesitant'}</span>`;
       }
-
-      // Review badge
-      const reviewBadge = reviewed
-        ? `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#34C759;background:#34C75918;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif">✓ รีวิวแล้ว</span>`
-        : `<span style="font-size:var(--text-2xs);font-weight:var(--fw-medium);color:#FF9500;background:#FF950018;padding:2px 7px;border-radius:var(--r-sm);font-family:'Noto Sans Thai',sans-serif">รอรีวิว</span>`;
 
       // Co-visit badge
       const cvBadge = s.covisit_verified
@@ -3799,8 +3892,8 @@ body:not(.echo-active) { background:unset; }
     <div style="display:flex;gap:3px;align-items:center;flex:1">${dots}</div>
     ${toneBadge}
     ${cvBadge}
-    ${reviewBadge}
   </div>
+  <div style="margin-top:8px">${_reviewStepBarHtml(stepInfo)}</div>
   ${s.tl_note ? `<div style="font-size:var(--text-xs);color:#534AB7;font-style:italic;line-height:1.5;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(83,74,183,.12);font-family:'Noto Sans Thai',sans-serif">${s.tl_note}</div>` : ''}
 </div>`;
     }).join('');
@@ -5697,7 +5790,7 @@ ${confBanner}
     }
   }
 
-  return { open, startRecording, stopRecording, cancel, _recDismissDead, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _retryCheckinSyncNow, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
+  return { open, startRecording, stopRecording, cancel, _recDismissDead, _loadVisitHero, _phase: () => _phase, _tab, _save: () => { cancel(); }, /* v575: data auto-saved in _processBlob — กดบันทึก = ปิดเฉยๆ ไม่ insert ซ้ำ */ _openDebrief, _closeDebrief, _debriefPick, _debriefNote, _saveDebrief, _openSkillTrend, _closeTrend, _hidePicker, _pickerConfirmKam, _pickerConfirmSales, _pickerSearchInline, _salesPickerSearch, _minimize, _minimizeFromTimer, _switchMainTab, _topbarLeft, _openSessionDetail, _closeSessionDetail, _sdTab, _sdToggleWhy, _sdToggleNote, _markSessionReviewed, _saveTLSessionNote, _covisitVerify, _cvSelectRow, _orbTap, _doCheckin, _retryCheckinSyncNow, _histFilter, _recoverBuffer, _discardBuffer, _bustRubricCache: () => { _rubricCache = null; }, _reapplyBodyLock, _restoreBodyScroll, _renderEchoState, _resumeAnalysis, _startAsyncPipeline, _sweepStuckAsyncRows };
 
 })();
 
