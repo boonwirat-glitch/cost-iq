@@ -97,8 +97,16 @@ check('needs_gemini: hiccup ยังไม่แตะ general (ci_sessions) at
   /hiccupAttempts = \(\(row\.listen_state[\s\S]{0,300}\+ 1;/.test(STAGE1) &&
   /listen_state: \{ \.\.\.\(row\.listen_state \|\| \{\}\), attempts: hiccupAttempts/.test(STAGE1) &&
   !/hiccup ชั่วคราวรายหน้าต่าง[\s\S]{0,900}ci_sessions\.attempts \+\+/.test(STAGE1));
-check('ล้างสถานะระหว่างทางทิ้งก่อนส่งต่อให้ Whisper (ไม่งั้นค้างครึ่งๆ)',
-  /listen_state: null \}\)\.catch/.test(STAGE1));
+// v_enginelatch (2026-08-21): ยอมแพ้ Gemini แล้วต้องล็อกเป็น Whisper ไม่ใช่ล้างเป็น null
+// ถ้าล้างเป็น null แล้วรอบ Whisper ถูกฆ่ากลางทาง (waitUntil ตาย) tick ถัดไปจะเริ่ม
+// Gemini ใหม่จากศูนย์ อัปไฟล์ใหม่ทั้งก้อน วนไม่จำกัดโดยไม่มีตัวนับไหนขยับ
+// (ตรวจของจริงแล้ว: ci_sessions.attempts เป็น 0 ทุกแถว = ไม่มีเพดานคุมวงจรนี้เลย)
+check('ยอมแพ้ Gemini = ล็อกเป็น Whisper ไม่ใช่ล้างสถานะเป็น null (กันวนอัปไฟล์ใหม่)',
+  /listen_state: \{ engine: 'whisper', gave_up_at:/.test(STAGE1) &&
+  /const _latchedWhisper = !!\(row\.listen_state && row\.listen_state\.engine === 'whisper'\);/.test(STAGE1) &&
+  /const useGemini = !_latchedWhisper &&/.test(STAGE1));
+check('ล็อกแล้วต้องไม่กลับไปแตะ Gemini อีก แม้เป็นเส้น forcedGemini',
+  STAGE1.indexOf('!_latchedWhisper &&') < STAGE1.indexOf('forcedGemini || (env.LISTEN_ENGINE'));
 check('t เป็น null เมื่อไหร่ = เรียก Whisper เสมอ',
   // v_lazyaudio: มีคอมเมนต์คั่นระหว่าง if กับ t = await แล้ว จึงเช็คด้วยลำดับ index
   // ไม่ใช่ระยะตัวอักษร (regex เดิมพังทันทีที่แทรกคอมเมนต์ — กับดักเดิมของไฟล์นี้)
@@ -232,8 +240,12 @@ check('มี _geminiDeleteFile ไว้สั่งลบ และพลา�
   /method: 'DELETE'/.test(WK));
 check('ถอดจบครบทุกช่วงแล้วลบไฟล์ทิ้งก่อน return ผลลัพธ์',
   /if \(st\.file_name\) await _geminiDeleteFile\(env, st\.file_name\);\s*return \{/.test(STEP));
-check('เลิกใช้ไฟล์เพราะตกไป Whisper ก็ลบทิ้งก่อนล้าง listen_state',
-  /if \(_cur\.file_name\) await _geminiDeleteFile\(env, _cur\.file_name\);\s*\n\s*await sbPatch\(env, 'ci_sessions', `id=eq\.\$\{sessionId\}`, \{ listen_state: null \}\)/.test(STAGE1));
+check('เลิกใช้ไฟล์เพราะตกไป Whisper ก็ลบทิ้งก่อนเขียนสถานะใหม่',
+  // v_enginelatch: เขียน listen_state เป็น {engine:'whisper'} แทน null แล้ว — เช็คด้วย
+  // ลำดับ index (ลบไฟล์ต้องมาก่อนเขียนสถานะ) ไม่ใช่ regex ติดกันแบบเดิม
+  STAGE1.indexOf('if (_cur.file_name) await _geminiDeleteFile(env, _cur.file_name);') > -1 &&
+  STAGE1.indexOf("listen_state: { engine: 'whisper'",
+    STAGE1.indexOf('if (_cur.file_name) await _geminiDeleteFile(env, _cur.file_name);')) > -1);
 check('needs_gemini งบหมดถาวรก็ลบไฟล์ทิ้งก่อนปิดคิว',
   /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,900}pipeline_stage: 'failed_system'/.test(STAGE1));
 
@@ -275,6 +287,17 @@ console.log('\n── 6d. v_queuethru: คิวไหลเร็วขึ้�
   check('แถวที่ยังไม่ได้ทำต้องไม่ถูก claim ทิ้งไว้ (break ก่อน processSession)',
     SW.indexOf('SWEEP_DEADLINE_MS') < SW.indexOf('await processSession'));
 }
+
+// ── 6e. v_errretention + v_tslong + v_sweepsolo: งานเก็บกวาด ────────────────
+console.log('\n── 6e. งานเก็บกวาด: retention + คลิปเกิน 100 นาที ──');
+check('app_errors มี retention แล้ว (เดิมไม่มีเลย และเป็นตารางใหญ่สุดของฐาน)',
+  /const ERROR_LOG_RETENTION_DAYS = \d+;/.test(WK) &&
+  /sbDelete\(env, 'app_errors', `created_at=lt\./.test(WK));
+check('คลิปเกิน 100 นาทีต้องอ่าน timestamp 3 หลักได้ (ไม่งั้นทั้งไฟล์อ่านไม่ออก)',
+  /\^\\s\*\(\\d\{1,3\}:\\d\{2\}/.test(WK),
+  '_abSecToTs ออก 3 หลักเมื่อเกิน 100 นาที แต่ _abParseCompact เดิมรับแค่ 2');
+check('tick งานกวาดรายวันไม่ทำคิวด้วย (กัน waitUntil ถูกยกเลิกเพราะแย่งเวลากัน)',
+  /if \(_isDailyTick\) \{[\s\S]{0,400}\} else \{\s*\n\s*cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(WK));
 
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',

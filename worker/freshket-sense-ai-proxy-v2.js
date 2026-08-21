@@ -2038,7 +2038,16 @@ async function processSession(sessionId, origin, env) {
       // สวิตช์ย้อนกลับ: ตั้ง env var LISTEN_ENGINE=whisper แล้วกลับไปใช้ของเดิม
       // ได้ทันทีโดยไม่ต้องแก้โค้ด (เผื่อ Gemini มีปัญหาแล้วต้องถอยด่วน)
       let t = null;
-      const useGemini = forcedGemini || (env.LISTEN_ENGINE !== 'whisper' && !!env.GEMINI_API_KEY);
+      // v_enginelatch (2026-08-21): เมื่อยอมแพ้ Gemini แล้วต้อง "ล็อก" ไว้ว่า session นี้
+      // ใช้ Whisper ต่อไป · ของเดิมล้าง listen_state เป็น null แล้วส่งต่อให้ Whisper
+      // ซึ่งถูก แต่ถ้ารอบ Whisper ถูกฆ่ากลางทาง (waitUntil / invocation ตาย) แถวก็กลับ
+      // เป็น uploaded + listen_state null = tick ถัดไป **เริ่ม Gemini ใหม่จากศูนย์
+      // อัปไฟล์ใหม่ทั้งก้อน** วนได้ไม่จำกัดโดยไม่มีตัวนับไหนขยับเลย
+      // (ci_sessions.attempts ของจริงเป็น 0 ทุกแถว — ตรวจแล้ว ไม่มีเพดานคุมวงจรนี้)
+      // นี่คือความล้มแบบมองไม่เห็นชนิดเดียวกับลูป 22 ชม. เป็นครั้งที่สามของวันนี้
+      const _latchedWhisper = !!(row.listen_state && row.listen_state.engine === 'whisper');
+      const useGemini = !_latchedWhisper &&
+        (forcedGemini || (env.LISTEN_ENGINE !== 'whisper' && !!env.GEMINI_API_KEY));
       if (useGemini) {
         if (!env.GEMINI_API_KEY) {
           // ตกมาที่นี่เพราะ Whisper รับไม่ไหว แต่ไม่มีกุญแจ Gemini เลย — ไม่มีทางออก
@@ -2167,7 +2176,13 @@ async function processSession(sessionId, origin, env) {
           // v_filecleanup: เลิกใช้ไฟล์นี้แล้ว (Whisper รับช่วงต่อจาก audioBytes ในเครื่อง
           // ไม่ใช้ file_uri) — ลบทิ้งก่อนล้าง state (best-effort)
           if (_cur.file_name) await _geminiDeleteFile(env, _cur.file_name);
-          await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { listen_state: null }).catch(() => {});
+          // v_enginelatch: ล็อกเป็น Whisper แทนการล้างเป็น null — ถ้ารอบ Whisper ถูกฆ่า
+          // กลางทาง tick ถัดไปจะลอง Whisper ซ้ำ (ถูกและเร็ว) ไม่ใช่เริ่ม Gemini ใหม่
+          // ทั้งก้อนแล้ววนเผาโควตาไปเรื่อยๆ · ความล้มของ Whisper มี failStage +
+          // ci_sessions.attempts คุมเพดานอยู่แล้ว จึงจบได้จริง
+          await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
+            { listen_state: { engine: 'whisper', gave_up_at: new Date().toISOString(),
+                              reason: _emsg.slice(0, 200) } }).catch(() => {});
           t = null;
         }
       }
@@ -2479,6 +2494,10 @@ async function sweepExpiredAudio(env) {
 // ครอบคลุมเกิน 4 ไตรมาสเผื่อดู skill trend ย้อนหลังข้ามปี — ปรับได้ผ่าน env
 // ถ้าต้องการสั้น/ยาวกว่านี้ (0 = ปิดการลบทั้งหมด เหมือน AUDIO_RETENTION_DAYS)
 const SKILL_LOG_RETENTION_DAYS = 400;
+// v_errretention (2026-08-21): app_errors เป็นตารางใหญ่สุดของฐาน (4,166 แถว / 2.1MB
+// จากฐานทั้งก้อน 24MB) และไม่มีนโยบายลบเลยมาก่อน · เป็น log ไล่ปัญหา ไม่ใช่ข้อมูล
+// ธุรกิจ — 30 วันพอสำหรับการไล่บั๊ก (render storm ที่เจอเมื่อ 20 ส.ค. ใช้ข้อมูล 7 วัน)
+const ERROR_LOG_RETENTION_DAYS = 30;
 
 async function sweepExpiredSkillLogs(env) {
   const days = Number(env.SKILL_LOG_RETENTION_DAYS ?? SKILL_LOG_RETENTION_DAYS);
@@ -2491,6 +2510,13 @@ async function sweepExpiredSkillLogs(env) {
   try {
     await sbDelete(env, 'kam_skill_log', `session_date=lt.${encodeURIComponent(cutoffDate)}`);
   } catch (e) { console.error('[skill-log-sweep] kam_skill_log ลบไม่สำเร็จ:', e?.message || e); }
+  // v_errretention (2026-08-21): app_errors ไม่มีนโยบายลบเลยมาก่อน และตอนนี้เป็น
+  // ตารางใหญ่สุดของฐาน (4,166 แถว / 2.1MB จากฐานทั้งก้อน 24MB) · เป็น log สำหรับไล่
+  // ปัญหา ไม่ใช่ข้อมูลธุรกิจ เก็บ 30 วันพอ · เกาะรอบ 03:00 UTC เดียวกัน ไม่เพิ่ม cron
+  const errCutoff = new Date(Date.now() - ERROR_LOG_RETENTION_DAYS * 86400000).toISOString();
+  try {
+    await sbDelete(env, 'app_errors', `created_at=lt.${encodeURIComponent(errCutoff)}`);
+  } catch (e) { console.error('[skill-log-sweep] app_errors ลบไม่สำเร็จ:', e?.message || e); }
 }
 
 async function handleListModels(env) {
@@ -2533,7 +2559,12 @@ function _abSecToTs(sec) {
 function _abParseCompact(raw) {
   const out = [];
   for (const line of String(raw || '').split('\n')) {
-    const m = line.match(/^\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\|\s*([^|]{0,20}?)\s*\|\s*(.+?)\s*$/);
+    // v_tslong (2026-08-21): เดิมรับนาทีแค่ 1-2 หลัก แต่ _abSecToTs ออก 3 หลักเมื่อ
+    // เกิน 100 นาที ⇒ คลิปยาวเกิน 100 นาทีทุกบรรทัดไม่ match แล้ว _abParseCompact
+    // คืน null → "Gemini ตอบมาแต่อ่านไม่ออก" ทั้งไฟล์ · ไม่เคยระเบิดเพราะเพดาน
+    // LISTEN_MAX_ATTEMPTS เดิมตัดคลิปยาวออกไปก่อนอยู่แล้ว แต่ตอนนี้เพดานขยายเป็น 48
+    // ทำให้คลิปยาวขนาดนั้นถึงจุดนี้ได้จริง (ของจริงมีถึง 79 นาทีแล้ว)
+    const m = line.match(/^\s*(\d{1,3}:\d{2}(?::\d{2})?)\s*\|\s*([^|]{0,20}?)\s*\|\s*(.+?)\s*$/);
     if (!m) continue;
     const sp = m[2].trim();
     out.push({
@@ -2661,15 +2692,21 @@ export default {
     // sweepPending ทุก tick — เคาะโมเดลจบแล้ว (Gemini ชนะ) ถอดออกแล้วตามที่ตั้งใจ
     // ไว้ตั้งแต่แรก (docs/supabase-migration-ears-ab-2026-08-14.sql) เพราะมันกัน
     // คิวจริงได้นานสุด ~100 นาที/แถวที่ติดธง และปิดเสียงแจ้งเตือนความล้มเหลวไปด้วย
-    cfCtx.waitUntil(sweepPending(env));
     // v_queue: กวาดไฟล์เสียงหมดอายุวันละครั้งพอ (03:00 UTC = 10 โมงเช้าไทย)
     // ของเดิมยิงคู่กับ sweepPending ทุก tick — งานนั้นใช้ได้ถึง 51 subrequest
     // ในตัวมันเอง จึงแย่งเพดาน 50 ของ invocation เดียวกันกับงานหลักโดยไม่จำเป็น
     const at = new Date(event && event.scheduledTime ? event.scheduledTime : Date.now());
-    if (at.getUTCHours() === 3 && at.getUTCMinutes() < 5) {
+    const _isDailyTick = at.getUTCHours() === 3 && at.getUTCMinutes() < 5;
+    // v_sweepsolo (2026-08-21): tick ของงานกวาดรายวัน **ไม่ต้องทำคิวด้วย** · ตอนนี้
+    // sweepPending กินเวลาได้ถึง 150 วิ (v_queuethru) ถ้าปล่อยคู่กันใน waitUntil
+    // เดียวกัน งานกวาดจะเสี่ยงถูกยกเลิกทิ้งแบบเดียวกับที่ /process เจอ — และงานกวาด
+    // ที่ถูกฆ่าจะไม่ทิ้งร่องรอยอะไรเลยเหมือนกัน · เสียคิวไป 5 นาทีวันละครั้งคุ้มกว่า
+    if (_isDailyTick) {
       cfCtx.waitUntil(sweepExpiredAudio(env));
       // v_skilllog: เกาะรอบ 03:00 UTC เดียวกัน — ไม่เพิ่ม cron trigger ใหม่
       cfCtx.waitUntil(sweepExpiredSkillLogs(env));
+    } else {
+      cfCtx.waitUntil(sweepPending(env));
     }
     // v_keyexport: ส่งออก Key SKU ไป Google Sheets 4 รอบ/วันตามเวลาไทยที่บุชขอ
     if (KEY_EXPORT_UTC_HOURS.includes(at.getUTCHours()) && at.getUTCMinutes() < 5) {
