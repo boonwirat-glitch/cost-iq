@@ -41,8 +41,7 @@ const STAGE1 = WK.slice(WK.indexOf('// ── Stage 1: uploaded / needs_gemini �
 const STEP = WK.slice(WK.indexOf('async function runListenStep'), WK.indexOf('async function processSession'));
 // v_winoverlap (2026-08-21): ตัววางแผนหน้าต่างถูกแยกออกมาเป็นฟังก์ชันของตัวเอง
 // เพื่อให้ harness รันจริงทดสอบได้ ไม่ใช่แค่ grep หาสตริงในโค้ดก้อนใหญ่
-const PLAN = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('function _resplitWindow'));
-const PLAN2 = WK.slice(WK.indexOf('function _resplitWindow'), WK.indexOf('function _windowDrift'));
+const PLAN = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('function _keepInWindow'));
 
 console.log('\n── 1. Gemini เป็นหูหลัก แต่ถอยกลับได้ ──');
 check('stage 1 เรียก runListenStep ก่อน ไม่ใช่ Whisper',
@@ -119,7 +118,19 @@ console.log('\n── 3. คลิปยาว: ถอดข้าม tick ไ�
 check('อัปไฟล์ครั้งเดียว แล้วใช้ file_uri ซ้ำ',
   /if \(!st\.file_uri\) \{/.test(STEP) && /_geminiUploadAudio/.test(STEP));
 check('ยังไม่จบ = ปล่อย claim ให้ tick ถัดไปทำต่อ (stage ยังเป็น uploaded)',
-  /if \(!step\) \{[\s\S]{0,300}processing_since: null \}\);\s*return;/.test(STAGE1));
+  STAGE1.indexOf('if (!step) {') > -1 &&
+  STAGE1.indexOf('processing_since: null', STAGE1.indexOf('if (!step) {')) > -1);
+// ── v_queuefair (2026-08-21): ตัวยอมคิวมีอยู่แล้วในดีไซน์ แต่ไม่เคยถูกใช้ ────────
+// order ของ sweepPending คือ next_attempt_at.asc.nullsfirst,visited_at.asc และคอมเมนต์
+// ผู้เขียนระบุเจตนา "ไม่มีใครผูกขาด" — แต่เส้นทางสำเร็จไม่เคยเซ็ต next_attempt_at
+// จึงค้าง null ตลอดกาลแล้ว visited_at เก่าสุดยึดคิวคนเดียว (หลักฐานสด 21 ส.ค.:
+// session 19 ส.ค. กินคิวทั้งบ่าย อีก 2 ตัว attempts ยังเป็น 0)
+check('ทำงานเสร็จหนึ่งขั้นแล้วต้อง "ยอมคิว" ทุกจุด (ไม่ผูกขาดคิว)',
+  (() => {
+    // ทุกจุดที่ปล่อย claim แบบ "ยังไม่จบ" ต้องเซ็ต next_attempt_at ไปด้วย
+    const yields = (STAGE1.match(/next_attempt_at: new Date\(\)\.toISOString\(\)/g) || []).length;
+    return yields >= 3;   // if(!step) + hiccup ของ forcedGemini + v_keepprogress
+  })(), 'ต้องมีครบทั้ง 3 จุด ไม่งั้น session ที่ค้างจุดนั้นจะยึดคิวต่อ');
 check('อ่าน listen_state กลับมาด้วย ไม่งั้นลืมทุกรอบ',
   /select=id,owner_email,owner_type,account_id,account_name,sku_glossary,duration_secs,pipeline_stage,status,audio_path,transcript,processing_since,attempts,listen_state/.test(WK));
 check('เขียนกลับแบบรวมสถานะเดิม ไม่ทับทั้งก้อน',
@@ -133,14 +144,21 @@ check(`ช่วงละ ${WIN} นาที — รอดแม้วันท
   WIN > 0 && WIN * 530 / 76 < 115, `LISTEN_WIN_MIN=${WIN}`);
 check('คลิปสั้นยิงรอบเดียว ไม่ซอยโดยไม่จำเป็น',
   /dur \/ 60 <= LISTEN_SINGLE_MAX_MIN/.test(PLAN));
-check('เจอ 524/timeout แล้วผ่าช่วงครึ่งหนึ่ง แทนลองขนาดเดิมซ้ำ',
+// v_winmemory (2026-08-21): 524 = "ขนาดคำขอนี้ใหญ่เกินไปสำหรับวันนี้" ซึ่งเป็นข้อมูล
+// ระดับ session ไม่ใช่ระดับหน้าต่าง ⇒ ต้องหดแล้ววางแผน "ทุกหน้าต่างที่เหลือ" ใหม่ทีเดียว
+// แล้วจำไว้ที่ listen_state.win_sec · ของเดิมหดทีละหน้าต่าง หน้าต่างถัดไปจึงไปเจอ 524
+// ใหม่เองอีก = จ่ายค่าค้นพบซ้ำทุกหน้าต่าง (เห็นสดวันนี้: หน้าต่าง 3 หดถึง 2 นาที
+// แต่หน้าต่าง 4-9 ยังตั้งต้นที่ 12 นาที)
+check('เจอ 524/timeout แล้วหดขนาดคำขอ + วางแผนที่เหลือใหม่ทั้งหมด',
   /\/\\b524\\b\|timeout\|timed out\/i\.test\(msg\)/.test(STEP) &&
-  /const parts = _resplitWindow\(w, row\.duration_secs\);/.test(STEP) &&
-  /windows\.splice\(i, 1, \.\.\.parts\)/.test(STEP));
-// v_winresplit (2026-08-21): ตรรกะพื้นหดย้ายไปอยู่ใน _resplitWindow แล้ว (คืน null
-// เมื่อผ่าต่อไม่ได้) — STEP จึงไม่มีคำว่า LISTEN_MIN_WIN_SEC อีก ต้องเช็คที่ใหม่
+  /const _newWin = Math\.max\(LISTEN_MIN_WIN_SEC \* 2, Math\.floor\(_curWin \/ 2\)\);/.test(STEP) &&
+  /windows\.splice\(i, windows\.length - i, \.\.\.remaining\)/.test(STEP));
+check('จำขนาดคำขอที่ใช้ได้ไว้ใน listen_state.win_sec (ไม่ค้นพบซ้ำทุกหน้าต่าง)',
+  /const _curWin = st\.win_sec \|\| \(LISTEN_WIN_MIN \* 60\);/.test(STEP) &&
+  /await save\(\{ windows, win_sec: _newWin \}\)/.test(STEP));
 check('มีพื้นหดต่ำสุด — หดจนสั้นแล้วยังพัง = โยนต่อให้ตกไป Whisper',
-  /LISTEN_MIN_WIN_SEC/.test(PLAN2) && /return null;/.test(PLAN2) && /throw e;/.test(STEP));
+  /if \(_newWin < _curWin\)/.test(STEP) && /LISTEN_MIN_WIN_SEC/.test(STEP) && /throw e;/.test(STEP),
+  'ถ้า _newWin ไม่เล็กลงแล้ว ต้องตกไป throw ไม่ใช่วางแผนเดิมซ้ำ');
 // v_winfloor (2026-08-21): พื้น 180 ทำให้หน้าต่าง 6 นาทีผ่าต่อไม่ได้ (360 > 360 เป็นเท็จ)
 // ตันทันทีเมื่อ 524 ซ้ำที่ 6 นาที — เจอสดๆ กับ session 19 ส.ค. 16:00 บ่ายวันนี้
 check('พื้นหดต้องต่ำพอให้หน้าต่าง 6 นาทีผ่าต่อได้อีก (ไม่ตันที่ 524 ซ้ำ)',
@@ -234,6 +252,30 @@ check('ตกไป Whisper ต้องยังได้ไบต์จริ�
 check('ไม่มีการโหลดไฟล์แบบไม่มีเงื่อนไขหลงเหลืออยู่',
   !/const audioBytes = await sbStorageGet/.test(noComments(STAGE1)));
 
+// ── v_queuethru (2026-08-21): เพิ่ม throughput แบบมีเพดาน subrequest ที่คิดเลขไว้ ──
+// เดิม limit=1 ⇒ ทั้งระบบไหล 1 หน้าต่างต่อ 5 นาที รวมทุกคน · เหตุผลเดิมคือเพดาน
+// 50 subrequest/invocation ซึ่งเปลี่ยนไปแล้วหลัง v_lazyaudio (ขั้นถอดหน้าต่างเหลือ ~6)
+console.log('\n── 6d. v_queuethru: คิวไหลเร็วขึ้นโดยไม่ทะลุเพดาน subrequest ──');
+{
+  const SW = WK.slice(WK.indexOf('const SWEEP_MAX_STEPS'), WK.indexOf('await _alertIfFailingOften'));
+  const num = re => Number((WK.match(re) || [])[1]);
+  const steps = num(/const SWEEP_MAX_STEPS\s+= (\d+)/);
+  const analyze = num(/const SWEEP_MAX_ANALYZE = (\d+)/);
+  const deadline = num(/const SWEEP_DEADLINE_MS = (\d+)/);
+  check('หยิบหลาย session ต่อ tick ไม่ใช่ 1 (คิวไม่ไหลทีละหน้าต่างอีก)',
+    steps > 1 && /limit=\$\{SWEEP_MAX_STEPS\}/.test(WK), `SWEEP_MAX_STEPS=${steps}`);
+  check('งบ subrequest worst case ยังต่ำกว่าเพดาน 50 (ปลอดภัยแม้อยู่ Free plan)',
+    (steps - analyze) * 6 + analyze * 19 < 50,
+    `(${steps}-${analyze})×6 + ${analyze}×19 = ${(steps - analyze) * 6 + analyze * 19}`);
+  check('จำกัดขั้น analyze ต่อ tick (ขั้นนี้กิน subrequest หนักสุด ~19)',
+    analyze >= 1 && analyze < steps && /r\.pipeline_stage === 'transcribed'/.test(SW));
+  check('มีกำหนดเวลา ไม่เริ่มขั้นใหม่จนล้นไป tick ถัดไป',
+    deadline > 0 && deadline < 300000 && /Date\.now\(\) - _t0 > SWEEP_DEADLINE_MS/.test(SW),
+    `SWEEP_DEADLINE_MS=${deadline} ต้องน้อยกว่าคาบ cron 300000`);
+  check('แถวที่ยังไม่ได้ทำต้องไม่ถูก claim ทิ้งไว้ (break ก่อน processSession)',
+    SW.indexOf('SWEEP_DEADLINE_MS') < SW.indexOf('await processSession'));
+}
+
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',
   /async function runTranscribe\(/.test(WK));
@@ -261,7 +303,7 @@ console.log('\n── 8. v_winoverlap + v_usability: รันจริงกั
   vm.createContext(ctx);
   try {
     vm.runInContext(`${helpers}\n${consts}\n${usab}\n${plan}\n` +
-      'this.API={_planListenWindows,_keepInWindow,_usabilityScore,_windowDrift,_resplitWindow,' +
+      'this.API={_planListenWindows,_keepInWindow,_usabilityScore,_windowDrift,' +
       'LISTEN_WIN_MIN,LISTEN_STRIDE_MIN,LISTEN_MAX_ATTEMPTS,LISTEN_MIN_WIN_SEC};', ctx);
     const A = ctx.API;
 
@@ -339,60 +381,35 @@ console.log('\n── 8. v_winoverlap + v_usability: รันจริงกั
     check('รันจริง: ท่อน [ฟังไม่ชัด] เยอะ กดคะแนนลงจริง',
       A._usabilityScore(mk(100, 600), 600, 50) < A._usabilityScore(mk(100, 600), 600, 0));
 
-    // ── v_winresplit: ผ่าหน้าต่างตอน 524 ต้องไม่ทิ้งเกราะกันเสียงเพี้ยน ──
-    // เคสจริงที่ทำให้เจอบั๊กนี้: session 19 ส.ค. 16:00 บ่าย 21 ส.ค. โดน 524 ที่
-    // {from:360,to:1080,keep_to:720} แล้วของเดิมผ่าเป็น {360,720,keep 720} ซึ่งขอ=เก็บ
-    // → เก็บครึ่งหลังที่เพี้ยนเข้ามาด้วย ได้แค่ 13 ท่อน/17 ตัวอักษร (ปกติ 57/39)
+    // ── v_winmemory: วางแผนที่เหลือใหม่ด้วยขนาดเล็กลง ──
     const okOverlap = p => p.keep_to === null || (p.to - p.from) >= (p.keep_to - p.from) * 2;
     {
-      const parts = A._resplitWindow({ from: 360, to: 1080, keep_to: 720 }, 2406);
-      check('รันจริง: 524 บนหน้าต่างปกติ → คำขอเล็กลงครึ่ง แต่ยังขอเผื่อ 2 เท่าของที่เก็บ',
-        parts.length === 2 &&
-        (parts[0].to - parts[0].from) === 360 && parts[0].keep_to === 540 &&
-        (parts[1].to - parts[1].from) === 360 && parts[1].keep_to === 720 &&
-        parts.every(okOverlap),
-        JSON.stringify(parts));
-      check('รันจริง: ช่วงที่เก็บของก้อนใหม่ต่อกันพอดี ครอบคลุมของเดิมครบ ไม่มีรู',
-        parts[0].from === 360 && parts[0].keep_to === parts[1].from && parts[1].keep_to === 720);
+      // 524 ที่หน้าต่างเริ่มนาที 12 ของคลิป 40 นาที → วางแผนนาที 12 ถึงจบใหม่ที่ 6 นาที
+      const re = A._planListenWindows(2406, 720, 360);
+      check('รันจริง: วางแผนที่เหลือใหม่เริ่มถูกจุด และคำขอเล็กลงตามที่สั่ง',
+        re[0].from === 720 && (re[0].to - re[0].from) === 360 && re[0].keep_to === 900,
+        JSON.stringify(re.slice(0, 2)));
+      check('รันจริง: ที่เหลือยังคงเกราะ "ขอ 2 เท่าของที่เก็บ" ทุกก้อน',
+        re.every(okOverlap), JSON.stringify(re));
+      check('รันจริง: ช่วงเก็บของที่เหลือต่อกันพอดีถึงท้ายไฟล์ ไม่มีรู',
+        re.every((p, i) => i === 0 || p.from === re[i - 1].keep_to) &&
+        re[re.length - 1].keep_to === null);
+      check('รันจริง: หดแล้วจำนวนก้อนเพิ่มขึ้นจริง (จ่ายเวลาแลกความน่าจะสำเร็จ)',
+        re.length > A._planListenWindows(2406, 720, 720).length);
     }
-    {
-      // หน้าต่างที่เคยถูกผ่าด้วยโค้ดเก่าจนขอ=เก็บ — ต้องกู้เกราะกลับมาได้
-      const parts = A._resplitWindow({ from: 360, to: 720, keep_to: 720 }, 2406);
-      const tiles = parts.length >= 2 && parts[0].from === 360 &&
-        parts[parts.length - 1].keep_to === 720 &&
-        parts.every((p, i) => i === 0 || p.from === parts[i - 1].keep_to);
-      check('รันจริง: หน้าต่างที่เสียเกราะไปแล้ว (ขอ=เก็บ) ต้องได้เกราะคืน + คำขอเล็กลง',
-        parts.every(okOverlap) && tiles &&
-        (parts[0].to - parts[0].from) < 360,     // คำขอเดิมล้มที่ 360 วิ ต้องเล็กกว่านั้น
-        JSON.stringify(parts));
-    }
-    {
-      const parts = A._resplitWindow({ from: 2160, to: 2406, keep_to: null }, 2406);
-      check('รันจริง: หน้าต่างสุดท้าย (keep_to=null) ผ่าแล้วก้อนท้ายยังเก็บถึงจบไฟล์',
-        parts.length >= 2 && parts[parts.length - 1].keep_to === null &&
-        parts[0].keep_to !== null, JSON.stringify(parts));
-    }
-    check('รันจริง: เล็กจนผ่าต่อไม่ได้ = คืน null (ห้ามวนซ้ำหน้าต่างเดิมตลอดกาล)',
-      A._resplitWindow({ from: 0, to: 60, keep_to: 60 }, 2406) === null,
-      String(JSON.stringify(A._resplitWindow({ from: 0, to: 60, keep_to: 60 }, 2406))));
-    check('รันจริง: ผ่าซ้ำๆ ขนาดคำขอต้องเล็กลงเรื่อยๆ แล้วจบ ไม่วนไม่รู้จบ',
+    check('รันจริง: หดถึงพื้นแล้วขนาดไม่เล็กลงอีก (ผู้เรียกจะได้ตกไป Whisper)',
       (() => {
-        let w = { from: 0, to: 720, keep_to: 360 }, sizes = [], guard = 0;
-        while (w && guard++ < 20) {
-          const p = A._resplitWindow(w, 2406);
-          if (!p) break;
-          sizes.push(p[0].to - p[0].from);
-          w = p[0];
-        }
-        // ต้องหยุดเอง และขนาดต้องไม่เพิ่มขึ้นเลย
-        return guard < 20 && sizes.length >= 2 &&
-               sizes.every((s, i) => i === 0 || s <= sizes[i - 1]);
-      })());
-    check('รันจริง: state รูปแบบเก่า (ไม่มี keep_to) ยังผ่าครึ่งแบบเดิมได้',
+        const floor = A.LISTEN_MIN_WIN_SEC * 2;
+        const p = A._planListenWindows(2406, 0, 1);   // ขอเล็กกว่าพื้น
+        return (p[0].to - p[0].from) === floor;
+      })(), `พื้น = ${A.LISTEN_MIN_WIN_SEC * 2} วิ`);
+    check('รันจริง: คลิปสั้นตอนหดต้องได้หน้าต่างจริง ไม่ใช่ก้อนเดิมซ้ำ (กันวนวางแผนเดิม)',
       (() => {
-        const p = A._resplitWindow({ from: 0, to: 720 }, 2406);
-        return p && p.length === 2 && p[0].to === 360 && p[1].from === 360;
-      })());
+        const p = A._planListenWindows(180, 0, 120);
+        return p.length >= 1 && p[0].from === 0 && p[0].to !== null;
+      })(), JSON.stringify(A._planListenWindows(180, 0, 120)));
+    check('รันจริง: การวางแผนครั้งแรกของคลิปสั้นยังเป็นคำขอเดียวเหมือนเดิม',
+      A._planListenWindows(158)[0].from === null);
 
     // ── ตัววัดเสียงเพี้ยน ──
     const dseg = (sec, text) => ({ ts: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, text });

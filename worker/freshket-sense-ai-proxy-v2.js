@@ -1729,12 +1729,23 @@ const LISTEN_WIN_MAX_FAILS = 3;
 //   keep_to  = เก็บท่อนถึงวินาทีนี้ (ไม่รวม) · null = เก็บถึงท้ายไฟล์ (หน้าต่างสุดท้าย)
 //   undefined = state รูปแบบเก่าก่อน 21 ส.ค. → _keepInWindow เก็บทั้งหมดแบบเดิม
 // แยกออกมาเป็นฟังก์ชันเพื่อให้ harness รันจริงทดสอบได้ ไม่ใช่แค่ grep หาสตริง
-function _planListenWindows(durSec) {
+function _planListenWindows(durSec, fromSec, winSecOverride) {
   const dur = Math.ceil(durSec || 0);
-  if (dur / 60 <= LISTEN_SINGLE_MAX_MIN) return [{ from: null, to: null, keep_to: null }];
-  const win = LISTEN_WIN_MIN * 60, stride = LISTEN_STRIDE_MIN * 60;
+  const start = Math.max(0, Math.floor(fromSec || 0));
+  // ทางลัด "คลิปสั้น = คำขอเดียวทั้งไฟล์" ใช้ได้เฉพาะการวางแผนครั้งแรก · ถ้ามี
+  // winSecOverride แปลว่ากำลังหดเพราะ 524 ต้องได้หน้าต่างจริงออกไป ไม่ใช่ก้อนเดิมซ้ำ
+  // (ไม่งั้นวนวางแผนเดิมไปเรื่อยๆ จนงบหมดโดยไม่มีอะไรเปลี่ยน)
+  if (!start && !winSecOverride && dur / 60 <= LISTEN_SINGLE_MAX_MIN) {
+    return [{ from: null, to: null, keep_to: null }];
+  }
+  // v_winmemory (2026-08-21): ขนาดคำขอเป็นพารามิเตอร์ได้ เพื่อให้ตอนเจอ 524 วางแผน
+  // "ทุกหน้าต่างที่เหลือ" ด้วยขนาดที่เล็กลงในครั้งเดียว ไม่ใช่หดทีละหน้าต่างแล้วให้
+  // หน้าต่างถัดไปไปเจอ 524 ใหม่เองอีก (เห็นสดวันนี้: หน้าต่าง 3 หดถึง 2 นาที แต่
+  // หน้าต่าง 4-9 ยังจะเริ่มที่ 12 นาที = จ่ายค่าค้นพบซ้ำทุกหน้าต่าง)
+  const win = Math.max(LISTEN_MIN_WIN_SEC * 2, winSecOverride || LISTEN_WIN_MIN * 60);
+  const stride = Math.floor(win / 2);
   const out = [];
-  for (let s = 0; s < dur; s += stride) {
+  for (let s = start; s < dur; s += stride) {
     const to = Math.min(s + win, dur);
     const keepTo = Math.min(s + stride, dur);
     // เศษท้ายไฟล์ที่สั้นกว่าครึ่ง stride ให้กลืนรวมกับหน้าต่างนี้ ไม่ต้องยิงคำขอจิ๋วอีกรอบ
@@ -1755,45 +1766,6 @@ function _keepInWindow(segments, w) {
     if (t == null) return false;
     return t >= w.from && (w.keep_to === null || t < w.keep_to);
   });
-}
-
-// v_winresplit (2026-08-21): เจอ 524 = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน ต้องลดขนาด
-// "คำขอ" ลง · ของเดิมผ่าครึ่งทั้งช่วงขอและช่วงเก็บพร้อมกัน ผลคือช่วงขอเท่ากับช่วงเก็บ
-// พอดี = เสียเกราะกันเสียงเพี้ยนไปทั้งหน้าต่างนั้น (ครึ่งหลังที่เพี้ยนถูกเก็บเข้ามาด้วย)
-// วัดได้จริงจาก session 19 ส.ค. 16:00 บ่ายนี้: หน้าต่างปกติ 0-720 ได้ 57 ท่อน ยาว
-// เฉลี่ย 39 ตัวอักษร · หน้าต่างที่ถูกผ่า 360-720 ได้แค่ 13 ท่อน ยาว 17 ตัวอักษร
-// (ratio 0 = ครึ่งหลังไม่มีท่อนเลย) — แย่กว่ากัน 4 เท่า และมองไม่เห็นเลยถ้าไม่มีตัววัด
-//
-// แก้: วางแผน "ช่วงที่เหลือต้องเก็บ" ใหม่ด้วย stride ครึ่งเดียว โดยคงกติกาเดิมว่า
-// ขอเป็น 2 เท่าของที่เก็บเสมอ ⇒ คำขอเล็กลงจริง (แก้ 524) และยังมีเกราะครบ
-// คืน null = เล็กจนผ่าต่อไม่ได้แล้ว ให้ผู้เรียกโยน error ต่อตามเดิม
-function _resplitWindow(w, durSec) {
-  const dur = Math.ceil(durSec || 0);
-  const from = (w && w.from != null) ? w.from : 0;
-  const reqTo = (w && w.to != null) ? w.to : dur;
-  // state รูปแบบเก่าก่อน 21 ส.ค. (ไม่มี keep_to) — ผ่าครึ่งแบบเดิม ไม่มีอะไรให้รักษา
-  if (!w || w.keep_to === undefined) {
-    const mid = Math.floor((from + reqTo) / 2);
-    if (reqTo - from <= LISTEN_MIN_WIN_SEC * 2) return null;
-    return [{ from, to: mid }, { from: mid, to: reqTo }];
-  }
-  // 524 เกิดจาก "คำตอบยาวเกิน" ซึ่งโตตามความยาวเสียงที่ขอ ⇒ ตัวที่ต้องเล็กลงคือ
-  // **ขนาดคำขอ** ไม่ใช่ขนาดช่วงที่เก็บ · ตั้งคำขอใหม่เป็นครึ่งเดียวของคำขอที่ล้ม
-  // แล้ววางแผนช่วงที่ต้องเก็บด้วย stride = ครึ่งของคำขอใหม่ (คงกติกา ขอ = 2 × เก็บ)
-  const reqLen = reqTo - from;
-  const win = Math.max(LISTEN_MIN_WIN_SEC * 2, Math.floor(reqLen / 2));
-  if (win >= reqLen) return null;      // เล็กจนหดต่อไม่ได้แล้ว — ห้ามวนซ้ำตลอดกาล
-  const stride = Math.floor(win / 2);
-  const keepEnd = (w.keep_to === null) ? dur : w.keep_to;
-  const out = [];
-  for (let s = from; s < keepEnd; s += stride) {
-    const kt = Math.min(s + stride, keepEnd);
-    const isLast = kt >= keepEnd;
-    out.push({ from: s, to: Math.min(s + win, dur),
-               keep_to: (isLast && w.keep_to === null) ? null : kt });
-    if (isLast) break;
-  }
-  return out.length ? out : null;
 }
 
 // v_driftmeter (2026-08-21): ตัววัดอาการเพี้ยนช่วงท้ายคำขอ — บทเรียนของรอบนี้คือผม
@@ -1946,18 +1918,23 @@ async function runListenStep(env, row, audioBytes) {
     // หมดเวลา = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน "ในวันนี้" → ผ่าช่วงนั้นครึ่งหนึ่ง
     // แล้วไปต่อ · ลองขนาดเดิมซ้ำมีแต่จะพังซ้ำและเผาเงินเปล่า
     if (/\b524\b|timeout|timed out/i.test(msg)) {
-      // v_winresplit: วางแผนช่วงที่เหลือใหม่ด้วย stride ครึ่งเดียว โดยคงกติกา
-      // "ขอเป็น 2 เท่าของที่เก็บ" ⇒ คำขอเล็กลงจริงแต่เกราะกันเสียงเพี้ยนยังอยู่
-      const parts = _resplitWindow(w, row.duration_secs);
-      if (parts && parts.length) {
-        windows.splice(i, 1, ...parts);
-        await save({ windows });
-        const _reqMin = Math.round(((parts[0].to - parts[0].from) / 60) * 10) / 10;
-        const _keepMin = parts[0].keep_to == null ? _reqMin
-          : Math.round(((parts[0].keep_to - parts[0].from) / 60) * 10) / 10;
-        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — วางแผนใหม่ ${parts.length} ก้อน ` +
-          `(ขอ ${_reqMin} นาที เก็บ ${_keepMin} นาที)`);
-        return null;
+      // v_winmemory: 524 บอกว่า "ขนาดคำขอนี้ใหญ่เกินไปสำหรับวันนี้" ซึ่งเป็นข้อมูลระดับ
+      // session ไม่ใช่ระดับหน้าต่าง ⇒ หดแล้ววางแผน **ทุกหน้าต่างที่เหลือ** ใหม่ทีเดียว
+      // แล้วจำขนาดไว้ใน listen_state.win_sec · จ่ายค่าค้นพบครั้งเดียวต่อ session
+      // (คงกติกา "ขอ 2 เท่าของที่เก็บ" เสมอ เพราะ _planListenWindows คุมให้อยู่แล้ว)
+      const _curWin = st.win_sec || (LISTEN_WIN_MIN * 60);
+      const _newWin = Math.max(LISTEN_MIN_WIN_SEC * 2, Math.floor(_curWin / 2));
+      const _keepStart = (w.from == null) ? 0 : w.from;
+      if (_newWin < _curWin) {
+        const remaining = _planListenWindows(row.duration_secs, _keepStart, _newWin);
+        if (remaining && remaining.length) {
+          windows.splice(i, windows.length - i, ...remaining);
+          await save({ windows, win_sec: _newWin });
+          console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — หดคำขอ ` +
+            `${Math.round(_curWin / 60)}→${Math.round(_newWin / 60)} นาที แล้ววางแผนที่เหลือใหม่ ` +
+            `${remaining.length} ก้อน (เก็บ ${Math.round(_newWin / 120)} นาที/ก้อน)`);
+          return null;
+        }
       }
     }
     throw e;   // เหตุอื่น (หรือหดจนสุดแล้วยังพัง) → ให้ผู้เรียกตัดสินใจตกไป Whisper
@@ -2074,7 +2051,14 @@ async function processSession(sessionId, origin, env) {
           const step = await runListenStep(env, row, audioBytes);
           if (!step) {
             // ยังไม่จบ — ปล่อย claim ให้ tick ถัดไปทำช่วงต่อไป (stage เดิม)
-            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { processing_since: null });
+            // v_queuefair (2026-08-21): เซ็ต next_attempt_at ด้วย = "ยอมคิว" · order ของ
+            // sweepPending คือ next_attempt_at.asc.nullsfirst,visited_at.asc และคอมเมนต์
+            // ผู้เขียนระบุเจตนาว่า "ไม่มีใครผูกขาด" — แต่เส้นทางสำเร็จไม่เคยเซ็ตค่านี้เลย
+            // จึงค้าง null ตลอดกาลแล้วตัว visited_at เก่าสุดยึดคิวคนเดียว (เห็นสดวันนี้:
+            // session 19 ส.ค. กินคิวทั้งบ่าย อีก 2 ตัว attempts ยังเป็น 0) · ใส่เวลา
+            // "เดี๋ยวนี้" ไม่ใช่อนาคต ⇒ ยังหยิบได้ tick ถัดไป แต่ไปต่อท้ายคนที่ยังไม่ได้คิว
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`,
+              { processing_since: null, next_attempt_at: new Date().toISOString() });
             return;
           }
           t = step;
@@ -2140,6 +2124,7 @@ async function processSession(sessionId, origin, env) {
             console.warn(`[listen] ${sessionId} needs_gemini hiccup ชั่วคราว (ครั้งที่ ${hiccupAttempts}/${LISTEN_MAX_ATTEMPTS}) — ลอง tick ถัดไป: ${hiccupMsg}`);
             await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
               processing_since: null,
+              next_attempt_at: new Date().toISOString(),   // v_queuefair: ยอมคิว
               listen_state: { ...(row.listen_state || {}), attempts: hiccupAttempts, last_error: hiccupMsg, updated_at: new Date().toISOString() }
             }).catch(() => {});
             return;
@@ -2171,6 +2156,7 @@ async function processSession(sessionId, origin, env) {
               `เก็บ ${(_cur.segs || []).length} ท่อนที่ถอดไว้แล้ว ลอง tick ถัดไป: ${_emsg}`);
             await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
               processing_since: null,
+              next_attempt_at: new Date().toISOString(),   // v_queuefair: ยอมคิว
               listen_state: { ..._cur, fails: _fails, last_error: _emsg.slice(0, 300), updated_at: new Date().toISOString() }
             }).catch(() => {});
             return;
@@ -2378,7 +2364,23 @@ async function processSession(sessionId, origin, env) {
 //   และ stage 2 อีก ~19 · ของเดิม limit=3 จึงใช้ได้ถึง 51-204 = เกินเพดานอยู่แล้ว
 //   (ยังไม่ระเบิดเพราะทุก session ล้มเร็ว) · ปล่อยให้ tick ถัดไปหยิบต่อ ถูกกว่า
 //   และตรงกับหลักการ "ONE stage per invocation" ที่ประกาศไว้ตอนออกแบบ A2v2.1
+// v_queuethru (2026-08-21): เดิม limit=1 ⇒ ทั้งระบบไหลแค่ "1 หน้าต่างต่อ 5 นาที รวม
+// ทุกคน" · คลิป 51 นาที = 9 หน้าต่าง = 45 นาทีอย่างต่ำแม้คิวว่าง และวันที่ 19 ส.ค.
+// มี 10 session เข้าคิวพร้อมกัน — นี่คือเหตุผลจริงที่น้องๆ รอนาน
+//
+// เหตุผลเดิมของ limit=1 คือเพดาน **50 subrequest ต่อ invocation** (คอมเมนต์ข้างบน:
+// stage 1 กินได้ถึง ~31) ซึ่ง **เปลี่ยนไปแล้ว** หลัง v_lazyaudio: ขั้น "ถอดหนึ่ง
+// หน้าต่าง" ไม่โหลดไฟล์เสียงอีก เหลือ อ่านแถว + จอง + save(attempt) + Gemini +
+// save(ผล) + ปล่อย claim ≈ **6 subrequest**
+//
+// งบ worst case ของค่าที่ตั้งไว้ข้างล่าง: 3 หน้าต่าง × 6 + 1 analyze × 19 = **37 < 50**
+// ⇒ ปลอดภัยแม้อยู่ Free plan · ถ้าจะขยับค่าพวกนี้ ต้องคิดเลขนี้ใหม่ทุกครั้ง
+const SWEEP_MAX_STEPS   = 4;        // จำนวนขั้นต่อ tick
+const SWEEP_MAX_ANALYZE = 1;        // ขั้น analyze กิน subrequest หนัก (~19) จำกัด 1
+const SWEEP_DEADLINE_MS = 150000;   // ไม่เริ่มขั้นใหม่หลังผ่านไป 2.5 นาที (กัน tick ซ้อน)
+
 async function sweepPending(env) {
+  const _t0 = Date.now();
   const staleIso = new Date(Date.now() - PROCESS_CLAIM_STALE_MS).toISOString();
   const nowIso   = new Date().toISOString();
   let rows = [];
@@ -2394,9 +2396,21 @@ async function sweepPending(env) {
       `&and=(or(pipeline_stage.eq.uploaded,pipeline_stage.eq.needs_gemini,and(pipeline_stage.eq.transcribed,status.eq.draft)),` +
       `or(processing_since.is.null,processing_since.lt.${encodeURIComponent(staleIso)}),` +
       `or(next_attempt_at.is.null,next_attempt_at.lte.${encodeURIComponent(nowIso)}))` +
-      `&order=next_attempt_at.asc.nullsfirst,visited_at.asc&limit=1`);
+      `&order=next_attempt_at.asc.nullsfirst,visited_at.asc&limit=${SWEEP_MAX_STEPS}`);
   } catch (_) { return; }
+  let _analyzeDone = 0, _steps = 0;
   for (const r of rows) {
+    // เลยกำหนดเวลาแล้ว = หยุดรับงานใหม่ ปล่อยให้ tick ถัดไปทำต่อ (แถวที่เหลือยังอยู่
+    // ในคิว ไม่ได้ถูก claim จึงไม่มีอะไรค้าง)
+    if (Date.now() - _t0 > SWEEP_DEADLINE_MS) {
+      console.log(`[sweep] ถึงกำหนดเวลา — ทำได้ ${_steps}/${rows.length} ขั้น ที่เหลือรอ tick ถัดไป`);
+      break;
+    }
+    // ขั้น analyze (transcribed→analyzed) กิน subrequest หนักกว่ามาก จำกัดต่อ tick
+    const _isAnalyze = r.pipeline_stage === 'transcribed';
+    if (_isAnalyze && _analyzeDone >= SWEEP_MAX_ANALYZE) continue;
+    if (_isAnalyze) _analyzeDone++;
+    _steps++;
     try { await processSession(r.id, null, env); } catch (_) {}
   }
   await _alertIfFailingOften(env);
