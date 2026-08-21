@@ -24,6 +24,8 @@ const sk    = SRC('11_skills.js');
 const core  = SRC('01_core.js');
 // v_pillwarn (2026-08-21): สถานะเตือนของ pill อยู่ใน CSS ต้องอ่านมาตรวจด้วย
 const ecss  = SRC('styles_echo.css');
+// v_devgate (2026-08-21): ต้องยืนยันว่า /nrr ไม่มีช่องข้าม auth แบบเดียวกับ Sense
+const nrrData = fs.readFileSync(path.join(__dirname, '..', 'src', 'nrr', 'nrr_data.js'), 'utf8');
 const worker = fs.readFileSync(path.join(__dirname, '..', 'worker', 'freshket-sense-ai-proxy-v2.js'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -990,6 +992,66 @@ check('CSS ของสถานะเตือนมีจริง และ�
   /@media \(prefers-reduced-motion:reduce\)\{[\s\S]{0,200}fp-warn\{animation:none\}/.test(ecss));
 check('สีเตือนเป็นเหลืองอำพัน ไม่ใช่แดงกระพริบจนลูกค้าสะดุดตา',
   /#echo-float-pill\.fp-warn\{[\s\S]{0,250}rgba\(255,159,10/.test(ecss));
+
+// ── 15. v_devgate: โหมดทดสอบต้องไม่เปิดบนเน็ตจริง ────────────────────────────
+// เจอของจริง 21 ส.ค.: https://freshket-sense.pages.dev/?local=1 เข้าได้โดยไม่ล็อกอิน
+// เลือก persona admin แล้วเห็นข้อมูลบริษัททั้งหมด (ยอดทีม ฿193.7M · ชื่อ KAM 20 คน
+// พร้อม %NRR และค่าคอมรายคน) · การฝัง iframe ก็ข้ามได้เหมือนกัน
+console.log('\n── 15. v_devgate: ปิดทางเข้าที่ไม่ต้องล็อกอิน ──');
+check('มี _isDevHost() ที่ยอมแค่ localhost/127.0.0.1/::1',
+  /function _isDevHost\(\)/.test(core) &&
+  /h === 'localhost' \|\| h === '127\.0\.0\.1'/.test(core) &&
+  /h === '::1' \|\| h === '\[::1\]'/.test(core));
+check('กันที่ตัวฟังก์ชัน ไม่ใช่แค่จุดเรียก (ปิดทางเรียกจาก console)',
+  /function activateLocalMode\(\)\{\s*\n\s*if\(!_isDevHost\(\)\)\{/.test(core) &&
+  /function _setLocalPersona\(role, email, name\)\{\s*\n\s*if\(!_isDevHost\(\)\)\{/.test(core));
+check('จุดเรียกใน checkSession ก็เช็คด้วย (ไม่งั้นบนเน็ตจริงได้จอว่าง)',
+  /if\(_isDevHost\(\) && window\.location\.search\.includes\('local=1'\)\)/.test(core) &&
+  /if\(_isDevHost\(\) && window\.self!==window\.top\)/.test(core));
+check('ไม่มีทางเข้าโหมดทดสอบที่ไม่ผ่าน _isDevHost เหลืออยู่',
+  (() => {
+    // ทุกบรรทัดที่รัน (ไม่ใช่คอมเมนต์) ซึ่งอ้าง local=1 หรือ self!==top ต้องมี _isDevHost คู่กัน
+    const bad = core.split('\n').filter(l =>
+      !/^\s*(\/\/|\*|<!--)/.test(l) &&
+      /local=1|window\.self!==window\.top/.test(l) &&
+      !/_isDevHost/.test(l));
+    return bad.length === 0;
+  })(), 'เจอบรรทัดที่เข้าโหมดทดสอบได้โดยไม่เช็ค host');
+check('/nrr ไม่มีช่องข้าม auth แบบเดียวกัน',
+  !/local=1/.test(nrrData) || !/activateLocalMode|_setLocalPersona/.test(nrrData),
+  'localdata=1 ใน /nrr สลับที่มาของ CSV เท่านั้น ไม่ได้ข้าม auth');
+check('index.html ที่ส่งขึ้นจริงมีการ์ดนี้แล้ว (ไม่ใช่แก้แต่ src)',
+  /function _isDevHost\(\)/.test(fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')));
+
+// รันจริง: ดึง _isDevHost ออกมาเทสต์กับ hostname จริงทุกแบบ ไม่ใช่แค่ grep
+{
+  const vm = require('vm');
+  const i = core.indexOf('function _isDevHost()');
+  let depth = 0, started = false, j = i;
+  for (; j < core.length; j++) {
+    if (core[j] === '{') { depth++; started = true; }
+    else if (core[j] === '}') { depth--; if (started && depth === 0) { j++; break; } }
+  }
+  const src = core.slice(i, j);
+  const hostOk = (h) => {
+    const ctx = { location: { hostname: h } };
+    vm.createContext(ctx);
+    vm.runInContext(src + '\nthis.r = _isDevHost();', ctx);
+    return ctx.r;
+  };
+  check('รันจริง: localhost / 127.0.0.1 / ::1 / *.localhost → เข้าโหมดทดสอบได้',
+    hostOk('localhost') && hostOk('127.0.0.1') && hostOk('::1') &&
+    hostOk('[::1]') && hostOk('dev.localhost'));
+  check('รันจริง: โดเมน production → เข้าโหมดทดสอบไม่ได้',
+    !hostOk('freshket-sense.pages.dev') && !hostOk('sense.freshket.co'),
+    'นี่คือเคสที่รั่วอยู่จริงก่อนวันนี้');
+  check('รันจริง: โดเมนอื่นที่แอบตั้งชื่อล่อ → เข้าไม่ได้',
+    !hostOk('evil.example.com') && !hostOk('localhost.evil.com') &&
+    !hostOk('notlocalhost') && !hostOk('mylocalhost.io'),
+    'ระวัง endsWith(".localhost") ต้องไม่ยอม "localhost.evil.com"');
+  check('รันจริง: hostname ว่าง (file://) → เข้าไม่ได้ (ตั้งใจให้เข้มไว้)',
+    !hostOk(''));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

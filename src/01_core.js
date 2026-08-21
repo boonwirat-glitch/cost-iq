@@ -1391,7 +1391,30 @@ async function loadAltsFromSupabase(accountId) {
   } catch(e) { return null; }
 }
 
+// ── v_devgate (2026-08-21): โหมดทดสอบต้องใช้ได้เฉพาะบนเครื่องนักพัฒนา ───────────
+//
+// ของเดิม `?local=1` และการฝัง iframe ข้าม Supabase auth ทั้งหมดโดย **ไม่เช็ค
+// hostname เลย** ⇒ เปิด https://freshket-sense.pages.dev/?local=1 บนเน็ตจริงแล้ว
+// เลือก persona "Bucci (VP Revenue)" ได้ทันที เห็นข้อมูลบริษัททั้งหมดโดยไม่ต้อง
+// ล็อกอิน (ทดสอบจริงแล้ววันนี้: ยอดทีม ฿193.7M · ชื่อ KAM ทั้ง 20 คนพร้อม %NRR
+// รายคน · ค่าคอมรายคน) · ข้อมูลพวกนี้มาจาก R2 ที่เป็น bucket สาธารณะ จึงไม่ติด
+// RLS ของ Supabase เลยแม้แต่ชั้นเดียว
+//
+// กันที่ "ตัวฟังก์ชัน" ไม่ใช่แค่จุดเรียกใน checkSession() เพราะ _setLocalPersona
+// เป็น global ⇒ ถ้ากันแค่จุดเรียก คนที่เปิด console ก็ยังพิมพ์เรียกเองได้อยู่
+function _isDevHost(){
+  try {
+    const h = String(location.hostname || '').toLowerCase();
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '[::1]' ||
+           h.endsWith('.localhost');
+  } catch(_) { return false; }
+}
+
 function activateLocalMode(){
+  if(!_isDevHost()){
+    console.warn('[v_devgate] โหมดทดสอบใช้ได้เฉพาะ localhost — บนเน็ตจริงต้องล็อกอินเท่านั้น');
+    return;   // ไม่โชว์ picker และไม่ตั้ง persona ให้ → ตกไปเส้นทางล็อกอินปกติ
+  }
   // Show persona picker so tester can simulate KAM or TL without Supabase
   const overlay=document.getElementById('local-persona-overlay');
   if(overlay){overlay.style.display='flex';return;}
@@ -1400,6 +1423,10 @@ function activateLocalMode(){
 }
 
 function _setLocalPersona(role, email, name){
+  if(!_isDevHost()){
+    console.warn('[v_devgate] ตั้ง persona ได้เฉพาะบน localhost');
+    return;
+  }
   currentUser={id:'local-'+role,email:email};
   currentUserProfile={id:'local-'+role,email:email,full_name:name,kam_name:name,role:normalizeRole(role),squad:'SA'};
   // Reset account context so new persona starts clean (prevent stale account/visit bleed)
@@ -1414,12 +1441,15 @@ function _setLocalPersona(role, email, name){
 }
 
 async function checkSession() {
-  // LOCAL DEV MODE: ?local=1 bypasses Supabase auth entirely
-  if(window.location.search.includes('local=1')){
+  // LOCAL DEV MODE: ?local=1 bypasses Supabase auth entirely — เฉพาะ localhost
+  // v_devgate: ต้องเช็ค _isDevHost() ที่จุดเรียกด้วย ไม่ใช่พึ่งแต่การ์ดในฟังก์ชัน
+  // เพราะของเดิม return ทันทีหลังเรียก ⇒ ถ้าการ์ดข้างในปฏิเสธเฉยๆ จะได้จอว่าง
+  // (ไม่โชว์ทั้ง picker และหน้าล็อกอิน) · บนเน็ตจริงต้องไหลลงไปเส้นทางล็อกอินปกติ
+  if(_isDevHost() && window.location.search.includes('local=1')){
     activateLocalMode();
     return;
   }
-  if(window.self!==window.top){activateLocalMode();return;}
+  if(_isDevHost() && window.self!==window.top){activateLocalMode();return;}
   // Password recovery links should show reset form, not bypass login into the app.
   if(_urlLooksLikePasswordRecovery()){
     try {
