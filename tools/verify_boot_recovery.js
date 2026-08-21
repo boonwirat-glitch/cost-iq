@@ -211,4 +211,60 @@ console.log('\n[v_bootauth] checkSession() (cold boot) ก็ต้องลอ�
     csBlock2.indexOf('_showLoginOverlayClean()') > csBlock2.indexOf("getSession(boot-2)"));
 }
 
+// ── v_quotaguard (2026-08-21): 402 (เกินโควตา) ต้องไม่ถูกอ่านว่า "ไม่มีสิทธิ์" ──
+// AUTH_UNKNOWN เดิมครอบแค่ความเงียบ (reject/timeout) · 402 ตอบเร็วและครบรูปแบบ
+// getSession() จึง resolve เป็น {data:{session:null},error} ⇒ เด้งผู้ใช้ออกทั้ง 3 ทาง
+// แล้วล็อกอินกลับก็ 402 อีก = ทั้งบริษัทเข้าไม่ได้
+console.log('\n[v_quotaguard] 402/429/5xx = "ตอบไม่ได้" ไม่ใช่ "ไม่มีสิทธิ์"');
+{
+  const vm = require('vm');
+  const i = core.indexOf('function _authUnknown(v){');
+  let d = 0, started = false, j = i;
+  for (; j < core.length; j++) {
+    if (core[j] === '{') { d++; started = true; }
+    else if (core[j] === '}') { d--; if (started && d === 0) { j++; break; } }
+  }
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(core.slice(i, j) + '\nthis.f = _authUnknown;', ctx);
+  const u = ctx.f;
+  const res = (status) => u({ data: { session: null }, error: { status, message: 'x' } });
+
+  check('402 (เกินโควตา) = ไม่รู้ → เก็บ session ไว้ ไม่เด้งออก', res(402) === true);
+  check('429 (ถูกจำกัดอัตรา) = ไม่รู้', res(429) === true);
+  check('500/503 (ฝั่งเขาล่ม) = ไม่รู้', res(500) === true && res(503) === true);
+  check('408 (timeout) = ไม่รู้', res(408) === true);
+  check('⚠ 401/403 = ยืนยันว่าไม่มีสิทธิ์จริง → ต้องเด้งออกตามปกติ',
+    res(401) === false && res(403) === false,
+    'ถ้าเหมารวมด้วย จะไม่มีวันเด้งผู้ใช้ออกเลยแม้ session หมดอายุจริง');
+  check('400 (invalid refresh token) = ยืนยันจริง → เด้งออก', res(400) === false);
+  check('ไม่มี error เลย = ยืนยันว่าไม่มี session → เด้งออกตามปกติ',
+    u({ data: { session: null }, error: null }) === false);
+  check('sentinel AUTH_UNKNOWN เดิมยังทำงาน', u({ __authUnknown: true, data: null }) === true);
+  check('ข้อความแบบ network error ก็ถือว่าไม่รู้',
+    u({ error: { message: 'Failed to fetch' } }) === true);
+}
+
+console.log('\n[v_quotaguard] เข้าโหมดดูอย่างเดียวแทนการปิดประตูใส่หน้า');
+check('มีกุญแจสำรองที่หมดอายุ 24 ชม. เท่ากับ profile cache เดิม',
+  /const _LAST_ID_TTL_MS = 24 \* 60 \* 60 \* 1000;/.test(core) &&
+  /Date\.now\(\) - o\.savedAt > _LAST_ID_TTL_MS/.test(core));
+check('บันทึกกุญแจสำรองตอนโหลด profile สำเร็จ',
+  /_lastIdentitySave\(currentUser, currentUserProfile\);/.test(core));
+check('กดออกจากระบบเองแล้วต้องล้างกุญแจสำรองทิ้ง (ไม่เหลือทางเข้า)',
+  /_lastIdentityClear\(\); \/\/ v_quotaguard/.test(core));
+check('checkSession: ตอบไม่ได้ 2 รอบ + มีกุญแจสำรอง → เข้าโหมดดูอย่างเดียว ไม่เด้ง login',
+  (() => {
+    const a = core.indexOf("getSession(boot-2)");
+    const bLast = core.indexOf('const _lastId = _lastIdentityGet();', a);
+    const bBanner = core.indexOf('_showReadOnlyBanner();', bLast);
+    const bLogin = core.indexOf('_showLoginOverlayClean()', bLast);
+    return bLast > a && bBanner > bLast && (bLogin === -1 || bBanner < bLogin);
+  })());
+check('ไม่มีกุญแจสำรอง (เครื่องใหม่/ไม่เคยล็อกอิน) → ยังเด้ง login ตามปกติ',
+  /ไม่มีตัวตนที่จำไว้ — เด้ง login/.test(core));
+check('แถบเตือนบอกตรงๆ ว่าบันทึกอะไรไม่ได้ ไม่ปล่อยให้เงียบ',
+  /โหมดดูอย่างเดียว/.test(core) && /บันทึกอะไรไม่ได้/.test(core) &&
+  /window\.SENSE_READONLY = true;/.test(core));
+
 process.exit(fail ? 1 : 0);

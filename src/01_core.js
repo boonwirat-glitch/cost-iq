@@ -38,7 +38,74 @@ const supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 // _authUnknown(_r) ก่อนตัดสินใจเด้งผู้ใช้ออก
 const SENSE_AUTH_TIMEOUT_MS = 8000;
 const AUTH_UNKNOWN = Object.freeze({ __authUnknown: true, data: null });
-function _authUnknown(v){ return !!(v && v.__authUnknown); }
+// v_quotaguard (2026-08-21): AUTH_UNKNOWN เดิมครอบแค่ "ความเงียบ" (promise reject
+// หรือ timeout 8 วิ) ซึ่งเป็นกรณีที่ v_authfix ออกแบบมาแก้ · แต่ **โควตาเกิน**
+// ไม่เงียบเลย — Supabase ตอบ 402 กลับมาเร็วและมีรูปแบบสมบูรณ์ ⇒ getSession() ไม่
+// reject แต่ resolve เป็น { data:{session:null}, error:AuthApiError(402) }
+// ⇒ โค้ดเดิมอ่านว่า "ยืนยันแล้วว่าไม่มี session" แล้วเด้งผู้ใช้ออกทั้ง 3 ทาง
+// แล้วล็อกอินกลับก็ 402 อีก = เข้าไม่ได้เลยทั้งบริษัท
+//
+// กติกาใหม่: error ที่ "ไม่ใช่คำตัดสินเรื่องสิทธิ์" ให้ถือว่า "ไม่รู้" ทั้งหมด
+//   402 = เกินโควตา · 429 = ถูกจำกัดอัตรา · 408/5xx = ฝั่งเขามีปัญหา
+// **ห้ามรวม 400/401/403** เพราะนั่นคือคำตอบจริงว่าไม่มีสิทธิ์ ถ้าเหมารวมจะกลายเป็น
+// ไม่มีวันเด้งผู้ใช้ออกเลยแม้ session หมดอายุจริง
+function _authUnknown(v){
+  if (v && v.__authUnknown) return true;
+  var e = v && v.error;
+  if (!e) return false;
+  var st = Number(e.status || e.statusCode || 0);
+  if (st === 402 || st === 408 || st === 429 || (st >= 500 && st <= 599)) return true;
+  var m = String((e && e.message) || '').toLowerCase();
+  if (/failed to fetch|network|load failed|timed? ?out|econn|quota|exceeded/.test(m)) return true;
+  return false;
+}
+
+// v_quotaguard: "กุญแจสำรอง" — จำไว้ว่าเครื่องนี้ใครล็อกอินอยู่ล่าสุด เพื่อให้เปิด
+// โหมดดูอย่างเดียวได้ตอนหลังบ้านตอบไม่ได้ · TTL 24 ชม.เท่ากับ profile cache เดิม
+// จึงไม่เปิดหน้าต่างความเสี่ยงใหม่เกินกว่าที่มีอยู่แล้ว · ล้างตอนกดออกจากระบบจริง
+const _LAST_ID_KEY = 'sense_last_identity_v1';
+const _LAST_ID_TTL_MS = 24 * 60 * 60 * 1000;
+function _lastIdentitySave(user, profile){
+  try{
+    if(!user || !user.id) return;
+    localStorage.setItem(_LAST_ID_KEY, JSON.stringify({
+      id: user.id, email: user.email || (profile && profile.email) || '',
+      role: (profile && profile.role) || '', full_name: (profile && profile.full_name) || '',
+      savedAt: Date.now()
+    }));
+  }catch(_){}
+}
+function _lastIdentityGet(){
+  try{
+    const raw = localStorage.getItem(_LAST_ID_KEY);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    if(!o || !o.id || !o.savedAt) return null;
+    if(Date.now() - o.savedAt > _LAST_ID_TTL_MS) return null;   // เก่าเกินไป ไม่ให้ใช้
+    return o;
+  }catch(_){ return null; }
+}
+function _lastIdentityClear(){ try{ localStorage.removeItem(_LAST_ID_KEY); }catch(_){} }
+
+// แถบแจ้งเตือนค้างบนจอ — ต้องไม่เงียบ ผู้ใช้ต้องรู้ว่ากำลังดูข้อมูลในโหมดจำกัด
+let _readOnlyBannerShown = false;
+function _showReadOnlyBanner(){
+  if(_readOnlyBannerShown) return;
+  _readOnlyBannerShown = true;
+  window.SENSE_READONLY = true;
+  try{
+    const b = document.createElement('div');
+    b.id = 'sense-readonly-banner';
+    b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;' +
+      'background:rgba(120,72,10,.97);color:#FFE7C2;padding:8px 14px;' +
+      "font-family:'Noto Sans Thai',sans-serif;font-size:13px;line-height:1.45;" +
+      'text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35)';
+    b.innerHTML = '⚠️ <b>โหมดดูอย่างเดียว</b> — ระบบหลังบ้านตอบไม่ได้ชั่วคราว ' +
+      'ตัวเลขที่เห็นยังใช้ได้ แต่<b>บันทึกอะไรไม่ได้</b> (อัดเสียง/รีวิว/แก้คอมมิชชั่น)';
+    document.body.appendChild(b);
+    document.body.style.paddingTop = '38px';
+  }catch(_){}
+}
 function _withTimeout(p, ms, label){
   var t = null;
   var limit = ms || SENSE_AUTH_TIMEOUT_MS;
@@ -1332,6 +1399,8 @@ async function loadUserProfile() {
       currentUserProfile = data;
       normalizeCurrentUserProfileRole(); _detectAndMarkSalesSession();
       _profileCacheSet(currentUserProfile); // v220: persist for next cold boot
+      // v_quotaguard: จำตัวตนไว้ด้วย เพื่อให้เข้าโหมดดูอย่างเดียวได้ถ้าหลังบ้านล่ม
+      _lastIdentitySave(currentUser, currentUserProfile);
     } else {
       // Fallback: build minimal profile from auth session so role/email still work
       currentUserProfile = { id: currentUser.id, email: currentUser.email, role: 'rep', full_name: '' };
@@ -1362,6 +1431,7 @@ async function doSignOut() {
     console.warn('[signOut]', e);
   }
   _profileCacheClear(currentUser && currentUser.id); // v220: invalidate cache on explicit logout
+  _lastIdentityClear(); // v_quotaguard: กดออกเองแล้วต้องไม่เหลือทางเข้าโหมดดูอย่างเดียว
   // Note: onAuthStateChange(SIGNED_OUT) should also run. This fallback prevents stale splash/loader state.
   currentUser = null;
   currentUserProfile = null;
@@ -1486,7 +1556,33 @@ async function checkSession() {
       await new Promise(r => setTimeout(r, 2500));
       _cs = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot-2)');
       if (_authUnknown(_cs)) {
-        console.warn('[checkSession] รอบสองก็ตอบไม่ได้ — จำเป็นต้องเด้ง login กันผ้าคลุม boot ค้าง');
+        // v_quotaguard (2026-08-21): ของเดิมยอมแพ้ตรงนี้แล้วเด้ง login — ซึ่งถูก
+        // ตอนเน็ตล่มชั่วคราว (ผู้ใช้กดล็อกอินใหม่ได้) แต่**ผิดตอนหลังบ้านเกินโควตา**
+        // เพราะล็อกอินก็ไม่ผ่านเหมือนกัน ⇒ หน้า login กลายเป็นทางตัน ทั้งที่ข้อมูล
+        // ที่ทีมขายต้องใช้ (พอร์ต/NRR/SKU) อยู่บน R2 ซึ่งยังทำงานปกติดี
+        //
+        // ถ้าเครื่องนี้เคยล็อกอินไว้ภายใน 24 ชม. → ปล่อยเข้าโหมดดูอย่างเดียว
+        // โดยใช้ตัวตนที่จำไว้ + profile cache เดิม แทนที่จะปิดประตูใส่หน้า
+        const _lastId = _lastIdentityGet();
+        if (_lastId) {
+          console.warn('[checkSession] หลังบ้านตอบไม่ได้ 2 รอบ — เข้าโหมดดูอย่างเดียวด้วยตัวตนที่จำไว้');
+          window._sessionCheckHandling = true;
+          currentUser = { id: _lastId.id, email: _lastId.email };
+          const _cachedPf = _profileCacheGet(_lastId.id);
+          currentUserProfile = _cachedPf || {
+            id: _lastId.id, email: _lastId.email,
+            role: _lastId.role || 'rep', full_name: _lastId.full_name || ''
+          };
+          normalizeCurrentUserProfileRole();
+          _detectAndMarkSalesSession();
+          try{ if(typeof _patchR2FilesForSales==='function') _patchR2FilesForSales(); }catch(e){}
+          if(!sheetsLoadStarted&&typeof loadFromGoogleSheets==='function')loadFromGoogleSheets();
+          window._sessionCheckHandling = false;
+          hideLoginOverlay();
+          _showReadOnlyBanner();
+          return;
+        }
+        console.warn('[checkSession] รอบสองก็ตอบไม่ได้ และไม่มีตัวตนที่จำไว้ — เด้ง login');
       }
     }
     const session = _cs && _cs.data && _cs.data.session;
