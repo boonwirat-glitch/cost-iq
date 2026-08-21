@@ -295,4 +295,52 @@ check('แถบเตือนบอกตรงๆ ว่าบันทึก
   /โหมดดูอย่างเดียว/.test(core) && /บันทึกอะไรไม่ได้/.test(core) &&
   /window\.SENSE_READONLY = true;/.test(core));
 
+// ── v_offlinecfg: ตั้งค่าคอมต้องรอดตอนหลังบ้านตอบ 402 ──
+// ตัวที่จับได้จริงรอบนี้: supabase-js ไม่ throw เวลา 402 มันคืน data:null
+// ⇒ `resp.data || []` ทำให้ cache ถูกปั๊ม loaded:true ด้วยตารางเปล่า
+// = หน้าคอมโชว์ ฿0 หน้าตาเหมือนเลขจริง · ข้อแรกล็อกไว้ว่าต้องเช็ค error ก่อน
+const nrrComm = read('src/nrr/nrr_commission.js');
+
+check('402 ไม่ throw ⇒ ต้องเช็ค resp.error เอง ไม่เชื่อแค่ว่ามี data',
+  /if \(resp\.error\) throw new Error\('target_settings/.test(nrrComm) &&
+  /if \(respErr\) throw new Error\('commission_plans/.test(nrrComm));
+
+check('โหลดตั้งค่าสำเร็จ = เก็บสำเนาลงเครื่องทั้ง 2 ตาราง',
+  /nrrCfgSave\('rates', byKey\);/.test(nrrComm) &&
+  /nrrCfgSave\('plans', \{/.test(nrrComm));
+
+check('โหลดไม่ได้ + มีสำเนา → ใช้สำเนา และติดป้าย fromCache',
+  /var cached = nrrCfgLoad\('rates'\);/.test(nrrComm) &&
+  /var cachedPlans = nrrCfgLoad\('plans'\);/.test(nrrComm) &&
+  (nrrComm.match(/fromCache: true/g) || []).length === 2);
+
+check('โหลดไม่ได้ + ไม่มีสำเนา → loaded:false (ห้ามคืน ฿0 เป็นเลขจริง)',
+  // เช็คด้วยลำดับ index ไม่ใช่ระยะห่างตัวอักษร — regex แบบนับ char พังมาหลายรอบแล้ว
+  (() => {
+    const ratesNoCache = nrrComm.includes('{ byKey: {}, loaded: false, error: e.message }');
+    const plansNoCache = nrrComm.includes('{ tiersByPlan: {}, assignments: {}, loaded: false, error: e.message }');
+    // และขา "ไม่มีสำเนา" ต้องอยู่หลังการลองอ่านสำเนา (คือเป็น fallback จริง)
+    const tryRates = nrrComm.indexOf("nrrCfgLoad('rates')");
+    const tryPlans = nrrComm.indexOf("nrrCfgLoad('plans')");
+    return ratesNoCache && plansNoCache && tryRates > 0 && tryPlans > tryRates &&
+      nrrComm.indexOf('{ byKey: {}, loaded: false, error: e.message }') > tryRates &&
+      nrrComm.indexOf('{ tiersByPlan: {}, assignments: {}, loaded: false, error: e.message }') > tryPlans;
+  })());
+
+check('สำเนามีอายุ ไม่ใช้ของเก่าค้างปี',
+  /NRR_CFG_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(nrrComm) &&
+  /Date\.now\(\) - o\.at > NRR_CFG_TTL_MS\) return null/.test(nrrComm));
+
+check('บอกผู้ใช้ครั้งเดียวว่าเครื่องนี้จำสิทธิ์ไว้แล้ว (จะได้รู้ว่า arm สำเร็จ)',
+  (() => {
+    const c = read('src/nrr/nrr_core.js');
+    // ต้องประกาศหลังบันทึก identity สำเร็จ ไม่ใช่ก่อน
+    const save = c.indexOf('nrrLastIdentitySave(nrrProfile.email');
+    const announce = c.indexOf('nrrAnnounceOfflineArmed();', save);
+    return save > 0 && announce > save &&
+      /localStorage\.setItem\(NRR_ARMED_KEY/.test(c) &&
+      // storage ใช้ไม่ได้ = จำไม่ได้ ห้ามโฆษณาว่าพร้อม
+      /\} catch \(e\) \{ return; \}/.test(c);
+  })());
+
 process.exit(fail ? 1 : 0);

@@ -56,6 +56,21 @@ function nrrLastIdentityGet() {
 }
 function nrrLastIdentityClear() { try { localStorage.removeItem(NRR_LAST_ID_KEY); } catch (e) {} }
 
+// v_armnotice: ยืนยันครั้งเดียวต่อเครื่องว่า "จำสิทธิ์ไว้แล้ว" · ประกาศหลัง
+// nrrInitApp เพื่อให้ตัวโหลดตั้งค่าคอมได้เก็บสำเนาลงเครื่องไปด้วยรอบเดียวกัน
+var NRR_ARMED_KEY = 'nrr_offline_armed_v1';
+function nrrAnnounceOfflineArmed() {
+  try {
+    if (localStorage.getItem(NRR_ARMED_KEY)) return;
+    localStorage.setItem(NRR_ARMED_KEY, String(Date.now()));
+  } catch (e) { return; }   // ปิด storage อยู่ = จำอะไรไม่ได้ ไม่ควรโฆษณาว่าพร้อม
+  setTimeout(function () {
+    if (typeof nrrToast === 'function') {
+      nrrToast('เครื่องนี้พร้อมแล้ว — เปิดดูได้ 7 วันแม้หลังบ้านล่ม (อย่ากดออกจากระบบ)', '✅');
+    }
+  }, 1500);
+}
+
 // เข้าโหมดดูอย่างเดียว — ใช้สิทธิ์ที่จำไว้ พร้อมแถบบอกผู้ใช้ตรงๆ ห้ามเงียบ
 function nrrEnterReadOnly(reason) {
   var last = nrrLastIdentityGet();
@@ -152,6 +167,10 @@ async function nrrOnSessionReady(session) {
     nrrLastIdentitySave(nrrProfile.email, role, nrrProfile.name);
     nrrShowApp();
     if (typeof nrrInitApp === 'function') nrrInitApp();
+    // v_armnotice: บอกครั้งเดียวว่าเครื่องนี้พร้อมเปิดแบบไม่ต้องล็อกอินแล้ว
+    // ถ้าไม่บอก ผู้ใช้ไม่มีทางรู้ว่า "เปิดหนึ่งครั้งเพื่อ arm" สำเร็จหรือยัง —
+    // แล้วจะรู้ตัวตอนที่สายไปแล้วคือตอนหลังบ้านล่มจริง
+    nrrAnnounceOfflineArmed();
   } catch (e) {
     console.error('[nrr] on_session_ready', e.message);
     // v_quotaguard: ล้มด้วย exception ก็ถือว่า "ตอบไม่ได้" — ลองโหมดดูอย่างเดียวก่อน

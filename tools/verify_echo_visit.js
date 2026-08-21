@@ -884,7 +884,13 @@ check('_renderTLTeamFeed มีเส้น short-circuit สำหรับ fai
   const CRON_STEP_SRC = (ci.match(/const CRON_STEP_MIN = \d+;/) || [''])[0];
   const src = [CRON_STEP_SRC, REVIEW_STEP_LABELS_SRC,
                grab('_reviewEtaText'), grab('_reviewStepInfo'), grab('_reviewStepBarHtml')].join('\n');
-  const ctx = {};
+  // ตรึงนาฬิกาในแซนด์บ็อกซ์ · _reviewStepInfo เรียก Date.now() เอง (ไม่รับ nowMs)
+  // ⇒ ถ้าไม่ตรึง ชุดทดสอบจะผ่านแค่ในเวลาทำการ แล้วพังเองหลัง 23:00 น.
+  // โดยที่โค้ดไม่ได้เปลี่ยนอะไรเลย — เจอของจริงคืนนี้ ตอนรันตอน 23:50
+  const FIXED_NOW = Date.UTC(2026, 7, 20, 7, 0, 0); // 14:00 ไทย = ในเวลาทำการ
+  // subclass ไม่ใช่ replace — `new Date(nowMs)` ต้องทำงานตามปกติ ตรึงแค่ .now()
+  class FixedDate extends Date { static now() { return FIXED_NOW; } }
+  const ctx = { Date: FixedDate };
   vm.createContext(ctx);
   try {
     vm.runInContext(src + '\nthis.eta=_reviewEtaText; this.info=_reviewStepInfo; this.bar=_reviewStepBarHtml;', ctx);

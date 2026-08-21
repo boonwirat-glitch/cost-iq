@@ -81,11 +81,43 @@ window.nrrSnapshotsForEmailAcrossMonths = nrrSnapshotsForEmailAcrossMonths;
 // _commGetConfig key pattern exactly: '{metricCode}_params' -> JSON object.
 var nrrCommRatesCache = null; // { byKey: {key: parsedValue}, loaded }
 
+// v_offlinecfg (2026-08-21): สำเนาตารางตั้งค่าไว้ในเครื่อง
+//
+// เจอตอนเตรียมรับ Supabase ถูกระงับ: supabase-js **ไม่ throw** เวลาเจอ 402/5xx
+// มันคืน { data: null, error: {...} } ⇒ `resp.data || []` ข้างล่างกลายเป็น
+// ตารางเปล่า แล้ว cache ถูกปั๊ม loaded:true ทั้งที่ไม่ได้โหลดอะไรมาเลย
+// ผลคือหน้าคอมโชว์ ฿0 หน้าตาเหมือนเลขจริง ไม่มีอะไรบอกว่าผิด — อันตรายกว่า error
+//
+// แก้ 2 ชั้น: (1) เช็ค resp.error ทุกครั้ง ไม่เชื่อแค่ว่ามี data ไหม
+// (2) โหลดสำเร็จ = เก็บสำเนาไว้ · โหลดไม่ได้ = ใช้สำเนา (ตั้งค่าคอมแทบไม่เปลี่ยน
+// รายวัน อายุ 7 วันเท่า identity) · ไม่มีสำเนา = loaded:false ให้ผู้เรียกขึ้น
+// "ไม่มีข้อมูล" ห้ามคืน ฿0 เด็ดขาด
+var NRR_CFG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+function nrrCfgSave(key, val) {
+  try { localStorage.setItem('nrr_cfg_' + key, JSON.stringify({ v: val, at: Date.now() })); } catch (e) {}
+}
+function nrrCfgLoad(key) {
+  try {
+    var o = JSON.parse(localStorage.getItem('nrr_cfg_' + key) || 'null');
+    if (!o || !o.at || Date.now() - o.at > NRR_CFG_TTL_MS) return null;
+    return o.v;
+  } catch (e) { return null; }
+}
+// รวม error จากหลาย response ของ Promise.all ให้เหลือตัวเดียว (null = ไม่มี error)
+function nrrRespError() {
+  for (var i = 0; i < arguments.length; i++) {
+    var r = arguments[i];
+    if (r && r.error) return r.error;
+  }
+  return null;
+}
+
 async function nrrFetchCommissionRates() {
   if (nrrCommRatesCache && nrrCommRatesCache.loaded) return nrrCommRatesCache;
   if (!supa) { nrrCommRatesCache = { byKey: {}, loaded: false, error: 'no_auth' }; return nrrCommRatesCache; }
   try {
     var resp = await supa.from('target_settings').select('key,value');
+    if (resp.error) throw new Error('target_settings: ' + (resp.error.message || resp.error.status));
     var rows = resp.data || [];
     var byKey = {};
     rows.forEach(function (s) {
@@ -97,9 +129,14 @@ async function nrrFetchCommissionRates() {
       }
     });
     nrrCommRatesCache = { byKey: byKey, loaded: true };
+    nrrCfgSave('rates', byKey);
   } catch (e) {
     console.warn('[nrr] target_settings fetch failed', e);
-    nrrCommRatesCache = { byKey: {}, loaded: false, error: e.message };
+    var cached = nrrCfgLoad('rates');
+    nrrCommRatesCache = cached
+      ? { byKey: cached, loaded: true, fromCache: true }
+      : { byKey: {}, loaded: false, error: e.message };
+    if (cached) console.warn('[nrr] ใช้สำเนาตั้งค่าในเครื่องแทน (target_settings)');
   }
   return nrrCommRatesCache;
 }
@@ -155,6 +192,8 @@ async function nrrFetchCommissionPlans() {
       supa.from('commission_rule_tiers').select('rule_id,tier_order,min_value,max_value,payout_value'),
       supa.from('commission_plan_assignments').select('period_month,assignment_scope,assignee_key,plan_code')
     ]);
+    var respErr = nrrRespError(res[0], res[1], res[2], res[3]);
+    if (respErr) throw new Error('commission_plans: ' + (respErr.message || respErr.status));
     var plans = res[0].data || [], rules = res[1].data || [];
     var tiers = res[2].data || [], assigns = res[3].data || [];
     var planById = {};
@@ -181,9 +220,15 @@ async function nrrFetchCommissionPlans() {
       assignments[a.period_month + '|' + a.assignment_scope + '|' + a.assignee_key] = a.plan_code;
     });
     nrrCommPlansCache = { tiersByPlan: tiersByPlan, assignments: assignments, catBonusByPlan: catBonusByPlan, loaded: true };
+    nrrCfgSave('plans', { tiersByPlan: tiersByPlan, assignments: assignments, catBonusByPlan: catBonusByPlan });
   } catch (e) {
     console.warn('[nrr] commission plans fetch failed', e);
-    nrrCommPlansCache = { tiersByPlan: {}, assignments: {}, loaded: false, error: e.message };
+    var cachedPlans = nrrCfgLoad('plans');
+    nrrCommPlansCache = cachedPlans
+      ? { tiersByPlan: cachedPlans.tiersByPlan || {}, assignments: cachedPlans.assignments || {},
+          catBonusByPlan: cachedPlans.catBonusByPlan || {}, loaded: true, fromCache: true }
+      : { tiersByPlan: {}, assignments: {}, loaded: false, error: e.message };
+    if (cachedPlans) console.warn('[nrr] ใช้สำเนาตั้งค่าในเครื่องแทน (commission plans)');
   }
   return nrrCommPlansCache;
 }
