@@ -1709,7 +1709,13 @@ const LISTEN_STRIDE_MIN = 6;
 // คลิปสั้นกว่านี้ = คำขอเดียวทั้งไฟล์ ไม่ซ้อน · คงไว้ที่ 6 เพราะคลิปสั้นในของจริง
 // (158-241 วิ) ได้ผลดีอยู่แล้วทุกตัว — อาการเพี้ยนพบเฉพาะคลิปยาว (24.5 กับ 52 นาที)
 const LISTEN_SINGLE_MAX_MIN = 6;
-const LISTEN_MIN_WIN_SEC = 180;
+// v_winfloor (2026-08-21): 180→60 · ทางผ่าครึ่งจะทำงานได้ต่อเมื่อ to-from > ค่านี้×2
+// ค่าเดิม 180 ทำให้หน้าต่าง 6 นาที (360 วิ) ผ่าต่อไม่ได้เลย (360 > 360 เป็นเท็จ) แล้ว
+// โยน error ทิ้งทันที · เจอสดๆ จากของจริงวันนี้: session 19 ส.ค. 16:00 โดน Gemini 524
+// ที่หน้าต่าง 12 นาที → ผ่าเหลือ 6 นาที → **524 ซ้ำที่ 6 นาที** → ตันเพราะหดต่อไม่ได้
+// (บ่ายวันนี้ Gemini ช้ากว่าปกติ ตรงกับคำเตือนข้างบนว่า "ผ่านตอนเช้า ตายตอนบ่ายได้")
+// ลดพื้นลงให้กลไกหดตัวทำงานได้จริงถึง ~1 นาที แทนที่จะยอมแพ้ที่ 6 นาที
+const LISTEN_MIN_WIN_SEC = 60;
 // v_winoverlap: 20→48 — stride 6 นาทีทำให้ visit 60 นาทีต้อง ~11 คำขอ บวกการผ่าครึ่ง
 // ตอน 524 และ retry ที่กินงบด้วย · ค่า 20 เดิมทำคลิป ~50 นาทีชนเพดานจริง แล้วโดนทิ้ง
 // ทั้งที่เสียงดีสมบูรณ์ (21 ส.ค. 10:18 = 25.41MB/8,640 B/s · 18 ส.ค. 11:08 เคสเดียวกัน)
@@ -1749,6 +1755,45 @@ function _keepInWindow(segments, w) {
     if (t == null) return false;
     return t >= w.from && (w.keep_to === null || t < w.keep_to);
   });
+}
+
+// v_winresplit (2026-08-21): เจอ 524 = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน ต้องลดขนาด
+// "คำขอ" ลง · ของเดิมผ่าครึ่งทั้งช่วงขอและช่วงเก็บพร้อมกัน ผลคือช่วงขอเท่ากับช่วงเก็บ
+// พอดี = เสียเกราะกันเสียงเพี้ยนไปทั้งหน้าต่างนั้น (ครึ่งหลังที่เพี้ยนถูกเก็บเข้ามาด้วย)
+// วัดได้จริงจาก session 19 ส.ค. 16:00 บ่ายนี้: หน้าต่างปกติ 0-720 ได้ 57 ท่อน ยาว
+// เฉลี่ย 39 ตัวอักษร · หน้าต่างที่ถูกผ่า 360-720 ได้แค่ 13 ท่อน ยาว 17 ตัวอักษร
+// (ratio 0 = ครึ่งหลังไม่มีท่อนเลย) — แย่กว่ากัน 4 เท่า และมองไม่เห็นเลยถ้าไม่มีตัววัด
+//
+// แก้: วางแผน "ช่วงที่เหลือต้องเก็บ" ใหม่ด้วย stride ครึ่งเดียว โดยคงกติกาเดิมว่า
+// ขอเป็น 2 เท่าของที่เก็บเสมอ ⇒ คำขอเล็กลงจริง (แก้ 524) และยังมีเกราะครบ
+// คืน null = เล็กจนผ่าต่อไม่ได้แล้ว ให้ผู้เรียกโยน error ต่อตามเดิม
+function _resplitWindow(w, durSec) {
+  const dur = Math.ceil(durSec || 0);
+  const from = (w && w.from != null) ? w.from : 0;
+  const reqTo = (w && w.to != null) ? w.to : dur;
+  // state รูปแบบเก่าก่อน 21 ส.ค. (ไม่มี keep_to) — ผ่าครึ่งแบบเดิม ไม่มีอะไรให้รักษา
+  if (!w || w.keep_to === undefined) {
+    const mid = Math.floor((from + reqTo) / 2);
+    if (reqTo - from <= LISTEN_MIN_WIN_SEC * 2) return null;
+    return [{ from, to: mid }, { from: mid, to: reqTo }];
+  }
+  // 524 เกิดจาก "คำตอบยาวเกิน" ซึ่งโตตามความยาวเสียงที่ขอ ⇒ ตัวที่ต้องเล็กลงคือ
+  // **ขนาดคำขอ** ไม่ใช่ขนาดช่วงที่เก็บ · ตั้งคำขอใหม่เป็นครึ่งเดียวของคำขอที่ล้ม
+  // แล้ววางแผนช่วงที่ต้องเก็บด้วย stride = ครึ่งของคำขอใหม่ (คงกติกา ขอ = 2 × เก็บ)
+  const reqLen = reqTo - from;
+  const win = Math.max(LISTEN_MIN_WIN_SEC * 2, Math.floor(reqLen / 2));
+  if (win >= reqLen) return null;      // เล็กจนหดต่อไม่ได้แล้ว — ห้ามวนซ้ำตลอดกาล
+  const stride = Math.floor(win / 2);
+  const keepEnd = (w.keep_to === null) ? dur : w.keep_to;
+  const out = [];
+  for (let s = from; s < keepEnd; s += stride) {
+    const kt = Math.min(s + stride, keepEnd);
+    const isLast = kt >= keepEnd;
+    out.push({ from: s, to: Math.min(s + win, dur),
+               keep_to: (isLast && w.keep_to === null) ? null : kt });
+    if (isLast) break;
+  }
+  return out.length ? out : null;
 }
 
 // v_driftmeter (2026-08-21): ตัววัดอาการเพี้ยนช่วงท้ายคำขอ — บทเรียนของรอบนี้คือผม
@@ -1886,25 +1931,17 @@ async function runListenStep(env, row, audioBytes) {
     // หมดเวลา = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน "ในวันนี้" → ผ่าช่วงนั้นครึ่งหนึ่ง
     // แล้วไปต่อ · ลองขนาดเดิมซ้ำมีแต่จะพังซ้ำและเผาเงินเปล่า
     if (/\b524\b|timeout|timed out/i.test(msg)) {
-      const from = w.from == null ? 0 : w.from;
-      const to = w.to == null ? Math.ceil(row.duration_secs || 0) : w.to;
-      const mid = Math.floor((from + to) / 2);
-      if (to - from > LISTEN_MIN_WIN_SEC * 2) {
-        // v_winoverlap: ผ่าแค่ช่วงที่ "ขอ" — ช่วงที่ "เก็บ" ของหน้าต่างเดิมต้องคงเดิม
-        // ทั้งก้อน ไม่งั้นจะเกิดรูตรงกลางบทที่ไม่มีใครเก็บ · keep_to === undefined คือ
-        // state รูปแบบเก่าก่อน 21 ส.ค. ปล่อยให้ซีกใหม่เป็น undefined ต่อ (เก็บทั้งหมด)
-        const keepTo = w.keep_to;
-        const parts = [];
-        parts.push({ from, to: mid,
-          keep_to: (keepTo === undefined) ? undefined
-                 : (keepTo === null) ? mid : Math.min(mid, keepTo) });
-        // ซีกหลังมีอะไรต้องเก็บไหม — ถ้าช่วงเก็บจบก่อน mid แล้ว ก็ไม่ต้องยิงคำขอนั้นเลย
-        if (keepTo === undefined || keepTo === null || keepTo > mid) {
-          parts.push({ from: mid, to, keep_to: keepTo });
-        }
+      // v_winresplit: วางแผนช่วงที่เหลือใหม่ด้วย stride ครึ่งเดียว โดยคงกติกา
+      // "ขอเป็น 2 เท่าของที่เก็บ" ⇒ คำขอเล็กลงจริงแต่เกราะกันเสียงเพี้ยนยังอยู่
+      const parts = _resplitWindow(w, row.duration_secs);
+      if (parts && parts.length) {
         windows.splice(i, 1, ...parts);
         await save({ windows });
-        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid - from) / 60)} นาที (เหลือ ${parts.length} ซีกที่ต้องขอ)`);
+        const _reqMin = Math.round(((parts[0].to - parts[0].from) / 60) * 10) / 10;
+        const _keepMin = parts[0].keep_to == null ? _reqMin
+          : Math.round(((parts[0].keep_to - parts[0].from) / 60) * 10) / 10;
+        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — วางแผนใหม่ ${parts.length} ก้อน ` +
+          `(ขอ ${_reqMin} นาที เก็บ ${_keepMin} นาที)`);
         return null;
       }
     }

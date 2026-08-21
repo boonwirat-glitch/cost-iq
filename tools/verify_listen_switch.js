@@ -41,7 +41,8 @@ const STAGE1 = WK.slice(WK.indexOf('// ── Stage 1: uploaded / needs_gemini �
 const STEP = WK.slice(WK.indexOf('async function runListenStep'), WK.indexOf('async function processSession'));
 // v_winoverlap (2026-08-21): ตัววางแผนหน้าต่างถูกแยกออกมาเป็นฟังก์ชันของตัวเอง
 // เพื่อให้ harness รันจริงทดสอบได้ ไม่ใช่แค่ grep หาสตริงในโค้ดก้อนใหญ่
-const PLAN = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('function _windowDrift'));
+const PLAN = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('function _resplitWindow'));
+const PLAN2 = WK.slice(WK.indexOf('function _resplitWindow'), WK.indexOf('function _windowDrift'));
 
 console.log('\n── 1. Gemini เป็นหูหลัก แต่ถอยกลับได้ ──');
 check('stage 1 เรียก runListenStep ก่อน ไม่ใช่ Whisper',
@@ -124,13 +125,19 @@ check('คลิปสั้นยิงรอบเดียว ไม่ซอ
   /dur \/ 60 <= LISTEN_SINGLE_MAX_MIN/.test(PLAN));
 check('เจอ 524/timeout แล้วผ่าช่วงครึ่งหนึ่ง แทนลองขนาดเดิมซ้ำ',
   /\/\\b524\\b\|timeout\|timed out\/i\.test\(msg\)/.test(STEP) &&
+  /const parts = _resplitWindow\(w, row\.duration_secs\);/.test(STEP) &&
   /windows\.splice\(i, 1, \.\.\.parts\)/.test(STEP));
-// v_winoverlap: ผ่าแค่ช่วงที่ "ขอ" · ช่วงที่ "เก็บ" ต้องคงเดิมทั้งก้อน ไม่งั้นเกิดรูกลางบท
-check('ผ่าครึ่งแล้วช่วงที่เก็บต้องไม่หาย และซีกที่ไม่มีอะไรต้องเก็บก็ไม่ต้องยิง',
-  /keep_to: \(keepTo === undefined\) \? undefined/.test(STEP) &&
-  /if \(keepTo === undefined \|\| keepTo === null \|\| keepTo > mid\)/.test(STEP));
+// v_winresplit (2026-08-21): ตรรกะพื้นหดย้ายไปอยู่ใน _resplitWindow แล้ว (คืน null
+// เมื่อผ่าต่อไม่ได้) — STEP จึงไม่มีคำว่า LISTEN_MIN_WIN_SEC อีก ต้องเช็คที่ใหม่
 check('มีพื้นหดต่ำสุด — หดจนสั้นแล้วยังพัง = โยนต่อให้ตกไป Whisper',
-  /LISTEN_MIN_WIN_SEC/.test(STEP) && /throw e;/.test(STEP));
+  /LISTEN_MIN_WIN_SEC/.test(PLAN2) && /return null;/.test(PLAN2) && /throw e;/.test(STEP));
+// v_winfloor (2026-08-21): พื้น 180 ทำให้หน้าต่าง 6 นาทีผ่าต่อไม่ได้ (360 > 360 เป็นเท็จ)
+// ตันทันทีเมื่อ 524 ซ้ำที่ 6 นาที — เจอสดๆ กับ session 19 ส.ค. 16:00 บ่ายวันนี้
+check('พื้นหดต้องต่ำพอให้หน้าต่าง 6 นาทีผ่าต่อได้อีก (ไม่ตันที่ 524 ซ้ำ)',
+  (() => {
+    const floor = Number((WK.match(/const LISTEN_MIN_WIN_SEC = (\d+)/) || [])[1]);
+    return floor > 0 && 360 > floor * 2;
+  })(), 'ถ้า 360 ไม่ > พื้น×2 หน้าต่าง 6 นาทีจะหดต่อไม่ได้และล้มทันที');
 check('รวมผลเรียงตามเวลาจริง',
   /\.sort\(\(a, b\) => \(_abTsToSec\(a\?\.ts\) \?\? 0\) - \(_abTsToSec\(b\?\.ts\) \?\? 0\)\)/.test(STEP));
 
@@ -229,7 +236,8 @@ console.log('\n── 8. v_winoverlap + v_usability: รันจริงกั
   vm.createContext(ctx);
   try {
     vm.runInContext(`${helpers}\n${consts}\n${usab}\n${plan}\n` +
-      'this.API={_planListenWindows,_keepInWindow,_usabilityScore,_windowDrift,LISTEN_WIN_MIN,LISTEN_STRIDE_MIN,LISTEN_MAX_ATTEMPTS};', ctx);
+      'this.API={_planListenWindows,_keepInWindow,_usabilityScore,_windowDrift,_resplitWindow,' +
+      'LISTEN_WIN_MIN,LISTEN_STRIDE_MIN,LISTEN_MAX_ATTEMPTS,LISTEN_MIN_WIN_SEC};', ctx);
     const A = ctx.API;
 
     // ── ตัววางแผนหน้าต่าง ──
@@ -305,6 +313,61 @@ console.log('\n── 8. v_winoverlap + v_usability: รันจริงกั
       A._usabilityScore([], 100, 0) === null && A._usabilityScore(mk(5, 50), 0, 0) === null);
     check('รันจริง: ท่อน [ฟังไม่ชัด] เยอะ กดคะแนนลงจริง',
       A._usabilityScore(mk(100, 600), 600, 50) < A._usabilityScore(mk(100, 600), 600, 0));
+
+    // ── v_winresplit: ผ่าหน้าต่างตอน 524 ต้องไม่ทิ้งเกราะกันเสียงเพี้ยน ──
+    // เคสจริงที่ทำให้เจอบั๊กนี้: session 19 ส.ค. 16:00 บ่าย 21 ส.ค. โดน 524 ที่
+    // {from:360,to:1080,keep_to:720} แล้วของเดิมผ่าเป็น {360,720,keep 720} ซึ่งขอ=เก็บ
+    // → เก็บครึ่งหลังที่เพี้ยนเข้ามาด้วย ได้แค่ 13 ท่อน/17 ตัวอักษร (ปกติ 57/39)
+    const okOverlap = p => p.keep_to === null || (p.to - p.from) >= (p.keep_to - p.from) * 2;
+    {
+      const parts = A._resplitWindow({ from: 360, to: 1080, keep_to: 720 }, 2406);
+      check('รันจริง: 524 บนหน้าต่างปกติ → คำขอเล็กลงครึ่ง แต่ยังขอเผื่อ 2 เท่าของที่เก็บ',
+        parts.length === 2 &&
+        (parts[0].to - parts[0].from) === 360 && parts[0].keep_to === 540 &&
+        (parts[1].to - parts[1].from) === 360 && parts[1].keep_to === 720 &&
+        parts.every(okOverlap),
+        JSON.stringify(parts));
+      check('รันจริง: ช่วงที่เก็บของก้อนใหม่ต่อกันพอดี ครอบคลุมของเดิมครบ ไม่มีรู',
+        parts[0].from === 360 && parts[0].keep_to === parts[1].from && parts[1].keep_to === 720);
+    }
+    {
+      // หน้าต่างที่เคยถูกผ่าด้วยโค้ดเก่าจนขอ=เก็บ — ต้องกู้เกราะกลับมาได้
+      const parts = A._resplitWindow({ from: 360, to: 720, keep_to: 720 }, 2406);
+      const tiles = parts.length >= 2 && parts[0].from === 360 &&
+        parts[parts.length - 1].keep_to === 720 &&
+        parts.every((p, i) => i === 0 || p.from === parts[i - 1].keep_to);
+      check('รันจริง: หน้าต่างที่เสียเกราะไปแล้ว (ขอ=เก็บ) ต้องได้เกราะคืน + คำขอเล็กลง',
+        parts.every(okOverlap) && tiles &&
+        (parts[0].to - parts[0].from) < 360,     // คำขอเดิมล้มที่ 360 วิ ต้องเล็กกว่านั้น
+        JSON.stringify(parts));
+    }
+    {
+      const parts = A._resplitWindow({ from: 2160, to: 2406, keep_to: null }, 2406);
+      check('รันจริง: หน้าต่างสุดท้าย (keep_to=null) ผ่าแล้วก้อนท้ายยังเก็บถึงจบไฟล์',
+        parts.length >= 2 && parts[parts.length - 1].keep_to === null &&
+        parts[0].keep_to !== null, JSON.stringify(parts));
+    }
+    check('รันจริง: เล็กจนผ่าต่อไม่ได้ = คืน null (ห้ามวนซ้ำหน้าต่างเดิมตลอดกาล)',
+      A._resplitWindow({ from: 0, to: 60, keep_to: 60 }, 2406) === null,
+      String(JSON.stringify(A._resplitWindow({ from: 0, to: 60, keep_to: 60 }, 2406))));
+    check('รันจริง: ผ่าซ้ำๆ ขนาดคำขอต้องเล็กลงเรื่อยๆ แล้วจบ ไม่วนไม่รู้จบ',
+      (() => {
+        let w = { from: 0, to: 720, keep_to: 360 }, sizes = [], guard = 0;
+        while (w && guard++ < 20) {
+          const p = A._resplitWindow(w, 2406);
+          if (!p) break;
+          sizes.push(p[0].to - p[0].from);
+          w = p[0];
+        }
+        // ต้องหยุดเอง และขนาดต้องไม่เพิ่มขึ้นเลย
+        return guard < 20 && sizes.length >= 2 &&
+               sizes.every((s, i) => i === 0 || s <= sizes[i - 1]);
+      })());
+    check('รันจริง: state รูปแบบเก่า (ไม่มี keep_to) ยังผ่าครึ่งแบบเดิมได้',
+      (() => {
+        const p = A._resplitWindow({ from: 0, to: 720 }, 2406);
+        return p && p.length === 2 && p[0].to === 360 && p[1].from === 360;
+      })());
 
     // ── ตัววัดเสียงเพี้ยน ──
     const dseg = (sec, text) => ({ ts: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, text });
