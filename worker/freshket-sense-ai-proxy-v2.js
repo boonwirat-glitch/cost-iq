@@ -183,16 +183,59 @@ async function sbDelete(env, table, query) {
   const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}?${query}`, { method: 'DELETE', headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbDelete ${table} ${r.status}: ${await r.text().catch(() => '')}`);
 }
+// v_audior2 (2026-08-21): อ่านไฟล์เสียงจาก R2 ก่อน แล้วค่อยถอยไป Supabase
+//
+// ทำไม: การดึงไฟล์ออกจาก Supabase Storage คือต้นเหตุทั้งหมดของ Cached Egress ที่
+// เกินโควตา 327% — path แบบ authenticated ถูก CDN แคช (พิสูจน์แล้วจาก log จริง:
+// 71 จาก 88 request เป็น cf_cache_status=HIT) ⇒ ทุกครั้งที่ถอดเสียงหนึ่งหน้าต่าง
+// ถูกนับเต็มขนาดไฟล์ · R2 ไม่คิดค่าขาออกเลย
+//
+// **ต้องมีทางถอย** เพราะไฟล์เก่าที่อัดก่อนวันนี้ยังอยู่บน Supabase (retention 7 วัน)
+// ⇒ ลอง R2 ก่อน ไม่เจอค่อยไป Supabase · ใช้ audio_path ตัวเดิมเป็นกุญแจทั้งสองที่
+// ไม่ต้องแก้ schema และไม่ต้อง migrate อะไร · ถอดทางถอยออกได้หลัง 7 วัน
 async function sbStorageGet(env, path) {
+  if (env.ECHO_AUDIO) {
+    try {
+      const obj = await env.ECHO_AUDIO.get(path);
+      if (obj) {
+        console.log(`[audio] อ่านจาก R2: ${path} (ไม่คิดค่าขาออก)`);
+        return new Uint8Array(await obj.arrayBuffer());
+      }
+    } catch (e) {
+      console.warn('[audio] อ่าน R2 ไม่สำเร็จ — ถอยไป Supabase:', (e && e.message) || e);
+    }
+  }
   const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, { headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbStorageGet ${r.status}: ${await r.text().catch(() => '')}`);
+  console.warn(`[audio] อ่านจาก Supabase (คิดค่าขาออก): ${path}`);
   return new Uint8Array(await r.arrayBuffer());
 }
-async function sbStorageDelete(env, path) {
-  const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
-    method: 'DELETE', headers: _sbHeaders(env)
+
+// v_audior2: เขียนไฟล์เสียงลง R2 · ใช้โดย endpoint /audio-put ที่แอปยิงมา
+async function r2AudioPut(env, path, bytes, contentType) {
+  if (!env.ECHO_AUDIO) throw new Error('ไม่มี R2 binding (ECHO_AUDIO)');
+  await env.ECHO_AUDIO.put(path, bytes, {
+    httpMetadata: { contentType: contentType || 'audio/webm' }
   });
-  if (!r.ok) throw new Error(`sbStorageDelete ${r.status}`);
+}
+// v_audior2: ลบทั้งสองที่ — ช่วงเปลี่ยนผ่านไฟล์อยู่ได้ทั้ง R2 และ Supabase
+// ถ้าลบแค่ที่เดียวจะเหลือไฟล์กำพร้าที่ sweepExpiredAudio หาไม่เจออีกตลอดกาล
+// (มันไล่จากตาราง ci_sessions ไม่ได้ไล่จากตัว bucket)
+async function sbStorageDelete(env, path) {
+  let r2Err = null, sbErr = null;
+  if (env.ECHO_AUDIO) {
+    try { await env.ECHO_AUDIO.delete(path); } catch (e) { r2Err = e; }
+  }
+  try {
+    const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
+      method: 'DELETE', headers: _sbHeaders(env)
+    });
+    // 404 = ไม่มีอยู่แล้ว (เช่นไฟล์ใหม่ที่อยู่แต่ใน R2) ถือว่าสำเร็จ ไม่ใช่ error
+    if (!r.ok && r.status !== 404) sbErr = new Error(`sbStorageDelete ${r.status}`);
+  } catch (e) { sbErr = e; }
+  // โยนต่อเฉพาะเมื่อ **ทั้งสองที่** ลบไม่สำเร็จ — ผู้เรียก (sweepExpiredAudio) จะได้
+  // ไม่เซ็ต audio_path=null ทิ้ง แล้ววนลบใหม่รอบหน้าได้ตามดีไซน์เดิม
+  if (r2Err && sbErr) throw sbErr;
 }
 // v_cpudiet: _bytesToB64 ถูกถอดออก — มันคือฆาตกร exceededCpu บน Workers Free
 // (สร้าง binary string ของไฟล์ 9-24MB = CPU เกิน 10ms แน่นอน) · เสียงดิบส่งเป็น
@@ -2523,6 +2566,40 @@ async function sweepExpiredSkillLogs(env) {
   } catch (e) { console.error('[skill-log-sweep] app_errors ลบไม่สำเร็จ:', e?.message || e); }
 }
 
+// ── v_audior2 (2026-08-21): รับไฟล์เสียงจากแอปแล้วเขียนลง R2 ─────────────────
+//
+// ทำไมต้องผ่าน worker ไม่ให้แอปยิงเข้า R2 ตรงๆ: R2 ไม่มี client SDK ที่ให้แอป
+// ถือกุญแจได้อย่างปลอดภัย (จะกลายเป็นใครก็เขียน/อ่านถังได้) · worker ถือ binding
+// อยู่ฝ่ายเดียว แอปแค่ส่ง bytes มา
+//
+// ทำไมไม่ใช้ presigned URL: ต้องเซ็น SigV4 เองในเวิร์กเกอร์ ซึ่งยาวกว่านี้มาก
+// และไฟล์จริงใหญ่สุดที่เจอคือ 41MB ยังอยู่ในเพดาน request body ของ Workers
+// (ถ้าวันหลังไฟล์ใหญ่กว่านี้ค่อยเปลี่ยนไปทาง presigned)
+//
+// **ฝั่งแอปต้องมีทางถอยไป Supabase ถ้าตรงนี้ล้ม** — เสียงที่อัดมาแล้วหายคือความ
+// เสียหายที่กู้ไม่ได้ ห้ามแลกกับการประหยัดค่า egress เด็ดขาด
+async function handleAudioPut(request, env) {
+  if (request.method !== 'POST') return json({ error: 'POST only' }, 405, env);
+  if (!env.ECHO_AUDIO) return json({ error: 'ยังไม่ได้ผูก R2 binding' }, 503, env);
+
+  const path = new URL(request.url).searchParams.get('path') || '';
+  // กันเขียนออกนอกโฟลเดอร์ที่ควร และกันอักขระแปลกปลอม — path มาจาก client
+  if (!/^echo-audio\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webm|mp4|m4a|ogg)$/i.test(path)) {
+    return json({ error: 'path ไม่ถูกรูปแบบ' }, 400, env);
+  }
+  try {
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (!bytes.length) return json({ error: 'ไฟล์ว่าง' }, 400, env);
+    const ct = request.headers.get('content-type') || 'audio/webm';
+    await r2AudioPut(env, path, bytes, ct);
+    console.log(`[audio] เขียนลง R2 สำเร็จ: ${path} (${(bytes.length / 1048576).toFixed(1)}MB)`);
+    return json({ ok: true, path, bytes: bytes.length, store: 'r2' }, 200, env);
+  } catch (e) {
+    console.error('[audio] เขียน R2 ล้มเหลว:', (e && e.message) || e);
+    return json({ error: 'เขียน R2 ไม่สำเร็จ: ' + ((e && e.message) || e) }, 502, env);
+  }
+}
+
 async function handleListModels(env) {
   if (!env.GEMINI_API_KEY) return json({ error: 'ไม่มี GEMINI_API_KEY' }, 400, env);
   try {
@@ -2748,6 +2825,7 @@ export default {
     if (url.pathname === '/eval')          return handleEval(request, env);
     if (url.pathname === '/transcribe')    return handleTranscribe(request, env);
     if (url.pathname === '/analyze-audio') return handleAnalyzeAudio(request, env);
+    if (url.pathname === '/audio-put')     return handleAudioPut(request, env);
 
     // ช่องทาง AI กลางของ Sense (ไม่มี path) — ตัวจริงอยู่ใน handleGeneralAI
     let body;

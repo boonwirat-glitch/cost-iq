@@ -321,6 +321,43 @@ check('พักแค่คิวถอดเสียง — งานกว�
 check('พักแล้วต้อง log บอกทุก tick ไม่ใช่เงียบหาย',
   /\[pause\] สายถอดเสียงถูกพักไว้/.test(WK));
 
+// ── 6g. v_audior2: ย้ายไฟล์เสียงไป R2 (ต้นเหตุ egress) ───────────────────────
+console.log('\n── 6g. v_audior2: ไฟล์เสียงอยู่ R2 · Supabase เป็นทางถอย ──');
+check('worker อ่าน R2 ก่อน แล้วค่อยถอยไป Supabase',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    return f.indexOf('env.ECHO_AUDIO.get(path)') > -1 &&
+           f.indexOf('env.ECHO_AUDIO.get(path)') < f.indexOf('/storage/v1/object/');
+  })(), 'ถ้าอ่าน Supabase ก่อน จะยังโดนคิดค่าขาออกเหมือนเดิม');
+check('ยังมีทางถอยไป Supabase (ไฟล์เก่าใน retention 7 วันต้องถอดได้)',
+  /\/storage\/v1\/object\/\$\{AUDIO_BUCKET\}\/\$\{path\}`, \{ headers: _sbHeaders\(env\) \}/.test(WK));
+check('log แยกออกว่าอ่านจากที่ไหน (ตรวจได้ว่าย้ายสำเร็จจริงไหม)',
+  /อ่านจาก R2/.test(WK) && /อ่านจาก Supabase \(คิดค่าขาออก\)/.test(WK));
+check('ลบไฟล์หมดอายุลบทั้งสองที่ (กันไฟล์กำพร้าที่ sweep หาไม่เจอ)',
+  /env\.ECHO_AUDIO\.delete\(path\)/.test(WK) &&
+  /if \(!r\.ok && r\.status !== 404\) sbErr/.test(WK) &&
+  /if \(r2Err && sbErr\) throw sbErr;/.test(WK));
+check('endpoint /audio-put กัน path ออกนอกโฟลเดอร์ (path มาจาก client)',
+  /\^echo-audio\\\/\[0-9a-f-\]\{36\}\\\/\[0-9a-f-\]\{36\}\\\.\(webm\|mp4\|m4a\|ogg\)\$/.test(WK) &&
+  /path ไม่ถูกรูปแบบ/.test(WK));
+check('endpoint รับแต่ POST และปฏิเสธไฟล์ว่าง',
+  /if \(request\.method !== 'POST'\)/.test(WK) && /ไฟล์ว่าง/.test(WK));
+check('ผูก R2 binding ใน wrangler.toml แล้ว และเป็นถังส่วนตัว (ไม่ใช่ freshket-data ที่เปิดสาธารณะ)',
+  (() => {
+    const wt = fs.readFileSync(path.join(__dirname, '..', 'wrangler.toml'), 'utf8');
+    return /binding = "ECHO_AUDIO"/.test(wt) &&
+           /bucket_name = "freshket-echo-audio"/.test(wt) &&
+           !/bucket_name = "freshket-data"/.test(wt);
+  })(), 'freshket-data เปิดสาธารณะ — ไฟล์เสียงมีบทสนทนาลูกค้า+GPS ห้ามลงถังนั้น');
+check('ฝั่งแอปอัป R2 ก่อน และถอยไป Supabase ถ้าล้ม (เสียงต้องไม่หาย)',
+  (() => {
+    const i = CI.indexOf('let _store = ');
+    const iR2 = CI.indexOf('/audio-put?path=', i);
+    const iFallback = CI.indexOf("supa.storage.from('ciq-data')", i);
+    return i > -1 && iR2 > i && iFallback > iR2 &&
+           /_store = 'supabase'/.test(CI);
+  })(), 'ลำดับต้องเป็น R2 ก่อน แล้ว Supabase เป็นทางถอย ไม่ใช่ทางเดียว');
+
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',
   /async function runTranscribe\(/.test(WK));

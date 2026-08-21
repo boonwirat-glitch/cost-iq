@@ -1,4 +1,4 @@
-<!-- Freshket Sense v279: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v280: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v279',
+      version: 'v280',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -53013,9 +53013,31 @@ body:not(.echo-active) { background:unset; }
       const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
         ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2));
       path = `echo-audio/${userId}/${rand}.${ext}`;
-      const { error: upErr } = await supa.storage.from('ciq-data')
-        .upload(path, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
-      if (upErr) throw upErr;
+
+      // ── v_audior2 (2026-08-21): อัปขึ้น R2 ก่อน ถอยไป Supabase ถ้าล้ม ──────────
+      //
+      // ทำไมย้าย: Supabase คิดค่า "ขาออก" ทุกครั้งที่ worker ดึงไฟล์ไปถอดเสียง
+      // (พิสูจน์จาก log จริง: 71 จาก 88 request เป็น cache HIT = ถูกนับเต็มขนาดไฟล์)
+      // ทำให้เกินโควตา 327% · R2 ไม่คิดค่าขาออก ⇒ ยอดฝั่ง Supabase เหลือ 0
+      // การอัปโหลด "ขาเข้า" ไม่เคยมีค่าใช้จ่ายทั้งสองฝั่ง — ที่แพงคือขาออก
+      //
+      // ลำดับสำคัญมาก: **เสียงที่อัดมาแล้วหายคือความเสียหายที่กู้ไม่ได้** ห้ามแลกกับ
+      // การประหยัดค่า egress ⇒ ถ้า R2 ล้มด้วยเหตุใดก็ตาม ถอยไปอัป Supabase แบบเดิม
+      // ทันที (worker อ่านได้ทั้งสองที่อยู่แล้ว จึงถอดเสียงได้เหมือนกัน)
+      let _store = 'r2';
+      try {
+        const _r2res = await fetch(
+          `${WORKER_URL}/audio-put?path=${encodeURIComponent(path)}`,
+          { method: 'POST', headers: { 'Content-Type': blob.type || 'audio/webm' }, body: blob });
+        if (!_r2res.ok) throw new Error('R2 ตอบ ' + _r2res.status + ': ' + (await _r2res.text().catch(() => '')).slice(0, 120));
+      } catch (_r2e) {
+        console.warn('[CI upload] อัป R2 ไม่สำเร็จ — ถอยไป Supabase:', (_r2e && _r2e.message) || _r2e);
+        _store = 'supabase';
+        const { error: upErr } = await supa.storage.from('ciq-data')
+          .upload(path, blob, { upsert: true, contentType: blob.type || 'audio/webm' });
+        if (upErr) throw upErr;   // ล้มทั้งสองที่ = ปล่อยให้ catch ข้างนอกจัดการ (เสียงยังอยู่ใน IndexedDB)
+      }
+      console.log(`[CI upload] เก็บไฟล์เสียงที่ ${_store}: ${path} (${(blob.size / 1048576).toFixed(1)}MB)`);
       _uploadedOk = true;
 
       // 2) claim/create the session row at stage 'uploaded'
