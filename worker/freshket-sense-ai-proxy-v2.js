@@ -205,6 +205,20 @@ async function sbStorageGet(env, path) {
       console.warn('[audio] อ่าน R2 ไม่สำเร็จ — ถอยไป Supabase:', (e && e.message) || e);
     }
   }
+  // v_pausesb (2026-08-21): พักเฉพาะ "การดึงจาก Supabase" ไม่ใช่พักทั้งระบบ
+  //
+  // ของเดิมพักที่ scheduled() ทั้งก้อน ซึ่งแรงเกินจำเป็นและยังมีช่องด้วย: /process
+  // ที่แอปยิงเอง (_sweepStuckAsyncRows) เรียก processSession ตรงๆ ไม่ผ่าน cron
+  // ⇒ session ที่พักไว้ถูกหยิบไปทำอีกจนดึงไฟล์จาก Supabase ซ้ำ (เจอของจริงคืนนี้)
+  //
+  // พักที่จุดนี้แทน ครอบทุกทางเรียกในที่เดียว และแม่นกว่า: ไฟล์ใหม่ที่อยู่ R2 แล้ว
+  // ถอดได้ปกติ (ไม่มีค่าใช้จ่าย) · ขั้นวิเคราะห์ก็ทำได้ปกติ (ใช้ transcript ใน DB
+  // ไม่แตะไฟล์เสียง) · เหลือรอเฉพาะคลิปเก่าที่ยังอยู่บน Supabase เท่านั้น
+  if (ECHO_PIPELINE_PAUSED && env.ECHO_PIPELINE_RESUME !== '1') {
+    const err = new Error('SUPABASE_AUDIO_PAUSED: คลิปนี้ยังอยู่บน Supabase — พักดึงไว้จนโควตากลับมา (2 ก.ย.) หรืออัปแผน');
+    err.pausedSupabaseAudio = true;
+    throw err;
+  }
   const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, { headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbStorageGet ${r.status}: ${await r.text().catch(() => '')}`);
   console.warn(`[audio] อ่านจาก Supabase (คิดค่าขาออก): ${path}`);
@@ -2056,6 +2070,10 @@ async function processSession(sessionId, origin, env) {
     const claimed = await sbPatch(env, 'ci_sessions', claimQuery(row.pipeline_stage), { processing_since: new Date().toISOString() });
     if (!claimed.length) return; // another invocation owns this stage
     try {
+      // v_pausesb: ถ้าคลิปนี้ยังอยู่บน Supabase และกำลังพักดึงอยู่ ให้ถอยออกจากคิว
+      // แบบสุภาพ — ไม่นับเป็นความล้ม ไม่กินงบ attempts และไม่ทิ้งความคืบหน้าใดๆ
+      // นัดใหม่หลังโควตารีเซ็ต (2 ก.ย.) · ถ้าอัป Pro ก่อนนั้น ตั้ง
+      // ECHO_PIPELINE_RESUME=1 แล้วมันกลับมาทำต่อทันทีจากจุดเดิม
       // v_lazyaudio (2026-08-21): เดิมโหลดไฟล์เสียงเต็มก้อนทุก tick ก่อนจะรู้ด้วยซ้ำว่า
       // ต้องใช้ไบต์หรือไม่ · คลิปยาวถอดข้าม tick ทีละหน้าต่าง และหลังอัปเข้า Gemini
       // ครั้งแรกแล้ว runListenStep ใช้แต่ file_uri **ไม่แตะ audioBytes เลย** ⇒ ทุก tick
@@ -2115,6 +2133,16 @@ async function processSession(sessionId, origin, env) {
           }
           t = step;
         } catch (e) {
+          // v_pausesb: คลิปเก่าที่ยังอยู่บน Supabase — ถอยออกจากคิวเงียบๆ ไม่นับเป็น
+          // ความล้ม ไม่แตะ attempts/fails และไม่ล้าง listen_state · นัดใหม่ 3 ก.ย.
+          if (e && e.pausedSupabaseAudio) {
+            console.warn(`[pausesb] ${sessionId} คลิปอยู่บน Supabase — เลื่อนไปหลังโควตารีเซ็ต`);
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+              processing_since: null,
+              next_attempt_at: '2026-09-03T00:00:00Z'
+            }).catch(() => {});
+            return;
+          }
           if (forcedGemini) {
             // v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอยแล้ว —
             // ตัวคุมงบลองใหม่ที่ถูกต้องคือ listen_state.attempts/LISTEN_MAX_ATTEMPTS
@@ -2283,6 +2311,15 @@ async function processSession(sessionId, origin, env) {
         }).catch(() => {});
       }
     } catch (e) {
+      // v_pausesb: เส้น Whisper ก็ดึงไฟล์เหมือนกัน — ถ้าติดสถานะพัก ต้องไม่ถูก
+      // failStage ตีตราว่าล้ม (จะกินงบ attempts แล้วปิดคิวถาวรทั้งที่ไฟล์ดีอยู่)
+      if (e && e.pausedSupabaseAudio) {
+        console.warn(`[pausesb] ${sessionId} (เส้น Whisper) คลิปอยู่บน Supabase — เลื่อนไปหลังโควตารีเซ็ต`);
+        await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+          processing_since: null, next_attempt_at: '2026-09-03T00:00:00Z'
+        }).catch(() => {});
+        return;
+      }
       // v_queue: ปล่อย claim + ตัดสินชะตาตามสาเหตุ (ดู failStage)
       await failStage(env, sessionId, 'transcribe', e, row);
     }
@@ -2786,22 +2823,11 @@ export default {
       cfCtx.waitUntil(sweepExpiredAudio(env));
       // v_skilllog: เกาะรอบ 03:00 UTC เดียวกัน — ไม่เพิ่ม cron trigger ใหม่
       cfCtx.waitUntil(sweepExpiredSkillLogs(env));
-    } else if (ECHO_PIPELINE_PAUSED && env.ECHO_PIPELINE_RESUME !== '1') {
-      // v_pause (2026-08-21 20:xx +07): หยุดสายถอดเสียงชั่วคราว
-      //
-      // ทำไม: Supabase Cached Egress เกินโควตา 327% (16.33/5 GB) และ grace period
-      // หมด 22 ส.ค. · ต้นเหตุคือการดึงไฟล์เสียงออกจาก Supabase Storage ไปถอด
-      // (71 จาก 88 request ใน 24 ชม. เป็น cache HIT = ถูกนับเต็มขนาดไฟล์ทุกครั้ง)
-      // ยอดที่ใช้ไปแล้วลบไม่ได้ แต่หยุดไม่ให้โตต่อได้ ⇒ พักไว้จนกว่าจะย้ายไฟล์เสียง
-      // ไป R2 เสร็จ (R2 ไม่คิดค่าขาออก) หรือจนกว่าจะอัปแผน
-      //
-      // **การอัดเสียงยังทำงานปกติ ไม่มีอะไรหาย** — ไฟล์ยังถูกอัปโหลดและ row ยังถูก
-      // สร้างครบ แค่ยังไม่ถูกถอดเป็นข้อความจนเปิดคืน
-      //
-      // เปิดคืน 2 ทาง: (1) ตั้ง env var ECHO_PIPELINE_RESUME=1 บน Cloudflare
-      // dashboard ได้ทันทีโดยไม่ต้อง deploy · (2) แก้ค่าคงที่ข้างล่างเป็น false
-      console.warn('[pause] สายถอดเสียงถูกพักไว้ (v_pause) — ตั้ง ECHO_PIPELINE_RESUME=1 เพื่อเปิดคืน');
     } else {
+      // v_pausesb (2026-08-21): ของเดิมพักทั้งสายที่นี่ ซึ่งแรงเกินจำเป็นและมีช่อง
+      // (/process ที่แอปยิงเองไม่ผ่านทางนี้ จึงยังดึงไฟล์ได้อยู่ — เจอของจริงคืนนี้)
+      // ย้ายการพักไปอยู่ที่ sbStorageGet แทน: ครอบทุกทางเรียก และพักเฉพาะคลิปที่ยัง
+      // อยู่บน Supabase · ไฟล์ใหม่ที่อยู่ R2 กับขั้นวิเคราะห์ทำงานต่อได้ตามปกติ
       cfCtx.waitUntil(sweepPending(env));
     }
     // v_keyexport: ส่งออก Key SKU ไป Google Sheets 4 รอบ/วันตามเวลาไทยที่บุชขอ

@@ -308,18 +308,38 @@ check('tick งานกวาดรายวันไม่ทำคิวด�
            sc.indexOf('sweepExpiredAudio') < iSweep;
   })());
 
-// ── 6f. v_pause: สวิตช์พักสายถอดเสียง (ชั่วคราว 21 ส.ค.) ─────────────────────
-console.log('\n── 6f. v_pause: พักสายถอดเสียงเพื่อหยุดยอด egress ──');
-check('มีสวิตช์พัก และเปิดคืนได้ด้วย env var ไม่ต้อง deploy',
-  /const ECHO_PIPELINE_PAUSED = (true|false);/.test(WK) &&
-  /ECHO_PIPELINE_PAUSED && env\.ECHO_PIPELINE_RESUME !== '1'/.test(WK));
-check('พักแค่คิวถอดเสียง — งานกวาดไฟล์หมดอายุรายวันยังทำงาน',
+// ── 6f. v_pausesb: พักเฉพาะการดึงไฟล์จาก Supabase ────────────────────────────
+// ของเดิมพักทั้งสายที่ scheduled() ซึ่งแรงเกินจำเป็นและมีช่อง: /process ที่แอปยิงเอง
+// (_sweepStuckAsyncRows) ไม่ผ่าน cron จึงยังดึงไฟล์ได้ — เจอของจริง 21 ส.ค. 21:02
+// session ที่พักไว้ถูกหยิบไปทำอีกจนดึงไฟล์ซ้ำ
+console.log('\n── 6f. v_pausesb: พักเฉพาะคลิปที่ยังอยู่บน Supabase ──');
+check('พักที่ sbStorageGet (ครอบทุกทางเรียก รวม /process ที่ไม่ผ่าน cron)',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    return /ECHO_PIPELINE_PAUSED && env\.ECHO_PIPELINE_RESUME !== '1'/.test(f) &&
+           /pausedSupabaseAudio = true/.test(f);
+  })());
+check('พักหลังจากลอง R2 แล้ว — ไฟล์ที่อยู่ R2 ต้องถอดได้ปกติ ไม่โดนพักไปด้วย',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    return f.indexOf('env.ECHO_AUDIO.get(path)') < f.indexOf('ECHO_PIPELINE_PAUSED');
+  })(), 'ถ้าพักก่อนลอง R2 การอัดใหม่จะถอดไม่ได้ทั้งที่ไม่มีค่าใช้จ่าย');
+check('ไม่พักที่ scheduled() อีกแล้ว (คิวเดินปกติ)',
   (() => {
     const sc = WK.slice(WK.indexOf('async scheduled('), WK.indexOf('async fetch('));
-    return sc.indexOf('sweepExpiredAudio') < sc.indexOf('ECHO_PIPELINE_PAUSED');
-  })(), 'ถ้าพักงานกวาดด้วย ไฟล์เสียงจะค้างสะสมกินพื้นที่');
-check('พักแล้วต้อง log บอกทุก tick ไม่ใช่เงียบหาย',
-  /\[pause\] สายถอดเสียงถูกพักไว้/.test(WK));
+    return !/ECHO_PIPELINE_PAUSED/.test(sc);
+  })());
+check('ติดสถานะพัก = เลื่อนนัดเงียบๆ ไม่นับเป็นความล้ม (ทั้งเส้น Gemini และ Whisper)',
+  (WK.match(/if \(e && e\.pausedSupabaseAudio\)/g) || []).length >= 2 &&
+  /next_attempt_at: '2026-09-03T00:00:00Z'/.test(WK));
+check('เส้น Whisper ต้องไม่ถูก failStage ตีตราว่าล้ม (จะกินงบแล้วปิดคิวถาวร)',
+  (() => {
+    const i = WK.indexOf("await failStage(env, sessionId, 'transcribe', e, row);");
+    const g = WK.lastIndexOf('e.pausedSupabaseAudio', i);
+    return g > -1 && i - g < 700;
+  })());
+check('เปิดคืนได้ด้วย env var ไม่ต้อง deploy',
+  /env\.ECHO_PIPELINE_RESUME !== '1'/.test(WK));
 
 // ── 6g. v_audior2: ย้ายไฟล์เสียงไป R2 (ต้นเหตุ egress) ───────────────────────
 console.log('\n── 6g. v_audior2: ไฟล์เสียงอยู่ R2 · Supabase เป็นทางถอย ──');
