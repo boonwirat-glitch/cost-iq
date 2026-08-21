@@ -101,7 +101,10 @@ check('needs_gemini: hiccup ยังไม่แตะ general (ci_sessions) at
 check('ล้างสถานะระหว่างทางทิ้งก่อนส่งต่อให้ Whisper (ไม่งั้นค้างครึ่งๆ)',
   /listen_state: null \}\)\.catch/.test(STAGE1));
 check('t เป็น null เมื่อไหร่ = เรียก Whisper เสมอ',
-  /if \(!t\) \{\s*t = await runTranscribe\(/.test(STAGE1));
+  // v_lazyaudio: มีคอมเมนต์คั่นระหว่าง if กับ t = await แล้ว จึงเช็คด้วยลำดับ index
+  // ไม่ใช่ระยะตัวอักษร (regex เดิมพังทันทีที่แทรกคอมเมนต์ — กับดักเดิมของไฟล์นี้)
+  STAGE1.indexOf('if (!t) {') > -1 &&
+  STAGE1.indexOf('t = await runTranscribe(', STAGE1.indexOf('if (!t) {')) > -1);
 check('มีเพดานจำนวนรอบ ไม่วนไม่รู้จบ',
   /attempts > LISTEN_MAX_ATTEMPTS/.test(STEP));
 
@@ -208,6 +211,21 @@ check('เลิกใช้ไฟล์เพราะตกไป Whisper ก�
   /if \(_cur\.file_name\) await _geminiDeleteFile\(env, _cur\.file_name\);\s*\n\s*await sbPatch\(env, 'ci_sessions', `id=eq\.\$\{sessionId\}`, \{ listen_state: null \}\)/.test(STAGE1));
 check('needs_gemini งบหมดถาวรก็ลบไฟล์ทิ้งก่อนปิดคิว',
   /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,900}pipeline_stage: 'failed_system'/.test(STAGE1));
+
+// ── v_lazyaudio (2026-08-21): ห้ามดาวน์โหลดไฟล์เสียงทิ้งเปล่าๆ ทุก tick ────────
+// ต้นเหตุยอด egress พุ่งวันที่ 18-19 ส.ค.: คลิปยาวถอดข้าม tick ทีละหน้าต่าง แต่โค้ด
+// โหลดไฟล์เต็มก้อน (15-26MB) ทุก tick ก่อนจะรู้ว่าต้องใช้ไบต์ไหม ทั้งที่หลังอัปเข้า
+// Gemini แล้วมันใช้แต่ file_uri · session ของ Tape ติดลูป 22+ ชม. = ~264 tick × 26.56MB
+console.log('\n── 6c. v_lazyaudio: ไม่โหลดไฟล์เสียงซ้ำทุก tick ──');
+check('มี file_uri อยู่แล้ว = ไม่โหลดไฟล์เสียงเลย (Gemini อ่านจากไฟล์ของตัวเอง)',
+  /const _haveGeminiFile = !!\(row\.listen_state && row\.listen_state\.file_uri\);/.test(STAGE1) &&
+  /if \(!_haveGeminiFile\) await _fetchAudio\(\);/.test(STAGE1));
+check('โหลดแบบ lazy ครั้งเดียวแล้วจำไว้ ไม่โหลดซ้ำในรอบเดียวกัน',
+  /if \(!audioBytes\) audioBytes = await sbStorageGet\(env, row\.audio_path\);/.test(STAGE1));
+check('ตกไป Whisper ต้องยังได้ไบต์จริง (โหลดตอนนั้นถ้ายังไม่มี)',
+  /t = await runTranscribe\(await _fetchAudio\(\), mime,/.test(STAGE1));
+check('ไม่มีการโหลดไฟล์แบบไม่มีเงื่อนไขหลงเหลืออยู่',
+  !/const audioBytes = await sbStorageGet/.test(noComments(STAGE1)));
 
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',

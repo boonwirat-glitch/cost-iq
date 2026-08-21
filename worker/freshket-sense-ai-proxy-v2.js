@@ -2021,8 +2021,26 @@ async function processSession(sessionId, origin, env) {
     const claimed = await sbPatch(env, 'ci_sessions', claimQuery(row.pipeline_stage), { processing_since: new Date().toISOString() });
     if (!claimed.length) return; // another invocation owns this stage
     try {
-      const audioBytes = await sbStorageGet(env, row.audio_path);
+      // v_lazyaudio (2026-08-21): เดิมโหลดไฟล์เสียงเต็มก้อนทุก tick ก่อนจะรู้ด้วยซ้ำว่า
+      // ต้องใช้ไบต์หรือไม่ · คลิปยาวถอดข้าม tick ทีละหน้าต่าง และหลังอัปเข้า Gemini
+      // ครั้งแรกแล้ว runListenStep ใช้แต่ file_uri **ไม่แตะ audioBytes เลย** ⇒ ทุก tick
+      // ที่เหลือคือการดาวน์โหลด 15-26MB ทิ้งเปล่าๆ
+      //
+      // นี่คือต้นเหตุของยอด egress ที่พุ่งวันที่ 18-19 ส.ค. ที่บุชเห็น: session ของ Tape
+      // (26.56MB) ติดลูป needs_gemini อยู่ 22+ ชม. โดย cron หยิบทุก 5 นาที
+      // ≈ 264 tick × 26.56MB ≈ **7 GB** ดาวน์โหลดซ้ำไฟล์เดียว (โควตา free = 5 GB/เดือน)
+      // บั๊กลูปนั้นปิดไปแล้วเมื่อ 19 ส.ค. (v_hiccupbudget) แต่ตัวดาวน์โหลดทิ้งยังอยู่ —
+      // วัดสดวันนี้: 7 ครั้ง 99MB ทั้งที่ทำงานจริงแค่ไม่กี่หน้าต่าง
+      //
+      // แก้: โหลดเมื่อจำเป็นจริงเท่านั้น — รอบแรก (ยังไม่มี file_uri) หรือตอนตกไป Whisper
       const mime = row.audio_path.endsWith('.mp4') ? 'audio/mp4' : 'audio/webm';
+      let audioBytes = null;
+      const _haveGeminiFile = !!(row.listen_state && row.listen_state.file_uri);
+      const _fetchAudio = async () => {
+        if (!audioBytes) audioBytes = await sbStorageGet(env, row.audio_path);
+        return audioBytes;
+      };
+      if (!_haveGeminiFile) await _fetchAudio();
 
       // ── v_listen: Gemini เป็นหูหลัก · Whisper เป็นตัวสำรอง ──────────────
       // สวิตช์ย้อนกลับ: ตั้ง env var LISTEN_ENGINE=whisper แล้วกลับไปใช้ของเดิม
@@ -2153,7 +2171,8 @@ async function processSession(sessionId, origin, env) {
         }
       }
       if (!t) {
-        t = await runTranscribe(audioBytes, mime, row.duration_secs || 0, row.account_name || '', env, undefined, row.sku_glossary || '');
+        // v_lazyaudio: ตกมาถึงตรงนี้แปลว่าต้องใช้ไบต์จริง — ถ้ายังไม่ได้โหลดค่อยโหลดตอนนี้
+        t = await runTranscribe(await _fetchAudio(), mime, row.duration_secs || 0, row.account_name || '', env, undefined, row.sku_glossary || '');
       }
 
       if (t.no_speech || !(t.segments || []).length) {
