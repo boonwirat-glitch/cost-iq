@@ -1,4 +1,4 @@
-<!-- Freshket Sense v280: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v281: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v280',
+      version: 'v281',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -13113,7 +13113,13 @@ function _authUnknown(v){
 // โหมดดูอย่างเดียวได้ตอนหลังบ้านตอบไม่ได้ · TTL 24 ชม.เท่ากับ profile cache เดิม
 // จึงไม่เปิดหน้าต่างความเสี่ยงใหม่เกินกว่าที่มีอยู่แล้ว · ล้างตอนกดออกจากระบบจริง
 const _LAST_ID_KEY = 'sense_last_identity_v1';
-const _LAST_ID_TTL_MS = 24 * 60 * 60 * 1000;
+// v_quotaguard2 (2026-08-21): 24 ชม. → 7 วัน · เดิมตั้งเท่า profile cache เพื่อไม่
+// เปิดหน้าต่างความเสี่ยงใหม่ แต่ถ้า Supabase ถูกตัดจริงตั้งแต่ 22 ส.ค. ถึงโควตารีเซ็ต
+// 2 ก.ย. คือ 11 วัน — 24 ชม. ทำให้เสาร์-อาทิตย์เดียวก็เข้าไม่ได้แล้ว
+// ความเสี่ยงที่เพิ่มคือ: เครื่องที่เคยล็อกอินไว้เปิดดูข้อมูลแบบอ่านอย่างเดียวได้นาน
+// ขึ้นตอนหลังบ้านล่ม · ยอมรับได้เพราะข้อมูลชุดเดียวกันถูกแคชไว้ในเครื่องอยู่แล้ว
+// (IndexedDB/localStorage) และการกดออกจากระบบเองยังล้างทิ้งทันทีเหมือนเดิม
+const _LAST_ID_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 function _lastIdentitySave(user, profile){
   try{
     if(!user || !user.id) return;

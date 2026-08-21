@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>window.NRR_BUILD = 'v132';</script>
+<script>window.NRR_BUILD = 'v1';</script>
 <style>
 /* ── nrr_tokens.css — "Fresh Canvas" design tokens ─────────────────────
    Adopted verbatim from the user-supplied Fresh Canvas spec, as the
@@ -4343,6 +4343,66 @@ var NRR_ALLOWED_ROLES = ['tl', 'admin', 'team_lead', 'team lead', 'rep'];
 var supa = null;
 var nrrProfile = null;
 
+// ── v_quotaguard (2026-08-21): /nrr ต้องรอดตอน Supabase ตอบไม่ได้ ──────────────
+//
+// เดิม /nrr ไม่มีทางถอยเลย: getSession ไม่ได้ session → nrrShowAuth() ปิดตาย และถ้า
+// อ่าน profiles ไม่ได้ก็ signOut() ทิ้งเลย ⇒ ตอน Supabase ตอบ 402 (เกินโควตา) จะ
+// เข้าไม่ได้ทั้งที่ข้อมูลที่หน้านี้ใช้แสดงผลเกือบทั้งหมดมาจาก R2 ซึ่งยังทำงานปกติดี
+//
+// พอร์ตกติกาเดียวกับ Sense (src/01_core.js v_quotaguard): 402/408/429/5xx =
+// "ตอบไม่ได้" ไม่ใช่ "ไม่มีสิทธิ์" · ห้ามรวม 400/401/403 เพราะนั่นคือคำตัดสินจริง
+var NRR_LAST_ID_KEY = 'nrr_last_identity_v1';
+var NRR_LAST_ID_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function nrrAuthUnknown(resp) {
+  var e = resp && resp.error;
+  if (!e) return false;
+  var st = Number(e.status || e.statusCode || 0);
+  if (st === 402 || st === 408 || st === 429 || (st >= 500 && st <= 599)) return true;
+  var m = String(e.message || '').toLowerCase();
+  return /failed to fetch|network|load failed|timed? ?out|econn|quota|exceeded/.test(m);
+}
+
+function nrrLastIdentitySave(email, role, name) {
+  try {
+    localStorage.setItem(NRR_LAST_ID_KEY, JSON.stringify({
+      email: email || '', role: role || '', name: name || '', savedAt: Date.now()
+    }));
+  } catch (e) {}
+}
+function nrrLastIdentityGet() {
+  try {
+    var o = JSON.parse(localStorage.getItem(NRR_LAST_ID_KEY) || 'null');
+    if (!o || !o.email || !o.savedAt) return null;
+    if (Date.now() - o.savedAt > NRR_LAST_ID_TTL_MS) return null;
+    if (!NRR_ALLOWED_ROLES.includes(o.role)) return null;
+    return o;
+  } catch (e) { return null; }
+}
+function nrrLastIdentityClear() { try { localStorage.removeItem(NRR_LAST_ID_KEY); } catch (e) {} }
+
+// เข้าโหมดดูอย่างเดียว — ใช้สิทธิ์ที่จำไว้ พร้อมแถบบอกผู้ใช้ตรงๆ ห้ามเงียบ
+function nrrEnterReadOnly(reason) {
+  var last = nrrLastIdentityGet();
+  if (!last) return false;
+  console.warn('[nrr] หลังบ้านตอบไม่ได้ (' + reason + ') — เข้าโหมดดูอย่างเดียวด้วยสิทธิ์ที่จำไว้');
+  nrrProfile = { role: last.role, email: last.email, name: last.name || last.email };
+  window.NRR_READONLY = true;
+  nrrShowApp();
+  try {
+    var b = document.createElement('div');
+    b.id = 'nrr-readonly-banner';
+    b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;' +
+      'background:rgba(120,72,10,.97);color:#FFE7C2;padding:8px 14px;font-size:13px;' +
+      "line-height:1.45;text-align:center;font-family:'Noto Sans Thai',sans-serif";
+    b.innerHTML = '⚠️ <b>โหมดดูอย่างเดียว</b> — ระบบหลังบ้านตอบไม่ได้ชั่วคราว ' +
+      'ตัวเลขยังใช้ได้ แต่บันทึกหรือแก้ไขอะไรไม่ได้';
+    document.body.appendChild(b);
+  } catch (e) {}
+  if (typeof nrrInitApp === 'function') nrrInitApp();
+  return true;
+}
+
 function nrrNormalizeRole(r) {
   var s = String(r || '').trim().toLowerCase();
   if (['team_lead', 'team lead', 'tl'].includes(s)) return 'tl';
@@ -4371,10 +4431,16 @@ window.addEventListener('DOMContentLoaded', async function () {
     var sessionResp = await supa.auth.getSession();
     var session = sessionResp.data.session;
     if (session) await nrrOnSessionReady(session);
-    else nrrShowAuth();
+    // v_quotaguard: ไม่มี session เพราะ "ตอบไม่ได้" ≠ ไม่มีสิทธิ์ — ลองโหมดดูอย่างเดียว
+    // ก่อนปิดประตู · ถ้าไม่มีสิทธิ์ที่จำไว้ ค่อยขึ้นหน้าล็อกอินตามเดิม
+    else if (!(nrrAuthUnknown(sessionResp) && nrrEnterReadOnly('getSession'))) nrrShowAuth();
   } catch (e) {
     console.error('[nrr] auth_init', e.message);
-    nrrShowAuthError('เชื่อมต่อระบบไม่ได้ — กรุณาลองใหม่');
+    // โยน exception = เน็ตล่ม/timeout ก็เข้าเกณฑ์ "ตอบไม่ได้" เหมือนกัน
+    if (!nrrEnterReadOnly('auth_init_throw')) {
+      nrrShowAuth();
+      nrrShowAuthError('เชื่อมต่อระบบไม่ได้ — กรุณาลองใหม่');
+    }
   }
 
   supa.auth.onAuthStateChange(async function (event, session) {
@@ -4392,18 +4458,31 @@ async function nrrOnSessionReady(session) {
     var profile = profResp.data;
     var role = nrrNormalizeRole(profile && profile.role || session.user.user_metadata && session.user.user_metadata.role || '');
 
+    // v_quotaguard: อ่าน profiles ไม่ได้เพราะ "ตอบไม่ได้" ต้องไม่ signOut ทิ้ง
+    // ของเดิมตกมาที่ role = '' แล้วเข้าเงื่อนไขข้างล่าง → signOut() → ล็อกอินกลับก็
+    // ไม่ได้เพราะโดนตัดเหมือนกัน ⇒ ผู้ใช้เข้าไม่ได้ถาวรจนโควตากลับมา
+    if (!profile && nrrAuthUnknown(profResp)) {
+      if (nrrEnterReadOnly('profiles')) return;
+    }
+
     if (!NRR_ALLOWED_ROLES.includes(role)) {
       await supa.auth.signOut();
+      nrrLastIdentityClear();   // ไม่มีสิทธิ์จริง = ต้องไม่เหลือทางเข้าโหมดดูอย่างเดียว
       nrrShowAuthError('บัญชีนี้ไม่มีสิทธิ์เข้าใช้หน้านี้');
       return;
     }
 
     nrrProfile = { role: role, email: session.user.email, name: (profile && profile.full_name) || session.user.email };
+    // v_quotaguard: จำสิทธิ์ไว้เพื่อให้เข้าโหมดดูอย่างเดียวได้ถ้าหลังบ้านล่มวันหลัง
+    nrrLastIdentitySave(nrrProfile.email, role, nrrProfile.name);
     nrrShowApp();
     if (typeof nrrInitApp === 'function') nrrInitApp();
   } catch (e) {
     console.error('[nrr] on_session_ready', e.message);
-    nrrShowAuthError('เกิดข้อผิดพลาด — กรุณา refresh หน้า');
+    // v_quotaguard: ล้มด้วย exception ก็ถือว่า "ตอบไม่ได้" — ลองโหมดดูอย่างเดียวก่อน
+    if (!nrrEnterReadOnly('on_session_ready_throw')) {
+      nrrShowAuthError('เกิดข้อผิดพลาด — กรุณา refresh หน้า');
+    }
   }
 }
 

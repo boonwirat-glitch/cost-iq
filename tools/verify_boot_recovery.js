@@ -246,9 +246,37 @@ console.log('\n[v_quotaguard] 402/429/5xx = "ตอบไม่ได้" ไม
 }
 
 console.log('\n[v_quotaguard] เข้าโหมดดูอย่างเดียวแทนการปิดประตูใส่หน้า');
-check('มีกุญแจสำรองที่หมดอายุ 24 ชม. เท่ากับ profile cache เดิม',
-  /const _LAST_ID_TTL_MS = 24 \* 60 \* 60 \* 1000;/.test(core) &&
+// v_quotaguard2 (2026-08-21): 24 ชม. → 7 วัน · ถ้าถูกตัดจริง 22 ส.ค. ถึงโควตารีเซ็ต
+// 2 ก.ย. คือ 11 วัน — 24 ชม. ทำให้เสาร์-อาทิตย์เดียวก็เข้าไม่ได้แล้ว
+check('กุญแจสำรองหมดอายุ 7 วัน (ครอบช่วงที่ถูกตัดจนโควตารีเซ็ต) และเช็ค TTL จริง',
+  /const _LAST_ID_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000;/.test(core) &&
   /Date\.now\(\) - o\.savedAt > _LAST_ID_TTL_MS/.test(core));
+
+// ── /nrr ต้องรอดด้วย — เดิมไม่มีทางถอยเลย และ signOut() ทิ้งเมื่ออ่าน profiles ไม่ได้
+console.log('\n[v_quotaguard] /nrr ก็ต้องเข้าได้แบบดูอย่างเดียว');
+{
+  const nrrCore = read('src/nrr/nrr_core.js');
+  check('/nrr แยก 402/429/5xx ออกจาก "ไม่มีสิทธิ์" เหมือน Sense',
+    /function nrrAuthUnknown\(resp\)/.test(nrrCore) &&
+    /st === 402 \|\| st === 408 \|\| st === 429 \|\| \(st >= 500 && st <= 599\)/.test(nrrCore));
+  check('/nrr จำสิทธิ์ล่าสุด 7 วัน และรับแต่ role ที่มีสิทธิ์จริง',
+    /NRR_LAST_ID_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/.test(nrrCore) &&
+    /if \(!NRR_ALLOWED_ROLES\.includes\(o\.role\)\) return null;/.test(nrrCore));
+  check('/nrr: getSession ไม่ได้เพราะตอบไม่ได้ → ลองโหมดดูอย่างเดียวก่อนปิดประตู',
+    /else if \(!\(nrrAuthUnknown\(sessionResp\) && nrrEnterReadOnly\('getSession'\)\)\) nrrShowAuth\(\);/.test(nrrCore));
+  check('/nrr: อ่าน profiles ไม่ได้ ต้องไม่ signOut ทิ้ง (เดิมล็อกอินกลับไม่ได้เลย)',
+    (() => {
+      const iGuard = nrrCore.indexOf('if (!profile && nrrAuthUnknown(profResp))');
+      const iSignOut = nrrCore.indexOf('await supa.auth.signOut();', iGuard);
+      return iGuard > -1 && iSignOut > iGuard;
+    })(), 'การ์ดต้องมาก่อน signOut ไม่งั้น 402 จะถูกอ่านเป็น "ไม่มีสิทธิ์"');
+  check('/nrr: ไม่มีสิทธิ์จริง = ล้างสิทธิ์ที่จำไว้ด้วย (ไม่เหลือทางเข้า)',
+    /nrrLastIdentityClear\(\);   \/\/ ไม่มีสิทธิ์จริง/.test(nrrCore));
+  check('/nrr: มีแถบบอกผู้ใช้ว่าอยู่โหมดดูอย่างเดียว ไม่เงียบ',
+    /โหมดดูอย่างเดียว/.test(nrrCore) && /window\.NRR_READONLY = true;/.test(nrrCore));
+  check('/nrr: nrr.html ที่ส่งจริง build มาแล้ว (ไม่ใช่แก้แต่ src)',
+    /function nrrEnterReadOnly\(/.test(fs.readFileSync(path.join(__dirname, '..', 'nrr.html'), 'utf8')));
+}
 check('บันทึกกุญแจสำรองตอนโหลด profile สำเร็จ',
   /_lastIdentitySave\(currentUser, currentUserProfile\);/.test(core));
 check('กดออกจากระบบเองแล้วต้องล้างกุญแจสำรองทิ้ง (ไม่เหลือทางเข้า)',
