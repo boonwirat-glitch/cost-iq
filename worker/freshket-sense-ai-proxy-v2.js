@@ -2390,6 +2390,10 @@ async function processSession(sessionId, origin, env) {
 //
 // งบ worst case ของค่าที่ตั้งไว้ข้างล่าง: 3 หน้าต่าง × 6 + 1 analyze × 19 = **37 < 50**
 // ⇒ ปลอดภัยแม้อยู่ Free plan · ถ้าจะขยับค่าพวกนี้ ต้องคิดเลขนี้ใหม่ทุกครั้ง
+// v_pause (2026-08-21): สวิตช์พักสายถอดเสียง — ดูเหตุผลเต็มที่จุดใช้ในตัว scheduled()
+// true = พัก · เปิดคืนได้ด้วย env var ECHO_PIPELINE_RESUME=1 โดยไม่ต้อง deploy
+const ECHO_PIPELINE_PAUSED = true;
+
 const SWEEP_MAX_STEPS   = 4;        // จำนวนขั้นต่อ tick
 const SWEEP_MAX_ANALYZE = 1;        // ขั้น analyze กิน subrequest หนัก (~19) จำกัด 1
 const SWEEP_DEADLINE_MS = 150000;   // ไม่เริ่มขั้นใหม่หลังผ่านไป 2.5 นาที (กัน tick ซ้อน)
@@ -2705,6 +2709,21 @@ export default {
       cfCtx.waitUntil(sweepExpiredAudio(env));
       // v_skilllog: เกาะรอบ 03:00 UTC เดียวกัน — ไม่เพิ่ม cron trigger ใหม่
       cfCtx.waitUntil(sweepExpiredSkillLogs(env));
+    } else if (ECHO_PIPELINE_PAUSED && env.ECHO_PIPELINE_RESUME !== '1') {
+      // v_pause (2026-08-21 20:xx +07): หยุดสายถอดเสียงชั่วคราว
+      //
+      // ทำไม: Supabase Cached Egress เกินโควตา 327% (16.33/5 GB) และ grace period
+      // หมด 22 ส.ค. · ต้นเหตุคือการดึงไฟล์เสียงออกจาก Supabase Storage ไปถอด
+      // (71 จาก 88 request ใน 24 ชม. เป็น cache HIT = ถูกนับเต็มขนาดไฟล์ทุกครั้ง)
+      // ยอดที่ใช้ไปแล้วลบไม่ได้ แต่หยุดไม่ให้โตต่อได้ ⇒ พักไว้จนกว่าจะย้ายไฟล์เสียง
+      // ไป R2 เสร็จ (R2 ไม่คิดค่าขาออก) หรือจนกว่าจะอัปแผน
+      //
+      // **การอัดเสียงยังทำงานปกติ ไม่มีอะไรหาย** — ไฟล์ยังถูกอัปโหลดและ row ยังถูก
+      // สร้างครบ แค่ยังไม่ถูกถอดเป็นข้อความจนเปิดคืน
+      //
+      // เปิดคืน 2 ทาง: (1) ตั้ง env var ECHO_PIPELINE_RESUME=1 บน Cloudflare
+      // dashboard ได้ทันทีโดยไม่ต้อง deploy · (2) แก้ค่าคงที่ข้างล่างเป็น false
+      console.warn('[pause] สายถอดเสียงถูกพักไว้ (v_pause) — ตั้ง ECHO_PIPELINE_RESUME=1 เพื่อเปิดคืน');
     } else {
       cfCtx.waitUntil(sweepPending(env));
     }

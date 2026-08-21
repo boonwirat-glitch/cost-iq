@@ -296,8 +296,30 @@ check('app_errors มี retention แล้ว (เดิมไม่มีเ�
 check('คลิปเกิน 100 นาทีต้องอ่าน timestamp 3 หลักได้ (ไม่งั้นทั้งไฟล์อ่านไม่ออก)',
   /\^\\s\*\(\\d\{1,3\}:\\d\{2\}/.test(WK),
   '_abSecToTs ออก 3 หลักเมื่อเกิน 100 นาที แต่ _abParseCompact เดิมรับแค่ 2');
+// v_pause เพิ่ม else-if คั่นระหว่าง _isDailyTick กับ sweepPending — เลิกใช้ระยะตัวอักษร
+// เช็คด้วยลำดับ index แทน: tick รายวันต้องมาก่อน และ sweepPending ต้องอยู่สาขา else
 check('tick งานกวาดรายวันไม่ทำคิวด้วย (กัน waitUntil ถูกยกเลิกเพราะแย่งเวลากัน)',
-  /if \(_isDailyTick\) \{[\s\S]{0,400}\} else \{\s*\n\s*cfCtx\.waitUntil\(sweepPending\(env\)\);/.test(WK));
+  (() => {
+    const sc = WK.slice(WK.indexOf('async scheduled('), WK.indexOf('async fetch('));
+    const iDaily = sc.indexOf('if (_isDailyTick) {');
+    const iSweep = sc.indexOf('cfCtx.waitUntil(sweepPending(env));');
+    return iDaily > -1 && iSweep > iDaily &&
+           sc.indexOf('sweepExpiredAudio') > iDaily &&
+           sc.indexOf('sweepExpiredAudio') < iSweep;
+  })());
+
+// ── 6f. v_pause: สวิตช์พักสายถอดเสียง (ชั่วคราว 21 ส.ค.) ─────────────────────
+console.log('\n── 6f. v_pause: พักสายถอดเสียงเพื่อหยุดยอด egress ──');
+check('มีสวิตช์พัก และเปิดคืนได้ด้วย env var ไม่ต้อง deploy',
+  /const ECHO_PIPELINE_PAUSED = (true|false);/.test(WK) &&
+  /ECHO_PIPELINE_PAUSED && env\.ECHO_PIPELINE_RESUME !== '1'/.test(WK));
+check('พักแค่คิวถอดเสียง — งานกวาดไฟล์หมดอายุรายวันยังทำงาน',
+  (() => {
+    const sc = WK.slice(WK.indexOf('async scheduled('), WK.indexOf('async fetch('));
+    return sc.indexOf('sweepExpiredAudio') < sc.indexOf('ECHO_PIPELINE_PAUSED');
+  })(), 'ถ้าพักงานกวาดด้วย ไฟล์เสียงจะค้างสะสมกินพื้นที่');
+check('พักแล้วต้อง log บอกทุก tick ไม่ใช่เงียบหาย',
+  /\[pause\] สายถอดเสียงถูกพักไว้/.test(WK));
 
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',
