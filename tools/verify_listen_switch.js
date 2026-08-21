@@ -178,6 +178,17 @@ check('ป้ายในแอปยังอ่านค่านี้อย�
 check('ระบุแหล่งที่มาเป็น gemini เพื่อให้ตรวจย้อนได้ว่าบทไหนมาจากหูไหน',
   /source: 'gemini-3\.1-pro'/.test(STEP));
 
+// v_driftmeter (2026-08-21): ตัววัดต้องรอดตอน "สำเร็จ" ให้ได้ ไม่ใช่แค่ตอนค้าง/ล้ม —
+// เคสสำเร็จคือเคสที่ต้องรู้ว่าครึ่งหลังของคำขอเพี้ยนหรือยัง · listen_state ถูกล้างตอน
+// สำเร็จ จึงต้องย้ายไปเก็บที่อื่นก่อน ไม่งั้นวัดไปก็อ่านไม่ได้
+check('ตัววัด drift ถูกเก็บลง ab_gemini ตอนสำเร็จ (listen_state ถูกล้างทิ้งตรงนั้น)',
+  /drift\s+\/\/ v_driftmeter/.test(STEP) &&
+  /ab_gemini: \{ drift: t\.drift, source: t\.source \|\| null, measured_at/.test(STAGE1) &&
+  /listen_state:\s+null,/.test(STAGE1));
+check('drift สะสมข้ามหน้าต่าง ไม่ใช่เก็บแค่หน้าต่างสุดท้าย',
+  /const drift = \(st\.drift \|\| \[\]\)\.concat\(\[_windowDrift\(res\.segments, w, row\.duration_secs\)\]\)/.test(STEP) &&
+  /await save\(\{ next: i \+ 1, segs, drift, fails: 0 \}\)/.test(STEP));
+
 console.log('\n── 6b. v_filecleanup: ลบไฟล์ Gemini Files API หลังเลิกใช้ (best-effort) ──');
 check('_geminiUploadAudio คืน {uri,name} ไม่ใช่ string เปล่า (name จำเป็นสำหรับสั่งลบ)',
   /return \{ uri: f\.uri, name \};/.test(WK));

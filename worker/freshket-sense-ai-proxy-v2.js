@@ -1959,7 +1959,8 @@ async function runListenStep(env, row, audioBytes) {
     segments: merged,
     source: 'gemini-3.1-pro',
     avg_transcript_confidence: conf,
-    avg_speaker_confidence: null   // แยกคนพูดมาในรอบเดียวกัน ไม่มีคะแนนแยก
+    avg_speaker_confidence: null,  // แยกคนพูดมาในรอบเดียวกัน ไม่มีคะแนนแยก
+    drift                          // v_driftmeter: ส่งต่อให้ processSession เก็บลง ab_gemini
   };
 }
 
@@ -2139,7 +2140,15 @@ async function processSession(sessionId, origin, env) {
         pipeline_error:        null,
         attempts:              0,      // ผ่าน stage แล้ว งบเริ่มนับใหม่สำหรับ stage หน้า
         next_attempt_at:       null,   // พร้อมให้ tick ถัดไปหยิบทันที
-        listen_state:          null    // v_listen: ถอดจบแล้ว ไม่ต้องเก็บสถานะระหว่างทาง
+        listen_state:          null,   // v_listen: ถอดจบแล้ว ไม่ต้องเก็บสถานะระหว่างทาง
+        // v_driftmeter (2026-08-21): ตัววัด drift สะสมอยู่ใน listen_state ระหว่างทาง
+        // แต่บรรทัดข้างบนล้าง listen_state ทิ้งตอนสำเร็จ = ข้อมูลหายตอนที่อยากอ่านที่สุด
+        // (เคสสำเร็จคือเคสที่ต้องรู้ว่าครึ่งหลังของคำขอเพี้ยนหรือยัง) จึงย้ายมาเก็บที่
+        // ab_gemini ซึ่งว่างสนิทตั้งแต่ A/B harness เดิมถูกลบไปเมื่อ 17 ส.ค. (grep แล้ว
+        // ไม่มีใครอ่านคอลัมน์นี้อีกเลยทั้ง worker และแอป) — ไม่ต้องเพิ่มคอลัมน์ใหม่
+        ...(t.drift && t.drift.length
+          ? { ab_gemini: { drift: t.drift, source: t.source || null, measured_at: new Date().toISOString() } }
+          : {})
       });
       // v_echor3 (2026-08-08): เดิมลบไฟล์เสียงทิ้งตรงนี้ทันที — ผลคือคลิปจริง 43
       // จาก 44 หายถาวร พอมีคนบอกว่า "ฟังไม่รู้เรื่อง" เราจึงกลับไปฟังต้นฉบับไม่ได้
