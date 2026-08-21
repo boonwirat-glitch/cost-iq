@@ -107,6 +107,13 @@ check('t เป็น null เมื่อไหร่ = เรียก Whisper
   STAGE1.indexOf('t = await runTranscribe(', STAGE1.indexOf('if (!t) {')) > -1);
 check('มีเพดานจำนวนรอบ ไม่วนไม่รู้จบ',
   /attempts > LISTEN_MAX_ATTEMPTS/.test(STEP));
+// v_attemptvisible (2026-08-21): waitUntil ที่ถูก Cloudflare ยกเลิกกลางทางไม่ทิ้งร่องรอย
+// อะไรเลย (ยืนยันจาก wrangler tail จริง) — ถ้าไม่บันทึกก่อนยิง ตัวนับไม่ขยับ เพดานที่
+// อ่านตัวนับนั้นก็ไม่มีวันทำงาน = บั๊กชนิดเดียวกับลูป 22 ชม. ของ Tape
+check('บันทึกความพยายามก่อนยิง Gemini ไม่ใช่หลังสำเร็จ (กันความล้มที่มองไม่เห็น)',
+  STEP.indexOf('await save({});') > -1 &&
+  STEP.indexOf('await save({});') < STEP.indexOf('res = await _listenCall('),
+  'ต้องอยู่ก่อน _listenCall ไม่งั้น invocation ที่ถูกฆ่าจะไม่ถูกนับ');
 
 console.log('\n── 3. คลิปยาว: ถอดข้าม tick ได้ ไม่เริ่มใหม่ ──');
 check('อัปไฟล์ครั้งเดียว แล้วใช้ file_uri ซ้ำ',

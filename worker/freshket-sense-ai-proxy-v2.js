@@ -1923,6 +1923,21 @@ async function runListenStep(env, row, audioBytes) {
   const w = windows[i];
   if (!w) throw new Error('listen_state เพี้ยน — ไม่มีช่วงให้ทำ');
 
+  // v_attemptvisible (2026-08-21): บันทึกว่า "กำลังจะลอง" **ก่อน** ยิง ไม่ใช่หลังสำเร็จ
+  //
+  // ยืนยันจาก wrangler tail จริง: เส้น HTTP /process ตอบ 202 ทันทีแล้วทำงานต่อใน
+  // waitUntil ซึ่ง Cloudflare **ยกเลิกทิ้ง** ถ้าคำขอ Gemini ใช้เวลานานเกินโควตา
+  //   "waitUntil() tasks did not complete within the allowed time
+  //    after invocation end and have been cancelled"
+  // ผลคือไม่สำเร็จ ไม่ error ไม่มีตัวนับไหนขยับ = มองไม่เห็นเลยว่าเกิดอะไรขึ้น
+  // (session 51 นาที 2 ตัวค้างที่หน้าต่างแรก 1.5 ชม. โดยไม่มีร่องรอยอะไรทั้งสิ้น)
+  // ซึ่งเป็นบั๊กชนิดเดียวกับลูป 22 ชม. ของ Tape: เพดานที่อ่านตัวนับซึ่งไม่เคยขยับ
+  // ย่อมไม่มีวันทำงาน
+  //
+  // เขียนก่อนยิงทำให้ความพยายามที่ถูกฆ่ากลางทางถูกนับจริง เพดาน
+  // LISTEN_MAX_ATTEMPTS จึงมีผลกับความล้มเหลวแบบนี้ด้วย และ query ดูย้อนได้
+  await save({});
+
   let res;
   try {
     res = await _listenCall(env, st.file_uri, w.from, w.to, row.account_name);
