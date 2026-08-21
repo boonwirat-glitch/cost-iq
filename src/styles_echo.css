@@ -76,4 +76,22 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
 #echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
 #echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
 #echo-float-pill .fp-label{display:none}
+/* v_pillwarn (2026-08-21): ไมค์ไม่ได้รับเสียงระหว่างที่ย่อเป็น pill — แถบเตือนตัวจริง
+   อยู่ใน #ci-fullsheet ที่ถูกซ่อนอยู่ จึงต้องให้ pill เองบอก · ตั้งใจให้ "rep เห็น
+   ลูกค้าไม่รู้": เปลี่ยนเป็นเหลืองอำพัน + เต้นช้าๆ ไม่ใช่กระพริบแดงจนสะดุดตาคนอื่น
+   (เหตุผลเดียวกับที่ v276 ซ่อนคำว่า Echo ออกจาก pill) */
+#echo-float-pill.fp-warn{
+  background:rgba(120,72,10,.92);
+  border-color:rgba(255,159,10,.55);
+  animation:echo-pill-warn 1.8s ease-in-out infinite;
+}
+#echo-float-pill.fp-warn .fp-bar{background:rgba(255,159,10,.75);animation:none;height:4px}
+#echo-float-pill.fp-warn .fp-time{color:rgba(255,214,150,.95)}
+@keyframes echo-pill-warn{
+  0%,100%{box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  50%    {box-shadow:0 2px 14px rgba(255,159,10,.45)}
+}
+@media (prefers-reduced-motion:reduce){
+  #echo-float-pill.fp-warn{animation:none}
+}
 #echo-float-pill .fp-time{font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(255,255,255,.55);min-width:36px}

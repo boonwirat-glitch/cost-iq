@@ -1,4 +1,4 @@
-<!-- Freshket Sense v276: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v277: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v276',
+      version: 'v277',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -7916,6 +7916,24 @@ body.echo-active .echo-nav-btn .lb{color:var(--tk-ok-bright)!important;font-weig
 #echo-float-pill .fp-bar:nth-child(4){height:11px;animation:echo-wd .7s steps(2,end) infinite .05s}
 #echo-float-pill .fp-bar:nth-child(5){height:13px;animation:echo-we .55s steps(2,end) infinite .12s}
 #echo-float-pill .fp-label{display:none}
+/* v_pillwarn (2026-08-21): ไมค์ไม่ได้รับเสียงระหว่างที่ย่อเป็น pill — แถบเตือนตัวจริง
+   อยู่ใน #ci-fullsheet ที่ถูกซ่อนอยู่ จึงต้องให้ pill เองบอก · ตั้งใจให้ "rep เห็น
+   ลูกค้าไม่รู้": เปลี่ยนเป็นเหลืองอำพัน + เต้นช้าๆ ไม่ใช่กระพริบแดงจนสะดุดตาคนอื่น
+   (เหตุผลเดียวกับที่ v276 ซ่อนคำว่า Echo ออกจาก pill) */
+#echo-float-pill.fp-warn{
+  background:rgba(120,72,10,.92);
+  border-color:rgba(255,159,10,.55);
+  animation:echo-pill-warn 1.8s ease-in-out infinite;
+}
+#echo-float-pill.fp-warn .fp-bar{background:rgba(255,159,10,.75);animation:none;height:4px}
+#echo-float-pill.fp-warn .fp-time{color:rgba(255,214,150,.95)}
+@keyframes echo-pill-warn{
+  0%,100%{box-shadow:0 2px 10px rgba(0,0,0,.3)}
+  50%    {box-shadow:0 2px 14px rgba(255,159,10,.45)}
+}
+@media (prefers-reduced-motion:reduce){
+  #echo-float-pill.fp-warn{animation:none}
+}
 #echo-float-pill .fp-time{font-size:var(--text-sm);font-family:'IBM Plex Mono','Noto Sans Thai',monospace;color:rgba(255,255,255,.55);min-width:36px}</style>
 <style id="auth-module-css">
 /* ============================================================
@@ -51191,11 +51209,23 @@ const CI = (() => {
   // คาดว่าเสร็จใน ~5 นาที ถ้านอกเวลาทำการ คำนวณ 9:05 ของรอบถัดไป (เผื่อ 5 นาที
   // ให้ tick แรกทำงาน) "พร้อมให้รีวิว"/"รีวิวแล้ว" ไม่มี ETA เพราะเป็นเวลาคน
   // (TL หรือ Admin กดปุ่ม "บันทึก + รีวิว" เอง) ไม่ใช่ cron จึงประมาณไม่ได้แม่นๆ
-  function _reviewEtaText(nowMs) {
+  // v_etareal (2026-08-21): เดิมคิดจากคาบ cron ล้วน ("ทุก 5 นาที" → "ภายใน ~5 นาที")
+  // ซึ่งถูกเฉพาะคลิปสั้นที่ถอดจบในคำขอเดียว · คลิปยาวถูกซอยเป็นหลายช่วงและทำได้
+  // "ช่วงละหนึ่ง tick" ⇒ คลิป 51 นาที = 9 ช่วง = 45 นาทีเป็นอย่างน้อย ป้ายเดิมจึง
+  // สัญญาเวลาที่ทำไม่ได้จริง (ผมคำนวณจากตาราง cron แต่ลืมว่า cron ทำทีละขั้น)
+  // ตอนนี้ worker เก็บ listen_state.windows/next ไว้แล้ว จึงนับช่วงที่เหลือได้จริง
+  const CRON_STEP_MIN = 5;
+  function _reviewEtaText(nowMs, remainingSteps) {
+    const steps = (typeof remainingSteps === 'number' && remainingSteps > 0) ? remainingSteps : 1;
+    const mins = steps * CRON_STEP_MIN;
     const THAI_OFFSET_MS = 7 * 3600 * 1000;
     const t = new Date((nowMs == null ? Date.now() : nowMs) + THAI_OFFSET_MS); // "เวลาไทย" อ่านผ่าน getUTC*
     const h = t.getUTCHours();
-    if (h >= 9 && h < 23) return 'ภายใน ~5 นาที';
+    // ยังอยู่ในเวลาที่ cron เดินอยู่ (9:00-22:55) — บอกเป็นช่วงเวลาที่เหลือจริง
+    if (h >= 9 && h < 23) {
+      if (steps <= 1) return 'ภายใน ~5 นาที';
+      return `ประมาณ ${mins} นาที (เหลือ ${steps} ช่วง)`;
+    }
     const next = new Date(t);
     next.setUTCHours(9, 5, 0, 0);
     if (h >= 23) next.setUTCDate(next.getUTCDate() + 1); // หลัง 23:00 แล้ว = รอบถัดไปคือพรุ่งนี้
@@ -51216,7 +51246,15 @@ const CI = (() => {
                 : stage === 'failed_system' ? 'วิเคราะห์ไม่สำเร็จ' : 'ไม่พบเสียงพูด';
       return { failed: true, why };
     }
-    if (stage === 'uploaded' || stage === 'needs_gemini') return { step: 0, eta: _reviewEtaText() };
+    // v_etareal: นับช่วงที่เหลือจาก listen_state จริงถ้ามี (คลิปยาวถูกซอยหลายช่วง
+    // และทำได้ช่วงละหนึ่ง tick) · ถ้าไม่มี = คลิปสั้น/ยังไม่วางแผน → ถือว่าเหลือ 1 ช่วง
+    const _ls = s.listen_state;
+    const _winTotal = (_ls && Array.isArray(_ls.windows)) ? _ls.windows.length : 0;
+    const _winDone = (_ls && typeof _ls.next === 'number') ? _ls.next : 0;
+    const _remaining = _winTotal ? Math.max(1, _winTotal - _winDone) : null;
+    if (stage === 'uploaded' || stage === 'needs_gemini') {
+      return { step: 0, eta: _reviewEtaText(null, _remaining) };
+    }
     if (stage === 'transcribed') return { step: 1, eta: _reviewEtaText() };
     // analyzed (หรือ stage เก่า/ไม่รู้จักที่มี skill_scores จริงแล้ว) — แยกด้วย tl_reviewed_at
     return s.tl_reviewed_at ? { step: 3, eta: null } : { step: 2, eta: null };
@@ -51756,7 +51794,14 @@ body:not(.echo-active) { background:unset; }
     const sheet = document.getElementById('ci-fullsheet');
     if (sheet) sheet.style.display = 'none';
     const pill = document.getElementById('echo-float-pill');
-    if (pill) { pill.classList.add('visible'); _startFloatTimer(); }
+    if (pill) {
+      pill.classList.add('visible');
+      // v_pillwarn: pill ต้องสะท้อนสถานะ "ตอนนี้" ทุกครั้งที่โผล่ — ถ้าไมค์ยังตายอยู่
+      // (เตือนไปแล้วและ rep ยังไม่กด "อัดต่อ") ต้องขึ้นสีเตือนตั้งแต่แรกที่ย่อ ไม่ใช่
+      // ขึ้นเฉพาะตอนที่ watchdog ยิงพอดีขณะย่ออยู่
+      pill.classList.toggle('fp-warn', !!_recDeadFired);
+      _startFloatTimer();
+    }
     document.body.classList.add('echo-active');
     // v598: restore body scroll when minimized — sheet is hidden so app nav must work
     // body scroll re-locked when user expands back (echoExpand → _reapplyBodyLock)
@@ -52493,7 +52538,7 @@ body:not(.echo-active) { background:unset; }
     clearInterval(_floatTimer);
     document.body.classList.remove('echo-active');
     const pill = document.getElementById('echo-float-pill');
-    if (pill) pill.classList.remove('visible');
+    if (pill) { pill.classList.remove('visible'); pill.classList.remove('fp-warn'); }
     // Reset CI fullsheet display if minimized
     const sheet = document.getElementById('ci-fullsheet');
     if (sheet) sheet.style.display = '';
@@ -52593,6 +52638,17 @@ body:not(.echo-active) { background:unset; }
     if (box) box.style.display = 'block';
     const sub = document.getElementById('ci-rec-dead-sub');
     if (sub) sub.textContent = 'ตรวจพบตอน ' + _fmt(_secs) + ' · เสียงช่วงก่อนหน้ายังอยู่ครบ';
+    // v_pillwarn (2026-08-21): แถบเตือนข้างบนอยู่ใน #ci-fullsheet ซึ่งถูก display:none
+    // ตอนย่อเป็น pill ⇒ ตอนย่อจะไม่เห็นอะไรเลย เหลือแค่การสั่นเป็นสัญญาณเดียว · และ
+    // v276 เพิ่งทำให้การย่อเป็นท่ามาตรฐาน (แตะตัวเลขเวลา) = สถานะย่อกลายเป็นสถานะปกติ
+    //
+    // **ไม่**สั่งขยายจอกลับเอง เพราะจะขัดกับเหตุผลทั้งหมดของ v276 (ไม่ให้ลูกค้าเห็นว่า
+    // มี AI ช่วยสรุป) — ทำให้ pill เองเปลี่ยนเป็นสีเตือนแทน: rep เห็นได้ทันทีจากมุมตา
+    // แต่ลูกค้าที่ไม่รู้ว่าปกติเป็นสีอะไรก็ยังไม่รู้ว่าเกิดอะไรขึ้น
+    try {
+      const pill = document.getElementById('echo-float-pill');
+      if (pill) pill.classList.add('fp-warn');
+    } catch(_) {}
     // ส่งขึ้น telemetry เพื่อให้เห็นของจริงหลังปล่อย ว่ายังเหลือเส้นทางไหนอีกไหม
     try {
       if (window.SenseSentinel && typeof window.SenseSentinel.report === 'function') {
@@ -52611,6 +52667,12 @@ body:not(.echo-active) { background:unset; }
     _recDeadCooldownUntil = Date.now() + REC_DEAD_COOLDOWN_MS;
     _recLastDataAt = Date.now();
     _recSamples = [{ t: Date.now(), b: _recBytes }];
+    // v_pillwarn: ปิดสีเตือนบน pill ด้วย ไม่ใช่แค่แถบในจอ — ถ้าไมค์ยังไม่ฟื้นจริง
+    // watchdog จะยิงใหม่หลังพ้นช่วงพักแล้วทาสีกลับมาเอง
+    try {
+      const pill = document.getElementById('echo-float-pill');
+      if (pill) pill.classList.remove('fp-warn');
+    } catch(_) {}
   }
 
   function _teardownRecorder(reason, opts) {
@@ -54801,7 +54863,7 @@ body:not(.echo-active) { background:unset; }
       // session ที่วิเคราะห์จบ (transcript/summary_data ไม่ดึงที่นี่ — หนักเกินสำหรับ
       // list 100 แถว detail view ดึงเองตอนเปิด)
       let q = supa.from('ci_sessions')
-        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage')
+        .select('id,owner_email,account_id,account_name,visited_at,duration_secs,skill_scores,customer_intel,next_actions,transcript_summary,tone_signals,tl_reviewed_at,tl_reviewed_by,tl_note,covisit_verified,status,pipeline_stage,listen_state')
         .order('visited_at', { ascending: false })
         .limit(isTL ? 100 : 50);
 
@@ -55216,7 +55278,13 @@ body:not(.echo-active) { background:unset; }
     // ไปทั้งที่ควรขึ้น ใช้เกณฑ์เข้มกว่ามากสำหรับ Gemini แทน: แค่มีท่อนเดียวที่มันเอง
     // ยังยอมรับว่าฟังไม่ชัด (conf < 1.0) ก็ควรเตือนแล้ว เพราะมันประเมินตัวเองสูงเกิน
     // จริงเป็นปกติอยู่แล้ว
-    const _confThreshold = s.transcript_source === 'gemini-3.1-pro' ? 1 : 0.6;
+    // v_usability (2026-08-21): เหตุผลข้างบนหมดอายุแล้ว · ตอนนี้ worker คิด
+    // transcript_confidence จาก "ความใช้ได้จริง" (ครอบคลุม × ความละเอียด × ความชัด)
+    // ด้วยสูตรเดียวกันทั้ง Gemini และ Whisper (ดู _usabilityScore ฝั่ง worker) ⇒ ตัวเลข
+    // มีความหมายเท่ากันทั้งสองแหล่งแล้ว ไม่ต้องมีเกณฑ์พิเศษต่อแหล่งอีก
+    // ตรวจกับ session จริง 6 ตัวแล้ว 0.6 แยกงานดี/งานพังได้ถูกทุกตัว: ของ Dent
+    // 19 ส.ค. (บุชยืนยันว่าแม่น) ได้ 0.73 = ไม่เตือน · ตัวที่ถอดได้ 27% ได้ 0.27 = เตือน
+    const _confThreshold = 0.6;
     let confBanner = '';
     if (typeof s.transcript_confidence === 'number' && s.transcript_confidence < _confThreshold) {
       confBanner = `<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin-top:10px;background:rgba(255,149,0,.08);border:0.5px solid rgba(255,149,0,.22);border-radius:var(--r-md);font-size:var(--text-sm);color:#B26A00;line-height:1.5;font-family:'Noto Sans Thai',sans-serif">
@@ -55891,6 +55959,21 @@ ${confBanner}
     // ไว้กับ _unmount() ข้างล่าง เพราะ _unmount() ถูกใช้ร่วมกับเส้น pipeline
     // เบื้องหลังที่อาจจบตอน rep กำลังอัดร้านถัดไปอยู่ (ดูคอมเมนต์ใน _unmount)
     // เสียงที่อัดไว้ไม่ถูกลบ — _mount() จะเรียก _checkRecoverBuffer() เสนอกู้คืนให้
+    //
+    // v_openguard (2026-08-21): แต่ "ไม่ถูกลบ" ไม่พอ — rep ต้องรู้ตัวว่าเพิ่งตัดการอัด
+    // ที่กำลังไปได้ดีทิ้ง · เส้นทางหลัก echoOpen() กันไว้แล้ว (เด้งไป echoExpand)
+    // แต่ยังมีอีก 2 ทางที่เรียก open() ตรงๆ โดยไม่มีการ์ด: echoHistory() (จุด Echo ใน
+    // หน้าพอร์ต — src/06_portview_teamview.js) และ ciOpen() · และการย่อเป็น pill
+    // (v276) ปลดล็อกการเลื่อนหน้าจอ ทำให้กดไปโดนทางพวกนั้นง่ายขึ้นมาก
+    // วางการ์ดที่ open() เองจึงครอบทุกทางเรียกในครั้งเดียว
+    if (_phase === 'recording' && _recorder && _recorder.state === 'recording') {
+      // _fmt() คืนรูป m:ss — เขียนต่อท้ายว่า "นาที" ไม่ได้ (11 วินาทีจะอ่านเป็น
+      // "0:11 นาที") เป็นบั๊กป้ายเดียวกับที่ _idbRecoverable ทำอยู่ ไม่ทำซ้ำ
+      const _ok = confirm('กำลังอัดอยู่ ' + _fmt(_secs) + ' (นาที:วินาที)\n\n' +
+        'ออกไปตอนนี้จะหยุดการอัดครั้งนี้ (เสียงที่อัดไว้ยังกู้คืนได้จากหน้า Echo)\n\n' +
+        'ต้องการออกไปเลยไหม?');
+      if (!_ok) return;   // ไม่ยืนยัน = ไม่แตะอะไรเลย อัดต่อเหมือนไม่มีอะไรเกิดขึ้น
+    }
     _teardownRecorder('open-account');
     // Guard: do not reset _sessionId if pipeline is still saving (processing/result phase)
     // Resetting _sessionId mid-pipeline causes fallback insert to create orphan row

@@ -22,6 +22,8 @@ const ci    = SRC('09_conv_intel.js');
 const pv    = SRC('06_portview_teamview.js');
 const sk    = SRC('11_skills.js');
 const core  = SRC('01_core.js');
+// v_pillwarn (2026-08-21): สถานะเตือนของ pill อยู่ใน CSS ต้องอ่านมาตรวจด้วย
+const ecss  = SRC('styles_echo.css');
 const worker = fs.readFileSync(path.join(__dirname, '..', 'worker', 'freshket-sense-ai-proxy-v2.js'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -246,7 +248,11 @@ check('_getTeamEmails: admin branch returns without self-fallback',
 check('detail select carries transcript + summary_data',
   /,transcript,summary_data,rep_lat,rep_lng,checked_in_at/.test(ci));
 check('list select carries pipeline_stage',
-  /tl_note,covisit_verified,status,pipeline_stage'/.test(ci));
+  /tl_note,covisit_verified,status,pipeline_stage/.test(ci));
+// v_etareal (2026-08-21): ETA ต้องนับ "ช่วงที่เหลือ" จริงจาก listen_state ไม่ใช่เดา
+// จากคาบ cron ล้วน — จึงต้องดึงคอลัมน์นี้มาในลิสต์ด้วย
+check('list select ดึง listen_state มาด้วย (ETA ต้องใช้นับช่วงที่เหลือ)',
+  /status,pipeline_stage,listen_state'/.test(ci));
 check('checked_in renders its own card in TL feed',
   /_renderTLTeamFeed[\s\S]{0,900}pipeline_stage === 'checked_in'/.test(ci));
 check('v_echor2: สรุปผลการ visit อยู่ในแท็บประวัติ คิดจากชุดเดียวกับรายการ',
@@ -415,13 +421,15 @@ check('client: session detail select carries transcript_confidence + pipeline_er
 check('client: low-confidence banner renders honest copy (no false claim about replaying audio)',
   /if \(typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < _confThreshold\)/.test(ci) &&
   !/ฟังต้นฉบับ/.test(ci));
-// v_confproxy (2026-08-17): 0.6 คงที่ใช้ไม่ได้กับ Gemini — proxy ของมันกระจุกใกล้
-// 1.0 เกือบทุกแถวไม่ว่าคุณภาพเสียงจะแย่แค่ไหนจริง (วัดจากข้อมูลจริง) ป้ายเตือนจึง
-// ต้องแยกเกณฑ์ตาม transcript_source ไม่งั้นจะไม่มีวันขึ้นเลยสำหรับ Gemini
+// v_usability (2026-08-21): เหตุผลของ v_confproxy หมดอายุแล้ว · worker คิด
+// transcript_confidence จากความใช้ได้จริง (ครอบคลุม × ความละเอียด × ความชัด) ด้วย
+// สูตรเดียวกันทั้งสองแหล่ง ⇒ ตัวเลขเทียบกันได้ตรงๆ ไม่ต้องมีเกณฑ์พิเศษต่อแหล่งอีก
+// ตรวจกับ session จริง 6 ตัวแล้ว 0.6 แยกงานดี/งานพังถูกทุกตัว
 check('client: session detail select ดึง transcript_source มาด้วย (จำเป็นต่อการแยกเกณฑ์)',
   /transcript_confidence,transcript_source/.test(ci));
-check('client: เกณฑ์เตือนแยกตาม transcript_source — gemini เข้มกว่า whisper มาก',
-  /const _confThreshold = s\.transcript_source === 'gemini-3\.1-pro' \? 1 : 0\.6;/.test(ci));
+check('client: ใช้เกณฑ์เดียว 0.6 ทั้งสองแหล่ง (ไม่มีเงื่อนไขพิเศษต่อแหล่งอีก)',
+  /const _confThreshold = 0\.6;/.test(ci) &&
+  !/transcript_source === 'gemini-3\.1-pro' \? 1 :/.test(ci));
 
 // v_recdebounce (2026-08-17): _phase ยังเป็น 'idle' ตลอดช่วงรอ getUserMedia() —
 // เดิมกดซ้อนสองครั้งในช่วงนี้ผ่านด่านได้ทั้งคู่ กลายเป็นสอง MediaRecorder ทำงาน
@@ -664,7 +672,15 @@ check('_unmount ไม่แตะ recorder เลย (ไม่งั้น pip
     return !/_teardownRecorder\(/.test(code);
   })());
 check('open() สั่งปิดไมค์เอง (จุดเดียวที่ตั้งใจทิ้งการอัดที่ค้างอยู่)',
-  /function open\(accountGuid\) \{[\s\S]{0,600}_teardownRecorder\('open-account'\);/.test(ci));
+  ci.indexOf("function open(accountGuid) {") > -1 &&
+  ci.indexOf("_teardownRecorder('open-account');", ci.indexOf("function open(accountGuid) {")) > -1);
+// v_openguard (2026-08-21): แต่ต้องถามก่อนถ้ากำลังอัดอยู่จริง — echoOpen() กันไว้แล้ว
+// แต่ echoHistory() (จุด Echo ในหน้าพอร์ต) กับ ciOpen() เรียก open() ตรงๆ ไม่มีการ์ด
+// และการย่อเป็น pill (v276) ปลดล็อกการเลื่อนจอ ทำให้กดไปโดนง่ายขึ้นมาก
+check('open() ถามก่อนตัดการอัดที่กำลังไหลอยู่ (ครอบทุกทางเรียกในจุดเดียว)',
+  /if \(_phase === 'recording' && _recorder && _recorder\.state === 'recording'\) \{/.test(ci) &&
+  /const _ok = confirm\('กำลังอัดอยู่ '/.test(ci) &&
+  /if \(!_ok\) return;/.test(ci));
 check('ขอไมค์ได้แล้วแต่ตั้ง recorder ไม่สำเร็จ ต้องปิดสตรีมทิ้ง (ไม่งั้นไมค์ค้างแบบเดิม)',
   /_pendingStream = await navigator\.mediaDevices\.getUserMedia/.test(ci) &&
   /_pendingStream\?\.getTracks\(\)\.forEach\(t => t\.stop\(\)\)/.test(ci));
@@ -832,7 +848,7 @@ check('ห้ามกลับไปใช้ createMediaStreamSource กับ
 // แยกกัน + บอกเวลาโดยประมาณจากตาราง cron จริง ไม่ใช่ป้าย "รอรีวิว" เดียวคลุมหมด
 console.log('\n── 12. v_reviewsteps: แยก "กำลังประมวลผล" ออกจาก "รอคนรีวิว" + ETA จริง ──');
 check('มี _reviewEtaText / _reviewStepInfo / _reviewStepBarHtml ครบ',
-  /function _reviewEtaText\(nowMs\)/.test(ci) &&
+  /function _reviewEtaText\(nowMs, remainingSteps\)/.test(ci) &&
   /function _reviewStepInfo\(s\)/.test(ci) &&
   /function _reviewStepBarHtml\(info\)/.test(ci));
 check('ป้ายล้มถาวร (failed_audio/failed_system/no_speech) ต้องไม่ใช้คำว่า "รอรีวิว" อีก',
@@ -862,7 +878,10 @@ check('_renderTLTeamFeed มีเส้น short-circuit สำหรับ fai
     return ci.slice(i, j);
   };
   const REVIEW_STEP_LABELS_SRC = (ci.match(/const REVIEW_STEP_LABELS = \[[^\]]*\];/) || [''])[0];
-  const src = [REVIEW_STEP_LABELS_SRC, grab('_reviewEtaText'), grab('_reviewStepInfo'), grab('_reviewStepBarHtml')].join('\n');
+  // v_etareal: _reviewEtaText อ้าง CRON_STEP_MIN แล้ว ต้องยกค่าคงที่เข้าแซนด์บ็อกซ์ด้วย
+  const CRON_STEP_SRC = (ci.match(/const CRON_STEP_MIN = \d+;/) || [''])[0];
+  const src = [CRON_STEP_SRC, REVIEW_STEP_LABELS_SRC,
+               grab('_reviewEtaText'), grab('_reviewStepInfo'), grab('_reviewStepBarHtml')].join('\n');
   const ctx = {};
   vm.createContext(ctx);
   try {
@@ -904,6 +923,33 @@ check('_renderTLTeamFeed มีเส้น short-circuit สำหรับ fai
     check('รันจริง: การ์ด failed ไม่มีแถบขั้นตอนปนอยู่ (แค่ป้ายแดงอันเดียว ไม่ใช่ progress bar)',
       /rgba\(255,59,48/.test(ctx.bar(ctx.info({ pipeline_stage: 'no_speech' }))) &&
       !/height:3px/.test(ctx.bar(ctx.info({ pipeline_stage: 'no_speech' }))));
+
+    // ── v_etareal (2026-08-21): ETA ต้องนับช่วงที่เหลือจริง ไม่ใช่พูด 5 นาทีทุกกรณี ──
+    // ป้ายเดิมสัญญา "ภายใน ~5 นาที" ทุกแถว ซึ่งถูกเฉพาะคลิปสั้นที่จบในคำขอเดียว ·
+    // คลิป 51 นาทีถูกซอย 9 ช่วงและทำได้ช่วงละ tick ⇒ จริงคือ ~45 นาที
+    const etaInHours = Date.UTC(2026, 7, 20, 7, 0, 0);   // 14:00 ไทย
+    check('รันจริง: คลิปสั้น (ไม่มี listen_state) ยังบอก "ภายใน ~5 นาที" เหมือนเดิม',
+      ctx.eta(etaInHours) === 'ภายใน ~5 นาที' &&
+      ctx.info({ pipeline_stage: 'uploaded' }).eta === 'ภายใน ~5 นาที');
+    check('รันจริง: คลิปยาว 9 ช่วง ยังไม่เริ่ม → บอกเวลาตามจำนวนช่วงจริง ไม่ใช่ 5 นาที',
+      (() => {
+        const e = ctx.info({ pipeline_stage: 'uploaded',
+          listen_state: { windows: new Array(9).fill({}), next: 0 } }).eta;
+        return e === 'ประมาณ 45 นาที (เหลือ 9 ช่วง)';
+      })(),
+      JSON.stringify(ctx.info({ pipeline_stage: 'uploaded',
+        listen_state: { windows: new Array(9).fill({}), next: 0 } }).eta));
+    check('รันจริง: ทำไปแล้ว 7 จาก 9 ช่วง → เวลาที่เหลือลดลงตามจริง',
+      ctx.info({ pipeline_stage: 'uploaded',
+        listen_state: { windows: new Array(9).fill({}), next: 7 } }).eta === 'ประมาณ 10 นาที (เหลือ 2 ช่วง)');
+    check('รันจริง: เหลือช่วงสุดท้าย → กลับไปใช้คำเดิม (ไม่โชว์ "เหลือ 1 ช่วง" ให้รกตา)',
+      ctx.info({ pipeline_stage: 'uploaded',
+        listen_state: { windows: new Array(9).fill({}), next: 8 } }).eta === 'ภายใน ~5 นาที');
+    check('รันจริง: นอกเวลา cron ยังเลื่อนไปรอบเช้าเหมือนเดิม แม้มีหลายช่วงเหลือ',
+      /~09:05 น\./.test(ctx.eta(Date.UTC(2026, 7, 19, 16, 40, 0), 9)));
+    check('รันจริง: listen_state เพี้ยน/ไม่มี windows ต้องไม่พัง',
+      ctx.info({ pipeline_stage: 'uploaded', listen_state: {} }).eta === 'ภายใน ~5 นาที' &&
+      ctx.info({ pipeline_stage: 'uploaded', listen_state: { windows: 'ไม่ใช่ array' } }).eta === 'ภายใน ~5 นาที');
   } catch (e) {
     check('รันจริง: แซนด์บ็อกซ์รันได้โดยไม่พัง', false, String(e && e.stack || e));
   }
@@ -923,5 +969,27 @@ check('_minimize เดิมไม่ถูกแตะ — ยังกัน�
   /function _minimize\(\) \{\s*\n\s*if \(_phase !== 'recording'\) return;\s*\n\s*const sheet = document\.getElementById\('ci-fullsheet'\);/.test(ci));
 
 // ════════════════════════════════════════════════════════════════════════════
+// ── 14. v_pillwarn: คำเตือนไมค์ตายต้องเห็นตอนย่อเป็น pill ─────────────────────
+// แถบเตือนตัวจริง (#ci-rec-dead) อยู่ใน #ci-fullsheet ที่ถูก display:none ตอนย่อ ⇒
+// ตอนย่อจะไม่เห็นอะไรเลย เหลือแค่การสั่น · v276 เพิ่งทำให้การย่อเป็นท่ามาตรฐาน
+console.log('\n── 14. v_pillwarn: เห็นคำเตือนได้ตอนย่อ แต่ลูกค้ายังไม่รู้ ──');
+check('_onDeadCapture ทาสีเตือนบน pill ด้วย ไม่ใช่เขียนแต่ใน sheet ที่ถูกซ่อน',
+  /const pill = document\.getElementById\('echo-float-pill'\);\s*\n\s*if \(pill\) pill\.classList\.add\('fp-warn'\);/.test(ci));
+check('ไม่สั่งขยายจอกลับเอง (จะขัดเหตุผลทั้งหมดของ v276 ที่ไม่ให้ลูกค้าเห็น)',
+  !/_onDeadCapture[\s\S]{0,900}echoExpand\(\)/.test(ci));
+check('กด "อัดต่อ" แล้วสีเตือนบน pill หายไปด้วย',
+  /_recDismissDead[\s\S]{0,700}pill\.classList\.remove\('fp-warn'\)/.test(ci));
+check('จบการอัดแล้วล้างสีเตือนทิ้ง ไม่ค้างไปรอบหน้า',
+  /classList\.remove\('visible'\); pill\.classList\.remove\('fp-warn'\)/.test(ci));
+// pill ต้องสะท้อนสถานะ "ตอนนี้" ทุกครั้งที่โผล่ ไม่ใช่เฉพาะตอน watchdog ยิงพอดีขณะย่อ
+// (ไม่งั้น: ไมค์ตาย → เตือน → ขยายจอ → ย่อใหม่ = pill สะอาดทั้งที่ไมค์ยังตาย)
+check('ย่อใหม่ตอนไมค์ยังตายอยู่ ต้องขึ้นสีเตือนตั้งแต่แรก',
+  /pill\.classList\.toggle\('fp-warn', !!_recDeadFired\);/.test(ci));
+check('CSS ของสถานะเตือนมีจริง และเคารพ prefers-reduced-motion',
+  /#echo-float-pill\.fp-warn\{/.test(ecss) &&
+  /@media \(prefers-reduced-motion:reduce\)\{[\s\S]{0,200}fp-warn\{animation:none\}/.test(ecss));
+check('สีเตือนเป็นเหลืองอำพัน ไม่ใช่แดงกระพริบจนลูกค้าสะดุดตา',
+  /#echo-float-pill\.fp-warn\{[\s\S]{0,250}rgba\(255,159,10/.test(ecss));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
