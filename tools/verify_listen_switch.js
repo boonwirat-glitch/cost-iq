@@ -30,9 +30,18 @@ function check(name, ok, detail) {
   else { fail++; console.log('  ✗ ' + name + (detail ? '\n      ' + detail : '')); }
 }
 
+// ทิ้งบรรทัดคอมเมนต์ออก — ใช้เวลาต้องยืนยันว่า "สตริงนี้ต้องไม่มีอยู่ในโค้ดที่รัน"
+// (คอมเมนต์อธิบายที่มามักอ้างคำเดิมที่กำลังเลิกใช้ ทำให้เช็คแบบนั้น false-fail)
+function noComments(s) {
+  return s.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+}
+
 const STAGE1 = WK.slice(WK.indexOf('// ── Stage 1: uploaded / needs_gemini → transcribed'),
                        WK.indexOf('// ── Stage 2: transcribed → analyzed'));
 const STEP = WK.slice(WK.indexOf('async function runListenStep'), WK.indexOf('async function processSession'));
+// v_winoverlap (2026-08-21): ตัววางแผนหน้าต่างถูกแยกออกมาเป็นฟังก์ชันของตัวเอง
+// เพื่อให้ harness รันจริงทดสอบได้ ไม่ใช่แค่ grep หาสตริงในโค้ดก้อนใหญ่
+const PLAN = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('function _windowDrift'));
 
 console.log('\n── 1. Gemini เป็นหูหลัก แต่ถอยกลับได้ ──');
 check('stage 1 เรียก runListenStep ก่อน ไม่ใช่ Whisper',
@@ -46,18 +55,31 @@ check('ไม่มี GEMINI_API_KEY ก็ยังทำงานได้ (�
 
 console.log('\n── 2. Gemini ล้ม = ต้องตกไป Whisper งานห้ามค้าง ──');
 check('มี try/catch ครอบเส้น Gemini แล้วปล่อยให้ t เป็น null',
-  // v_hiccupvisibility (2026-08-19): cap widened again 4200->6000 (2nd widening
-  // in 2 commits — v_hiccupbudget already bumped 2500->4200, then adding
-  // last_error persistence pushed it to ~4500) — generous headroom this time
-  // since this exact regex has now regressed twice from small nearby edits.
-  /catch \(e\) \{[\s\S]{0,6000}Gemini ล้ม → ใช้ตัวสำรอง Whisper[\s\S]{0,600}t = null;/.test(STAGE1));
+  // v_keepprogress (2026-08-21): เลิกวัดด้วยระยะตัวอักษรถึงสตริง — regex นี้พังจาก
+  // การแก้ใกล้ๆ มา 3 ครั้งแล้ว (2500→4200→6000) ทั้งที่พฤติกรรมไม่ได้เปลี่ยน
+  // เช็คด้วยลำดับ index แทน: catch ต้องมาก่อนจุดตกไป Whisper และ t = null
+  // ⚠ ห้ามใช้ indexOf('t = null;') เปล่าๆ — มี `let t = null;` ประกาศไว้ต้น stage
+  // อยู่แล้ว (ก่อน catch) จะเจอตัวนั้นก่อนเสมอ ต้องค้นต่อจากจุดข้อความ fallback
+  STAGE1.indexOf('catch (e) {') > -1 &&
+  STAGE1.indexOf('→ ใช้ตัวสำรอง Whisper') > STAGE1.indexOf('catch (e) {') &&
+  STAGE1.indexOf('t = null;', STAGE1.indexOf('→ ใช้ตัวสำรอง Whisper')) > -1);
 // v_attemptbudget (2026-08-17): needs_gemini ไม่มี Whisper ให้ถอย — เมื่องบ Gemini
 // เอง (LISTEN_MAX_ATTEMPTS) หมดจริงถึงปิดถาวร ส่วน hiccup ชั่วคราวปล่อยให้ tick
 // ถัดไปลองซ้ำ ไม่แตะ general attempts (เพดานแค่ 4) เพื่อไม่ให้ blip ที่ไม่เกี่ยวกับ
 // Gemini มาปิดคิวถาวรทั้งที่งบ Gemini จริงยังเหลือเยอะ
+// v_honestlabel (2026-08-21): เคสนี้ไฟล์เสียงดีสมบูรณ์ (ของจริง 21 ส.ค. 10:18 =
+// 25.41MB ที่ 8,640 B/s อยู่ในย่านไฟล์ดีเต็มๆ) ปัญหาอยู่ที่ตัวถอดล้วนๆ — ป้าย
+// failed_audio ที่แอปแปลว่า "ไฟล์เสียงใช้ไม่ได้" จึงโกหกและทำให้ไล่ผิดทาง
 check('needs_gemini: งบ Gemini หมดจริงถึงปิดถาวร (ไม่ผ่าน classifyFailure ที่จะเดาผิด)',
   /const genuinelyExhausted = \/ไม่จบใน \\d\+ รอบ\//.test(STAGE1) &&
-  /pipeline_stage: 'failed_audio', processing_since: null, next_attempt_at: null/.test(STAGE1));
+  /pipeline_stage: 'failed_system', processing_since: null, next_attempt_at: null/.test(STAGE1));
+check('ไฟล์เสียงดีแต่ถอดไม่จบ ต้องไม่ถูกตีตราว่า "ไฟล์เสียงใช้ไม่ได้"',
+  // ⚠ ต้องกรองคอมเมนต์ออกก่อน — คอมเมนต์ที่อธิบายที่มาอ้างคำว่า failed_audio โดย
+  // ตั้งใจ (ทั้งของ v_honestlabel เองและของ v_hiccupbudget เดิม) เป็นกับดักเดิมที่
+  // โดนมาแล้วใน verify_echo_visit.js — ใช้สำนวนกรองแบบเดียวกัน
+  !/failed_audio/.test(noComments(STAGE1)) &&
+  /ไฟล์เสียงปกติดี แต่ถอดด้วย Gemini ไม่จบ/.test(STAGE1),
+  'failed_audio = แอปขึ้นว่าไฟล์เสียงใช้ไม่ได้ ซึ่งไม่จริงสำหรับเคสนี้');
 // v_hiccupbudget (2026-08-19): a hiccup with no Whisper fallback for this
 // session (forcedGemini) used to release the claim WITHOUT ever persisting
 // listen_state.attempts — since runListenStep's own exhaustion throw only
@@ -99,10 +121,14 @@ const WIN = Number((WK.match(/const LISTEN_WIN_MIN = (\d+)/) || [])[1]);
 check(`ช่วงละ ${WIN} นาที — รอดแม้วันที่ช้าสุด (${Math.round(WIN * 530 / 76)} วิ < 128)`,
   WIN > 0 && WIN * 530 / 76 < 115, `LISTEN_WIN_MIN=${WIN}`);
 check('คลิปสั้นยิงรอบเดียว ไม่ซอยโดยไม่จำเป็น',
-  /st\.single === true \|\| dur \/ 60 <= LISTEN_SINGLE_MAX_MIN|dur \/ 60 <= LISTEN_SINGLE_MAX_MIN/.test(STEP));
+  /dur \/ 60 <= LISTEN_SINGLE_MAX_MIN/.test(PLAN));
 check('เจอ 524/timeout แล้วผ่าช่วงครึ่งหนึ่ง แทนลองขนาดเดิมซ้ำ',
   /\/\\b524\\b\|timeout\|timed out\/i\.test\(msg\)/.test(STEP) &&
-  /windows\.splice\(i, 1, \{ from, to: mid \}, \{ from: mid, to \}\)/.test(STEP));
+  /windows\.splice\(i, 1, \.\.\.parts\)/.test(STEP));
+// v_winoverlap: ผ่าแค่ช่วงที่ "ขอ" · ช่วงที่ "เก็บ" ต้องคงเดิมทั้งก้อน ไม่งั้นเกิดรูกลางบท
+check('ผ่าครึ่งแล้วช่วงที่เก็บต้องไม่หาย และซีกที่ไม่มีอะไรต้องเก็บก็ไม่ต้องยิง',
+  /keep_to: \(keepTo === undefined\) \? undefined/.test(STEP) &&
+  /if \(keepTo === undefined \|\| keepTo === null \|\| keepTo > mid\)/.test(STEP));
 check('มีพื้นหดต่ำสุด — หดจนสั้นแล้วยังพัง = โยนต่อให้ตกไป Whisper',
   /LISTEN_MIN_WIN_SEC/.test(STEP) && /throw e;/.test(STEP));
 check('รวมผลเรียงตามเวลาจริง',
@@ -133,14 +159,22 @@ console.log('\n── 5. prompt: ช่วงเวลา + ความละ�
 }
 
 console.log('\n── 6. ป้ายเตือนคุณภาพต้องไม่เงียบ ──');
-check('Gemini คืนค่าความมั่นใจจากสัดส่วนท่อนที่ฟังออก',
+// v_usability (2026-08-21): ของเดิมทั้งสองฝั่งใช้ค่าที่โมเดลเดาความมั่นใจตัวเอง ซึ่ง
+// แยก "งานใช้ได้" จาก "งานพัง" ไม่ออก — 19 ส.ค. 14:06 (บุชยืนยันว่าผลแม่น) ได้ 0.56
+// แต่ 21 ส.ค. 14:09 ที่ถอดได้แค่ 27% ของคลิป ได้ 0.53 · ตอนนี้คิดจากความครอบคลุม
+// คูณความละเอียดจริง ทั้งสองฝั่งใช้สูตรเดียวกัน
+check('ทั้งสองหูคิดค่าความมั่นใจจากความใช้ได้จริง ไม่ใช่ค่าที่โมเดลเดาตัวเอง',
+  /const conf = _usabilityScore\(merged, row\.duration_secs \|\| 0, unclear\)/.test(STEP) &&
+  /avg_transcript_confidence: _usabilityScore\(segments, duration_secs, 0\)/.test(WK) &&
+  !/avg_transcript_confidence: n \? segments\.reduce/.test(WK));
+check('ยังนับท่อน [ฟังไม่ชัด] ต่อ (เป็นตัวคูณ clarity ไม่ได้ทิ้งของเดิม)',
   /const unclear = merged\.filter\(s => \/\\\[ฟังไม่ชัด\\\]\/\.test/.test(STEP) &&
-  /const conf = merged\.length \? 1 - \(unclear \/ merged\.length\) : null/.test(STEP),
-  'ปล่อย null = ป้าย "ถอดเสียงไม่ชัดเจน" ในแอปจะไม่ขึ้นเลย เสียตัวกันพลาดที่ทำไว้');
-check('ป้ายในแอปยังอ่านค่านี้อยู่ (เกณฑ์แยกตามหู — gemini เข้มกว่า whisper มาก)',
-  /typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < _confThreshold/.test(CI) &&
-  /const _confThreshold = s\.transcript_source === 'gemini-3\.1-pro' \? 1 : 0\.6;/.test(CI),
-  'ค่า proxy ของ Gemini กระจุกใกล้ 1.0 เกือบทุกแถวจริง — เกณฑ์ 0.6 คงที่จะไม่มีวันขึ้นป้ายเลย');
+  /const clarity\s+= segs\.length \? 1 - \(Math\.max\(0, unclearCount \|\| 0\) \/ segs\.length\) : 1;/.test(WK));
+check('ค่ารายท่อนของ Whisper ยังอยู่ครบ (ตัวกรอง hallucination + ด่าน diarize ใช้ค่านี้)',
+  /transcript_confidence: Math\.max\(0, Math\.min\(1, Math\.exp\(s\.avg_logprob \|\| -0\.3\)\)\)/.test(WK) &&
+  /const LOW_CONF_EDIT_THRESHOLD = 0\.5;/.test(WK));
+check('ป้ายในแอปยังอ่านค่านี้อยู่',
+  /typeof s\.transcript_confidence === 'number' && s\.transcript_confidence < _confThreshold/.test(CI));
 check('ระบุแหล่งที่มาเป็น gemini เพื่อให้ตรวจย้อนได้ว่าบทไหนมาจากหูไหน',
   /source: 'gemini-3\.1-pro'/.test(STEP));
 
@@ -153,9 +187,9 @@ check('มี _geminiDeleteFile ไว้สั่งลบ และพลา�
 check('ถอดจบครบทุกช่วงแล้วลบไฟล์ทิ้งก่อน return ผลลัพธ์',
   /if \(st\.file_name\) await _geminiDeleteFile\(env, st\.file_name\);\s*return \{/.test(STEP));
 check('เลิกใช้ไฟล์เพราะตกไป Whisper ก็ลบทิ้งก่อนล้าง listen_state',
-  /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,150}listen_state: null \}\)/.test(STAGE1));
+  /if \(_cur\.file_name\) await _geminiDeleteFile\(env, _cur\.file_name\);\s*\n\s*await sbPatch\(env, 'ci_sessions', `id=eq\.\$\{sessionId\}`, \{ listen_state: null \}\)/.test(STAGE1));
 check('needs_gemini งบหมดถาวรก็ลบไฟล์ทิ้งก่อนปิดคิว',
-  /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,200}pipeline_stage: 'failed_audio'/.test(STAGE1));
+  /if \(row\.listen_state && row\.listen_state\.file_name\) \{[\s\S]{0,100}_geminiDeleteFile[\s\S]{0,900}pipeline_stage: 'failed_system'/.test(STAGE1));
 
 console.log('\n── 7. blast radius: ของเดิมต้องไม่หาย ──');
 check('runTranscribe (Whisper) ยังอยู่ครบ ไม่ได้ลบทิ้ง',
@@ -168,6 +202,115 @@ check('stage 2 (วิเคราะห์) ไม่ถูกแตะ',
   /if \(row\.pipeline_stage === 'transcribed' && row\.status !== 'saved'\)/.test(WK));
 check('ยังกันไฟล์ใหญ่เกินขีด Whisper ไว้ (ตัวสำรองต้องไม่ระเบิด)',
   /if \(_audioBytesLen > GROQ_MAX_AUDIO_BYTES\) throw new AudioTooLargeForGroq/.test(WK));
+
+// ── 8. v_winoverlap + v_usability: รันจริง ไม่ใช่แค่ grep ─────────────────────
+// บทเรียนของรอบ 19-21 ส.ค. คือผมปล่อย "สมมติฐานที่วัดไม่ได้" ลง production แล้ว
+// มันเสียหายเงียบๆ 2 วัน (Gemini ไม่ถอดคลิปยาวอีกเลย) เพราะไม่มีอะไรพิสูจน์
+// พฤติกรรมจริงเลย · บล็อกนี้ประกอบฟังก์ชันจริงในแซนด์บ็อกซ์แล้วรันกับ **เลขจริงของ
+// session ใน production 14-21 ส.ค.** ที่บุชเห็นด้วยตาเอง
+console.log('\n── 8. v_winoverlap + v_usability: รันจริงกับเลขจริงจาก production ──');
+{
+  const helpers = WK.slice(WK.indexOf('function _abTsToSec'), WK.indexOf('function _abSecToTs'));
+  const consts = (WK.match(/const LISTEN_WIN_MIN = \d+;[\s\S]*?const LISTEN_WIN_MAX_FAILS = \d+;/) || [''])[0];
+  const usab = WK.slice(WK.indexOf('const USABILITY_TARGET_SEG_PER_MIN'), WK.indexOf('async function runTranscribe'));
+  const plan = WK.slice(WK.indexOf('function _planListenWindows'), WK.indexOf('const LISTEN_RETRY_DELAYS'));
+  const ctx = {};
+  vm.createContext(ctx);
+  try {
+    vm.runInContext(`${helpers}\n${consts}\n${usab}\n${plan}\n` +
+      'this.API={_planListenWindows,_keepInWindow,_usabilityScore,_windowDrift,LISTEN_WIN_MIN,LISTEN_STRIDE_MIN,LISTEN_MAX_ATTEMPTS};', ctx);
+    const A = ctx.API;
+
+    // ── ตัววางแผนหน้าต่าง ──
+    check('รันจริง: คลิปสั้น (158 วิ = ของจริง 19 ส.ค. 14:20) = คำขอเดียว ไม่ซอย',
+      (() => { const w = A._planListenWindows(158);
+        return w.length === 1 && w[0].from === null && w[0].to === null; })());
+
+    const w48 = A._planListenWindows(2880);   // 48 นาที
+    check('รันจริง: คลิป 48 นาที = 8 คำขอ — เท่ากับตอน 6 นาทีไม่ซ้อนเป๊ะ (ไม่ช้าลง)',
+      w48.length === 8, `ได้ ${w48.length} คำขอ`);
+    check('รันจริง: แต่ละคำขอยาว 12 นาที แต่เก็บแค่ 6 นาทีแรก (ครึ่งที่ยังไม่เพี้ยน)',
+      w48[0].from === 0 && w48[0].to === 720 && w48[0].keep_to === 360 &&
+      w48[1].from === 360 && w48[1].to === 1080 && w48[1].keep_to === 720,
+      JSON.stringify(w48.slice(0, 2)));
+    check('รันจริง: คำขอสุดท้าย keep_to = null (เก็บถึงท้ายไฟล์ ไม่ตกท่อนท้าย)',
+      w48[w48.length - 1].keep_to === null && w48[w48.length - 1].to === 2880);
+    check('รันจริง: ช่วงที่เก็บต่อกันพอดีทั้งคลิป ไม่มีรูและไม่ทับกัน',
+      (() => {
+        for (let i = 0; i < w48.length - 1; i++) if (w48[i].keep_to !== w48[i + 1].from) return false;
+        return w48[0].from === 0;
+      })(), JSON.stringify(w48.map(w => [w.from, w.keep_to])));
+    check('รันจริง: ทุกคำขอเก็บไม่เกินครึ่งของสิ่งที่ขอ (ครึ่งหลังที่เพี้ยนถูกทิ้งจริง)',
+      w48.slice(0, -1).every(w => (w.keep_to - w.from) <= (w.to - w.from) / 2));
+    check('รันจริง: คลิป 60 นาที ใช้ 10 คำขอ — ยังห่างเพดาน 48 เยอะ (ค่าเดิม 20 เคยชน)',
+      A._planListenWindows(3600).length === 10 && A.LISTEN_MAX_ATTEMPTS >= 40,
+      `${A._planListenWindows(3600).length} คำขอ · เพดาน ${A.LISTEN_MAX_ATTEMPTS}`);
+    check('รันจริง: เศษท้ายไฟล์สั้นๆ ถูกกลืนรวม ไม่ยิงคำขอจิ๋วเพิ่ม',
+      (() => { const w = A._planListenWindows(760);   // 12.7 นาที
+        return w[w.length - 1].keep_to === null && w.length === 2; })(),
+      JSON.stringify(A._planListenWindows(760)));
+
+    // ── ตัวกรอง keep ──
+    const segsAt = secs => secs.map(s => ({ ts: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, text: 'x' }));
+    check('รันจริง: หน้าต่างกลางเก็บแค่ท่อนในช่วง keep (ครึ่งหลังของคำขอถูกทิ้ง)',
+      A._keepInWindow(segsAt([300, 420, 660, 780, 900]), { from: 360, to: 1080, keep_to: 720 })
+        .map(s => s.ts).join(',') === '7:00,11:00');
+    check('รันจริง: หน้าต่างสุดท้าย (keep_to=null) เก็บทุกท่อนตั้งแต่ from ไปจนจบ',
+      A._keepInWindow(segsAt([300, 2600, 2800]), { from: 2520, to: 2880, keep_to: null }).length === 2);
+    check('รันจริง: state รูปแบบเก่าที่ไม่มี keep_to = เก็บทั้งหมดแบบเดิม (งานที่ค้างในคิวไม่พัง)',
+      A._keepInWindow(segsAt([10, 400, 900]), { from: 0, to: 360 }).length === 3,
+      'ต้องเข้ากันได้กับ session ที่ listen_state ถูกเขียนไว้ก่อน 21 ส.ค.');
+    check('รันจริง: คำขอเดียวทั้งไฟล์ (from=null) เก็บทั้งหมด',
+      A._keepInWindow(segsAt([10, 100]), { from: null, to: null, keep_to: null }).length === 2);
+
+    // ── คะแนน "ใช้ได้จริง" เทียบกับ session จริงที่บุชเห็นด้วยตา ──
+    // สร้างท่อนจำลอง n ท่อน โดยท่อนสุดท้ายจบที่ lastEnd (คือทั้งสองตัวแปรที่สูตรใช้)
+    const mk = (n, lastEnd) => Array.from({ length: n }, (_, i) => ({
+      end_sec: ((i + 1) / n) * lastEnd, ts: '0:00', text: 'x'
+    }));
+    const cases = [
+      ['Dent 19 ส.ค. 14:06 (บุชยืนยันว่าผลแม่น)',      224, 2070, 2829, 0.732, false],
+      ['Dent 21 ส.ค. 12:54 (คนเดียวกัน ยาวเท่ากัน)',    115, 2322, 2857, 0.402, true ],
+      ['21 ส.ค. 14:09 (ถอดได้แค่ 27% ของคลิป)',          22,  165,  616, 0.268, true ],
+      ['20 ส.ค. 11:08 (ครอบคลุม 63% ท่อนบาง)',          131, 1570, 2501, 0.523, true ],
+      ['20 ส.ค. 13:10 (ครอบคลุมเต็ม ท่อนแน่น)',         185, 1469, 1474, 0.997, false],
+      ['14 ส.ค. 13:05 Gemini 64 นาที (เพดานเดิม)',      776, 3840, 3864, 0.994, false],
+    ];
+    for (const [label, n, lastEnd, dur, want, shouldWarn] of cases) {
+      const got = A._usabilityScore(mk(n, lastEnd), dur, 0);
+      check(`รันจริง: ${label} → ${want} ${shouldWarn ? '(ต้องเตือน)' : '(ต้องไม่เตือน)'}`,
+        Math.abs(got - want) < 0.01 && ((got < 0.6) === shouldWarn),
+        `ได้ ${got}`);
+    }
+    check('รันจริง: ค่าเดิมแยกงานดี/งานพังไม่ออก แต่ค่าใหม่แยกออก (นี่คือเหตุผลที่เปลี่ยน)',
+      // ของจริง: 19 ส.ค. conf 0.56 vs 21 ส.ค. 14:09 conf 0.53 — ต่างกัน 0.03 เท่านั้น
+      // ค่าใหม่: 0.732 vs 0.268 — ต่างกัน 0.46 และคร่อมเกณฑ์ 0.6 คนละฝั่ง
+      (() => {
+        const good = A._usabilityScore(mk(224, 2070), 2829, 0);
+        const bad  = A._usabilityScore(mk(22, 165), 616, 0);
+        return (good - bad) > 0.4 && good >= 0.6 && bad < 0.6;
+      })());
+    check('รันจริง: ไม่มีท่อน/ไม่รู้ความยาว = คืน null ไม่ใช่ 0 (0 จะขึ้นป้ายเตือนผิดๆ)',
+      A._usabilityScore([], 100, 0) === null && A._usabilityScore(mk(5, 50), 0, 0) === null);
+    check('รันจริง: ท่อน [ฟังไม่ชัด] เยอะ กดคะแนนลงจริง',
+      A._usabilityScore(mk(100, 600), 600, 50) < A._usabilityScore(mk(100, 600), 600, 0));
+
+    // ── ตัววัดเสียงเพี้ยน ──
+    const dseg = (sec, text) => ({ ts: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, text });
+    check('รันจริง: ตัววัด drift — ครึ่งหลังยาวเท่ากัน = ratio ใกล้ 1 (ไม่เพี้ยน)',
+      (() => {
+        const d = A._windowDrift([dseg(10, 'x'.repeat(40)), dseg(600, 'y'.repeat(40))], { from: 0, to: 720 }, 2880);
+        return d.ratio >= 0.9 && d.ratio <= 1.1;
+      })());
+    check('รันจริง: ตัววัด drift — ครึ่งหลังแตกเป็นคำสั้น = ratio ต่ำชัดเจน (จับอาการได้)',
+      (() => {
+        const d = A._windowDrift([dseg(10, 'x'.repeat(40)), dseg(600, 'สั้น')], { from: 0, to: 720 }, 2880);
+        return d.ratio !== null && d.ratio < 0.3 && d.front > d.back;
+      })(), 'นี่คือตัวชี้วัดที่ขาดไปตอน 19 ส.ค. ทำให้ตัดสินใจโดยไม่มีข้อมูล');
+  } catch (e) {
+    check('รันจริง: แซนด์บ็อกซ์รันได้โดยไม่พัง', false, String((e && e.stack) || e));
+  }
+}
 
 console.log('\n' + (fail ? `❌ verify_listen_switch: ผ่าน ${pass} · ไม่ผ่าน ${fail}` : `✅ verify_listen_switch: ผ่าน ${pass} · ไม่ผ่าน 0`));
 process.exit(fail ? 1 : 0);

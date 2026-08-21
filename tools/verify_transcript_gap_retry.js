@@ -27,10 +27,13 @@ function check(name, ok, detail) {
 console.log('── v_transcribegap: จับ transcript ที่ Groq ตัดจบก่อนความยาวคลิปจริง ──');
 
 const fnStart = WK.indexOf('async function runTranscribe(');
-// ระยะคงที่ 8000 ตัวอักษร — ครอบคลุมถึงหลัง groqData retry logic แน่นอน
-// (เดิมหา boundary ด้วยข้อความ "Step 2" แต่ตัวขีดในคอมเมนต์จริงไม่ตรงกับ
-// สตริงในไฟล์นี้เป๊ะ ระยะคงที่แข็งแรงกว่า ไม่ผูกกับตัวอักษรที่เดาไม่ได้)
-const fnBody = fnStart > -1 ? WK.slice(fnStart, fnStart + 8000) : '';
+// v_gapscore (2026-08-21): ระยะคงที่ 8000 พังทันทีที่เพิ่ม _groqCoverScore เข้าไป
+// (จุดที่ต้องเช็คขยับไป ~8600) — เลิกเดาระยะ ใช้จุดสิ้นสุดจริงของบล็อก gap-retry
+// เป็นขอบเขตแทน ซึ่งไม่ขยับตามความยาวคอมเมนต์ที่แทรกก่อนหน้า
+const _gapEnd = WK.indexOf('// Whisper hallucination guard', fnStart);
+const fnBody = fnStart > -1
+  ? WK.slice(fnStart, _gapEnd > fnStart ? _gapEnd : fnStart + 12000)
+  : '';
 check('ดึงเนื้อ runTranscribe ออกมาได้', !!fnBody);
 
 check('มีเกณฑ์ตัดสิน: อย่างน้อย 60 วิ หรือ 10% ของความยาวคลิป แล้วแต่ค่าไหนมากกว่า',
@@ -50,11 +53,52 @@ check('ลองใหม่ "ครั้งเดียว" เท่านั
            (retrySection.match(/fetch\('https:\/\/api\.groq\.com/g) || []).length === 1;
   })());
 
-check('เลือกผลที่ครอบคลุมมากกว่า (gap น้อยกว่า) ไม่ใช่เชื่อรอบสองเสมอ',
-  /if \(_retryGap < _firstGap\) \{/.test(fnBody) && /groqData = retryData;/.test(fnBody));
+// v_gapscore (2026-08-21): เกณฑ์เดิม `_retryGap < _firstGap` เทียบแค่ timestamp ท่อน
+// สุดท้าย → รอบสองที่ "ไปถึงท้ายกว่าแต่บางกว่า" ทับรอบแรกที่ละเอียดกว่าได้ · เจอจริง
+// กับ session ของ Dent: 21 ส.ค. 12:54 (47.6 นาที) ครอบคลุมเพิ่ม 8% แต่จำนวนท่อนหาย
+// ไป 49% เทียบกับคลิปยาวเท่ากันของคนเดียวกันเมื่อ 19 ส.ค. (224 → 115 ท่อน)
+check('เลือกผลจากคะแนนรวม (ครอบคลุม × ความละเอียด) ไม่ใช่แค่ไปถึงนาทีท้ายกว่า',
+  /function _groqCoverScore\(gd\)/.test(fnBody) &&
+  /const _s1 = _groqCoverScore\(groqData\), _s2 = _groqCoverScore\(retryData\);/.test(fnBody) &&
+  /if \(_s2 > _s1\) \{/.test(fnBody) && /groqData = retryData;/.test(fnBody) &&
+  !/if \(_retryGap < _firstGap\) \{/.test(fnBody));
+
+check('คะแนนใช้สูตรเดียวกับป้ายเตือนในแอป (เพดานความละเอียดตัวเดียวกัน)',
+  /density \/ USABILITY_TARGET_SEG_PER_MIN/.test(fnBody));
+
+check('log บอกทั้งคะแนนและจำนวนท่อน — ตรวจย้อนได้ว่าทำไมเลือกผลไหน',
+  /ท่อน \$\{_n2\} จาก \$\{_n1\}/.test(fnBody) && /ท่อน \$\{_n2\} เทียบ \$\{_n1\}/.test(fnBody));
 
 check('รอบสอง fetch ล้มเหลว/เครือข่ายพัง ต้องไม่ทำให้ทั้ง session พัง (ใช้ผลรอบแรกต่อ)',
   /catch \(e\) \{\s*\n\s*console\.warn\('\[transcribe\] ลองใหม่รอบสองล้มเหลว/.test(fnBody));
+
+// รันจริง: สูตรต้องปฏิเสธผลที่ "ยาวกว่าแต่บางกว่า" ตามเคสจริงของ Dent
+{
+  const vm = require('vm');
+  const c = { USABILITY_TARGET_SEG_PER_MIN: 6 };
+  vm.createContext(c);
+  vm.runInContext(`
+    function _lastSegEnd(gd){const s=(gd&&gd.segments)||[];return s.length?Math.max(...s.map(x=>x.end||0)):0;}
+    function mkScore(duration_secs){
+      return function(gd){
+        const segs=(gd&&gd.segments)||[]; if(!segs.length||!duration_secs) return 0;
+        const end=_lastSegEnd(gd); if(!end) return 0;
+        const coverage=Math.max(0,Math.min(1,end/duration_secs));
+        const density=(end/60)>0?segs.length/(end/60):0;
+        return coverage*Math.max(0,Math.min(1,density/USABILITY_TARGET_SEG_PER_MIN));
+      };
+    }
+    this.mkScore=mkScore;`, c);
+  const score = c.mkScore(2857);
+  const mk = (n, end) => ({ segments: Array.from({ length: n }, (_, i) => ({ end: ((i + 1) / n) * end })) });
+  const dense  = mk(224, 2070);   // รอบแรกแบบ 19 ส.ค. — สั้นกว่าแต่ละเอียด
+  const sparse = mk(115, 2322);   // รอบสองแบบ 21 ส.ค. — ยาวกว่าแต่บาง
+  check('รันจริง: ผล "ยาวกว่าแต่บางกว่า" ต้องแพ้ผลที่ละเอียดกว่า (เกณฑ์เดิมเลือกผิดข้อนี้)',
+    score(sparse) < score(dense) && (2857 - 2322) < (2857 - 2070),
+    `บาง ${score(sparse).toFixed(3)} · ละเอียด ${score(dense).toFixed(3)} — gap ของตัวบางน้อยกว่าจริง จึงเคยชนะด้วยเกณฑ์เดิม`);
+  check('รันจริง: ผลที่ทั้งยาวกว่าและแน่นกว่า ยังชนะตามปกติ',
+    score(mk(300, 2800)) > score(dense));
+}
 
 console.log('\n' + (fail ? `❌ verify_transcript_gap_retry: ผ่าน ${pass} · ไม่ผ่าน ${fail}` : `✅ verify_transcript_gap_retry: ผ่าน ${pass} · ไม่ผ่าน 0`));
 process.exit(fail ? 1 : 0);

@@ -323,6 +323,38 @@ class AudioTooLargeForGroq extends Error {
   }
 }
 
+// ── v_usability (2026-08-21): ตัวเลขที่โชว์เป็น "ความมั่นใจ" ต้องบอกได้ว่า *ผลใช้ได้
+// จริงแค่ไหน* ไม่ใช่ค่าที่โมเดลเดาความมั่นใจตัวเอง
+//
+// ของเดิมสองฝั่งใช้ค่าที่ไม่เกี่ยวกับความใช้ได้เลย: ฝั่ง Whisper = ค่าเฉลี่ยของ
+// exp(avg_logprob) รายท่อน · ฝั่ง Gemini = สัดส่วนท่อนที่ไม่ติดป้าย [ฟังไม่ชัด]
+// ทั้งสองแยก "งานที่ใช้ได้" ออกจาก "งานที่พัง" ไม่ออก — หลักฐานจากของจริง:
+// session 19 ส.ค. 14:06 (บุชยืนยันเองว่าผลแม่น) ได้ 0.56 แต่ 21 ส.ค. 14:09 ที่ถอดได้
+// แค่ 27% ของคลิป ได้ 0.53 · ใกล้กันจนป้ายเตือนไม่มีประโยชน์
+//
+// สองตัวแปรที่แยกได้จริงจากข้อมูล 14-21 ส.ค.:
+//   (1) ครอบคลุมกี่ % ของคลิป (งานพังจริงร่วงถึง 27-63%)
+//   (2) ท่อนต่อนาทีของช่วงที่ถอดได้ (งานดี 5.0-13.7 · งานบาง 2.1-3.1)
+// คูณกันแล้วตรวจกับ session จริงทุกตัวในชุดนั้น แยกถูกหมด (ดู tools/verify_listen_switch.js)
+const USABILITY_TARGET_SEG_PER_MIN = 6;
+function _usabilityScore(segments, durationSecs, unclearCount) {
+  const segs = segments || [];
+  if (!segs.length || !durationSecs) return null;
+  let lastEnd = 0;
+  for (const s of segs) {
+    // ฝั่ง Whisper มี end_sec · ฝั่ง Gemini มีแต่ ts (ไม่มี end_sec) จึงถอยไปอ่าน ts
+    const e = (typeof s.end_sec === 'number' && s.end_sec > 0) ? s.end_sec : _abTsToSec(s && s.ts);
+    if (typeof e === 'number' && e > lastEnd) lastEnd = e;
+  }
+  if (!lastEnd) return null;
+  const coverage   = Math.max(0, Math.min(1, lastEnd / durationSecs));
+  const coveredMin = lastEnd / 60;
+  const density    = coveredMin > 0 ? segs.length / coveredMin : 0;
+  const densityScore = Math.max(0, Math.min(1, density / USABILITY_TARGET_SEG_PER_MIN));
+  const clarity    = segs.length ? 1 - (Math.max(0, unclearCount || 0) / segs.length) : 1;
+  return Math.round(coverage * densityScore * clarity * 1000) / 1000;
+}
+
 async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, env, audioB64, skuGlossary) {
   const account_name = accountName;
   const _audioBytesLen = audioBytes && (audioBytes.byteLength ?? audioBytes.length);
@@ -431,6 +463,21 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
     const segs = gd?.segments || [];
     return segs.length ? Math.max(...segs.map(s => s.end || 0)) : 0;
   }
+  // v_gapscore (2026-08-21): ตัวเลือกผลรอบสองของเดิมเทียบแค่ timestamp ท่อนสุดท้าย
+  // (`_retryGap < _firstGap`) → รอบสองที่ "ไปถึงท้ายกว่าแต่บางกว่า" ทับรอบแรกที่ละเอียด
+  // กว่าได้ · เจอจริง: Dent 21 ส.ค. 12:54 (47.6 นาที) ได้ครอบคลุมเพิ่ม 8% แต่จำนวนท่อน
+  // หายไป 49% เทียบกับคลิปยาวเท่ากันของคนเดียวกันเมื่อ 19 ส.ค. (224 → 115 ท่อน)
+  // เกณฑ์ใหม่ = คะแนนเดียวกับ _usabilityScore (ครอบคลุม × ความละเอียด) ใช้รอบสอง
+  // เฉพาะเมื่อคะแนนรวมดีกว่าจริง ไม่ใช่แค่ไปถึงนาทีท้ายกว่า
+  function _groqCoverScore(gd) {
+    const segs = (gd && gd.segments) || [];
+    if (!segs.length || !duration_secs) return 0;
+    const end = _lastSegEnd(gd);
+    if (!end) return 0;
+    const coverage = Math.max(0, Math.min(1, end / duration_secs));
+    const density  = (end / 60) > 0 ? segs.length / (end / 60) : 0;
+    return coverage * Math.max(0, Math.min(1, density / USABILITY_TARGET_SEG_PER_MIN));
+  }
   const _gapThreshold = Math.max(GROQ_GAP_FLOOR_SEC, (duration_secs || 0) * GROQ_GAP_RATIO);
   const _firstGap = (duration_secs || 0) - _lastSegEnd(groqData);
   if (_firstGap > _gapThreshold) {
@@ -444,11 +491,15 @@ async function runTranscribe(audioBytes, mimeType, durationSecs, accountName, en
       if (retryRes.ok) {
         const retryData = await retryRes.json();
         const _retryGap = (duration_secs || 0) - _lastSegEnd(retryData);
-        if (_retryGap < _firstGap) {
-          console.warn(`[transcribe] รอบสองครอบคลุมมากกว่า (ขาดเหลือ ${_retryGap.toFixed(0)}s) — ใช้ผลรอบสองแทน`);
+        const _s1 = _groqCoverScore(groqData), _s2 = _groqCoverScore(retryData);
+        const _n1 = (groqData.segments || []).length, _n2 = (retryData.segments || []).length;
+        if (_s2 > _s1) {
+          console.warn(`[transcribe] รอบสองดีกว่าจริง (คะแนน ${_s2.toFixed(3)} > ${_s1.toFixed(3)} · ` +
+            `ขาดเหลือ ${_retryGap.toFixed(0)}s จาก ${_firstGap.toFixed(0)}s · ท่อน ${_n2} จาก ${_n1}) — ใช้ผลรอบสองแทน`);
           groqData = retryData;
         } else {
-          console.warn(`[transcribe] รอบสองไม่ได้ดีขึ้น (ขาด ${_retryGap.toFixed(0)}s) — ใช้ผลรอบแรกต่อ`);
+          console.warn(`[transcribe] รอบสองไม่ได้ดีขึ้น (คะแนน ${_s2.toFixed(3)} ≤ ${_s1.toFixed(3)} · ` +
+            `ท่อน ${_n2} เทียบ ${_n1}) — ใช้ผลรอบแรกต่อ`);
         }
       }
     } catch (e) {
@@ -634,7 +685,11 @@ ${segLines}
     duration_mins: Math.round((duration_secs || segments[n - 1].end_sec || 0) / 60),
     source: diarized ? 'groq_whisper_gemini_diarize' : 'whisper_fallback',
     avg_speaker_confidence: n ? segments.reduce((a, s) => a + s.speaker_confidence, 0) / n : 0,
-    avg_transcript_confidence: n ? segments.reduce((a, s) => a + s.transcript_confidence, 0) / n : 0
+    // v_usability: เดิมเป็นค่าเฉลี่ยของ exp(avg_logprob) รายท่อน = Whisper เดาความมั่นใจ
+    // ตัวเอง ซึ่งไม่บอกอะไรเรื่องความใช้ได้ (ดูเหตุผลเต็มที่ _usabilityScore) · ค่ารายท่อน
+    // ยังคงไว้ครบใน segments[].transcript_confidence — ตัวกรอง hallucination กับด่าน
+    // LOW_CONF_EDIT_THRESHOLD ของ diarize ยังใช้ค่าเดิมนั้นเหมือนเดิม ไม่กระทบ
+    avg_transcript_confidence: _usabilityScore(segments, duration_secs, 0)
   };
 }
 
@@ -1630,18 +1685,93 @@ async function handleProcess(request, env, cfCtx) {
 // จึงถอด **ทีละช่วง ข้าม cron tick** โดยจำสถานะไว้ที่ listen_state
 // (อัปไฟล์ครั้งเดียว ใช้ file_uri ซ้ำได้ ~48 ชม.) และ **หดช่วงเองเมื่อหมดเวลา**
 //
-// v_windegrade (2026-08-19): 12→6 นาที — เจอจริงจากการอ่าน transcript 2 เซสชัน
-// แยกกัน (Tape/Puttipong + Treerak/May) ว่าข้อความเริ่มเพี้ยน (เว้นวรรคทีละคำ/
-// พยางค์แบบไม่เป็นธรรมชาติ) หลังผ่านไปประมาณครึ่งความยาวของ "หนึ่งคำขอ" เสมอ
+// v_windegrade (2026-08-19): เจอจริงจากการอ่าน transcript 2 เซสชันแยกกัน
+// (Tape/Puttipong + Treerak/May) ว่าข้อความเริ่มเพี้ยน (เว้นวรรคทีละคำ/พยางค์แบบ
+// ไม่เป็นธรรมชาติ) หลังผ่านไปประมาณครึ่งความยาวของ "หนึ่งคำขอ" เสมอ
 // ไม่ว่าคำขอนั้นจะยาว 6 หรือ 12 นาที — ตัวชี้วัดความมั่นใจปัจจุบันจับจุดนี้ไม่ได้เลย
 // (นับแค่ท่อนที่ Gemini ติดป้าย [ฟังไม่ชัด] เอง ซึ่งไม่เกิดกับข้อความที่เพี้ยนแบบนี้)
-// ลดขนาดคำขอลงครึ่งหนึ่งเพื่อลดสัดส่วนของคลิปที่โดนผลกระทบ — ยังไม่การันตีว่าหายขาด
-// (อาจจะแค่เลื่อนจุดเริ่มเพี้ยนตามสัดส่วน) ต้องดูผลจริงจากคลิปที่ประมวลผลใหม่หลังจุดนี้
-// เทียบก่อน-หลัง ก่อนจะสรุปว่าคุ้มกับจำนวน cron tick/Gemini call ที่เพิ่มขึ้นต่อคลิปยาวๆ
-const LISTEN_WIN_MIN = 6;
+//
+// v_winoverlap (2026-08-21): รอบ 19 ส.ค. พยายามแก้ด้วยการหดคำขอครึ่งหนึ่ง (12→6)
+// ซึ่ง **ผิดโจทย์ตั้งแต่ต้น** — หลักฐานที่เขียนไว้เองข้างบนบอกว่าจุดเพี้ยนอยู่ที่
+// "ครึ่งของคำขอ ไม่ว่าคำขอจะยาวเท่าไหร่" ⇒ หดแล้วสัดส่วนที่เพี้ยนก็ยัง 50% เท่าเดิม
+// ได้แต่จำนวนคำขอที่เพิ่มเป็นเท่าตัว · ราคาที่จ่ายไปวัดได้จากของจริง: ตั้งแต่
+// 19 ส.ค. 13:16 **ไม่มีคลิปยาวเกิน 6 นาทีถอดจบด้วย Gemini อีกเลย** ตกไป Whisper
+// 100% (ท่อน/นาที ร่วงจาก 12.0-13.7 เหลือ 2.1-5.0) เพราะคำขอที่เพิ่มเป็นเท่าตัว
+// ไปเจอกับ _listenCall ที่ไม่มี retry + ทางล้มที่ทิ้งหน้าต่างที่เสร็จแล้วทั้งหมด
+//
+// วิธีที่ถูกคือ **ซ้อนหน้าต่าง**: ขอ WIN นาที แต่ขยับทีละ STRIDE นาที แล้วเก็บเฉพาะ
+// ท่อนใน STRIDE นาทีแรกของคำขอนั้น (ครึ่งที่ยังดี) — ครึ่งหลังที่เพี้ยนถูกทิ้ง และช่วง
+// เวลานั้นจะถูกถอดใหม่ในฐานะ "ครึ่งแรก" ของคำขอถัดไป ⇒ ทุกท่อนที่เก็บมาจากครึ่งแรก
+// เสมอ โดยไม่ต้องพึ่งสมมติฐานที่พิสูจน์แล้วว่าผิด · จำนวนคำขอคุมด้วย STRIDE ไม่ใช่ WIN
+// จึงเท่ากับตอน 6 นาทีไม่ซ้อนเป๊ะ (คลิป 48 นาที = 8 คำขอ) ไม่ช้าลงกว่าวันนี้
+const LISTEN_WIN_MIN = 12;
+const LISTEN_STRIDE_MIN = 6;
+// คลิปสั้นกว่านี้ = คำขอเดียวทั้งไฟล์ ไม่ซ้อน · คงไว้ที่ 6 เพราะคลิปสั้นในของจริง
+// (158-241 วิ) ได้ผลดีอยู่แล้วทุกตัว — อาการเพี้ยนพบเฉพาะคลิปยาว (24.5 กับ 52 นาที)
 const LISTEN_SINGLE_MAX_MIN = 6;
 const LISTEN_MIN_WIN_SEC = 180;
-const LISTEN_MAX_ATTEMPTS = 20;
+// v_winoverlap: 20→48 — stride 6 นาทีทำให้ visit 60 นาทีต้อง ~11 คำขอ บวกการผ่าครึ่ง
+// ตอน 524 และ retry ที่กินงบด้วย · ค่า 20 เดิมทำคลิป ~50 นาทีชนเพดานจริง แล้วโดนทิ้ง
+// ทั้งที่เสียงดีสมบูรณ์ (21 ส.ค. 10:18 = 25.41MB/8,640 B/s · 18 ส.ค. 11:08 เคสเดียวกัน)
+const LISTEN_MAX_ATTEMPTS = 48;
+// ถ้าหน้าต่างเดิมล้มติดกันครบเท่านี้ tick ถือว่า Gemini ไปต่อไม่ได้จริง ค่อยตกไป Whisper
+// (แต่ละ tick มี retry ในตัวอีก 3 ครั้ง = ลองจริง 9 ครั้งก่อนยอมแพ้ ใช้เวลา ~15 นาที)
+const LISTEN_WIN_MAX_FAILS = 3;
+
+// v_winoverlap: วางแผนหน้าต่างแบบซ้อน · คืน [{from, to, keep_to}]
+//   from/to  = ช่วงที่ "ขอ" ให้ Gemini ถอด
+//   keep_to  = เก็บท่อนถึงวินาทีนี้ (ไม่รวม) · null = เก็บถึงท้ายไฟล์ (หน้าต่างสุดท้าย)
+//   undefined = state รูปแบบเก่าก่อน 21 ส.ค. → _keepInWindow เก็บทั้งหมดแบบเดิม
+// แยกออกมาเป็นฟังก์ชันเพื่อให้ harness รันจริงทดสอบได้ ไม่ใช่แค่ grep หาสตริง
+function _planListenWindows(durSec) {
+  const dur = Math.ceil(durSec || 0);
+  if (dur / 60 <= LISTEN_SINGLE_MAX_MIN) return [{ from: null, to: null, keep_to: null }];
+  const win = LISTEN_WIN_MIN * 60, stride = LISTEN_STRIDE_MIN * 60;
+  const out = [];
+  for (let s = 0; s < dur; s += stride) {
+    const to = Math.min(s + win, dur);
+    const keepTo = Math.min(s + stride, dur);
+    // เศษท้ายไฟล์ที่สั้นกว่าครึ่ง stride ให้กลืนรวมกับหน้าต่างนี้ ไม่ต้องยิงคำขอจิ๋วอีกรอบ
+    const isLast = (dur - keepTo) < stride / 2;
+    out.push({ from: s, to, keep_to: isLast ? null : keepTo });
+    if (isLast) break;
+  }
+  return out;
+}
+
+// เก็บเฉพาะท่อนที่อยู่ในช่วง keep ของหน้าต่างนี้ (ครึ่งแรกของคำขอ = ครึ่งที่ยังไม่เพี้ยน)
+function _keepInWindow(segments, w) {
+  const segs = segments || [];
+  // คำขอเดียวทั้งไฟล์ (from เป็น null) หรือ state รูปแบบเก่าที่ไม่มี keep_to → เก็บทั้งหมด
+  if (!w || w.from == null || w.keep_to === undefined) return segs;
+  return segs.filter(s => {
+    const t = _abTsToSec(s && s.ts);
+    if (t == null) return false;
+    return t >= w.from && (w.keep_to === null || t < w.keep_to);
+  });
+}
+
+// v_driftmeter (2026-08-21): ตัววัดอาการเพี้ยนช่วงท้ายคำขอ — บทเรียนของรอบนี้คือผม
+// ปล่อยสมมติฐานที่ "วัดไม่ได้" ลง production แล้วมันเสียหายเงียบๆ 2 วัน · อาการคือ
+// ข้อความกลายเป็นคำ/พยางค์สั้นๆ ซึ่งค่าความมั่นใจจับไม่ได้เลย แต่ "ความยาวข้อความ
+// เฉลี่ยต่อท่อน" จับได้ · เก็บครึ่งแรก vs ครึ่งหลังของแต่ละคำขอไว้ให้ query เทียบได้
+// ratio ใกล้ 1 = ไม่เพี้ยน · ยิ่งต่ำ = ครึ่งหลังยิ่งแตกเป็นคำสั้น
+function _windowDrift(segments, w, durSec) {
+  const from = (w && w.from != null) ? w.from : 0;
+  const to = (w && w.to != null) ? w.to : Math.ceil(durSec || 0);
+  const mid = (from + to) / 2;
+  let fN = 0, fLen = 0, bN = 0, bLen = 0;
+  for (const s of segments || []) {
+    const t = _abTsToSec(s && s.ts);
+    if (t == null) continue;
+    const L = String((s && s.text) || '').length;
+    if (t < mid) { fN++; fLen += L; } else { bN++; bLen += L; }
+  }
+  const f = fN ? fLen / fN : 0, b = bN ? bLen / bN : 0;
+  return { win: `${Math.round(from)}-${Math.round(to)}`, n: (segments || []).length,
+           front: Math.round(f), back: Math.round(b),
+           ratio: f ? Math.round((b / f) * 100) / 100 : null };
+}
 
 function _listenPrompt(fromSec, toSec, accountName) {
   const win = (fromSec == null) ? '' :
@@ -1671,24 +1801,52 @@ mm:ss|ผู้พูด|ข้อความ
 00:07|C|ค่ะ วางตรงนี้เลย${win}`;
 }
 
+// v_listenretry (2026-08-21): ของเดิมไม่มี retry เลย — plain fetch แล้ว throw ทันทีที่
+// ไม่ใช่ 2xx · 503 "high demand" หรือ 500 ครั้งเดียวก็ล้มทั้งคลิป (เห็นจริงใน
+// listen_state.last_error ของ production: `Gemini 503`, `Gemini 524`) และเมื่อรวมกับ
+// จำนวนคำขอที่เพิ่มเป็นเท่าตัวจาก v_windegrade กลายเป็นเหตุที่ Gemini ไม่เคยถอดคลิปยาว
+// จบอีกเลยตั้งแต่ 19 ส.ค.
+//
+// ไม่ใช้ withRetry() ที่มีอยู่ เพราะมันลองซ้ำ *ทุก* error ซึ่งผิดสำหรับที่นี่:
+//   · 524 = คำตอบยาวเกินกว่าฝั่งโน้นจะปั่นทัน — ยิงซ้ำขนาดเดิมมีแต่พังซ้ำและกินเวลา
+//     รอบละหลายนาที ต้องโยนออกทันทีให้ผู้เรียกไปเข้าทาง "ผ่าครึ่งหน้าต่าง"
+//   · 400/403 = คำขอ/กุญแจผิด ลองซ้ำเท่าไหร่ก็เหมือนเดิม
+const LISTEN_RETRY_DELAYS = [0, 2000, 5000];
 async function _listenCall(env, fileUri, fromSec, toSec, accountName) {
   const t0 = Date.now();
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
-          { text: _listenPrompt(fromSec, toSec, accountName) }
-        ]}],
-        generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'text/plain' }
-      }) });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
-  const d = await r.json();
-  const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const segments = _abParseCompact(raw);
-  if (!segments) throw new Error(`Gemini ตอบมาแต่อ่านไม่ออก: ${raw.slice(0, 160)}`);
-  return { segments, elapsed_ms: Date.now() - t0 };
+  let lastErr = null;
+  for (let attempt = 0; attempt < LISTEN_RETRY_DELAYS.length; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, LISTEN_RETRY_DELAYS[attempt]));
+    let r;
+    try {
+      r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { file_data: { mime_type: 'audio/webm', file_uri: fileUri } },
+              { text: _listenPrompt(fromSec, toSec, accountName) }
+            ]}],
+            generationConfig: { temperature: 0, maxOutputTokens: 65536, responseMimeType: 'text/plain' }
+          }) });
+    } catch (e) {
+      lastErr = new Error(`Gemini เชื่อมต่อไม่ได้: ${(e && e.message) || e}`);
+      continue;
+    }
+    if (!r.ok) {
+      const err = new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+      if (r.status === 524 || r.status === 400 || r.status === 403) throw err;
+      lastErr = err;
+      continue;
+    }
+    const d = await r.json().catch(() => null);
+    const raw = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const segments = _abParseCompact(raw);
+    if (!segments) { lastErr = new Error(`Gemini ตอบมาแต่อ่านไม่ออก: ${raw.slice(0, 160)}`); continue; }
+    if (attempt) console.warn(`[listen] สำเร็จในความพยายามครั้งที่ ${attempt + 1}`);
+    return { segments, elapsed_ms: Date.now() - t0, tries: attempt + 1 };
+  }
+  throw lastErr || new Error('Gemini ล้มโดยไม่มีสาเหตุที่จับได้');
 }
 
 // ทำ "หนึ่งขั้น" ของการถอดด้วย Gemini · คืน null = ยังไม่จบ ให้ tick ถัดไปทำต่อ
@@ -1706,11 +1864,7 @@ async function runListenStep(env, row, audioBytes) {
   if (!st.file_uri) {
     const uploaded = await _geminiUploadAudio(env, audioBytes, 'audio/webm');
     const dur = row.duration_secs || 0;
-    const windows = [];
-    if (dur / 60 <= LISTEN_SINGLE_MAX_MIN) windows.push({ from: null, to: null });
-    else for (let s = 0; s < dur; s += LISTEN_WIN_MIN * 60) {
-      windows.push({ from: s, to: Math.min(s + LISTEN_WIN_MIN * 60, Math.ceil(dur)) });
-    }
+    const windows = _planListenWindows(dur);
     // v_filecleanup: เก็บ file_name (คนละอันกับ file_uri) ไว้ด้วย — ต้องใช้ตอนสั่งลบ
     // ไฟล์ทิ้งเมื่อถอดจบ/เลิกใช้ (ดู _geminiDeleteFile)
     await save({ file_uri: uploaded.uri, file_name: uploaded.name, windows, next: 0, segs: [] });
@@ -1736,34 +1890,68 @@ async function runListenStep(env, row, audioBytes) {
       const to = w.to == null ? Math.ceil(row.duration_secs || 0) : w.to;
       const mid = Math.floor((from + to) / 2);
       if (to - from > LISTEN_MIN_WIN_SEC * 2) {
-        windows.splice(i, 1, { from, to: mid }, { from: mid, to });
+        // v_winoverlap: ผ่าแค่ช่วงที่ "ขอ" — ช่วงที่ "เก็บ" ของหน้าต่างเดิมต้องคงเดิม
+        // ทั้งก้อน ไม่งั้นจะเกิดรูตรงกลางบทที่ไม่มีใครเก็บ · keep_to === undefined คือ
+        // state รูปแบบเก่าก่อน 21 ส.ค. ปล่อยให้ซีกใหม่เป็น undefined ต่อ (เก็บทั้งหมด)
+        const keepTo = w.keep_to;
+        const parts = [];
+        parts.push({ from, to: mid,
+          keep_to: (keepTo === undefined) ? undefined
+                 : (keepTo === null) ? mid : Math.min(mid, keepTo) });
+        // ซีกหลังมีอะไรต้องเก็บไหม — ถ้าช่วงเก็บจบก่อน mid แล้ว ก็ไม่ต้องยิงคำขอนั้นเลย
+        if (keepTo === undefined || keepTo === null || keepTo > mid) {
+          parts.push({ from: mid, to, keep_to: keepTo });
+        }
+        windows.splice(i, 1, ...parts);
         await save({ windows });
-        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid - from) / 60)} นาที`);
+        console.warn(`[listen] ${row.id} ช่วง ${i} หมดเวลา — ผ่าครึ่งเป็น ${Math.round((mid - from) / 60)} นาที (เหลือ ${parts.length} ซีกที่ต้องขอ)`);
         return null;
       }
     }
     throw e;   // เหตุอื่น (หรือหดจนสุดแล้วยังพัง) → ให้ผู้เรียกตัดสินใจตกไป Whisper
   }
 
-  const segs = (st.segs || []).concat(res.segments);
+  // v_winoverlap: หน้าต่างซ้อนกันแล้ว — เก็บเฉพาะครึ่งแรกของคำขอ (ครึ่งที่ยังไม่เพี้ยน)
+  // ครึ่งหลังทิ้งไป เพราะช่วงเวลานั้นจะถูกถอดใหม่เป็นครึ่งแรกของคำขอถัดไป
+  const kept = _keepInWindow(res.segments, w);
+  const drift = (st.drift || []).concat([_windowDrift(res.segments, w, row.duration_secs)]);
+  const segs = (st.segs || []).concat(kept);
   const done = i + 1 >= windows.length;
   if (!done) {
-    await save({ next: i + 1, segs });
-    console.log(`[listen] ${row.id} ช่วง ${i + 1}/${windows.length} เสร็จใน ${Math.round(res.elapsed_ms / 1000)} วิ`);
+    // fails: 0 — ล้างตัวนับล้มติดกันทุกครั้งที่คืบหน้าได้จริง (ดู LISTEN_WIN_MAX_FAILS)
+    await save({ next: i + 1, segs, drift, fails: 0 });
+    console.log(`[listen] ${row.id} ช่วง ${i + 1}/${windows.length} เสร็จใน ${Math.round(res.elapsed_ms / 1000)} วิ ` +
+      `— เก็บ ${kept.length}/${res.segments.length} ท่อน`);
     return null;
   }
+  await save({ segs, drift, fails: 0 });
 
-  // ── รวมผลทุกช่วงเป็นบทเดียว เรียงตามเวลาจริง (ช่วงไม่ซ้อนกัน ไม่ต้องกันซ้ำ)
-  const merged = segs.slice().sort((a, b) => (_abTsToSec(a?.ts) ?? 0) - (_abTsToSec(b?.ts) ?? 0));
+  // ── รวมผลทุกช่วงเป็นบทเดียว เรียงตามเวลาจริง
+  // v_winoverlap: ช่วงที่ "ขอ" ซ้อนกันแล้ว แต่ช่วงที่ "เก็บ" ยังไม่ซ้อนกันโดยการออกแบบ
+  // (keep ของหน้าต่าง i จบตรงที่ from ของหน้าต่าง i+1 พอดี) — ถึงอย่างนั้นก็กันซ้ำไว้อีก
+  // ชั้น เพราะ Gemini ตอบเวลาคลาดออกนอกช่วงที่สั่งได้เอง และ state รูปแบบเก่า
+  // (ก่อน 21 ส.ค.) ที่ยังค้างอยู่ในคิวไม่มี keep_to จะเก็บทับกันได้
+  const _seen = new Set();
+  const merged = segs
+    .filter(s => {
+      const k = `${s && s.ts}|${(s && s.text) || ''}`;
+      if (_seen.has(k)) return false;
+      _seen.add(k); return true;
+    })
+    .sort((a, b) => (_abTsToSec(a?.ts) ?? 0) - (_abTsToSec(b?.ts) ?? 0));
 
   // Gemini ไม่ให้ตัวเลขความมั่นใจรายท่อนแบบ Whisper — แต่มันติดป้าย "[ฟังไม่ชัด]"
   // ตามที่ prompt สั่ง จึงใช้สัดส่วนท่อนที่ฟังออกเป็นตัวแทน เพื่อให้ป้ายเตือน
   // "ถอดเสียงไม่ชัดเจน" ในแอปยังทำงานต่อได้ (ถ้าปล่อยเป็น null ป้ายจะเงียบไปเฉยๆ
   // = เสียตัวกันความผิดพลาดที่ทำไว้แล้วไปเปล่าๆ)
   const unclear = merged.filter(s => /\[ฟังไม่ชัด\]/.test(s.text || '')).length;
-  const conf = merged.length ? 1 - (unclear / merged.length) : null;
+  // v_usability: เดิมใช้แค่สัดส่วนท่อนที่ไม่ติดป้าย [ฟังไม่ชัด] ซึ่งกระจุกใกล้ 1.0 เกือบ
+  // ทุกแถวจนแยกงานดี/งานพังไม่ออก · ตอนนี้รวมความครอบคลุมกับความละเอียดเข้าไปด้วย
+  const conf = _usabilityScore(merged, row.duration_secs || 0, unclear);
 
-  console.log(`[listen] ${row.id} ถอดจบ — ${merged.length} ท่อน จาก ${windows.length} ช่วง (ฟังไม่ชัด ${unclear})`);
+  const _dLast = drift[drift.length - 1];
+  console.log(`[listen] ${row.id} ถอดจบ — ${merged.length} ท่อน จาก ${windows.length} ช่วง ` +
+    `(ฟังไม่ชัด ${unclear} · คะแนนใช้ได้ ${conf} · drift ท้ายสุด ${_dLast ? _dLast.ratio : 'n/a'})`);
   // v_filecleanup: ถอดครบทุกช่วงแล้ว ไม่ต้องใช้ไฟล์นี้อีก — ลบทิ้ง (best-effort,
   // Google เก็บกวาดเองใน 48 ชม. เป็นตาข่ายรองอยู่แล้วถ้าลบตรงนี้พลาด)
   if (st.file_name) await _geminiDeleteFile(env, st.file_name);
@@ -1837,9 +2025,18 @@ async function processSession(sessionId, origin, env) {
               if (row.listen_state && row.listen_state.file_name) {
                 await _geminiDeleteFile(env, row.listen_state.file_name);
               }
+              // v_honestlabel (2026-08-21): เดิมลง failed_audio ซึ่งแอปแปลว่า "ไฟล์เสียง
+              // ใช้ไม่ได้" — **โกหก** เพราะเคสนี้ไฟล์เสียงดีสมบูรณ์ ปัญหาอยู่ที่ตัวถอด
+              // ไปต่อไม่ได้ล้วนๆ (ของจริง 21 ส.ค. 10:18 = 25.41MB ที่ 8,640 B/s ซึ่ง
+              // อยู่ในย่านไฟล์ดี 5,150-8,910 เต็มๆ · 18 ส.ค. 11:08 เคสเดียวกัน)
+              // ป้ายผิดทำให้ไล่ผิดทาง — บุชอ่าน log แล้วเข้าใจว่าไมค์พังอีกรอบ ทั้งที่
+              // ไมค์ไม่เกี่ยวเลย · failed_system แอปแปลว่า "วิเคราะห์ไม่สำเร็จ" ตรงกว่า
+              // และไม่ต้องแก้ฝั่งแอปเลย · ล้าง listen_state ด้วยเพื่อให้การ re-queue
+              // ด้วยมือเริ่มจากแผนหน้าต่างชุดใหม่ ไม่ใช่ของเก่าที่ค้างอยู่
               await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
-                pipeline_stage: 'failed_audio', processing_since: null, next_attempt_at: null,
-                pipeline_error: `${new Date().toISOString()} [transcribe] ไฟล์ใหญ่เกิน Whisper และ Gemini ไม่จบใน ${LISTEN_MAX_ATTEMPTS} รอบ: ${String((e && e.message) || e).slice(0, 300)}`
+                pipeline_stage: 'failed_system', processing_since: null, next_attempt_at: null,
+                listen_state: null,
+                pipeline_error: `${new Date().toISOString()} [transcribe] ไฟล์เสียงปกติดี แต่ถอดด้วย Gemini ไม่จบใน ${LISTEN_MAX_ATTEMPTS} รอบ (ไฟล์ใหญ่เกิน Whisper จึงไม่มีตัวสำรอง) — กู้ได้ด้วยการ re-queue ตราบใดที่ไฟล์เสียงยังอยู่: ${String((e && e.message) || e).slice(0, 240)}`
               }).catch(() => {});
               return;
             }
@@ -1876,14 +2073,43 @@ async function processSession(sessionId, origin, env) {
             }).catch(() => {});
             return;
           }
-          // Gemini ไปต่อไม่ได้จริงๆ → ล้างสถานะทิ้งแล้วให้ Whisper รับช่วง
-          // งานต้องไม่ค้างเพราะฝั่งใดฝั่งหนึ่งมีปัญหา
-          console.warn(`[listen] ${sessionId} Gemini ล้ม → ใช้ตัวสำรอง Whisper: ${e?.message || e}`);
+          // v_keepprogress (2026-08-21): เดิมจุดนี้ล้าง listen_state ทิ้ง **ทันทีที่ล้ม
+          // ครั้งแรก** — ทุกหน้าต่างที่ถอดเสร็จแล้วหายหมด แล้วเริ่มใหม่ด้วย Whisper
+          // รวมกับ _listenCall ที่ไม่มี retry (v_listenretry) และจำนวนคำขอที่เพิ่มเป็น
+          // เท่าตัวจาก v_windegrade = 503/524 ครั้งเดียวเสียงานทั้งคลิป · นี่คือกลไก
+          // ที่ทำให้ตั้งแต่ 19 ส.ค. 13:16 ไม่มีคลิปยาวไหนถอดจบด้วย Gemini อีกเลย
+          //
+          // แก้: เก็บความคืบหน้าไว้ ให้ tick ถัดไปลองหน้าต่างเดิมต่อ (แบบเดียวกับทาง
+          // forcedGemini ข้างบนที่ทำถูกอยู่แล้ว) · ตกไป Whisper เฉพาะเมื่อหน้าต่างเดิม
+          // ล้มติดกันครบ LISTEN_WIN_MAX_FAILS tick หรืองบรวมหมด — มีเพดานชัดเจน
+          // ไม่ปล่อยค้างตลอดกาลเหมือนบั๊ก 22 ชม. ของ Tape (v_hiccupbudget)
+          const _emsg = String((e && e.message) || e);
+          const _exhausted = /ไม่จบใน \d+ รอบ/.test(_emsg);
+          // อ่าน listen_state ล่าสุดก่อนเขียนกลับ — **ห้าม** spread ของที่อ่านมาตอนต้น
+          // ฟังก์ชัน เพราะ runListenStep อาจ save() ความคืบหน้าไปแล้วในรอบนี้ (อัปไฟล์
+          // เสร็จ / ผ่าครึ่งหน้าต่างตอน 524) เขียนทับด้วยของเก่า = ลบความคืบหน้าทิ้ง
+          // ซึ่งเป็นบั๊กชนิดเดียวกับที่กำลังแก้อยู่ตรงนี้
+          let _cur = row.listen_state || {};
+          try {
+            const _fresh = await sbSelect(env, `ci_sessions?id=eq.${sessionId}&select=listen_state`);
+            if (_fresh && _fresh[0] && _fresh[0].listen_state) _cur = _fresh[0].listen_state;
+          } catch (_) { /* อ่านไม่ได้ก็ใช้ของที่มี ดีกว่าไม่เขียนอะไรเลย */ }
+          const _fails = (_cur.fails || 0) + 1;
+          if (!_exhausted && _fails < LISTEN_WIN_MAX_FAILS) {
+            console.warn(`[listen] ${sessionId} Gemini สะดุด (ล้มติดกัน ${_fails}/${LISTEN_WIN_MAX_FAILS}) — ` +
+              `เก็บ ${(_cur.segs || []).length} ท่อนที่ถอดไว้แล้ว ลอง tick ถัดไป: ${_emsg}`);
+            await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, {
+              processing_since: null,
+              listen_state: { ..._cur, fails: _fails, last_error: _emsg.slice(0, 300), updated_at: new Date().toISOString() }
+            }).catch(() => {});
+            return;
+          }
+          // ยอมแพ้จริง → ปล่อย Whisper รับช่วง งานต้องไม่ค้างเพราะฝั่งใดฝั่งหนึ่งมีปัญหา
+          console.warn(`[listen] ${sessionId} Gemini ไปต่อไม่ได้ ` +
+            `(${_exhausted ? 'งบหมด' : `ล้มติดกัน ${_fails} ครั้ง`}) → ใช้ตัวสำรอง Whisper: ${_emsg}`);
           // v_filecleanup: เลิกใช้ไฟล์นี้แล้ว (Whisper รับช่วงต่อจาก audioBytes ในเครื่อง
           // ไม่ใช้ file_uri) — ลบทิ้งก่อนล้าง state (best-effort)
-          if (row.listen_state && row.listen_state.file_name) {
-            await _geminiDeleteFile(env, row.listen_state.file_name);
-          }
+          if (_cur.file_name) await _geminiDeleteFile(env, _cur.file_name);
           await sbPatch(env, 'ci_sessions', `id=eq.${sessionId}`, { listen_state: null }).catch(() => {});
           t = null;
         }
