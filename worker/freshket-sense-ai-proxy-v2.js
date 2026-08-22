@@ -183,6 +183,52 @@ async function sbDelete(env, table, query) {
   const r = await fetch(`${_sbUrl(env)}/rest/v1/${table}?${query}`, { method: 'DELETE', headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbDelete ${table} ${r.status}: ${await r.text().catch(() => '')}`);
 }
+// ── v_sbbudget (2026-08-22): เพดานแข็งของการดึงไฟล์เสียงจาก Supabase ──────────
+//
+// เปิดระบบถอดเสียงคืนตามที่บุชสั่ง โดยมีเงื่อนไขว่า "ต้องไม่ spike อีก" · การนั่งเฝ้า
+// ไม่ใช่คำตอบ เพราะรอบที่แล้วมันพังตอนตี 3 (คลิปเดียวโดนดึงซ้ำ 264 รอบ ≈ 7 GB
+// ในคืนเดียว โควตาทั้งเดือนมีแค่ 5 GB) — กว่าจะเห็นก็สายไปแล้ว
+//
+// เพดานนี้บังคับที่โค้ด: ดึงจาก Supabase ได้ไม่เกิน SB_AUDIO_BUDGET_MB ต่อเดือน
+// ครบแล้วโยน error แบบเดียวกับตอนพัก (session ถูกนัดคิวใหม่ ไม่ถือว่าล้มเหลว
+// ไฟล์ไม่หาย) · ไฟล์ที่อยู่ใน R2 ไม่นับ ไม่ถูกจำกัด เพราะไม่มีค่าใช้จ่าย
+//
+// ตัวนับเก็บใน R2 ไม่ใช่ Supabase — เพราะต้องอ่านได้แม้ตอน Supabase ถูกระงับ
+// (ถ้าเก็บฝั่ง Supabase แล้วโดน 402 ตัวกันจะพังพร้อมกับสิ่งที่มันควรกัน)
+//
+// จงใจ fail-open ถ้าอ่าน/เขียนตัวนับไม่ได้: R2 ล่มชั่วคราวไม่ควรหยุดถอดเสียงทั้งระบบ
+// และเพดานยังทำงานต่อทันทีที่อ่านได้อีกครั้ง · แลกกับความเสี่ยงว่าถ้า R2 พังยาวๆ
+// เพดานจะไม่คุ้ม — ยอมรับได้ เพราะถ้า R2 พังยาว ไฟล์เสียงก็อ่านไม่ได้อยู่ดี
+const SB_AUDIO_BUDGET_MB = 400;
+const _sbBudgetKey = () => `_meta/sb-audio-egress-${new Date().toISOString().slice(0, 7)}.json`;
+
+async function _sbBudgetRead(env) {
+  if (!env.ECHO_AUDIO) return null;
+  try {
+    const o = await env.ECHO_AUDIO.get(_sbBudgetKey());
+    if (!o) return { bytes: 0, pulls: 0 };
+    const v = await o.json();
+    return { bytes: Number(v.bytes) || 0, pulls: Number(v.pulls) || 0 };
+  } catch (e) {
+    console.warn('[budget] อ่านตัวนับไม่ได้ — ปล่อยผ่าน:', (e && e.message) || e);
+    return null;
+  }
+}
+
+async function _sbBudgetAdd(env, bytes) {
+  if (!env.ECHO_AUDIO) return;
+  try {
+    const cur = (await _sbBudgetRead(env)) || { bytes: 0, pulls: 0 };
+    const next = { bytes: cur.bytes + bytes, pulls: cur.pulls + 1, updated: new Date().toISOString() };
+    await env.ECHO_AUDIO.put(_sbBudgetKey(), JSON.stringify(next),
+      { httpMetadata: { contentType: 'application/json' } });
+    console.warn(`[budget] ดึงจาก Supabase สะสมเดือนนี้ ${(next.bytes / 1048576).toFixed(1)}MB ` +
+                 `จากเพดาน ${SB_AUDIO_BUDGET_MB}MB (${next.pulls} ครั้ง)`);
+  } catch (e) {
+    console.warn('[budget] เขียนตัวนับไม่ได้:', (e && e.message) || e);
+  }
+}
+
 // v_audior2 (2026-08-21): อ่านไฟล์เสียงจาก R2 ก่อน แล้วค่อยถอยไป Supabase
 //
 // ทำไม: การดึงไฟล์ออกจาก Supabase Storage คือต้นเหตุทั้งหมดของ Cached Egress ที่
@@ -214,15 +260,27 @@ async function sbStorageGet(env, path) {
   // พักที่จุดนี้แทน ครอบทุกทางเรียกในที่เดียว และแม่นกว่า: ไฟล์ใหม่ที่อยู่ R2 แล้ว
   // ถอดได้ปกติ (ไม่มีค่าใช้จ่าย) · ขั้นวิเคราะห์ก็ทำได้ปกติ (ใช้ transcript ใน DB
   // ไม่แตะไฟล์เสียง) · เหลือรอเฉพาะคลิปเก่าที่ยังอยู่บน Supabase เท่านั้น
-  if (ECHO_PIPELINE_PAUSED && env.ECHO_PIPELINE_RESUME !== '1') {
+  if (ECHO_PIPELINE_PAUSED || env.ECHO_PIPELINE_PAUSE === '1') {
     const err = new Error('SUPABASE_AUDIO_PAUSED: คลิปนี้ยังอยู่บน Supabase — พักดึงไว้จนโควตากลับมา (2 ก.ย.) หรืออัปแผน');
     err.pausedSupabaseAudio = true;
     throw err;
   }
+  // v_sbbudget: เช็คเพดานก่อนยิง ไม่ใช่หลังยิง — ยิงแล้วถึงรู้ว่าเกินคือจ่ายไปแล้ว
+  const _budget = await _sbBudgetRead(env);
+  if (_budget && _budget.bytes >= SB_AUDIO_BUDGET_MB * 1048576) {
+    const err = new Error(
+      `SUPABASE_AUDIO_BUDGET: ดึงจาก Supabase ครบเพดานเดือนนี้แล้ว ` +
+      `(${(_budget.bytes / 1048576).toFixed(0)}MB/${SB_AUDIO_BUDGET_MB}MB) — คลิปนี้รอรอบบิลใหม่`);
+    err.pausedSupabaseAudio = true;   // ใช้ทางเดียวกับตอนพัก: นัดคิวใหม่ ไม่ใช่ตีตราล้มเหลว
+    throw err;
+  }
+
   const r = await fetch(`${_sbUrl(env)}/storage/v1/object/${AUDIO_BUCKET}/${path}`, { headers: _sbHeaders(env) });
   if (!r.ok) throw new Error(`sbStorageGet ${r.status}: ${await r.text().catch(() => '')}`);
-  console.warn(`[audio] อ่านจาก Supabase (คิดค่าขาออก): ${path}`);
-  return new Uint8Array(await r.arrayBuffer());
+  const _bytes = new Uint8Array(await r.arrayBuffer());
+  console.warn(`[audio] อ่านจาก Supabase (คิดค่าขาออก ${(_bytes.length / 1048576).toFixed(1)}MB): ${path}`);
+  await _sbBudgetAdd(env, _bytes.length);
+  return _bytes;
 }
 
 // v_audior2: เขียนไฟล์เสียงลง R2 · ใช้โดย endpoint /audio-put ที่แอปยิงมา
@@ -2471,8 +2529,14 @@ async function processSession(sessionId, origin, env) {
 // งบ worst case ของค่าที่ตั้งไว้ข้างล่าง: 3 หน้าต่าง × 6 + 1 analyze × 19 = **37 < 50**
 // ⇒ ปลอดภัยแม้อยู่ Free plan · ถ้าจะขยับค่าพวกนี้ ต้องคิดเลขนี้ใหม่ทุกครั้ง
 // v_pause (2026-08-21): สวิตช์พักสายถอดเสียง — ดูเหตุผลเต็มที่จุดใช้ในตัว scheduled()
-// true = พัก · เปิดคืนได้ด้วย env var ECHO_PIPELINE_RESUME=1 โดยไม่ต้อง deploy
-const ECHO_PIPELINE_PAUSED = true;
+//
+// v_sbbudget (2026-08-22): เปิดคืนแล้ว ตามที่บุชสั่ง (เงื่อนไข "ต้องไม่ spike อีก"
+// บังคับด้วยเพดาน SB_AUDIO_BUDGET_MB ที่ sbStorageGet ไม่ใช่ด้วยการนั่งเฝ้า)
+//
+// กลับด้านสวิตช์: ของเดิมเป็น "พักไว้ ปลดด้วย RESUME=1" ซึ่งแปลว่าเวลาจะพักฉุกเฉิน
+// ต้อง deploy — ช้าเกินไปสำหรับสิ่งที่พังตอนตี 3 · ตอนนี้เป็น "วิ่งอยู่ พักได้ทันที
+// ด้วย env var ECHO_PIPELINE_PAUSE=1" ⇒ กดพักได้ในไม่กี่วินาที ไม่ต้องแตะโค้ด
+const ECHO_PIPELINE_PAUSED = false;
 
 const SWEEP_MAX_STEPS   = 4;        // จำนวนขั้นต่อ tick
 const SWEEP_MAX_ANALYZE = 1;        // ขั้น analyze กิน subrequest หนัก (~19) จำกัด 1

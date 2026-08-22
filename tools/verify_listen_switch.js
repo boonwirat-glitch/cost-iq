@@ -316,7 +316,7 @@ console.log('\n── 6f. v_pausesb: พักเฉพาะคลิปที�
 check('พักที่ sbStorageGet (ครอบทุกทางเรียก รวม /process ที่ไม่ผ่าน cron)',
   (() => {
     const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
-    return /ECHO_PIPELINE_PAUSED && env\.ECHO_PIPELINE_RESUME !== '1'/.test(f) &&
+    return /ECHO_PIPELINE_PAUSED \|\| env\.ECHO_PIPELINE_PAUSE === '1'/.test(f) &&
            /pausedSupabaseAudio = true/.test(f);
   })());
 check('พักหลังจากลอง R2 แล้ว — ไฟล์ที่อยู่ R2 ต้องถอดได้ปกติ ไม่โดนพักไปด้วย',
@@ -338,8 +338,36 @@ check('เส้น Whisper ต้องไม่ถูก failStage ตีต�
     const g = WK.lastIndexOf('e.pausedSupabaseAudio', i);
     return g > -1 && i - g < 700;
   })());
-check('เปิดคืนได้ด้วย env var ไม่ต้อง deploy',
-  /env\.ECHO_PIPELINE_RESUME !== '1'/.test(WK));
+// v_sbbudget (2026-08-22): กลับด้านสวิตช์ — เดิม "พักไว้ ปลดด้วย RESUME=1" ทำให้
+// การ **พักฉุกเฉิน** ต้อง deploy ซึ่งช้าเกินไปสำหรับสิ่งที่พังตอนตี 3
+check('พักฉุกเฉินได้ด้วย env var ไม่ต้อง deploy (ทิศที่ต้องเร็วคือขาพัก)',
+  /env\.ECHO_PIPELINE_PAUSE === '1'/.test(WK));
+check('ค่าเริ่มต้นคือ "วิ่งอยู่" ไม่ใช่ "พักอยู่"',
+  /const ECHO_PIPELINE_PAUSED = false;/.test(WK));
+
+// ── 6f2. v_sbbudget: เพดานแข็งกันยอดพุ่งซ้ำ ──────────────────────────────────
+console.log('\n── 6f2. v_sbbudget: เพดานการดึงจาก Supabase ──');
+check('เช็คเพดาน "ก่อน" ยิง fetch — ยิงแล้วถึงรู้ว่าเกิน = จ่ายไปแล้ว',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    return f.indexOf('_sbBudgetRead(env)') < f.indexOf('/storage/v1/object/');
+  })());
+check('เกินเพดาน = เลื่อนนัด ไม่ใช่ตีตราล้มเหลว (ใช้ธงเดียวกับตอนพัก)',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    const i = f.indexOf('SUPABASE_AUDIO_BUDGET');
+    return i > -1 && f.indexOf('pausedSupabaseAudio = true', i) > i;
+  })());
+check('เพดานนับเฉพาะขา Supabase — ไฟล์ใน R2 ไม่โดนจำกัด (ไม่มีค่าใช้จ่าย)',
+  (() => {
+    const f = WK.slice(WK.indexOf('async function sbStorageGet'), WK.indexOf('async function r2AudioPut'));
+    return f.indexOf('env.ECHO_AUDIO.get(path)') < f.indexOf('_sbBudgetRead(env)');
+  })());
+check('ตัวนับเก็บใน R2 ไม่ใช่ Supabase (ต้องอ่านได้แม้ Supabase โดน 402)',
+  /_sbBudgetKey\(\)/.test(WK) && /env\.ECHO_AUDIO\.put\(_sbBudgetKey/.test(WK) &&
+  !/sbUpsert\(env, 'target_settings'[^)]*budget/.test(WK));
+check('บวกตัวนับหลังดึงสำเร็จ ด้วยขนาดจริงที่ได้มา ไม่ใช่ค่าประมาณ',
+  /_sbBudgetAdd\(env, _bytes\.length\)/.test(WK));
 
 // ── 6g. v_audior2: ย้ายไฟล์เสียงไป R2 (ต้นเหตุ egress) ───────────────────────
 console.log('\n── 6g. v_audior2: ไฟล์เสียงอยู่ R2 · Supabase เป็นทางถอย ──');
@@ -352,7 +380,9 @@ check('worker อ่าน R2 ก่อน แล้วค่อยถอยไ�
 check('ยังมีทางถอยไป Supabase (ไฟล์เก่าใน retention 7 วันต้องถอดได้)',
   /\/storage\/v1\/object\/\$\{AUDIO_BUCKET\}\/\$\{path\}`, \{ headers: _sbHeaders\(env\) \}/.test(WK));
 check('log แยกออกว่าอ่านจากที่ไหน (ตรวจได้ว่าย้ายสำเร็จจริงไหม)',
-  /อ่านจาก R2/.test(WK) && /อ่านจาก Supabase \(คิดค่าขาออก\)/.test(WK));
+  // v_sbbudget: log ฝั่ง Supabase บอกขนาดจริงด้วยแล้ว — ต้องมี เพราะเป็นตัวเลข
+  // เดียวกับที่เอาไปบวกเข้าเพดาน ถ้า log ไม่ตรงกับที่นับ ไล่ปัญหาไม่ได้
+  /อ่านจาก R2/.test(WK) && /อ่านจาก Supabase \(คิดค่าขาออก \$\{/.test(WK));
 check('ลบไฟล์หมดอายุลบทั้งสองที่ (กันไฟล์กำพร้าที่ sweep หาไม่เจอ)',
   /env\.ECHO_AUDIO\.delete\(path\)/.test(WK) &&
   /if \(!r\.ok && r\.status !== 404\) sbErr/.test(WK) &&
