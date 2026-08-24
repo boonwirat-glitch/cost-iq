@@ -113,9 +113,25 @@ params AS (
 -- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
 -- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
 user_account_type AS (
+  -- v_namefix (2026-08-24): ดึงชื่อจาก user_master มาด้วย ไม่ใช่แค่ account_type
+  --
+  -- อาการ: 24 ส.ค. บนแดชบอร์ด แถวเดือน ส.ค. โชว์ชื่อร้านเป็นช่องว่างหรือ UUID
+  -- 2,288 แถว (17.7%) ใน vp_view · ทุกแถวเป็นเดือนปัจจุบันล้วน เดือน ก.ค. ปกติดี
+  -- และ 2,259 แถวในนั้น "account เดียวกันมีชื่ออยู่แล้ว" ในแถวเดือน ก.ค. ของไฟล์เดียวกัน
+  --
+  -- สาเหตุ: ชื่อมาจาก o.cdp_account_name / o.cdp_res_name บนตาราง order โดยหยิบ
+  -- ออเดอร์ล่าสุดของเดือนนั้น (QUALIFY ROW_NUMBER() ... ORDER BY delivery_date DESC)
+  -- ⇒ ถ้าออเดอร์ล่าสุดของเดือนยังไม่ถูก CDP เติมชื่อ (งาน enrich ตามหลังไม่ทัน)
+  -- ชื่อจะว่างทั้งแถว ทั้งที่ร้านนั้นมีชื่ออยู่ใน dim.user_master ตามปกติ
+  -- ยิ่งใกล้วันที่รันยิ่งเจอเยอะ — เดือนที่ปิดแล้วเลยไม่เป็น
+  --
+  -- แก้: user_master เป็นแหล่งชื่อหลัก (grain = res_id เหมือน account_type ที่ join
+  -- อยู่แล้ว) ให้ cdp_* บนออเดอร์เป็นตัวสำรอง — กลับด้านจากของเดิม
   SELECT
     CAST(res_id AS STRING) AS outlet_id,
-    account_type
+    account_type,
+    account_name AS um_account_name,
+    res_name     AS um_res_name
   FROM `freshket-rn.dim.user_master`
 ),
 
@@ -729,7 +745,11 @@ SELECT
   r.period_month, r.movement_type, r.transfer_scope,
   r.current_portfolio, r.current_staff_owner,
   r.base_portfolio, r.base_staff_owner,
-  r.outlet_id, r.account_id, r.account_name, r.res_name, COALESCE(um.account_type, r.account_type) AS account_type,
+  r.outlet_id, r.account_id,
+  -- v_namefix: NULLIF กัน '' ที่ cdp เขียนมาเป็นสตริงว่าง ไม่ใช่ NULL
+  COALESCE(NULLIF(TRIM(um.um_account_name), ''), NULLIF(TRIM(r.account_name), '')) AS account_name,
+  COALESCE(NULLIF(TRIM(um.um_res_name),     ''), NULLIF(TRIM(r.res_name),     '')) AS res_name,
+  COALESCE(um.account_type, r.account_type) AS account_type,
   r.cohort_month,
   ROUND(r.curr_gmv, 0) AS curr_gmv,
   ROUND(r.base_gmv, 0) AS base_gmv,

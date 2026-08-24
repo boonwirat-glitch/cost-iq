@@ -738,3 +738,27 @@ function nrrClassifyRow(r, scope, myTlEmail) {
   return r.movement_type;
 }
 window.nrrClassifyRow = nrrClassifyRow;
+
+// ── v_namefix (2026-08-24): ชื่อร้านที่เอาไปแสดงผล ห้ามว่าง ห้ามเป็น UUID ────
+//
+// ก่อนหน้านี้มีทางแสดงชื่อ 2 ทางที่ fallback คนละแบบ และพังคนละอาการ:
+//   · แถวร้านเดี่ยว/สาขา  nrrEsc(r.res_name || r.account_name)  → ว่างทั้งบรรทัด
+//   · หัวกลุ่ม account    account_name || key(=account_id)      → โชว์ UUID ยาวๆ
+// ทั้งคู่เกิดจากสาเหตุเดียวกัน (ชื่อหายจากข้อมูลเดือนปัจจุบัน) แต่ผู้ใช้เห็นเป็น
+// คนละปัญหา · nrrBackfillMissingNames กู้ได้ 98.7% แล้ว ตัวนี้คุมส่วนที่เหลือ
+//
+// กติกา: มีชื่อจริงใช้ชื่อจริง · ไม่มีก็บอกตรงๆ ว่าไม่มี **ห้ามเอา id มาโชว์แทนชื่อ**
+// เพราะ UUID อ่านไม่ออก ค้นหาไม่ได้ และดูเหมือนระบบพังมากกว่าดูเหมือนข้อมูลขาด
+var NRR_NO_NAME = '(ไม่มีชื่อในข้อมูล)';
+function nrrDisplayName() {
+  for (var i = 0; i < arguments.length; i++) {
+    var v = (arguments[i] || '').trim();
+    // กัน id หลุดมาเป็นชื่อ: UUID 36 ตัว หรือสตริงยาวที่เป็น hex+ขีดล้วน
+    if (!v) continue;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) continue;
+    return v;
+  }
+  return NRR_NO_NAME;
+}
+window.nrrDisplayName = nrrDisplayName;
+

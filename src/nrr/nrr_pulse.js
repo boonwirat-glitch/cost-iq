@@ -287,7 +287,7 @@ function nrrPulseModel() {
   // account_name only shown as a secondary line when it genuinely differs.
   function arrivalItem(r, kind) {
     var isToday = (r.first_dollar_date || '').slice(0, 10) === yIso;
-    var primary = r.res_name || r.account_name || r.account_id;
+    var primary = nrrDisplayName(r.res_name, r.account_name);   // v_namefix
     var secondary = (r.account_name && r.account_name !== primary) ? r.account_name : '';
     return {
       kind: kind,

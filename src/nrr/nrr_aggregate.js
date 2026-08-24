@@ -476,7 +476,8 @@ function nrrGroupOutletsByAccount(outlets) {
     if (!groups[key]) {
       groups[key] = {
         account_id: key,
-        account_name: o.row.account_name || key,
+        // v_namefix: เดิม `|| key` ทำให้หัวกลุ่มโชว์ account_id เป็น UUID
+        account_name: o.row.account_name || '',
         outlets: [],
         total_curr_gmv: 0,
         total_base_gmv: 0,

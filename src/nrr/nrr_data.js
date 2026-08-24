@@ -84,6 +84,9 @@ function _nrrParseQnrrCsv(text) {
       byTlEmail[row.latest_tl_email].push(row);
     }
   });
+  // v_namefix: byKamEmail/byTlEmail ถือ reference ของ object เดียวกับ allRows
+  // (push ตัวเดิม ไม่ได้ copy) ⇒ เติมที่ allRows ที่เดียวก็ครบทุกทาง
+  nrrBackfillMissingNames(allRows);
   return { byKamEmail: byKamEmail, byTlEmail: byTlEmail, allRows: allRows };
 }
 
@@ -258,6 +261,44 @@ window.nrrListAdsForTeam = nrrListAdsForTeam;
 window.bulkPmData = { loaded: false };
 window.bulkAdminData = { loaded: false };
 
+// ── v_namefix (2026-08-24): เติมชื่อร้านที่หายจากข้อมูลเดือนปัจจุบัน ─────────
+//
+// อาการที่บุชเจอ: แถวเดือน ส.ค. โชว์ชื่อร้านเป็นช่องว่าง หรือเป็น UUID ยาวๆ
+// วัดจริงจาก R2: vp_view 2,288/12,961 แถว (17.7%) ไม่มีทั้ง account_name และ
+// res_name · admin_view 548 (10.7%) · pm_view 314 · kam_rep_view 132
+// **ทุกแถวเป็นเดือนปัจจุบันล้วน** เดือนก่อนหน้าในไฟล์เดียวกันปกติดี
+//
+// ต้นเหตุอยู่ฝั่ง SQL: ชื่อถูกดึงจาก order.cdp_account_name ของออเดอร์ล่าสุด
+// ในเดือนนั้น ⇒ ถ้า CDP ยังเติมชื่อออเดอร์ใหม่ไม่ทัน ชื่อว่างทั้งแถว
+// แก้ถาวรแล้วใน sql/q3_2026_movement_*_view.sql (ให้ dim.user_master เป็นแหล่งหลัก)
+// แต่ต้องรอทีม data รัน — ตัวนี้คือตาข่ายฝั่งแอปเพื่อไม่ต้องรอ
+//
+// วิธี: 2,259 จาก 2,288 แถว (98.7%) มีชื่ออยู่แล้วในแถวเดือนอื่น **ของไฟล์เดียวกัน**
+// เลยยืมมาเติมได้เลย ไม่ต้องโหลดอะไรเพิ่ม · ยืมตาม outlet_id ก่อน (ตรงตัวที่สุด)
+// แล้วค่อย account_id · ไม่ทับของที่มีอยู่แล้ว เติมเฉพาะช่องที่ว่างจริง
+//
+// ตั้งใจไม่แตะแถวที่หาชื่อไม่เจอเลย (29 แถว) — ปล่อยว่างไว้ให้ชั้นแสดงผลจัดการ
+// ดีกว่าเดาชื่อมั่วๆ ใส่ตัวเลขเงินของร้านที่ระบุตัวไม่ได้
+function nrrBackfillMissingNames(rows) {
+  var acctName = {}, outletRes = {}, outletAcct = {};
+  rows.forEach(function (r) {
+    if (r.account_id && r.account_name && !acctName[r.account_id]) acctName[r.account_id] = r.account_name;
+    if (r.outlet_id && r.res_name && !outletRes[r.outlet_id]) outletRes[r.outlet_id] = r.res_name;
+    if (r.outlet_id && r.account_name && !outletAcct[r.outlet_id]) outletAcct[r.outlet_id] = r.account_name;
+  });
+  var filled = 0;
+  rows.forEach(function (r) {
+    if (!r.account_name) {
+      var a = outletAcct[r.outlet_id] || acctName[r.account_id];
+      if (a) { r.account_name = a; r.name_backfilled = true; filled++; }
+    }
+    if (!r.res_name && outletRes[r.outlet_id]) { r.res_name = outletRes[r.outlet_id]; r.name_backfilled = true; }
+  });
+  if (filled) console.warn('[nrr] เติมชื่อร้านที่หายจากข้อมูลเดือนปัจจุบัน ' + filled + ' แถว (ดู v_namefix)');
+  return rows;
+}
+window.nrrBackfillMissingNames = nrrBackfillMissingNames;
+
 function _nrrParsePortfolioCsv(text) {
   var lines = text.trim().split('\n').slice(1).filter(function (l) { return l.trim(); });
   var allRows = [];
@@ -288,7 +329,7 @@ function _nrrParsePortfolioCsv(text) {
       new_user_exp_date:    (p[20] || '').trim()
     });
   });
-  return allRows;
+  return nrrBackfillMissingNames(allRows);   // v_namefix
 }
 
 // Shared fetch for both portfolio-view files. Returns {allRows, loaded}

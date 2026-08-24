@@ -108,9 +108,16 @@ params AS (
 -- current account_type จาก dim.user_master (สถานะล่าสุด ณ วันที่ query)
 -- ใช้แทน r.account_type ที่มาจาก per-period order snapshot ซึ่งไม่ consistent
 user_account_type AS (
+  -- v_namefix (2026-08-24): ดึงชื่อจาก user_master มาด้วย ไม่ใช่แค่ account_type
+  -- ชื่อเดิมมาจาก o.cdp_account_name/cdp_res_name บนออเดอร์ล่าสุดของเดือน ⇒ ถ้า CDP
+  -- ยังเติมชื่อออเดอร์เดือนปัจจุบันไม่ทัน ชื่อจะว่างทั้งแถว (เจอจริง 24 ส.ค.: ว่าง
+  -- 17.7% ใน vp_view ทุกแถวเป็นเดือนปัจจุบัน เดือนก่อนหน้าปกติ) · ให้ user_master
+  -- เป็นแหล่งหลัก cdp เป็นตัวสำรอง — รายละเอียดเต็มอยู่ในไฟล์ vp_view
   SELECT
     CAST(res_id AS STRING) AS outlet_id,
-    account_type
+    account_type,
+    account_name AS um_account_name,
+    res_name     AS um_res_name
   FROM `freshket-rn.dim.user_master`
 ),
 
@@ -733,8 +740,9 @@ SELECT
   r.base_staff_owner,
   r.outlet_id,
   r.account_id,
-  r.account_name,
-  r.res_name,
+  -- v_namefix: NULLIF กัน '' ที่ cdp เขียนมาเป็นสตริงว่าง ไม่ใช่ NULL
+  COALESCE(NULLIF(TRIM(um.um_account_name), ''), NULLIF(TRIM(r.account_name), '')) AS account_name,
+  COALESCE(NULLIF(TRIM(um.um_res_name),     ''), NULLIF(TRIM(r.res_name),     '')) AS res_name,
   COALESCE(um.account_type, r.account_type) AS account_type,
   r.cohort_month,
   -- v_tinfull: transfer_in ใช้ยอดเต็มเดือน (gmv_full_by_month) แทนยอดกรอง KAM

@@ -189,7 +189,7 @@ function nrrOutletRowHtml(o, opts) {
   return '<' + tag + ' class="nrr-row' + (isLink ? ' nrr-row-linked' : '') + (opts.indent ? ' nrr-row-branch' : '') + '"' + hrefAttr + '>' +
     '<div class="nrr-row-chev"></div>' +
     '<div class="nrr-row-text nrr-row-text-dot">' + nrrMvDotHtml(o.movement) +
-    '<div><span class="nrr-row-name">' + nrrEsc(r.res_name || r.account_name) + '</span>' +
+    '<div><span class="nrr-row-name">' + nrrEsc(nrrDisplayName(r.res_name, r.account_name)) + '</span>' +   // v_namefix
     '<div class="nrr-row-meta">' + kamMeta + nrrEsc(r.account_name || '') + transferMeta + '</div></div></div>' +
     '<div class="nrr-row-nums">' + numbersHtml + '</div>' +
     '</' + tag + '>';

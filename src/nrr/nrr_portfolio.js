@@ -184,7 +184,7 @@ function nrrRiskQueue(rows, opts) {
     // this is a straight activity check (gmv_to_date), not the old pct/churn
     // proxy, so it can't mislabel an account that's still actually buying.
     var trulyQuiet = (row.gmv_to_date || 0) === 0;
-    var acctName = row.account_name || row.account_id;
+    var acctName = nrrDisplayName(row.account_name);   // v_namefix: ห้ามโชว์ UUID แทนชื่อ
     var big = (opts && opts.bigOutletByAcct) ? opts.bigOutletByAcct[row.account_id] : null;
     out.push({
       account_id: row.account_id,

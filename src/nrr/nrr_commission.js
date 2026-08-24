@@ -601,7 +601,7 @@ function nrrComputeHandoverForKam(kamEmail, period) {
     var bd = parseFloat(r.baseline_days_in_month) || 30, pd = parseFloat(r.perf_days_in_month) || 30;
     baselineNorm += b / bd * 30; perfNorm += p / pd * 30;
     baselineGmv += b; currentGmv += p;
-    return { name: r.account_name || r.account_id, account_id: r.account_id, baseline: b, current: p, transfer_month: r.transfer_month };
+    return { name: nrrDisplayName(r.account_name), account_id: r.account_id, baseline: b, current: p, transfer_month: r.transfer_month };
   });
   // v91: rounded to 1 decimal (was Math.round to a whole %) — must match
   // Sense's rounding exactly, or a KAM at e.g. 99.94% retention would round

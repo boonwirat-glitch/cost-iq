@@ -412,7 +412,7 @@ function nrrAcctRowHtml(item, opts) {
   // (matches Sense's own "tap the card to open the account" gesture).
   return '<a class="nrr-acct-row" href="#/account/' + encodeURIComponent(r.account_id) + '" style="border-left-color:' + color + '">' +
     '<div class="nrr-acct-row-left">' +
-    '<div class="nrr-acct-row-name">' + nrrEsc(r.account_name || r.account_id) + '</div>' +
+    '<div class="nrr-acct-row-name">' + nrrEsc(nrrDisplayName(r.account_name)) + '</div>' +
     '<div class="nrr-acct-row-meta"><span class="num">' + nrrFmtGMV(r.runrate_gmv) + '</span><span class="micro">run-rate</span>' +
     '<span class="micro">/ ' + (pace.pct != null ? nrrFmtGMV(pace.baseline_gmv) : '—') + ' เดือนฐาน</span>' +
     '<span class="micro">· ดูแล ' + (r.days_with_current_kam || 0) + ' วัน</span>' + kamHtml + '</div>' +
@@ -952,7 +952,7 @@ function nrrAccountHeaderHtml(row) {
     '<a href="#/portfolio" class="nrr-acct-back" aria-label="กลับ Portfolio">←</a>' +
     '<div><div class="eyebrow">' + nrrEsc(row.account_type || '') +
     '<span class="nrr-acct-type-chip">' + nrrEsc(row.kam_name || '') + '</span></div>' +
-    '<div class="h2" style="font-size:19px">' + nrrEsc(row.account_name || row.account_id) + '</div></div>' +
+    '<div class="h2" style="font-size:19px">' + nrrEsc(nrrDisplayName(row.account_name)) + '</div></div>' +
     '</div>';
 }
 
@@ -5583,7 +5583,7 @@ function nrrCommOutletListHtml(outlets, emptyText, commissionRate) {
       var valueHtml = commissionRate != null
         ? '<span class="ds-row-value">' + nrrFmtGMVExact(gmv * commissionRate) + '</span>'
         : '<span class="ds-row-meta">' + nrrFmtGMVExact(gmv) + '</span>';
-      return '<div class="ds-row">' + leading + '<span class="ds-row-name">' + nrrEsc(r.account_name || r.outlet_id) + '</span>' + segChip + valueHtml + '</div>';
+      return '<div class="ds-row">' + leading + '<span class="ds-row-name">' + nrrEsc(nrrDisplayName(r.account_name)) + '</span>' + segChip + valueHtml + '</div>';
     }).join('');
 }
 
@@ -5916,7 +5916,7 @@ function nrrRenderSlideoverBody() {
     return '<details class="nrr-acct-group">' +
       '<summary class="nrr-row"><div class="nrr-row-chev"><span class="nrr-chev-icon">›</span></div>' +
       '<div class="nrr-row-text nrr-row-text-dot">' + nrrMvDotHtml(uniformMv) +
-      '<div><span class="nrr-row-name">' + nrrEsc(g.account_name) + '</span>' +
+      '<div><span class="nrr-row-name">' + nrrEsc(nrrDisplayName(g.account_name)) + '</span>' +   // v_namefix
       '<div class="nrr-row-meta">' + g.outlets.length + ' สาขา</div></div></div>' +
       '<div class="nrr-row-nums">' + nrrTripleHtml('sm', groupTriple, { signal: true }) + '</div>' +
       '</summary><div class="nrr-branch-block">' + branches + '</div></details>';

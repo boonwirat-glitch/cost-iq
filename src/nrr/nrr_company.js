@@ -677,7 +677,7 @@ function _nrrPipeOutletRowHtml(r, today) {
   } else { dTxt = 'ไม่มีกำหนดส่งมอบ'; }
   return '<div class="nrr-pipe-row">' +
     '<div class="nrr-pipe-main">' +
-    '<div class="nrr-pipe-name">' + nrrEsc(r.account_name || r.account_id || r.outlet_id || '—') + '</div>' +
+    '<div class="nrr-pipe-name">' + nrrEsc(nrrDisplayName(r.account_name)) + '</div>' +
     '<div class="micro">' + nrrEsc(r.account_type || '—') + ' · ' + dTxt + '</div>' +
     '</div>' +
     '<div class="num nrr-pipe-gmv">' + (r.last_month_gmv > 0 ? nrrFmtGMVExact(r.last_month_gmv) : '—') + '</div>' +
