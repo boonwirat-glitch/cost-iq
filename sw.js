@@ -12,7 +12,7 @@
 // Fix: always strip redirect flag by creating fresh Response from body.
 // Background update: fire-and-forget, never returned directly to browser.
 
-const CACHE_NAME = 'sense-v282';
+const CACHE_NAME = 'sense-v283';
 const APP_URL = '/index.html';
 
 // v_egress (2026-08-14): รูปที่แอปใช้ทุกครั้งที่เปิด — เก็บไว้ตั้งแต่ install

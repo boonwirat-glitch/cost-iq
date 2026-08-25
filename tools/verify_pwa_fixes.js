@@ -100,5 +100,42 @@ console.log('\n── 3. pill บังปุ่ม Echo: #data-load-pill ต้
     !!m && /\+\s*9[6-9]px|\+\s*1\d\dpx/.test(m[1]));
 }
 
+// ── v_updatepill (2026-08-25): การ์ดชวนอัปเดต ───────────────────────────────
+// บุชขอให้ "น่ากด" และ "น้องๆ ต้องรู้สึกปลอดภัยพอที่จะกด"
+// ของเดิมเป็นแถบเล็กเขียนแค่ "แตะเพื่ออัปเดต" ซึ่งไม่ตอบสิ่งที่คนลังเลจริง 3 ข้อ
+// ข้อความบนการ์ดคือ "สัญญา" กับผู้ใช้ — ถ้าโค้ดเปลี่ยนจนไม่จริง ต้องแก้ข้อความด้วย
+const sh = fs.readFileSync(path.join(__dirname, '..', 'src', 'shell.html'), 'utf8');
+const pillFn = (sh.match(/function _showUpdatePill\(\)\{[\s\S]*?\n          \}/) || [''])[0];
+
+check('การ์ดตอบครบ 3 ข้อที่คนลังเลก่อนกด (เร็ว · ไม่หลุดล็อกอิน · ข้อมูลไม่หาย)',
+  /2 วินาที/.test(pillFn) && /ไม่ต้องล็อกอินใหม่/.test(pillFn) && /ข้อมูลไม่หาย/.test(pillFn));
+
+check('สัญญา "ไม่ต้องล็อกอินใหม่/ข้อมูลไม่หาย" เป็นจริง — ทางกดอัปเดตห้ามล้าง storage/signOut',
+  !/signOut|localStorage\.clear|sessionStorage\.clear|caches\.delete/.test(pillFn));
+
+check('ยังปักธงผู้ใช้กดเอง ก่อนส่ง SKIP_WAITING (ไม่งั้น controllerchange ไม่ reload)',
+  (() => {
+    const f = pillFn.indexOf('_senseUserRequestedUpdate = true');
+    const m = pillFn.indexOf("postMessage('SKIP_WAITING')", f);
+    return f > -1 && m > f;
+  })());
+
+check('กดแล้วมีสถานะกำลังทำ ไม่ปล่อยให้กดรัว',
+  /go\.disabled\s*=\s*true/.test(pillFn) && /กำลังอัปเดต/.test(pillFn));
+
+check('มีตาข่ายถ้าอัปเดตไม่คืบใน 6 วิ — ไม่ปล่อยวงหมุนค้างตลอดกาล',
+  /},6000\);/.test(pillFn) && /location\.reload\(\)/.test(pillFn));
+
+check('ปฏิเสธด้วยปุ่มข้อความ ไม่ใช่กากบาทเล็กที่กดพลาดง่าย',
+  /sense-update-later/.test(pillFn) && /ไว้ทีหลัง/.test(pillFn) &&
+  !/sense-update-x/.test(pillFn));
+
+check('การ์ดระบุสีเองทั้งหมด ไม่ยืม token ของแอป (เคยออกมาขาวโพลนบนแอปสีเขียวเข้ม)',
+  !/var\(--surface|var\(--ink-1|var\(--ok-dim|var\(--border/.test(pillFn));
+
+check('เคารพ prefers-reduced-motion',
+  /prefers-reduced-motion/.test(pillFn));
+
+
 console.log('\n' + (fail ? `❌ verify_pwa_fixes: ผ่าน ${pass} · ไม่ผ่าน ${fail}` : `✅ verify_pwa_fixes: ผ่าน ${pass} · ไม่ผ่าน 0`));
 process.exit(fail ? 1 : 0);
