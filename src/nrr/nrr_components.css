@@ -2045,3 +2045,18 @@ body.nrr-pulse-on { background: #0E2A21; }
 .nrr-waiver-gmv { margin-top: 6px; }
 .nrr-waiver-gmv .num { color: var(--ink); }
 .nrr-waiver-audit { margin-top: 6px; color: var(--ink3); }
+
+/* v_slideexport (2026-08-25): ปุ่ม Export ในหัวแผงรายละเอียด
+   วางคู่กับปุ่มปิด เพื่อสื่อว่า "ไฟล์ที่ได้ = สิ่งที่อยู่ในแผงนี้" ตามที่บุชขอ
+   จงใจให้เงียบกว่าปุ่มหลักของหน้า — เป็นทางเลือก ไม่ใช่สิ่งที่ต้องกด */
+.nrr-sh-export{
+  font-family:inherit;font-size:12.5px;font-weight:700;white-space:nowrap;
+  padding:6px 11px;border-radius:9px;cursor:pointer;
+  background:var(--fc-ok-dim,rgba(0,166,81,.09));
+  color:var(--fc-ok-text,#0A7A3E);
+  border:1px solid var(--fc-ok-border,rgba(0,166,81,.24));
+  transition:background .12s ease,transform .1s ease;
+}
+.nrr-sh-export:hover{background:var(--fc-ok-dim2,rgba(0,166,81,.16))}
+.nrr-sh-export:active{transform:scale(.96)}
+.nrr-sh-export[disabled]{opacity:.55;cursor:default}

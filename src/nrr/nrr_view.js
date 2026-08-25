@@ -54,6 +54,9 @@ async function nrrInitApp() {
   document.getElementById('nrr-slideover-body').addEventListener('keydown', nrrHandleNoteInputKeydown);
   document.getElementById('nrr-slideover-backdrop').addEventListener('click', nrrCloseSlideover);
   document.getElementById('nrr-slideover-close').addEventListener('click', nrrCloseSlideover);
+  // v_slideexport
+  var _slExp = document.getElementById('nrr-slideover-export');
+  if (_slExp) _slExp.addEventListener('click', function () { nrrExportSlideover(); });
   document.getElementById('nrr-slideover-search').addEventListener('input', function (e) {
     nrrSlideoverState.search = e.target.value.trim().toLowerCase();
     nrrRenderSlideoverBody();
@@ -2143,7 +2146,10 @@ function nrrShellHtml() {
     '</div></div>' +
     '<div id="nrr-slideover-backdrop"></div>' +
     '<div class="float" id="nrr-slideover">' +
-    '  <div class="nrr-slideover-head"><div><div class="nrr-sh-title" id="nrr-slideover-title">ร้านค้า</div><div class="meta" id="nrr-slideover-sub"></div></div><button class="nrr-sh-close" id="nrr-slideover-close">✕</button></div>' +
+    '  <div class="nrr-slideover-head"><div><div class="nrr-sh-title" id="nrr-slideover-title">ร้านค้า</div><div class="meta" id="nrr-slideover-sub"></div></div>' +
+    // v_slideexport: ปุ่มอยู่ในแผงเอง ไม่ใช่ที่หัวหน้าเพจ — เพื่อให้เห็นชัดว่า
+    // สิ่งที่จะได้คือ "รายการที่เห็นอยู่ตรงนี้" ตามตัวกรองที่เปิดอยู่จริง
+    '  <div style="display:flex;align-items:center;gap:8px"><button class="nrr-sh-export" id="nrr-slideover-export" title="ดาวน์โหลดรายการที่เห็นอยู่เป็น CSV">⤓ Export</button><button class="nrr-sh-close" id="nrr-slideover-close">✕</button></div></div>' +
     '  <div style="padding:12px 22px 0;display:flex;gap:8px;align-items:center"><input class="nrr-search" id="nrr-slideover-search" placeholder="ค้นหาร้านค้า/account..." style="flex:1;min-width:0"><span id="nrr-slideover-kamwrap" style="display:none"></span></div>' +
     '  <div style="padding:10px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-chips"></div></div>' +
     '  <div style="padding:6px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-momentum-chips" style="display:none"></div></div>' +
@@ -5869,6 +5875,120 @@ function nrrRenderSlideoverChips(showMv, showKamChips, showMomentum) {
     });
   } else { kamWrap.style.display = 'none'; kamWrap.innerHTML = ''; }
 }
+
+// v_slideexport: แยกตรรกะกรองออกมา เพื่อให้ "สิ่งที่เห็น" กับ "สิ่งที่ export"
+// มาจากฟังก์ชันเดียวกันเสมอ · ถ้าแยกกันเขียน วันหนึ่งมันจะไม่ตรงกันแน่นอน
+function nrrSlideoverVisibleOutlets() {
+  var st = nrrSlideoverState;
+  return nrrSlideoverOutlets.filter(function (o) {
+    if (st.movementFilter !== 'all' && o.movement !== st.movementFilter) return false;
+    if (st.momentumFilter && st.momentumFilter !== 'all' && _nrrSlideoverRowMomentum(o.row).cls !== st.momentumFilter) return false;
+    if (st.kamFilter && st.kamFilter !== 'all' && (o.row.latest_staff_owner || '—') !== st.kamFilter) return false;
+    if (st.search) {
+      var hay = ((o.row.account_name || '') + ' ' + (o.row.res_name || '') + ' ' + (o.row.latest_staff_owner || '')).toLowerCase();
+      if (hay.indexOf(st.search) === -1) return false;
+    }
+    return true;
+  });
+}
+window.nrrSlideoverVisibleOutlets = nrrSlideoverVisibleOutlets;
+
+// ── v_slideexport (2026-08-25): Export จากในแผงรายละเอียด ────────────────────
+//
+// บุชขอปุ่มไว้ "ในแผง" ไม่ใช่หัวเพจ เพื่อให้ผู้ใช้เห็นชัดว่าไฟล์ที่ได้คือขอบเขตไหน
+// ⇒ ยึด nrrSlideoverVisibleOutlets() ตัวเดียวกับที่วาดบนจอ ตัวกรองที่เปิดอยู่
+// (movement / โมเมนตัม / KAM / คำค้น) มีผลกับไฟล์ตรงตามที่ตาเห็น
+//
+// ยอดรายเดือน: แถวในแผงมีแค่เดือนที่เลือก จึงต้องไปประกอบจากทุก pool ที่โหลดไว้
+// (kam_rep_view + vp/admin/pm) แล้ว index ด้วย outlet_id|เดือน · ทำแบบนี้เพราะ
+// แผงถูกเปิดได้จากหลายทาง (KAM/ทีม/movement/บริษัท) ซึ่งดึงคนละ pool กัน
+function _nrrMonthIndexForExport() {
+  var idx = {}, months = {};
+  function feed(rows) {
+    (rows || []).forEach(function (r) {
+      if (!r || !r.outlet_id || !r.period_month) return;
+      months[r.period_month] = true;
+      var k = r.outlet_id + '|' + r.period_month;
+      // เจอซ้ำจากหลาย pool = เก็บตัวแรกไว้ (ค่าเดียวกัน คนละมุมมองเท่านั้น)
+      if (!idx[k]) idx[k] = r;
+    });
+  }
+  try { feed(window.bulkQnrrData && window.bulkQnrrData.allRows); } catch (e) {}
+  ['bulkVpData', 'bulkAdminData', 'bulkPmData'].forEach(function (n) {
+    try { if (window[n] && window[n].loaded) feed(window[n].allRows); } catch (e) {}
+  });
+  return { idx: idx, months: Object.keys(months).sort() };
+}
+
+async function nrrExportSlideover() {
+  var btn = document.getElementById('nrr-slideover-export');
+  var visible = nrrSlideoverVisibleOutlets();
+  if (!visible.length) {
+    if (typeof nrrToast === 'function') nrrToast('ไม่มีรายการให้ export');
+    return;
+  }
+  var oldLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียม...'; }
+  try {
+    // "active ล่าสุด" อยู่ใน bulk_outlets.csv ซึ่งโหลดแบบขี้เกียจ (เฉพาะแผง churn)
+    // ⇒ ถ้ายังไม่มี ต้องรอโหลดก่อน ไม่งั้นคอลัมน์นี้ว่างทั้งไฟล์แบบเงียบๆ
+    if ((!window.bulkOutletsData || !window.bulkOutletsData.loaded) &&
+        typeof nrrFetchBulkOutletsCsv === 'function') {
+      await nrrFetchBulkOutletsCsv();
+    }
+  } catch (e) {}
+
+  var mi = _nrrMonthIndexForExport();
+  var st = nrrSlideoverState;
+  var baseLabel = QNRR_CFG.months_th[QNRR_CFG.base_month] || QNRR_CFG.base_month;
+
+  var headers = ['account_id', 'ชื่อบัญชี', 'outlet_id', 'ชื่อร้าน', 'ประเภท',
+                 'movement', 'KAM', 'TL', 'cohort', 'ฐาน (' + baseLabel + ') ฿'];
+  mi.months.forEach(function (m) { headers.push((QNRR_CFG.months_th[m] || m) + ' ฿'); });
+  headers.push('สั่งล่าสุด', 'ยอดเดือนที่เลือก ฿', 'run-rate เดือนที่เลือก ฿');
+
+  var rows = visible.map(function (o) {
+    var r = o.row;
+    var cd = parseFloat(r.curr_days) || 30;
+    var mtd = parseFloat(r.curr_gmv) || 0;
+    var row = [
+      r.account_id || '',
+      nrrDisplayName(r.account_name),
+      r.outlet_id || '',
+      nrrDisplayName(r.res_name, r.account_name),
+      r.account_type || '',
+      (typeof MV_LABEL !== 'undefined' && MV_LABEL[o.movement]) || o.movement || '',
+      r.latest_staff_owner || '',
+      r.latest_tl || '',
+      r.cohort_month || '',
+      Math.round(parseFloat(r.base_gmv) || 0)
+    ];
+    mi.months.forEach(function (m) {
+      var hit = mi.idx[r.outlet_id + '|' + m];
+      row.push(hit ? Math.round(parseFloat(hit.curr_gmv) || 0) : '');
+    });
+    var last = (r.account_id && r.outlet_id && typeof nrrOutletLastOrderDate === 'function')
+      ? nrrOutletLastOrderDate(r.account_id, r.outlet_id) : null;
+    row.push(last || '');
+    row.push(Math.round(mtd));
+    row.push(Math.round(cd > 0 ? mtd / cd * nrrDaysIn(r.period_month) : 0));
+    return row;
+  });
+
+  // ชื่อไฟล์บอกขอบเขตให้ครบ เปิดย้อนหลังแล้วยังรู้ว่าไฟล์นี้คืออะไร
+  var title = (document.getElementById('nrr-slideover-title') || {}).textContent || 'slideover';
+  var parts = [title];
+  if (st.movementFilter && st.movementFilter !== 'all') parts.push(st.movementFilter);
+  if (st.kamFilter && st.kamFilter !== 'all') parts.push(st.kamFilter);
+  if (st.momentumFilter && st.momentumFilter !== 'all') parts.push(st.momentumFilter);
+  if (st.search) parts.push('ค้นหา-' + st.search);
+  var slug = parts.join('-').replace(/[^\wก-๙฀-๿-]+/g, '-').replace(/-+/g, '-').slice(0, 90);
+
+  nrrExportCsv('nrr-' + slug + '.csv', headers, rows);
+  if (btn) { btn.disabled = false; btn.textContent = oldLabel || '⤓ Export'; }
+  if (typeof nrrToast === 'function') nrrToast('ดาวน์โหลดแล้ว ' + rows.length + ' ร้าน (ตามที่กรองอยู่)', '⤓');
+}
+window.nrrExportSlideover = nrrExportSlideover;
 
 function nrrRenderSlideoverBody() {
   var body = document.getElementById('nrr-slideover-body');
