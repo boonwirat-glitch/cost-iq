@@ -1,4 +1,4 @@
-<!-- Freshket Sense v281: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v282: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v281',
+      version: 'v282',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -13713,8 +13713,42 @@ supa.auth.onAuthStateChange((event, session) => {
     // ยังไม่มี currentUser = ไม่มี session ให้กู้ = เด้งหน้า login เลย ไม่ต้องรอ
     // grace 1200ms (grace มีไว้กันจอกะพริบตอน "กำลังใช้งานอยู่แล้วโทเคนเด้ง")
     if (!currentUser) {
-      _senseDataLog('AUTH','🔒 SIGNED_OUT ตอนยังไม่ได้ล็อกอิน — โชว์หน้า login ทันที');
-      _showLoginOverlayClean();
+      // v_bootauth2 (2026-08-25): เดิมโชว์ login "ทันที" ซึ่งเร็วเกินไป
+      //
+      // หลักฐานจากของจริง (auth.refresh_tokens ของบุช 25 ส.ค.): token ของ session
+      // เดิมถูกต่ออายุ **สำเร็จ** เวลา 03:51:38 และยังไม่ถูก revoke จนถึงตอนนี้ —
+      // แต่ 4 วินาทีถัดมามี session ใหม่เกิดขึ้น = แอปเด้งหน้า login แล้วบุชล็อกอินใหม่
+      // ทั้งที่ session เดิมใช้ได้อยู่ · นี่คือสาเหตุที่ "ทิ้งไว้สักพักแล้วต้องล็อกอินใหม่"
+      //
+      // ทำไม: ตอน PWA เปิดใหม่ supabase-js จะกู้ session จาก localStorage แล้ว
+      // ต่ออายุ token · ระหว่างนั้นมันยิง SIGNED_OUT ออกมาก่อนชั่วขณะ ซึ่งตอน
+      // cold boot currentUser ยังเป็น null เสมอ → เข้าสาขานี้ → ปิดประตูทันที
+      // ทั้งที่อีกไม่กี่ร้อย ms การต่ออายุจะสำเร็จ
+      //
+      // แก้: รอสั้นๆ แล้วถามซ้ำก่อนตัดสิน · ยังคงจบที่หน้า login เสมอถ้าไม่มี session
+      // จริง (กันอาการผ้าคลุม boot ค้างที่ v_bootnet แก้ไว้ ห้ามถอยกลับไปตรงนั้น)
+      clearTimeout(window._bootSignedOutTimer);
+      window._bootSignedOutTimer = setTimeout(async () => {
+        window._bootSignedOutTimer = null;
+        if (currentUser) return;                    // มีคนพาเข้าไปแล้ว
+        let _r = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot-signedout)');
+        if (_authUnknown(_r)) {
+          // ตอบไม่ได้ = ไม่รู้ ห้ามตีความว่าล็อกเอาต์ · ให้ checkSession ที่มีการ
+          // ลองซ้ำ + โหมดดูอย่างเดียวเป็นคนตัดสินแทน
+          _senseDataLog('AUTH','⏳ SIGNED_OUT ตอนบูต แต่เช็คซ้ำตอบไม่ได้ — ปล่อยให้ checkSession ตัดสิน');
+          return;
+        }
+        const _sess = _r && _r.data && _r.data.session;
+        if (_sess && _sess.user) {
+          _senseDataLog('AUTH','✅ SIGNED_OUT ตอนบูตเป็นของชั่วคราว — ต่ออายุสำเร็จ ไม่ต้องล็อกอินใหม่');
+          currentUser = _sess.user;
+          try { loadUserProfile(); } catch(e) {}
+          hideLoginOverlay();
+          return;
+        }
+        _senseDataLog('AUTH','🔒 SIGNED_OUT ตอนบูต ยืนยันแล้วว่าไม่มี session — โชว์หน้า login');
+        _showLoginOverlayClean();
+      }, 1200);
       return;
     }
     currentUser = null;
@@ -39180,8 +39214,21 @@ window._commBuildTlPayout = _commBuildTlPayout;
 
 
 // SECTION:TARGETS
+// v_stormfix (2026-08-25): กันยิงซ้ำซ้อน — cache กันได้เฉพาะ "หลังโหลดเสร็จ"
+// แต่ระหว่างที่ยังโหลดไม่เสร็จ ทุกคนที่เรียกเข้ามาจะยิง network ของตัวเองหมด
+// ตอนบูตของ admin มีคนเรียกพร้อมกันหลายราย (ดู render_storm ใน app_errors)
+// = อ่าน Supabase ซ้ำโดยเปล่าประโยชน์ และหน่วงให้ตัววาดค้างนานขึ้นไปอีก
+// ⇒ ให้คนที่มาทีหลังรอ promise ก้อนเดียวกัน แทนที่จะเริ่มงานของตัวเอง
+const _tgtInFlight = {};
 async function loadTargets(quarter) {
   if (!quarter) quarter = _tgtCurrentQuarter();
+  if (_tgtInFlight[quarter]) return _tgtInFlight[quarter];
+  const _p = _loadTargetsInner(quarter).finally(() => { delete _tgtInFlight[quarter]; });
+  _tgtInFlight[quarter] = _p;
+  return _p;
+}
+
+async function _loadTargetsInner(quarter) {
   const months = _tgtQuarterMonths(quarter);
 
   const hit = _tgtQuarterCache[quarter];
@@ -46205,7 +46252,40 @@ function renderPortviewNRRBar() {
 
 // ── Portview NRR + Target Widget ────────────────────────────────
 // SECTION:NRR_WIDGET
+// ── v_stormfix (2026-08-25): กันวาดซ้อนกัน ──────────────────────────────────
+//
+// อาการ: บุชใช้ admin (เห็นทุกบัญชี) แล้วแอปค้างและเด้งออก ตอนเปิดแอปใหม่ๆ
+// ที่ข้อมูลกำลังโหลด · app_errors ยืนยัน: renderPortviewTargetBar ยิง 7 ครั้ง
+// ใน 10 วิ ยังเกิดอยู่บน v281 (17 คน) ทั้งที่ v273 เพิ่มตัวรวมคำสั่งไปแล้ว
+//
+// ทำไม v273 ปิดไม่หมด: มันเปลี่ยนแค่ "จุดที่เรียกจากข้างนอก" ให้ผ่านตัวรวมคำสั่ง
+// แต่ตัวฟังก์ชันเองยังกันการทำงานซ้อนไม่ได้ · ฟังก์ชันนี้เป็น async และมี
+// `await loadTargets(...)` อยู่ตรงกลาง ⇒ ระหว่างที่รอ (นานเป็นวินาทีสำหรับ admin
+// เพราะข้อมูลเยอะ) ตัวกันรัวที่ตั้งไว้ 300ms หมดอายุไปแล้ว คนเรียกรายถัดไปจึงเข้ามา
+// ได้และ await ซ้อนกันอีกชุด · พอชุดแรกทำเสร็จมันสั่ง `bar._lastRenderMs = 0`
+// (ตั้งใจ reset เพื่อให้วาดใหม่ด้วยค่า target ที่เพิ่งได้) = เปิดประตูให้ทุกคน
+// ที่ค้างอยู่วิ่งเข้าพร้อมกัน · ซ้ำร้ายทางกู้ตัวเอง 2 จุดข้างล่างก็ตั้งใจข้ามตัวกันรัว
+// ด้วย ⇒ ตอนบูตของ admin ตัวกันรัวแทบไม่ทำงานเลย
+//
+// แก้ที่ราก: ให้ทำงานได้ทีละชุดเท่านั้น · ถ้ามีคนเรียกระหว่างที่ยังทำอยู่ ไม่ต้อง
+// เข้าคิวซ้อน แค่จำไว้ว่า "ขอวาดอีกรอบ" แล้วค่อยวาดรอบเดียวตอนจบ
+let _tgtBarRunning = false, _tgtBarRerunWanted = false;
 async function renderPortviewTargetBar() {
+  if (_tgtBarRunning) { _tgtBarRerunWanted = true; return; }
+  _tgtBarRunning = true;
+  try {
+    return await _renderPortviewTargetBarInner();
+  } finally {
+    _tgtBarRunning = false;
+    if (_tgtBarRerunWanted) {
+      _tgtBarRerunWanted = false;
+      // ผ่านตัวรวมคำสั่ง ไม่เรียกตรง — คนที่ขอมาระหว่างนั้นหลายรายยุบเหลือรอบเดียว
+      if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(120);
+    }
+  }
+}
+
+async function _renderPortviewTargetBarInner() {
   const bar = document.getElementById('tgt-portview-bar');
   if (!bar) return;
   // Debounce: skip if rendered within last 300ms AND same KAM context (prevents flicker)
@@ -46252,7 +46332,14 @@ async function renderPortviewTargetBar() {
     bar.style.display = 'none';
     if (!bar._healPending) {
       bar._healPending = true;
-      setTimeout(() => { bar._healPending = false; bar._lastRenderMs = 0; try { renderPortviewTargetBar(); } catch(e) {} }, 1500);
+      // v_stormfix: จำกัดจำนวนครั้ง — ของเดิมวนได้ไม่จำกัดทุก 1.5 วิ ตราบใดที่
+      // ข้อมูลยังไม่มา ซึ่งคือสภาพปกติของ admin ตอนบูต
+      setTimeout(() => {
+        bar._healPending = false; bar._lastRenderMs = 0;
+        bar._healTries = (bar._healTries || 0) + 1;
+        if (bar._healTries > 3) return;
+        try { if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(0); else renderPortviewTargetBar(); } catch(e) {}
+      }, 1500);
     }
     return;
   }
@@ -46333,12 +46420,16 @@ async function renderPortviewTargetBar() {
       setTimeout(() => {
         bar._healPending = false;
         bar._lastRenderMs = 0; // bypass debounce for retry
-        try { renderPortviewTargetBar(); } catch(e) {}
+        // v_stormfix: จำกัดจำนวนครั้ง + ผ่านตัวรวมคำสั่ง (เหตุผลเดียวกับจุดบน)
+        bar._healTries = (bar._healTries || 0) + 1;
+        if (bar._healTries > 3) return;
+        try { if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(0); else renderPortviewTargetBar(); } catch(e) {}
       }, 2000);
     }
     return;
   }
   bar._healPending = false; // render succeeded — clear retry flag
+  bar._healTries = 0;        // v_stormfix: สำเร็จแล้ว เริ่มนับใหม่ได้
 
   // ── Pace % ───────────────────────────────────────────────────
   const pct = Math.round(runRate / target * 100);

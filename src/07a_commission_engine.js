@@ -1523,8 +1523,21 @@ window._commBuildTlPayout = _commBuildTlPayout;
 
 
 // SECTION:TARGETS
+// v_stormfix (2026-08-25): กันยิงซ้ำซ้อน — cache กันได้เฉพาะ "หลังโหลดเสร็จ"
+// แต่ระหว่างที่ยังโหลดไม่เสร็จ ทุกคนที่เรียกเข้ามาจะยิง network ของตัวเองหมด
+// ตอนบูตของ admin มีคนเรียกพร้อมกันหลายราย (ดู render_storm ใน app_errors)
+// = อ่าน Supabase ซ้ำโดยเปล่าประโยชน์ และหน่วงให้ตัววาดค้างนานขึ้นไปอีก
+// ⇒ ให้คนที่มาทีหลังรอ promise ก้อนเดียวกัน แทนที่จะเริ่มงานของตัวเอง
+const _tgtInFlight = {};
 async function loadTargets(quarter) {
   if (!quarter) quarter = _tgtCurrentQuarter();
+  if (_tgtInFlight[quarter]) return _tgtInFlight[quarter];
+  const _p = _loadTargetsInner(quarter).finally(() => { delete _tgtInFlight[quarter]; });
+  _tgtInFlight[quarter] = _p;
+  return _p;
+}
+
+async function _loadTargetsInner(quarter) {
   const months = _tgtQuarterMonths(quarter);
 
   const hit = _tgtQuarterCache[quarter];

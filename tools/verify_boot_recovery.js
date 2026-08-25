@@ -135,9 +135,23 @@ check('SIGNED_OUT ไม่ผูกกับ currentUser อีกต่อไ�
   !/event\s*===\s*'SIGNED_OUT'\s*&&\s*currentUser/.test(coreC),
   'cold boot มี currentUser = null เสมอ → สาขานี้ถูกข้าม → ไม่มีใครปิดผ้าคลุม');
 
-check('SIGNED_OUT ตอนยังไม่มี currentUser ต้องเด้งหน้า login ทันที',
-  /SIGNED_OUT[\s\S]{0,700}?!currentUser[\s\S]{0,300}?_showLoginOverlayClean\(\)/.test(coreC),
-  'ไม่มี session ให้กู้ = ไม่ต้องรอ grace');
+// v_bootauth2 (2026-08-25): ข้อนี้เคยเขียนว่า "ต้องเด้ง login ทันที" ซึ่งตอนนั้นถูก
+// (แก้อาการผ้าคลุม boot ค้างถาวร) แต่เร็วเกินไป — หลักฐานจาก auth.refresh_tokens
+// ของบุช: token ต่ออายุสำเร็จ แต่แอปเด้ง login ไปแล้วก่อนหน้านั้นเสี้ยววินาที
+// เจตนาใหม่: ยังต้อง "จบที่หน้า login เสมอถ้าไม่มี session จริง" แต่ห้ามตัดสินทันที
+check('SIGNED_OUT ตอนยังไม่มี currentUser ต้องจบที่หน้า login ถ้ายืนยันแล้วว่าไม่มี session',
+  // ยึดจากสาขา SIGNED_OUT แล้วเทียบ "ลำดับ" ไม่ใช่ระยะห่างตัวอักษร —
+  // การนับ char พังมาหลายรอบแล้ว และ `if (!currentUser) {` มีหลายที่ในไฟล์
+  (() => {
+    const so = coreC.indexOf("event === 'SIGNED_OUT'");
+    if (so < 0) return false;
+    const guard = coreC.indexOf('if (!currentUser) {', so);
+    const timer = coreC.indexOf('_bootSignedOutTimer', guard);
+    const recheck = coreC.indexOf('getSession(boot-signedout)', timer);
+    const login = coreC.indexOf('_showLoginOverlayClean()', recheck);
+    return guard > so && timer > guard && recheck > timer && login > recheck;
+  })(),
+  'ต้องมีทั้งการถามซ้ำ และปลายทางที่เด้ง login จริงเมื่อยืนยันแล้ว');
 
 // ── 5. ธงบอกว่า JS หลักรับช่วงต่อแล้ว ต้องปักครบทุกจุดที่ปิด splash ได้ ────
 console.log('\n[src/01_core.js] — ธงรับช่วงต่อ');
@@ -342,5 +356,57 @@ check('บอกผู้ใช้ครั้งเดียวว่าเค�
       // storage ใช้ไม่ได้ = จำไม่ได้ ห้ามโฆษณาว่าพร้อม
       /\} catch \(e\) \{ return; \}/.test(c);
   })());
+
+// ── v_stormfix / v_bootauth2 (2026-08-25) ──────────────────────────────────
+// บุช: admin ใช้แล้วค้าง+เด้งออก และ PWA มือถือ logout เองถ้าทิ้งไว้
+// app_errors ยืนยัน render_storm ยังเกิดบน v281 (17 คน) ทั้งที่ v273 แก้ไปแล้ว
+const tgt = read('src/07b_nrr_target.js');
+const eng = read('src/07a_commission_engine.js');
+
+check('ตัววาด target bar ทำงานทีละชุด (async เดิมเรียกซ้อนกันได้ ตัวกันรัว 300ms จึงไร้ผล)',
+  /let _tgtBarRunning = false, _tgtBarRerunWanted = false;/.test(tgt) &&
+  /if \(_tgtBarRunning\) \{ _tgtBarRerunWanted = true; return; \}/.test(tgt) &&
+  /async function _renderPortviewTargetBarInner\(\)/.test(tgt));
+
+check('คนที่ขอวาดระหว่างทำงานอยู่ ยุบเหลือรอบเดียว และผ่านตัวรวมคำสั่ง',
+  (() => {
+    const i = tgt.indexOf('_tgtBarRerunWanted = false;\n      // ผ่านตัวรวมคำสั่ง');
+    return i > -1 && tgt.indexOf('scheduleRenderPortviewTargetBar(120)', i) > i;
+  })());
+
+check('ทางกู้ตัวเองมีเพดาน ไม่วนไม่จำกัด (สภาพปกติของ admin ตอนบูตคือข้อมูลยังไม่มา)',
+  (tgt.match(/if \(bar\._healTries > 3\) return;/g) || []).length === 2 &&
+  /bar\._healTries = 0;/.test(tgt));
+
+check('loadTargets กันยิงซ้ำระหว่างยังโหลดไม่เสร็จ (cache เดิมกันได้แค่หลังเสร็จ)',
+  /const _tgtInFlight = \{\};/.test(eng) &&
+  /if \(_tgtInFlight\[quarter\]\) return _tgtInFlight\[quarter\];/.test(eng) &&
+  /async function _loadTargetsInner\(quarter\)/.test(eng));
+
+check('SIGNED_OUT ตอน cold boot ต้องถามซ้ำก่อน ไม่เด้ง login ทันที',
+  (() => {
+    const i = core.indexOf("if (!currentUser) {");
+    const j = core.indexOf('window._bootSignedOutTimer = setTimeout', i);
+    const k = core.indexOf("getSession(boot-signedout)", j);
+    return i > 0 && j > i && k > j;
+  })());
+
+check('ถามซ้ำแล้วมี session → เข้าแอปเลย ไม่ต้องล็อกอินใหม่',
+  /SIGNED_OUT ตอนบูตเป็นของชั่วคราว/.test(core) &&
+  (() => {
+    const i = core.indexOf('SIGNED_OUT ตอนบูตเป็นของชั่วคราว');
+    return core.indexOf('hideLoginOverlay();', i) > i;
+  })());
+
+check('ถามซ้ำแล้วตอบไม่ได้ (เน็ตล่ม) → ห้ามเด้งออก',
+  (() => {
+    const i = core.indexOf('SIGNED_OUT ตอนบูต แต่เช็คซ้ำตอบไม่ได้');
+    const j = core.indexOf('return;', i);
+    const k = core.indexOf('_showLoginOverlayClean();', i);
+    return i > 0 && j > i && (k === -1 || j < k);
+  })());
+
+check('ยืนยันแล้วว่าไม่มี session จริง → ยังต้องเด้ง login (ห้ามถอย v_bootnet ที่แก้จอค้าง)',
+  /SIGNED_OUT ตอนบูต ยืนยันแล้วว่าไม่มี session/.test(core));
 
 process.exit(fail ? 1 : 0);

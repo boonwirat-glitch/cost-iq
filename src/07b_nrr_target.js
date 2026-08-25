@@ -807,7 +807,40 @@ function renderPortviewNRRBar() {
 
 // ── Portview NRR + Target Widget ────────────────────────────────
 // SECTION:NRR_WIDGET
+// ── v_stormfix (2026-08-25): กันวาดซ้อนกัน ──────────────────────────────────
+//
+// อาการ: บุชใช้ admin (เห็นทุกบัญชี) แล้วแอปค้างและเด้งออก ตอนเปิดแอปใหม่ๆ
+// ที่ข้อมูลกำลังโหลด · app_errors ยืนยัน: renderPortviewTargetBar ยิง 7 ครั้ง
+// ใน 10 วิ ยังเกิดอยู่บน v281 (17 คน) ทั้งที่ v273 เพิ่มตัวรวมคำสั่งไปแล้ว
+//
+// ทำไม v273 ปิดไม่หมด: มันเปลี่ยนแค่ "จุดที่เรียกจากข้างนอก" ให้ผ่านตัวรวมคำสั่ง
+// แต่ตัวฟังก์ชันเองยังกันการทำงานซ้อนไม่ได้ · ฟังก์ชันนี้เป็น async และมี
+// `await loadTargets(...)` อยู่ตรงกลาง ⇒ ระหว่างที่รอ (นานเป็นวินาทีสำหรับ admin
+// เพราะข้อมูลเยอะ) ตัวกันรัวที่ตั้งไว้ 300ms หมดอายุไปแล้ว คนเรียกรายถัดไปจึงเข้ามา
+// ได้และ await ซ้อนกันอีกชุด · พอชุดแรกทำเสร็จมันสั่ง `bar._lastRenderMs = 0`
+// (ตั้งใจ reset เพื่อให้วาดใหม่ด้วยค่า target ที่เพิ่งได้) = เปิดประตูให้ทุกคน
+// ที่ค้างอยู่วิ่งเข้าพร้อมกัน · ซ้ำร้ายทางกู้ตัวเอง 2 จุดข้างล่างก็ตั้งใจข้ามตัวกันรัว
+// ด้วย ⇒ ตอนบูตของ admin ตัวกันรัวแทบไม่ทำงานเลย
+//
+// แก้ที่ราก: ให้ทำงานได้ทีละชุดเท่านั้น · ถ้ามีคนเรียกระหว่างที่ยังทำอยู่ ไม่ต้อง
+// เข้าคิวซ้อน แค่จำไว้ว่า "ขอวาดอีกรอบ" แล้วค่อยวาดรอบเดียวตอนจบ
+let _tgtBarRunning = false, _tgtBarRerunWanted = false;
 async function renderPortviewTargetBar() {
+  if (_tgtBarRunning) { _tgtBarRerunWanted = true; return; }
+  _tgtBarRunning = true;
+  try {
+    return await _renderPortviewTargetBarInner();
+  } finally {
+    _tgtBarRunning = false;
+    if (_tgtBarRerunWanted) {
+      _tgtBarRerunWanted = false;
+      // ผ่านตัวรวมคำสั่ง ไม่เรียกตรง — คนที่ขอมาระหว่างนั้นหลายรายยุบเหลือรอบเดียว
+      if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(120);
+    }
+  }
+}
+
+async function _renderPortviewTargetBarInner() {
   const bar = document.getElementById('tgt-portview-bar');
   if (!bar) return;
   // Debounce: skip if rendered within last 300ms AND same KAM context (prevents flicker)
@@ -854,7 +887,14 @@ async function renderPortviewTargetBar() {
     bar.style.display = 'none';
     if (!bar._healPending) {
       bar._healPending = true;
-      setTimeout(() => { bar._healPending = false; bar._lastRenderMs = 0; try { renderPortviewTargetBar(); } catch(e) {} }, 1500);
+      // v_stormfix: จำกัดจำนวนครั้ง — ของเดิมวนได้ไม่จำกัดทุก 1.5 วิ ตราบใดที่
+      // ข้อมูลยังไม่มา ซึ่งคือสภาพปกติของ admin ตอนบูต
+      setTimeout(() => {
+        bar._healPending = false; bar._lastRenderMs = 0;
+        bar._healTries = (bar._healTries || 0) + 1;
+        if (bar._healTries > 3) return;
+        try { if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(0); else renderPortviewTargetBar(); } catch(e) {}
+      }, 1500);
     }
     return;
   }
@@ -935,12 +975,16 @@ async function renderPortviewTargetBar() {
       setTimeout(() => {
         bar._healPending = false;
         bar._lastRenderMs = 0; // bypass debounce for retry
-        try { renderPortviewTargetBar(); } catch(e) {}
+        // v_stormfix: จำกัดจำนวนครั้ง + ผ่านตัวรวมคำสั่ง (เหตุผลเดียวกับจุดบน)
+        bar._healTries = (bar._healTries || 0) + 1;
+        if (bar._healTries > 3) return;
+        try { if (typeof scheduleRenderPortviewTargetBar === 'function') scheduleRenderPortviewTargetBar(0); else renderPortviewTargetBar(); } catch(e) {}
       }, 2000);
     }
     return;
   }
   bar._healPending = false; // render succeeded — clear retry flag
+  bar._healTries = 0;        // v_stormfix: สำเร็จแล้ว เริ่มนับใหม่ได้
 
   // ── Pace % ───────────────────────────────────────────────────
   const pct = Math.round(runRate / target * 100);

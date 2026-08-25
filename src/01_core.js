@@ -664,8 +664,42 @@ supa.auth.onAuthStateChange((event, session) => {
     // ยังไม่มี currentUser = ไม่มี session ให้กู้ = เด้งหน้า login เลย ไม่ต้องรอ
     // grace 1200ms (grace มีไว้กันจอกะพริบตอน "กำลังใช้งานอยู่แล้วโทเคนเด้ง")
     if (!currentUser) {
-      _senseDataLog('AUTH','🔒 SIGNED_OUT ตอนยังไม่ได้ล็อกอิน — โชว์หน้า login ทันที');
-      _showLoginOverlayClean();
+      // v_bootauth2 (2026-08-25): เดิมโชว์ login "ทันที" ซึ่งเร็วเกินไป
+      //
+      // หลักฐานจากของจริง (auth.refresh_tokens ของบุช 25 ส.ค.): token ของ session
+      // เดิมถูกต่ออายุ **สำเร็จ** เวลา 03:51:38 และยังไม่ถูก revoke จนถึงตอนนี้ —
+      // แต่ 4 วินาทีถัดมามี session ใหม่เกิดขึ้น = แอปเด้งหน้า login แล้วบุชล็อกอินใหม่
+      // ทั้งที่ session เดิมใช้ได้อยู่ · นี่คือสาเหตุที่ "ทิ้งไว้สักพักแล้วต้องล็อกอินใหม่"
+      //
+      // ทำไม: ตอน PWA เปิดใหม่ supabase-js จะกู้ session จาก localStorage แล้ว
+      // ต่ออายุ token · ระหว่างนั้นมันยิง SIGNED_OUT ออกมาก่อนชั่วขณะ ซึ่งตอน
+      // cold boot currentUser ยังเป็น null เสมอ → เข้าสาขานี้ → ปิดประตูทันที
+      // ทั้งที่อีกไม่กี่ร้อย ms การต่ออายุจะสำเร็จ
+      //
+      // แก้: รอสั้นๆ แล้วถามซ้ำก่อนตัดสิน · ยังคงจบที่หน้า login เสมอถ้าไม่มี session
+      // จริง (กันอาการผ้าคลุม boot ค้างที่ v_bootnet แก้ไว้ ห้ามถอยกลับไปตรงนั้น)
+      clearTimeout(window._bootSignedOutTimer);
+      window._bootSignedOutTimer = setTimeout(async () => {
+        window._bootSignedOutTimer = null;
+        if (currentUser) return;                    // มีคนพาเข้าไปแล้ว
+        let _r = await _withTimeout(supa.auth.getSession(), SENSE_AUTH_TIMEOUT_MS, 'getSession(boot-signedout)');
+        if (_authUnknown(_r)) {
+          // ตอบไม่ได้ = ไม่รู้ ห้ามตีความว่าล็อกเอาต์ · ให้ checkSession ที่มีการ
+          // ลองซ้ำ + โหมดดูอย่างเดียวเป็นคนตัดสินแทน
+          _senseDataLog('AUTH','⏳ SIGNED_OUT ตอนบูต แต่เช็คซ้ำตอบไม่ได้ — ปล่อยให้ checkSession ตัดสิน');
+          return;
+        }
+        const _sess = _r && _r.data && _r.data.session;
+        if (_sess && _sess.user) {
+          _senseDataLog('AUTH','✅ SIGNED_OUT ตอนบูตเป็นของชั่วคราว — ต่ออายุสำเร็จ ไม่ต้องล็อกอินใหม่');
+          currentUser = _sess.user;
+          try { loadUserProfile(); } catch(e) {}
+          hideLoginOverlay();
+          return;
+        }
+        _senseDataLog('AUTH','🔒 SIGNED_OUT ตอนบูต ยืนยันแล้วว่าไม่มี session — โชว์หน้า login');
+        _showLoginOverlayClean();
+      }, 1200);
       return;
     }
     currentUser = null;
