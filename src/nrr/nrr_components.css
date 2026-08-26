@@ -2060,3 +2060,16 @@ body.nrr-pulse-on { background: #0E2A21; }
 .nrr-sh-export:hover{background:var(--fc-ok-dim2,rgba(0,166,81,.16))}
 .nrr-sh-export:active{transform:scale(.96)}
 .nrr-sh-export[disabled]{opacity:.55;cursor:default}
+
+/* v_basepermonth (2026-08-26): แถวฐาน NRR รายเดือน
+   เงียบกว่าแถว movement เพราะเป็นตัวหาร ไม่ใช่ยอดขาย — ไม่ควรแย่งสายตา
+   ส่วนต่างจากเดือนแรกโชว์เป็นตัวเล็กต่อท้าย เพื่อให้เห็นทันทีว่าขยับไปเท่าไร */
+.nrr-baserow td { color: var(--fc-ink-3, #6b7f76); font-size: 12.5px; }
+.nrr-baserow .nrr-base-val { font-variant-numeric: tabular-nums; }
+.nrr-base-delta {
+  display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700;
+  color: var(--fc-warn-text, #9a6b12);
+  background: var(--fc-warn-dim, rgba(255,149,0,.10));
+  border: 1px solid var(--fc-warn-border, rgba(255,149,0,.22));
+  border-radius: 999px; padding: 1px 6px; vertical-align: 1px;
+}

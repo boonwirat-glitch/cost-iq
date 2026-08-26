@@ -608,10 +608,49 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     return '<tr data-mv-row="waived_nrr" class="nrr-table-subrow"><td>↳ ยกเว้นจากฐาน NRR</td>' + cells + '</tr>';
   }
 
+  // ── v_basepermonth (2026-08-26): ฐาน NRR ของ "แต่ละเดือน" ────────────────
+  //
+  // บุชสังเกตเองว่าฐาน ก.ค./ส.ค./ก.ย. ไม่น่าจะเท่ากันเพราะมีร้านย้ายเข้าย้ายออก
+  // ระหว่างไตรมาส — ถูกต้อง engine คิดแยกรายเดือนมาตลอด (base_norm_m =
+  // ฐานตั้งต้น − ย้ายออกสะสม + ย้ายเข้าสะสม ตามนโยบาย "ย้ายเดือน M มีผลตั้งแต่
+  // เดือน M") แต่ตารางโชว์ฐานคอลัมน์เดียวคือของเดือนฐาน ⇒ อ่านแล้วเข้าใจว่า
+  // ทุกเดือนหารด้วยเลขเดียวกัน ซึ่งไม่จริง
+  //
+  // วัดจากข้อมูลจริง 26 ส.ค.: ระดับองค์กรขยับน้อย (181.08M → 180.91M) เพราะย้าย
+  // ภายในองค์กรหักล้างกันเอง แต่ระดับรายคนขยับจริง 6 จาก 16 KAM (สูงสุด ฿0.15M)
+  // ซึ่งกระทบ %NRR ของคนนั้นโดยตรง = กระทบค่าคอม จึงต้องมองเห็นได้
+  //
+  // แถวนี้จึงตอบทั้ง "แต่ละเดือน" และ "แต่ละ owner/segment" ในตัวเดียว เพราะตาราง
+  // ถูก scope ตามแท็บ/คนที่เลือกอยู่แล้ว · โชว์ค่าก่อนหักยกเว้น ให้ต่อกับแถว
+  // "ยกเว้นจากฐาน NRR" ที่มีอยู่ได้ตรงๆ
+  var baseRow = (function () {
+    var vals = columns.map(function (c) {
+      if (c.isBase) return null;
+      var bm = result.by_month[c.month];
+      return (bm && bm.base_norm_m != null) ? bm.base_norm_m * 30 : null;
+    }).filter(function (v) { return v != null; });
+    if (!vals.length) return '';
+    // ถ้าทุกเดือนเท่ากันเป๊ะ = ไม่มีการย้ายเลย แถวนี้ไม่ได้เพิ่มข้อมูลอะไร ซ่อนไป
+    var moved = vals.some(function (v) { return Math.abs(v - vals[0]) > 1; });
+    if (!moved) return '';
+    return '<tr class="nrr-table-subrow nrr-baserow"><td>ฐาน NRR ที่ใช้หารเดือนนั้น</td>' +
+      columns.map(function (c) {
+        if (c.isBase) return '<td class="micro">—</td>';
+        var bm = result.by_month[c.month];
+        if (!bm || bm.base_norm_m == null) return '<td class="micro">—</td>';
+        var v = bm.base_norm_m * 30;
+        var d = v - vals[0];
+        var delta = Math.abs(d) > 1
+          ? '<span class="nrr-base-delta">' + (d > 0 ? '+' : '−') + nrrFmtGMV(Math.abs(d)) + '</span>'
+          : '';
+        return '<td class="num-cell"><span class="nrr-base-val">' + nrrFmtGMV(v) + '</span>' + delta + '</td>';
+      }).join('') + '</tr>';
+  })();
+
   var tbodyHtml =
     simpleRowHtml(TABLE_ROWS[0]) + simpleRowHtml(TABLE_ROWS[1]) + waivedRowHtml() +
     handoverBlockHtml() +
-    TABLE_ROWS.slice(2).map(simpleRowHtml).join('');
+    TABLE_ROWS.slice(2).map(simpleRowHtml).join('') + baseRow;
   var totalRow = '<tr class="nrr-table-total"><td>Total GMV</td>' + columns.map(function (c) {
     if (c.isBase) return '<td class="num-cell">' + nrrFmtGMV(baseAdjusted + handoverBase) + '</td>';
     var bm = result.by_month[c.month];

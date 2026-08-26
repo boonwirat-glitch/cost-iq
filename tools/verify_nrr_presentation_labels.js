@@ -142,5 +142,31 @@ t('pool scope: กราฟยังเรนเดอร์แท่งได�
 t('base column title ย้ายไปอยู่ที่ .nrr-qcol-cap แล้ว (wrapper เป็น display:contents ไม่มี hit-area)',
   /class="nrr-qcol-cap num" title="/.test(poolChartHtml), poolChartHtml.slice(0, 160));
 
+// ── v_basepermonth (2026-08-26): ฐาน NRR รายเดือนต้องมองเห็นได้ ─────────────
+// บุชสังเกตเองว่าฐาน ก.ค./ส.ค. ไม่น่าเท่ากันเพราะมีร้านย้ายเข้า-ออกกลางไตรมาส
+// ถูกต้อง — engine คิดแยกรายเดือน (base_norm_m) มาตลอด แต่ตารางโชว์ฐานคอลัมน์
+// เดียวคือของเดือนฐาน ทำให้เข้าใจว่าทุกเดือนหารด้วยเลขเดียวกัน
+const comp = fs.readFileSync(path.join(ROOT, 'src/nrr/nrr_components.js'), 'utf8');
+const logic = fs.readFileSync(path.join(ROOT, 'src/nrr/nrr_logic.js'), 'utf8');
+
+t('engine คาย base_norm_m รายเดือนออกมาให้ใช้ (ไม่ต้องคำนวณซ้ำฝั่ง UI)',
+  /nrr_pct: nrr_pct, base_norm_m: base_norm_m/.test(logic));
+
+t('ตารางมีแถวฐานรายเดือน',
+  /var baseRow = \(function \(\)/.test(comp) &&
+  /ฐาน NRR ที่ใช้หารเดือนนั้น/.test(comp));
+
+t('แถวฐานอ่านจาก base_norm_m ของเดือนนั้นจริง ไม่ใช่ฐานเดือนแรกซ้ำๆ',
+  /bm\.base_norm_m \* 30/.test(comp));
+
+t('ประกาศ baseRow ก่อนถูกใช้ใน tbodyHtml (ไม่งั้นได้ค่า undefined ต่อท้ายตาราง)',
+  comp.indexOf('var baseRow =') < comp.indexOf('var tbodyHtml ='));
+
+t('ซ่อนแถวเมื่อทุกเดือนฐานเท่ากัน (ไม่มีการย้าย = แถวนี้ไม่เพิ่มข้อมูล)',
+  /if \(!moved\) return '';/.test(comp));
+
+t('โชว์ส่วนต่างจากเดือนแรก ให้เห็นทันทีว่าขยับเท่าไร',
+  /nrr-base-delta/.test(comp));
+
 console.log('\n' + (fail ? '❌' : '✅') + ' verify_nrr_presentation_labels: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
