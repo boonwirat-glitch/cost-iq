@@ -76,6 +76,8 @@ function makeSandbox(opts) {
     computeChurnRowsForAccount: id => (opts.churn || {})[id] || null,
     computeSkuMovementForAccount: id => (opts.movement || {})[id] || null,
     bulkSkuCurrentData: opts.skuCurrent || {},
+    bulkHistoryData: opts.history || {},
+    bulkCurrentMonthData: opts.currentMonth || {},
     navigator: { vibrate() {} },
     portviewSelectAccount: () => { sandbox._drilled = true; },
   };
@@ -86,6 +88,9 @@ function makeSandbox(opts) {
   vm.runInContext(DI, sandbox);
   return sandbox;
 }
+
+// top-level function declaration ใน vm ทับจากข้างนอกไม่ได้ ต้องรันสคริปต์ทับใน context เดิม
+function vmRun(sandbox, code) { vm.runInContext(code, sandbox); }
 
 const churnRow = (name, gmv, type, interval, late) =>
   ({ type, id: name, name, dept: '—', gmv, avgInterval: interval || 9, daysLate: late || 3 });
@@ -580,6 +585,127 @@ check('Esc ปิดหน้ารายการก่อน แล้วค�
   /_diListOpen\(\)\)_diCloseList\(\);\s*else closeDailyInsight\(\);/.test(DI.replace(/\n/g, '')));
 check('ปัดลงปิดจอถูกกันไว้ตอนเปิดหน้ารายการอยู่',
   DI.includes('!tracking||_diListOpen()'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 16. รอบวันจันทร์ ──');
+
+{
+  const mon = makeSandbox({});
+  const isMonday = new Date().getDay() === 1;
+  check('บล็อกสัปดาห์โผล่เฉพาะวันจันทร์',
+    mon._diIsWeeklyDay() === isMonday);
+
+  // ปักวันในสัปดาห์ให้เป็นจันทร์เพื่อทดสอบเนื้อหา ไม่งั้นเทสต์จะผ่านแค่วันจันทร์
+  // makeSandbox รับ map ของ localStorage ⇒ ต้องห่อเป็นคีย์จริงก่อน ไม่ใช่ส่ง state ดิบ
+  const wk = (state, skuCurrent, newCount) => {
+    const s2 = makeSandbox({ storage: { sense_daily_v1: JSON.stringify(state) }, skuCurrent });
+    s2._diIsWeeklyDay = () => true;
+    vmRun(s2, 'function _diIsWeeklyDay(){return true;}');
+    return s2._diWeekly(newCount);
+  };
+
+  const d3 = new Date(); d3.setDate(d3.getDate() - 3);
+  const day3 = d3.getFullYear() + '-' + String(d3.getMonth() + 1).padStart(2, '0') + '-' + String(d3.getDate()).padStart(2, '0');
+  const st = { seeded: true, marks: { [day3]: [
+    { aid: 'B', name: 'ร้าน', sku: 'p1', skuName: 'x', gmv: 20000 },
+    { aid: 'B', name: 'ร้าน', sku: 'p2', skuName: 'y', gmv: 5000 },
+    { aid: 'C', name: 'ร้านสอง', sku: 'q1', skuName: 'z', gmv: 8000 },
+  ] } };
+
+  const w = wk(st, { B: [{ item_id: 'p1', orders_this_month: 1 }] }, 4);
+  check('นับรายการกับร้านที่ทักไปในสัปดาห์ถูก',
+    w && w.items === 3 && w.shops === 2, JSON.stringify(w));
+  check('นับเฉพาะร้านที่กลับมาสั่งจริง พร้อมยอด',
+    w.backShops === 1 && w.backBaht === 20000);
+  check('พ่วงของที่เพิ่งถึงรอบตั้งแต่ครั้งก่อน (วันจันทร์ = ครอบเสาร์อาทิตย์)',
+    w.newCount === 4);
+  check('สัปดาห์ที่ไม่ได้ทักอะไรและไม่มีของใหม่ → ไม่ต้องมีบล็อกนี้',
+    wk({ seeded: true, marks: {} }, {}, 0) === null,
+    'บล็อกว่างๆ แย่กว่าไม่มีบล็อก');
+  check('ของเก่ากว่า 7 วันไม่ถูกนับเข้าสัปดาห์นี้',
+    wk({ seeded: true, marks: { '2020-01-01': st.marks[day3] } }, {}, 0) === null);
+
+  const html = makeSandbox({}).__renderWeekly
+    ? '' : (() => {
+      const s3 = makeSandbox({ accounts: [{ id: 'A', name: 'r', gmvToDate: 1, paceSignal: { expected: 9 } }] });
+      const data = s3.buildDailyInsight();
+      data.weekly = { items: 3, shops: 2, backShops: 1, backBaht: 20000, newCount: 4 };
+      return s3._diRenderBody(data);
+    })();
+  check('บล็อกวางไว้บนสุดของจอ ก่อนพาดหัว',
+    html.indexOf('di-week') > -1 && html.indexOf('di-week') < html.indexOf('di-find'));
+  check('พูดเป็นเรื่องที่ KAM ทำเอง ไม่ใช่รายงานตัวเลขลอยๆ',
+    /สัปดาห์ที่แล้วคุณทักไป/.test(html) && /กลับมาสั่งแล้ว/.test(html));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 17. สรุปเดือนแบบสไลด์ ──');
+
+{
+  const accounts = [
+    { id: 'A', name: 'ร้านโต', gmvToDate: 0, paceSignal: {} },
+    { id: 'B', name: 'ร้านหด', gmvToDate: 0, paceSignal: {} },
+  ];
+  const s = makeSandbox({
+    accounts,
+    currentMonth: { A: { month_label: 'ส.ค. 2569' }, B: { month_label: 'ส.ค. 2569' } },
+    history: {
+      A: [{ m: 'มิ.ย. 2569', s: 100000 }, { m: 'ก.ค. 2569', s: 160000 }, { m: 'ส.ค. 2569', s: 40000 }],
+      B: [{ m: 'มิ.ย. 2569', s: 90000 }, { m: 'ก.ค. 2569', s: 70000 }, { m: 'ส.ค. 2569', s: 20000 }],
+    },
+    movement: { A: { newSkus: [{ name: 'ของใหม่', gmv: 30000 }], recentMo: 'ก.ค. 2569' } },
+  });
+  const w = s._diMonthlyWrap(accounts);
+  check('สรุป "เดือนที่ปิดแล้วล่าสุด" ไม่ใช่เดือนที่ยังเดินอยู่',
+    w && w.label === 'ก.ค. 2569' && w.prevLabel === 'มิ.ย. 2569',
+    'ได้ ' + (w && w.label));
+  check('ยอดรวมและส่วนต่างถูก',
+    w.total === 230000 && w.prevTotal === 190000 && w.diff === 40000);
+  check('นับร้านที่โตกับร้านที่หดแยกกัน',
+    w.grew === 1 && w.shrank === 1);
+  check('ร้านที่โตมากสุดขึ้นก่อน',
+    w.risers[0].name === 'ร้านโต' && w.risers[0].diff === 60000);
+  check('รวมของที่ไม่เคยซื้อของทั้งพอร์ต',
+    w.newSkus === 1 && w.newBaht === 30000);
+
+  const slides = s._diBuildWrapSlides(w);
+  check('สไลด์ครบทุกเรื่องที่มีข้อมูล + หน้าปิดท้าย',
+    slides.length === 4 && slides[slides.length - 1].cta === 'ดูของวันนี้',
+    'ได้ ' + slides.length + ' สไลด์');
+  check('หน้าแรกพูดเรื่องยอดรวม ไม่ใช่เรื่องที่ต้องรีบ',
+    /พอร์ตคุณทำได้/.test(slides[0].h));
+  check('เดือนที่ไม่มีของใหม่และไม่เคยทัก → สไลด์สั้นลงเอง ไม่มีหน้าเปล่า',
+    (() => {
+      const s2 = makeSandbox({
+        accounts, currentMonth: { A: { month_label: 'ส.ค. 2569' } },
+        history: {
+          A: [{ m: 'มิ.ย. 2569', s: 100000 }, { m: 'ก.ค. 2569', s: 90000 }, { m: 'ส.ค. 2569', s: 1 }],
+          B: [{ m: 'มิ.ย. 2569', s: 90000 }, { m: 'ก.ค. 2569', s: 80000 }],
+        },
+      });
+      return s2._diBuildWrapSlides(s2._diMonthlyWrap(accounts)).length === 2;
+    })());
+  check('ประวัติไม่ถึงสองเดือนที่ปิดแล้ว → ไม่ต้องโชว์สรุปเดือน',
+    makeSandbox({ accounts, history: { A: [{ m: 'ก.ค. 2569', s: 1 }] } })._diMonthlyWrap(accounts) === null);
+
+  check('ประตูเดือนละครั้ง',
+    (() => {
+      const mk = s._diMonthKey();
+      return makeSandbox({ storage: { sense_daily_v1: JSON.stringify({ wrapped: mk }) } })._diWrapSeen() === true &&
+             makeSandbox({ storage: { sense_daily_v1: JSON.stringify({ wrapped: '2020-01' }) } })._diWrapSeen() === false;
+    })());
+}
+
+check('Esc ปิดสไลด์ก่อน แล้วรายการ แล้วค่อยทั้งจอ',
+  /_diWrapOpen\(\)\)_diCloseWrap\(\);\s*else if\(_diListOpen\(\)\)_diCloseList\(\);\s*else closeDailyInsight/.test(DI.replace(/\n/g, '')));
+check('สไลด์อยู่ชั้นบนสุดของจอนี้ (เหนือหน้ารายการ)',
+  (() => {
+    const wz = (DI.match(/#di-wrap\{[^}]*z-index:(\d+)/) || [])[1];
+    const lz = (DI.match(/#di-list\{[^}]*z-index:(\d+)/) || [])[1];
+    return wz && lz && parseInt(wz) > parseInt(lz);
+  })());
+check('ไม่จุดพลุทับสไลด์สรุปเดือน',
+  /if\(!wrapped&&d\.big&&d\.big\.celebrate\)/.test(DI));
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n' + (fail === 0

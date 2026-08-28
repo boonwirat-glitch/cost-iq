@@ -1,4 +1,4 @@
-<!-- Freshket Sense v286: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v287: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v286',
+      version: 'v287',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -35259,7 +35259,8 @@ function renderKeySkuSplitButton() {
 // เฟส 1 (v284): sheet รายวัน · ประตูวันละครั้ง · ปัดปิด · ปุ่มใน nav
 // เฟส 2 (v285): หน้ารายการเต็ม · แตะค้าง = ทักแล้ว · ป้าย "ใหม่" ·
 //                การ์ด "ได้ผลแล้ว" ที่ปิดวงจร · ฉลองแบบกำหนดตำแหน่งตายตัว
-// ยังไม่มี: รอบวันจันทร์/วันที่ 1 · TL-Admin · ปุ่มตอนเช็คอิน Echo
+// เฟส 3 (v287): บล็อกสรุปสัปดาห์ (วันจันทร์) · สรุปเดือนแบบสไลด์ (ครั้งแรกของเดือน)
+// ยังไม่มี: TL-Admin · ปุ่มตอนเช็คอิน Echo
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── ค่าคงที่ที่ปรับได้ ──────────────────────────────────────────────────────
@@ -35271,6 +35272,7 @@ const DI_ROLES       = ['rep','tl','ad','pm','ad_tl','admin'];
 const DI_HOLD_MS     = 420;    // แตะค้างนานเท่าไหร่ถึงนับว่า "ทักแล้ว"
 const DI_MARK_KEEP   = 14;     // เก็บประวัติการทักย้อนหลังกี่วัน
 const DI_SIGNAL_KEEP = 600;    // จำ id สัญญาณที่เคยเห็นได้กี่ตัว (ไว้ติดป้าย "ใหม่")
+const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
 
 // ── สถานะที่จำในเครื่อง ────────────────────────────────────────────────────
 // จงใจไม่เก็บฝั่ง Supabase: ถ้าเก็บที่นั่น พอโดน 402 จอนี้จะพังพร้อมกับสิ่งที่มันควรทำงานแทน
@@ -35396,6 +35398,117 @@ function _diFlagNew(ids){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 1b. รอบสัปดาห์ (วันจันทร์) — สรุปสิ่งที่ "คุณทำ" ไม่ใช่สิ่งที่ "ระบบเห็น"
+// ═══════════════════════════════════════════════════════════════════════════
+// ข้อมูลยอดขายในเครื่องเป็นรายเดือน ทำ delta รายสัปดาห์จริงๆ ไม่ได้ และไม่ควรเดา
+// สิ่งที่เป็นรายสัปดาห์จริงคือประวัติการทักของ KAM เอง ⇒ บล็อกนี้จึงเล่าเรื่องนั้น
+// บวกกับของที่เพิ่งถึงรอบตั้งแต่ครั้งก่อนที่เปิดดู (ซึ่งวันจันทร์ = ครอบเสาร์อาทิตย์พอดี)
+function _diIsWeeklyDay(){ return new Date().getDay()===DI_WEEK_DAY; }
+
+function _diWeekly(newCount){
+  if(!_diIsWeeklyDay())return null;
+  const marks=(_diLoadState().marks)||{};
+  const today=_diToday();
+  const from=new Date(); from.setDate(from.getDate()-7);
+  const cut=from.getFullYear()+'-'+String(from.getMonth()+1).padStart(2,'0')+'-'+String(from.getDate()).padStart(2,'0');
+
+  const seen=new Set(), shops=new Set(), backShops=new Set();
+  let items=0, backBaht=0;
+  Object.keys(marks).forEach(d=>{
+    if(d<cut||d>=today)return;
+    (marks[d]||[]).forEach(m=>{
+      const k=m.aid+'::'+m.sku;
+      if(seen.has(k))return;
+      seen.add(k); items++; shops.add(m.aid);
+      if(_diSkuOrderedNow(m.aid,m.sku)){ backShops.add(m.aid); backBaht+=(m.gmv||0); }
+    });
+  });
+  if(!items&&!newCount)return null;
+  return {items,shops:shops.size,backShops:backShops.size,backBaht,newCount:newCount||0};
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1c. สรุปเดือน — โชว์ครั้งแรกที่เปิดแอปในเดือนใหม่ (ไม่จำเป็นต้องวันที่ 1)
+// ═══════════════════════════════════════════════════════════════════════════
+const DI_MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function _diMonthKey(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function _diMonthSortKey(label){
+  const p=String(label||'').split(' ');
+  return (parseInt(p[1]||0)*12)+DI_MONTHS.indexOf(p[0]);
+}
+
+// เดือนที่สรุปคือ "เดือนที่ปิดแล้วล่าสุด" ไม่ใช่เดือนปัจจุบันที่ยังเดินอยู่
+function _diMonthlyWrap(accounts){
+  if(typeof bulkHistoryData==='undefined')return null;
+  const curLabel=((typeof bulkCurrentMonthData!=='undefined'&&accounts.length
+    &&bulkCurrentMonthData[accounts[0].id])||{}).month_label||'';
+
+  let lastLabel='', prevLabel='';
+  for(const a of accounts){
+    const h=(bulkHistoryData[a.id]||[]).filter(r=>r.m&&r.m!==curLabel);
+    if(h.length<2)continue;
+    h.sort((x,y)=>_diMonthSortKey(y.m)-_diMonthSortKey(x.m));
+    lastLabel=h[0].m; prevLabel=h[1].m; break;
+  }
+  if(!lastLabel||!prevLabel)return null;
+
+  let lastTotal=0, prevTotal=0, grew=0, shrank=0;
+  const risers=[];
+  accounts.forEach(a=>{
+    const h=bulkHistoryData[a.id]||[];
+    let l=0,pv=0;
+    h.forEach(r=>{ if(r.m===lastLabel)l=r.s||r.gmv||0; else if(r.m===prevLabel)pv=r.s||r.gmv||0; });
+    lastTotal+=l; prevTotal+=pv;
+    if(pv>0&&l>pv){ grew++; risers.push({id:a.id,name:a.name||'—',diff:l-pv,now:l}); }
+    else if(pv>0&&l<pv)shrank++;
+  });
+  risers.sort((x,y)=>y.diff-x.diff);
+
+  // ของใหม่ที่เข้าพอร์ตเดือนนั้น — ใช้ computeSkuMovementForAccount ตัวเดิม
+  let newSkus=0, newBaht=0; const newTop=[];
+  accounts.forEach(a=>{
+    let sm=null;
+    try{ sm=(typeof computeSkuMovementForAccount==='function')?computeSkuMovementForAccount(a.id):null; }catch(e){ sm=null; }
+    if(sm&&sm.newSkus&&sm.newSkus.length){
+      newSkus+=sm.newSkus.length;
+      const v=sm.newSkus.reduce((t,x)=>t+(x.gmv||0),0);
+      newBaht+=v;
+      newTop.push({name:a.name||'—',sku:sm.newSkus[0].name,gmv:sm.newSkus[0].gmv||0});
+    }
+  });
+  newTop.sort((x,y)=>y.gmv-x.gmv);
+
+  // ที่ทักไปเดือนก่อน กลับมากี่ร้าน
+  const marks=(_diLoadState().marks)||{};
+  const d=new Date(); d.setMonth(d.getMonth()-1);
+  const pm=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  const seen=new Set(), mShops=new Set(), mBack=new Set();
+  Object.keys(marks).forEach(k=>{
+    if(k.slice(0,7)!==pm)return;
+    (marks[k]||[]).forEach(m=>{
+      const key=m.aid+'::'+m.sku;
+      if(seen.has(key))return;
+      seen.add(key); mShops.add(m.aid);
+      if(_diSkuOrderedNow(m.aid,m.sku))mBack.add(m.aid);
+    });
+  });
+
+  return {
+    label:lastLabel, prevLabel:prevLabel,
+    total:lastTotal, prevTotal:prevTotal,
+    diff:lastTotal-prevTotal,
+    pct:prevTotal>0?Math.round((lastTotal-prevTotal)/prevTotal*100):null,
+    shops:accounts.length, grew:grew, shrank:shrank,
+    risers:risers.slice(0,3),
+    newSkus:newSkus, newBaht:newBaht, newTop:newTop.slice(0,2),
+    markedShops:mShops.size, backShops:mBack.size
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 2. รวบรวมสัญญาณ — เรียกของเดิมล้วนๆ ไม่มีสูตรใหม่
 // ═══════════════════════════════════════════════════════════════════════════
 function buildDailyInsight(){
@@ -35455,6 +35568,7 @@ function buildDailyInsight(){
   overdueTop.forEach(s=>{ s.items.forEach(r=>{ r.isNew=fresh.has(s.id+'::'+r.id); }); });
 
   const won=_diLoopClosure();
+  const weekly=_diWeekly(fresh.size);
 
   // ── เลือก "เรื่องใหญ่ของวันนี้" ──
   // ลำดับนี้ไม่ใช่เรื่องรสนิยม: วงจรปิดมาก่อนเพราะมันบอกว่า "สิ่งที่คุณทำได้ผล"
@@ -35504,7 +35618,7 @@ function buildDailyInsight(){
     aheadShops, aheadBaht, newSkuBaht,
     overdueTop, aheadTop, newFinds,
     newCount:fresh.size,
-    won, big,
+    won, weekly, big,
     quiet:!big&&overdueItems===0
   };
 }
@@ -35696,6 +35810,45 @@ function _diInjectStyles(){
 #di-sheet .di-chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
   color:#006650;background:#E9FFF6;border-radius:999px;padding:2px 8px;margin-top:5px}
 
+/* ── บล็อกสรุปสัปดาห์ (วันจันทร์) วางบนสุดของจอ ─────────────────────── */
+#di-sheet .di-week{background:#F4F8F6;border:1px solid #E4ECEA;border-radius:16px;
+  padding:13px 15px;margin-top:16px}
+#di-sheet .di-week-k{font-size:11.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:#7D9494}
+#di-sheet .di-week p{font-size:14.5px;line-height:1.55;color:#48696A;margin-top:6px}
+#di-sheet .di-week p b{color:#1D4849;font-weight:700}
+
+/* ── สรุปเดือนแบบสไลด์ ──────────────────────────────────────────────── */
+#di-wrap{position:absolute;inset:0;z-index:7;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) 0 0;color:#fff;
+  background:linear-gradient(155deg,#0F2E27,#00443A 62%,#063A32);
+  opacity:0;pointer-events:none;transition:opacity .3s ease}
+#di-wrap.di-on{opacity:1;pointer-events:auto}
+#di-wrap .di-bars{display:flex;gap:4px;padding:12px 16px 0}
+#di-wrap .di-bars i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.24)}
+#di-wrap .di-bars i.on{background:#00CE7C}
+#di-wrap .di-wclose{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;
+  z-index:2;background:rgba(255,255,255,.14);border:none;color:#fff;font-family:inherit;
+  font-size:12.5px;font-weight:600;border-radius:999px;padding:6px 13px;cursor:pointer}
+#di-wrap .di-slide{flex:1;display:flex;flex-direction:column;justify-content:center;
+  padding:0 26px 70px;text-align:left}
+#di-wrap .di-wk{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:rgba(199,255,231,.62)}
+#di-wrap .di-wh{font-size:27px;font-weight:700;letter-spacing:-.03em;line-height:1.3;margin-top:12px}
+#di-wrap .di-wv{font-size:48px;font-weight:700;letter-spacing:-.04em;line-height:1;
+  margin-top:16px;color:#00CE7C;font-variant-numeric:tabular-nums}
+#di-wrap .di-wp{font-size:15px;line-height:1.62;color:rgba(214,245,232,.8);margin-top:14px}
+#di-wrap .di-wp b{color:#fff;font-weight:600}
+#di-wrap .di-wlist{margin-top:16px;display:flex;flex-direction:column;gap:9px}
+#di-wrap .di-wrow{display:flex;align-items:baseline;gap:10px;font-size:14.5px}
+#di-wrap .di-wrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#di-wrap .di-wrow b{flex:0 0 auto;color:#00CE7C;font-weight:700;font-variant-numeric:tabular-nums}
+#di-wrap .di-wgo{margin-top:24px;align-self:flex-start;background:#00CE7C;color:#04352C;
+  border:none;border-radius:12px;font-family:inherit;font-size:14.5px;font-weight:700;
+  padding:12px 20px;cursor:pointer}
+#di-wrap .di-wtap{position:absolute;bottom:26px;left:0;right:0;text-align:center;
+  font-size:12px;color:rgba(199,255,231,.5)}
+
 /* ── ฉลอง: ตำแหน่งกำหนดตายตัว ทดสอบซ้ำได้ผลเดิม ห้ามใช้ Math.random ── */
 #di-spark{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}
 #di-spark i{position:absolute;width:7px;height:7px;border-radius:2px;opacity:0;
@@ -35711,7 +35864,7 @@ function _diInjectStyles(){
 @keyframes di-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
 
 @media (prefers-reduced-motion:reduce){
-  #di-sheet,#di-list,#di-sheet.di-in .di-rise,#di-boot{transition:none}
+  #di-sheet,#di-list,#di-wrap,#di-sheet.di-in .di-rise,#di-boot{transition:none}
   #di-sheet .di-rise{opacity:1;transform:none}
   #di-boot .di-av,#nav-restaurant.di-live.di-unread svg,#di-spark i{animation:none}
   #di-spark{display:none}
@@ -35763,6 +35916,21 @@ function _diRenderBody(d){
   let h='';
   h+='<p class="di-eyebrow di-rise di-d1">'+_diEsc(_diDateLabel())+'</p>';
   h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting())+(name?' คุณ'+_diEsc(name):'')+'</p>';
+
+  // วันจันทร์: วางสรุปสัปดาห์ไว้บนสุด เพราะเป็นสิ่งที่ต่างจากทุกวัน
+  if(d.weekly){
+    const w=d.weekly;
+    let line='';
+    if(w.items){
+      line='สัปดาห์ที่แล้วคุณทักไป <b>'+w.items+' รายการ</b> ใน <b>'+w.shops+' ร้าน</b>'
+          +(w.backShops?' · กลับมาสั่งแล้ว <b>'+w.backShops+' ร้าน</b> '+_diBaht(w.backBaht)
+                       :' · ยังไม่มีร้านไหนกลับมาสั่ง');
+    }
+    if(w.newCount){
+      line+=(line?'<br>':'')+'ตั้งแต่ครั้งก่อนที่เปิดดู มีของถึงรอบเพิ่มอีก <b>'+w.newCount+' รายการ</b>';
+    }
+    h+='<div class="di-week di-rise di-d1"><p class="di-week-k">สัปดาห์ที่ผ่านมา</p><p>'+line+'</p></div>';
+  }
 
   h+='<div class="di-find di-rise di-d2">';
   if(d.big){
@@ -36010,6 +36178,106 @@ function _diListOpen(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 7b. สรุปเดือนแบบสไลด์ — ครั้งแรกที่เปิดแอปในเดือนใหม่
+// ═══════════════════════════════════════════════════════════════════════════
+// ตรงนี้ทำเป็นสไลด์ (ต่างจากจอรายวันที่จงใจไม่ทำ) เพราะเป็นโมเมนต์พิธีการ
+// ไม่ใช่ของที่ต้องกวาดตาให้จบใน 30 วินาที · ดูปีละ 12 ครั้ง ไม่ใช่ทุกเช้า
+let _diWrapSlides=[], _diWrapAt=0;
+
+function _diWrapSeen(){ return _diLoadState().wrapped===_diMonthKey(); }
+
+function _diBuildWrapSlides(w){
+  const up=w.diff>=0;
+  const out=[];
+  out.push({
+    k:'สรุปเดือน '+w.label,
+    h:'เดือน '+w.label+'<br>พอร์ตคุณทำได้',
+    v:_diBaht(w.total),
+    p:(w.pct===null?'':'<b>'+(up?'+':'−')+_diBaht(Math.abs(w.diff))+'</b> จากเดือน '+w.prevLabel
+        +' ('+(up?'+':'')+w.pct+'%)<br>')+'จากทั้งหมด <b>'+w.shops+' ร้าน</b>ที่คุณดูแล'
+  });
+  if(w.grew){
+    out.push({
+      k:'ร้านที่โตขึ้น',
+      h:'<b>'+w.grew+' ร้าน</b> ซื้อมากกว่า<br>เดือนก่อนหน้า',
+      v:'',
+      p:'อีก '+w.shrank+' ร้านซื้อน้อยลง',
+      list:w.risers.map(r=>({n:r.name,v:'+'+_diBaht(r.diff)}))
+    });
+  }
+  if(w.newSkus){
+    out.push({
+      k:'ของที่ไม่เคยซื้อ',
+      h:'มีของใหม่เข้าพอร์ต<br><b>'+w.newSkus+' รายการ</b>',
+      v:_diBaht(w.newBaht),
+      p:w.newTop.length?('ก้อนใหญ่ที่สุดคือ <b>'+_diEsc(w.newTop[0].sku)+'</b><br>ที่ '
+        +_diEsc(w.newTop[0].name)):''
+    });
+  }
+  if(w.markedShops){
+    out.push({
+      k:'สิ่งที่คุณลงมือทำ',
+      h:'เดือนที่แล้วคุณทักไป<br><b>'+w.markedShops+' ร้าน</b>',
+      v:w.backShops?w.backShops+' ร้าน':'',
+      p:w.backShops?'กลับมาสั่งแล้วค่ะ':'ยังไม่มีร้านไหนกลับมาสั่ง แต่ยังไม่สายค่ะ'
+    });
+  }
+  out.push({
+    k:'เดือนใหม่',
+    h:'เริ่มเดือนใหม่กันค่ะ',
+    v:'',
+    p:'Olive จะคอยดูพอร์ต '+w.shops+' ร้านของคุณให้ทุกเช้าเหมือนเดิมนะคะ',
+    cta:'ดูของวันนี้'
+  });
+  return out;
+}
+
+function _diPaintWrap(){
+  const host=document.getElementById('di-wrap');
+  if(!host||!_diWrapSlides.length)return;
+  const sl=_diWrapSlides[_diWrapAt];
+  host.querySelector('.di-bars').innerHTML=
+    _diWrapSlides.map((x,i)=>'<i class="'+(i<=_diWrapAt?'on':'')+'"></i>').join('');
+  const body=host.querySelector('.di-slide');
+  body.innerHTML=
+     '<p class="di-wk">'+_diEsc(sl.k)+'</p>'
+    +'<p class="di-wh">'+sl.h+'</p>'
+    +(sl.v?'<p class="di-wv">'+_diEsc(sl.v)+'</p>':'')
+    +(sl.p?'<p class="di-wp">'+sl.p+'</p>':'')
+    +(sl.list?('<div class="di-wlist">'+sl.list.map(r=>
+        '<span class="di-wrow"><span>'+_diEsc(r.n)+'</span><b>'+_diEsc(r.v)+'</b></span>').join('')+'</div>'):'')
+    +(sl.cta?'<button class="di-wgo" id="di-wrap-go">'+_diEsc(sl.cta)+'</button>':'');
+  const go=document.getElementById('di-wrap-go');
+  if(go)go.addEventListener('click',function(ev){ ev.stopPropagation(); _diCloseWrap(); });
+}
+
+function _diWrapStep(dir){
+  const n=_diWrapAt+dir;
+  if(n<0)return;
+  if(n>=_diWrapSlides.length){ _diCloseWrap(); return; }
+  _diWrapAt=n;
+  _diPaintWrap();
+}
+
+function _diOpenWrap(w){
+  const host=document.getElementById('di-wrap');
+  if(!host)return;
+  _diWrapSlides=_diBuildWrapSlides(w);
+  _diWrapAt=0;
+  _diPaintWrap();
+  host.classList.add('di-on');
+  _diSaveState({wrapped:_diMonthKey()});
+}
+function _diCloseWrap(){
+  const host=document.getElementById('di-wrap');
+  if(host)host.classList.remove('di-on');
+}
+function _diWrapOpen(){
+  const host=document.getElementById('di-wrap');
+  return !!(host&&host.classList.contains('di-on'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 8. เปิด / ปิด
 // ═══════════════════════════════════════════════════════════════════════════
 let _diOpening=false;
@@ -36045,6 +36313,12 @@ function openDailyInsight(){
       +'</div>'
       +'<div id="di-list-body"></div>'
     +'</div>'
+    +'<div id="di-wrap">'
+      +'<div class="di-bars"></div>'
+      +'<button class="di-wclose" id="di-wrap-close" type="button">ข้าม</button>'
+      +'<div class="di-slide"></div>'
+      +'<p class="di-wtap">แตะขวาเพื่อไปต่อ · แตะซ้ายเพื่อย้อน</p>'
+    +'</div>'
     +'<div id="di-spark"></div>'
     +'<div id="di-boot"><span class="di-av">O</span><p>กำลังไล่ดู '+d.accountCount+' ร้านของคุณ'+_diEsc(_diMyName())+'...</p></div>';
   document.body.appendChild(sheet);
@@ -36057,7 +36331,15 @@ function openDailyInsight(){
     sheet.classList.add('di-in');
     setTimeout(()=>{ const b=document.getElementById('di-boot'); if(b)b.remove(); },600);
     _diFillVisitRow();
-    if(d.big&&d.big.celebrate)setTimeout(()=>_diCelebrate(d.big.celebrate),260);
+    // สรุปเดือนขึ้นก่อนจอรายวัน แล้วปิดแล้วเจอจอรายวันข้างล่าง — เดือนละครั้ง
+    let wrapped=false;
+    if(!_diWrapSeen()){
+      try{
+        const w=_diMonthlyWrap((typeof getPortviewAccounts==='function'?getPortviewAccounts():[])||[]);
+        if(w&&w.prevTotal>0){ _diOpenWrap(w); wrapped=true; }
+      }catch(e){ console.warn('monthly wrap failed',e); }
+    }
+    if(!wrapped&&d.big&&d.big.celebrate)setTimeout(()=>_diCelebrate(d.big.celebrate),260);
     _diOpening=false;
   };
   setTimeout(reveal,_diReduceMotion()?60:DI_BOOT_MS);
@@ -36067,6 +36349,13 @@ function openDailyInsight(){
   if(close)close.addEventListener('click',()=>closeDailyInsight());
   const back=document.getElementById('di-list-back');
   if(back)back.addEventListener('click',()=>_diCloseList());
+  const wclose=document.getElementById('di-wrap-close');
+  if(wclose)wclose.addEventListener('click',ev=>{ ev.stopPropagation(); _diCloseWrap(); });
+  const wrap=document.getElementById('di-wrap');
+  if(wrap)wrap.addEventListener('click',ev=>{
+    const r=wrap.getBoundingClientRect();
+    _diWrapStep(ev.clientX-r.left < r.width*0.32 ? -1 : 1);
+  });
   const cta=document.getElementById('di-cta');
   if(cta&&d.big&&d.big.shopId)cta.addEventListener('click',()=>_diGoToAccount(d.big.shopId));
 
@@ -36086,7 +36375,7 @@ function openDailyInsight(){
       sy=e.touches[0].clientY; tracking=(body.scrollTop<=2);
     },{passive:true});
     body.addEventListener('touchmove',e=>{
-      if(!tracking||_diListOpen())return;
+      if(!tracking||_diListOpen()||_diWrapOpen())return;
       if(e.touches[0].clientY-sy>70){ tracking=false; closeDailyInsight(); }
     },{passive:true});
   }
@@ -36108,7 +36397,8 @@ function openDailyInsight(){
 
 function _diEscKey(e){
   if(e.key!=='Escape')return;
-  if(_diListOpen())_diCloseList();
+  if(_diWrapOpen())_diCloseWrap();
+  else if(_diListOpen())_diCloseList();
   else closeDailyInsight();
 }
 
