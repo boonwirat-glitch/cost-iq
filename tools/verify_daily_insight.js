@@ -77,6 +77,8 @@ function makeSandbox(opts) {
     computeSkuMovementForAccount: id => (opts.movement || {})[id] || null,
     bulkSkuCurrentData: opts.skuCurrent || {},
     bulkHistoryData: opts.history || {},
+    bulkSkusData: opts.skus || { seed: {} },
+    _buildKamGroups: () => opts.groups || [],
     bulkCurrentMonthData: opts.currentMonth || {},
     navigator: { vibrate() {} },
     portviewSelectAccount: () => { sandbox._drilled = true; },
@@ -698,6 +700,10 @@ console.log('\n── 17. สรุปเดือนแบบสไลด์ �
 
 check('Esc ปิดสไลด์ก่อน แล้วรายการ แล้วค่อยทั้งจอ',
   /_diWrapOpen\(\)\)_diCloseWrap\(\);\s*else if\(_diListOpen\(\)\)_diCloseList\(\);\s*else closeDailyInsight/.test(DI.replace(/\n/g, '')));
+check('ซ่อนแถบโหลดข้อมูลของแอประหว่างเปิดจอ แล้วคืนค่าเดิมตอนปิด',
+  /_diToggleLoadPill\(true\)/.test(DI) && /_diToggleLoadPill\(false\)/.test(DI) &&
+  /el\._diPrev/.test(DI),
+  '#data-load-pill อยู่ z 9999 สูงกว่า sheet 9400 — เปิดตอน tier 3 แล้วมันยังค้างอยู่ได้');
 check('สไลด์อยู่ชั้นบนสุดของจอนี้ (เหนือหน้ารายการ)',
   (() => {
     const wz = (DI.match(/#di-wrap\{[^}]*z-index:(\d+)/) || [])[1];
@@ -706,6 +712,139 @@ check('สไลด์อยู่ชั้นบนสุดของจอน�
   })());
 check('ไม่จุดพลุทับสไลด์สรุปเดือน',
   /if\(!wrapped&&d\.big&&d\.big\.celebrate\)/.test(DI));
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 18. ข้อมูลยังมาไม่ครบ (บั๊กที่เจอตอนวางแผนเฟส 4) ──');
+// ตัวกระตุ้นเดิมผูกกับ tier 1 (portview+history) แต่ของค้างอยู่ tier 2-3
+// ⇒ จอเคยเปิดมาแล้วโชว์ 0 รายการทั้งที่มีของค้างจริง แล้วปั๊มว่าอ่านแล้วทั้งวัน
+
+check('รอ tier 3 ไม่ใช่ tier 1 (tier 1 มีแค่ portview/history ซึ่งไม่พอ)',
+  /DataRegistry\.onReady\(3/.test(DI));
+check('ยังมีเพดานเวลาเผื่อ tier 3 ไม่มาเลย — ไม่ปล่อยให้จอหายไปเฉยๆ',
+  /DataRegistry\.onReady\(1[\s\S]{0,120}DI_TIER_WAIT_MS/.test(DI));
+
+{
+  const acct = [{ id: 'A', name: 'ร้าน', gmvToDate: 60000, paceSignal: { expected: 40000 } }];
+  const s = makeSandbox({ accounts: acct, skus: {} });   // bulkSkusData ว่าง = ชั้น 3 ยังไม่มา
+  const d = s.buildDailyInsight();
+  check('รู้ตัวว่าข้อมูลยังไม่ครบ',
+    d.partial === true);
+  check('ข้อมูลครบแล้วธงต้องหาย',
+    makeSandbox({ accounts: acct, skus: { A: {} } }).buildDailyInsight().partial === false);
+  check('ข้อมูลไม่ครบ = ห้ามปั๊มว่าอ่านแล้ว (ไม่งั้นทั้งวันจะไม่ได้เห็นของค้างอีกเลย)',
+    /if\(!d\.partial\)_diMarkSeen\(\)/.test(DI));
+  check('มีทางวาดใหม่เมื่อข้อมูลมาทีหลัง ไม่ใช่ค้างเลขไม่ครบ',
+    /function _diRefreshBody/.test(DI) && /_diRefreshBody\(\)/.test(DI));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 19. จอของ TL — เห็นคนในทีม แล้วเห็นร้านที่ควรพูดถึง ──');
+
+{
+  const mkAcct = (id, name, opts) => Object.assign(
+    { id, name, gmvToDate: 0, paceSignal: { expected: 0 } }, opts || {});
+  const groups = [
+    { kamEmail: 'may@f.co', kamName: 'เมย์', pace: 104, paceCls: 'great',
+      accounts: [mkAcct('A', 'Stolen Cafe'), mkAcct('B', 'ร้านรอง')] },
+    { kamEmail: 'ploy@f.co', kamName: 'พลอย', pace: 88, paceCls: 'danger',
+      accounts: [mkAcct('C', 'Doughnut Library')] },
+    { kamEmail: 'nan@f.co', kamName: 'แนน', pace: 100, paceCls: 'safe',
+      accounts: [mkAcct('D', 'ร้านนิ่ง')] },
+  ];
+  const s = makeSandbox({
+    profile: { email: 'tl@f.co', kam_name: 'ทีมลีด', role: 'tl' },
+    groups,
+    skus: { A: {} },
+    churn: { C: [churnRow('น้ำมันปาล์ม', 47200, 'gone', 9, 12),
+                 churnRow('ไข่ไก่', 12600, 'near', 7, 2)] },
+    movement: { A: { newSkus: [{ name: 'เม็ดมะม่วงหิมพานต์', gmv: 42000 }], recentMo: 'ก.ค. 2569' } },
+  });
+  check('role tl เข้าโหมดทีม', s._diIsTeamMode() === true);
+  check('role rep ไม่เข้าโหมดทีม',
+    makeSandbox({ profile: { email: 'r@f.co', role: 'rep' } })._diIsTeamMode() === false);
+  check('admin ยังไม่รองรับ (บุชสั่งให้ทำ TL ก่อน)',
+    makeSandbox({ profile: { email: 'a@f.co', role: 'admin' },
+      accounts: [mkAcct('A', 'r')] })._diEligible() === false);
+
+  const d = s.buildTeamInsight();
+  check('ได้คนครบทุกคนในทีม', d.peopleCount === 3 && d.shops === 4);
+  check('พาดหัวเป็น ชื่อคน + ร้านของคนนั้น ไม่ใช่ตัวเลขรวม',
+    d.big && /เมย์/.test(d.big.head) && /Stolen Cafe/.test(d.big.head),
+    'ได้ ' + (d.big && d.big.head));
+  check('ข่าวดีมาก่อน — ของใหม่ ฿42,000 ชนะของค้าง ฿59,800',
+    d.big.kind === 'team-new' && d.big.value === 42000);
+  check('กดพาดหัวแล้วไปร้านนั้นจริง', d.big.shopId === 'A');
+
+  const may = d.people.find(p => p.name === 'เมย์');
+  const ploy = d.people.find(p => p.name === 'พลอย');
+  const nan = d.people.find(p => p.name === 'แนน');
+  check('ทุกคนมี "ร้านที่ควรพูดถึง" ของตัวเอง',
+    may.mention.name === 'Stolen Cafe' && ploy.mention.name === 'Doughnut Library');
+  check('คนที่ไม่มีเรื่อง = mention ว่าง (จอจะเขียนว่าพอร์ตนิ่ง ไม่ใช่เว้นว่าง)',
+    nan.mention === null);
+  check('ร้านที่ควรพูดถึงของคนที่มีแต่ของค้าง = ร้านที่เงินมากสุด พร้อมเหตุผล',
+    ploy.mention.kind === 'late' && ploy.mention.baht === 59800 &&
+    /ของถึงรอบแล้วยังไม่สั่ง 2 รายการ/.test(ploy.mention.why));
+  check('เรียงคนด้วยเงินของเรื่องที่ควรพูดถึง ไม่ใช่ตามชื่อ',
+    d.people[0].name === 'พลอย' && d.people[2].name === 'แนน',
+    'ได้ ' + d.people.map(p => p.name).join(','));
+  check('ยอดรวมทีมถูก', d.overdueItems === 2 && d.overdueBaht === 59800);
+
+  const html = s._diRenderTeamBody(d);
+  check('รายชื่อคนอยู่ในจอเดียวกัน ไม่ต้องกดเข้าอีกหน้า',
+    (html.match(/di-person/g) || []).length >= 3);
+  check('ชื่อคนวนสีได้ 4 สี', /di-c0/.test(html) && /di-c1/.test(html));
+  check('คนที่พอร์ตนิ่งเขียนบอก ไม่ปล่อยว่าง',
+    /พอร์ตนิ่ง ไม่มีอะไรต้องคุย/.test(html));
+  check('สรุปทั้งทีมอยู่ล่างสุด ไม่ใช่พระเอก',
+    html.indexOf('di-person') < html.indexOf('รวมทั้งทีม'));
+  check('จอ TL ไม่มีแตะค้าง (การทักลูกค้าเป็นงานของ KAM)',
+    !/data-markable/.test(s._diRenderList('kam:may@f.co', d)),
+    'ถ้ามี mark ของ TL จะไปปนกับวงจรปิดของ KAM');
+
+  const own = s._diListGroups('kam:ploy@f.co', d);
+  check('แตะชื่อคนแล้วได้ร้านของคนนั้นเท่านั้น',
+    own.length === 1 && own[0].name === 'Doughnut Library');
+  check('หัวข้อหน้ารายการบอกว่ากำลังดูของใคร',
+    s._diListTitle('kam:ploy@f.co', d).t === 'พลอย');
+  check('รอ target ก่อนคิด pace ของทีม แล้ววาดใหม่ (ไม่งั้น denominator ค้างที่ baseline)',
+    /team&&typeof _tgtLoaded[\s\S]{0,200}loadTargets\(_tgtCurrentQuarter\(\)\)[\s\S]{0,60}_diRefreshBody/.test(DI));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 20. การ์ดตอนเช็คอิน Echo ──');
+
+{
+  const host = { firstChild: null, _kids: [], insertBefore(n) { this._kids.push(n); } };
+  const s = makeSandbox({
+    skus: { A: {} },
+    elements: { 'ci-visit-hero': host },
+    churn: { A: [churnRow('น้ำมันปาล์ม', 47200, 'gone', 9, 12),
+                 churnRow('ไข่ไก่', 12600, 'near', 7, 2)],
+             B: [{ type: 'ordered' }] },
+  });
+  check('ร้านมีของค้าง → ขึ้นการ์ด', s.renderCheckinOverdue('A') === true);
+  check('ร้านไม่มีของค้าง → ไม่ขึ้นการ์ด (ไม่ใช่การ์ดว่าง)',
+    s.renderCheckinOverdue('B') === false);
+  check('ไม่ส่ง accountId มา → ไม่ทำอะไร', s.renderCheckinOverdue(null) === false);
+  check('ข้อมูลชั้น 3 ยังไม่มา → ไม่โชว์ศูนย์',
+    makeSandbox({ skus: {}, elements: { 'ci-visit-hero': host },
+      churn: { A: [churnRow('x', 1000, 'gone')] } }).renderCheckinOverdue('A') === false);
+  check('การ์ดอ่านอย่างเดียว ไม่มีปุ่ม ไม่แตะค้าง',
+    !/di-checkin-card[\s\S]{0,900}(<button|data-markable)/.test(DI));
+
+  const CI = R('src/09_conv_intel.js');
+  check('Echo เรียกหลังเช็คอินสำเร็จเท่านั้น (หลังโชว์ pill)',
+    (() => {
+      const p = CI.indexOf("pill.style.display = 'flex'");
+      const c = CI.indexOf('renderCheckinOverdue(_accountGuid)', p);
+      return p > -1 && c > p && c - p < 600;
+    })());
+  check('มี typeof guard — ถอดโมดูลออกแล้ว Echo ต้องไม่พัง',
+    /typeof renderCheckinOverdue === 'function'/.test(CI));
+  check('แตะไฟล์ Echo แค่จุดเดียว',
+    (CI.match(/renderCheckinOverdue/g) || []).length === 2);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n' + (fail === 0

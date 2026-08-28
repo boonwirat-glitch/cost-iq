@@ -28,11 +28,13 @@ const DI_STORE_KEY   = 'sense_daily_v1';
 const DI_GOOD_MIN    = 5000;   // ข่าวดีต้องมีมูลค่าอย่างน้อยเท่านี้ถึงจะขึ้นเป็นพาดหัว
 const DI_MAX_ACCOUNTS= 400;    // พอร์ตใหญ่กว่านี้ (admin ทั้งฐาน) ยังไม่รองรับ — ไม่เด้ง
 const DI_BOOT_MS     = 1100;   // บรรทัด "กำลังไล่ดู…" แสดงนานแค่ไหนก่อนเผยเนื้อหา
-const DI_ROLES       = ['rep','tl','ad','pm','ad_tl','admin'];
+const DI_ROLES       = ['rep','tl','ad','pm','ad_tl'];   // admin ยังไม่รองรับ (บุช 2026-08-28)
+const DI_TEAM_ROLES  = ['tl','ad_tl'];                   // role ที่เห็น "คนในทีม" แทน "ร้าน" 
 const DI_HOLD_MS     = 420;    // แตะค้างนานเท่าไหร่ถึงนับว่า "ทักแล้ว"
 const DI_MARK_KEEP   = 14;     // เก็บประวัติการทักย้อนหลังกี่วัน
 const DI_SIGNAL_KEEP = 600;    // จำ id สัญญาณที่เคยเห็นได้กี่ตัว (ไว้ติดป้าย "ใหม่")
 const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
+const DI_TIER_WAIT_MS= 8000;   // รอข้อมูลชั้น 3 นานสุดเท่าไหร่ก่อนยอมเปิดเท่าที่มี
 
 // ── สถานะที่จำในเครื่อง ────────────────────────────────────────────────────
 // จงใจไม่เก็บฝั่ง Supabase: ถ้าเก็บที่นั่น พอโดน 402 จอนี้จะพังพร้อมกับสิ่งที่มันควรทำงานแทน
@@ -271,6 +273,19 @@ function _diMonthlyWrap(accounts){
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. รวบรวมสัญญาณ — เรียกของเดิมล้วนๆ ไม่มีสูตรใหม่
 // ═══════════════════════════════════════════════════════════════════════════
+// ข้อมูลที่จอนี้ต้องใช้อยู่คนละชั้นกับตัวกระตุ้น:
+//   bulkSkuCurrentData = tier 2 · bulkSkusData = tier 3 · portview/paceSignal = tier 1
+// ถ้าเปิดตอนชั้น 3 ยังไม่มา ของค้างกับของใหม่จะหายเงียบๆ ทั้งที่มีจริง
+// ⇒ ต้องรู้ตัวว่าข้อมูลยังไม่ครบ แล้วห้ามปั๊มว่า "อ่านแล้ววันนี้"
+function _diDataComplete(){
+  try{
+    if(window.DataRegistry&&typeof window.DataRegistry.isReady==='function')
+      return !!window.DataRegistry.isReady(3);
+  }catch(e){}
+  // ไม่มี DataRegistry (เช่นในเทสต์) — ดูจากของจริงว่ามีข้อมูลไหม
+  return typeof bulkSkusData!=='undefined'&&Object.keys(bulkSkusData||{}).length>0;
+}
+
 function buildDailyInsight(){
   if(typeof getPortviewAccounts!=='function')return null;
   const accounts=getPortviewAccounts()||[];
@@ -378,9 +393,177 @@ function buildDailyInsight(){
     aheadShops, aheadBaht, newSkuBaht,
     overdueTop, aheadTop, newFinds,
     newCount:fresh.size,
+    partial:!_diDataComplete(),
     won, weekly, big,
     quiet:!big&&overdueItems===0
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 2b. จอของ TL — เห็นคนในทีม แล้วเห็นว่าร้านไหนของคนนั้นที่ควรพูดถึง
+// ═══════════════════════════════════════════════════════════════════════════
+// TL ดูแลคน ไม่ได้ดูแลร้าน ⇒ พาดหัวเป็น "คนหนึ่งคน + ร้านหนึ่งร้านของเขา"
+// ไม่ใช่กองตัวเลขรวมของทั้งทีม ซึ่งบอกไม่ได้ว่าเช้านี้ควรไปคุยกับใคร
+function _diIsTeamMode(){
+  const p=(typeof currentUserProfile!=='undefined'&&currentUserProfile)||null;
+  return !!(p&&DI_TEAM_ROLES.indexOf(p.role)>=0);
+}
+
+// "ร้านที่ควรพูดถึง" ของ KAM หนึ่งคน — บันไดเดียวกับจอ KAM ข่าวดีมาก่อนเสมอ
+function _diPickShopWorthMention(accounts){
+  let bestNew=null, bestLate=null, bestAhead=null;
+  accounts.forEach(a=>{
+    if(!a||!a.id)return;
+
+    let sm=null;
+    try{ sm=(typeof computeSkuMovementForAccount==='function')?computeSkuMovementForAccount(a.id):null; }catch(e){ sm=null; }
+    if(sm&&sm.newSkus&&sm.newSkus.length){
+      const top=sm.newSkus[0];
+      if(!bestNew||(top.gmv||0)>bestNew.baht)
+        bestNew={kind:'new',id:a.id,name:a.name||'—',baht:top.gmv||0,
+          why:'เริ่มซื้อ '+(top.name||'ของที่ไม่เคยซื้อ')};
+    }
+
+    let rows=null;
+    try{ rows=(typeof computeChurnRowsForAccount==='function')?computeChurnRowsForAccount(a.id):null; }catch(e){ rows=null; }
+    if(rows){
+      const late=rows.filter(r=>r.type==='gone'||r.type==='near');
+      if(late.length){
+        late.sort((x,y)=>(y.gmv||0)-(x.gmv||0));
+        const baht=late.reduce((t,r)=>t+(r.gmv||0),0);
+        if(!bestLate||baht>bestLate.baht)
+          bestLate={kind:'late',id:a.id,name:a.name||'—',baht:baht,count:late.length,
+            why:'ของถึงรอบแล้วยังไม่สั่ง '+late.length+' รายการ'};
+      }
+    }
+
+    const expected=(a.paceSignal||{}).expected||0;
+    const ahead=expected>0?((a.gmvToDate||0)-expected):0;
+    if(ahead>0&&(!bestAhead||ahead>bestAhead.baht))
+      bestAhead={kind:'ahead',id:a.id,name:a.name||'—',baht:ahead,
+        why:'ซื้อเร็วกว่าเดือนที่แล้ว'};
+  });
+
+  if(bestNew&&bestNew.baht>=DI_GOOD_MIN)return bestNew;
+  if(bestLate)return bestLate;
+  if(bestAhead&&bestAhead.baht>=DI_GOOD_MIN)return bestAhead;
+  if(bestNew)return bestNew;
+  return null;   // พอร์ตนิ่ง — ไม่ต้องยกร้านไหนเลย
+}
+
+function buildTeamInsight(){
+  if(typeof _buildKamGroups!=='function')return null;
+  let groups=[];
+  try{ groups=_buildKamGroups()||[]; }catch(e){ return null; }
+  if(!groups.length)return null;
+
+  let overdueItems=0, overdueShops=0, overdueBaht=0, aheadShops=0, aheadBaht=0, shops=0;
+  const people=groups.map(g=>{
+    const accts=g.accounts||[];
+    shops+=accts.length;
+    let lateItems=0, lateShops=0, lateBaht=0, upShops=0, upBaht=0;
+    accts.forEach(a=>{
+      let rows=null;
+      try{ rows=(typeof computeChurnRowsForAccount==='function')?computeChurnRowsForAccount(a.id):null; }catch(e){ rows=null; }
+      if(rows){
+        const late=rows.filter(r=>r.type==='gone'||r.type==='near');
+        if(late.length){ lateItems+=late.length; lateShops++; lateBaht+=late.reduce((t,r)=>t+(r.gmv||0),0); }
+      }
+      const expected=(a.paceSignal||{}).expected||0;
+      const ahead=expected>0?((a.gmvToDate||0)-expected):0;
+      if(ahead>0){ upShops++; upBaht+=ahead; }
+    });
+    overdueItems+=lateItems; overdueShops+=lateShops; overdueBaht+=lateBaht;
+    aheadShops+=upShops; aheadBaht+=upBaht;
+    return {
+      email:g.kamEmail||'', name:g.kamName||'—', total:accts.length,
+      pace:g.pace||0, paceCls:g.paceCls||'',
+      lateItems, lateShops, lateBaht, upShops, upBaht,
+      mention:_diPickShopWorthMention(accts),
+      accounts:accts
+    };
+  });
+
+  // เรียงคนด้วยเงินของเรื่องที่ควรพูดถึง ไม่ใช่ตามชื่อ · คนที่ไม่มีเรื่องอยู่ท้ายสุด
+  people.sort((x,y)=>((y.mention&&y.mention.baht)||0)-((x.mention&&x.mention.baht)||0));
+
+  // พาดหัว = คนที่มีเรื่องคุ้มค่าพูดถึงที่สุด ข่าวดีมาก่อน
+  const good=people.filter(p=>p.mention&&(p.mention.kind==='new'||p.mention.kind==='ahead'));
+  const bad=people.filter(p=>p.mention&&p.mention.kind==='late');
+  const lead=good[0]||bad[0]||null;
+  let big=null;
+  if(lead){
+    const m=lead.mention;
+    const isGood=(m.kind!=='late');
+    big={kind:'team-'+m.kind,shopId:m.id,celebrate:m.kind==='new'?'small':null,
+      tag:isGood?'Olive เจอมาให้':'คุยกับทีมวันนี้ยังทัน',
+      head:_diEsc(lead.name)+'<br>'+_diEsc(m.name)+' '+(m.kind==='new'?'เริ่มซื้อของที่ไม่เคยซื้อ'
+        :m.kind==='late'?'มีของถึงรอบสั่งแล้ว':'ซื้อเร็วกว่าเดือนที่แล้ว'),
+      value:m.baht,
+      body:'<b>'+_diEsc(lead.name)+'</b> ดูแล '+lead.total+' ร้าน · '+_diEsc(m.why),
+      cta:'เปิดดู '+m.name};
+  }
+
+  return {
+    team:true, people, shops, peopleCount:people.length,
+    overdueItems, overdueShops, overdueBaht, aheadShops, aheadBaht,
+    quietPeople:people.filter(p=>!p.mention).length,
+    partial:!_diDataComplete(),
+    big
+  };
+}
+
+function _diRenderTeamBody(d){
+  const name=_diMyName();
+  let h='';
+  h+='<p class="di-eyebrow di-rise di-d1">'+_diEsc(_diDateLabel())+'</p>';
+  h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting())+(name?' คุณ'+_diEsc(name):'')+'</p>';
+
+  h+='<div class="di-find di-rise di-d2">';
+  if(d.big){
+    h+='<span class="di-tag'+(d.big.kind==='team-late'?' di-calm':'')+'">'+_diEsc(d.big.tag)+'</span>';
+    h+='<p class="di-head">'+d.big.head+'</p>';
+    h+='<p class="di-value" id="di-value">'+_diBaht(d.big.value)+'</p>';
+    h+='<p class="di-p">'+d.big.body+'</p>';
+    if(d.big.shopId)h+='<button class="di-cta" id="di-cta">'+_diEsc(d.big.cta)+'</button>';
+  }else{
+    h+='<span class="di-tag di-calm">วันนี้ยังไม่มีอะไรใหม่</span>';
+    h+='<p class="di-head">ทีมนิ่งดีค่ะ</p>';
+    h+='<p class="di-value"><span id="di-value">'+d.peopleCount+'</span><small> คน · '+d.shops+' ร้าน</small></p>';
+    h+='<p class="di-p">ไม่มีใครในทีมที่มีเรื่องต้องรีบคุยวันนี้ค่ะ</p>';
+  }
+  h+='</div>';
+
+  // รายชื่อคน — อยู่ในจอเดียวกัน ไม่ต้องกดเข้าไปอีกหน้า
+  h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">คนในทีม '+d.peopleCount+' คน</p>';
+  d.people.forEach((p,i)=>{
+    const m=p.mention;
+    const sub=m?(_diEsc(m.name)+' · '+_diEsc(m.why))
+              :'พอร์ตนิ่ง ไม่มีอะไรต้องคุย';
+    h+='<button class="di-row di-person di-c'+(i%4)+'" data-kam="'+_diEsc(p.email||p.name)+'">'
+      +'<span class="di-row-m">'
+      +'<span class="di-row-title"><i></i>'+_diEsc(p.name)+' <em>'+p.total+' ร้าน</em></span>'
+      +'<span class="di-row-sub">'+sub+'</span></span>'
+      +(m?'<span class="di-row-v '+(m.kind==='late'?'di-neg':'di-pos')+'">'
+          +(m.kind==='late'?'':'+')+_diBaht(m.baht)+'</span>':'')
+      +'<svg class="di-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
+      +'</button>';
+  });
+  h+='</div>';
+
+  h+='<div class="di-rest di-rise di-d4"><p class="di-rest-k">รวมทั้งทีม</p>';
+  h+=_diRowHtml('di-row-overdue','ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
+      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน',
+      d.overdueItems?_diBaht(d.overdueBaht):'', 'di-neg', d.overdueItems===0);
+  h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
+      d.aheadShops+' ร้าน · เทียบวันต่อวันกับเดือนที่แล้ว',
+      d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
+  h+='</div>';
+
+  h+='<p class="di-method di-rise di-d4">'
+    +'"ร้านที่ควรพูดถึง" เลือกให้คนละหนึ่งร้าน — ของที่ร้านเพิ่งเริ่มซื้อมาก่อน '
+    +'ถ้าไม่มีจึงเป็นร้านที่ของค้างมากที่สุด · แตะชื่อคนเพื่อดูร้านที่เหลือ</p>';
+  return h;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -569,6 +752,15 @@ function _diInjectStyles(){
   background:#FFEEE1;border-radius:999px;padding:1px 7px;margin-left:6px}
 #di-sheet .di-chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
   color:#006650;background:#E9FFF6;border-radius:999px;padding:2px 8px;margin-top:5px}
+
+/* ── แถวรายชื่อคนในทีม (จอ TL) ───────────────────────────────────────── */
+#di-sheet .di-person .di-row-title{display:flex;align-items:center;gap:8px}
+#di-sheet .di-person .di-row-title i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;font-style:normal}
+#di-sheet .di-person .di-row-title em{font-style:normal;font-size:12.5px;font-weight:500;color:#7D9494}
+#di-sheet .di-person.di-c0 .di-row-title{color:#CC5200} #di-sheet .di-person.di-c0 i{background:#FF6600}
+#di-sheet .di-person.di-c1 .di-row-title{color:#C43E74} #di-sheet .di-person.di-c1 i{background:#C43E74}
+#di-sheet .di-person.di-c2 .di-row-title{color:#BA8500} #di-sheet .di-person.di-c2 i{background:#BA8500}
+#di-sheet .di-person.di-c3 .di-row-title{color:#B3261E} #di-sheet .di-person.di-c3 i{background:#B3261E}
 
 /* ── บล็อกสรุปสัปดาห์ (วันจันทร์) วางบนสุดของจอ ─────────────────────── */
 #di-sheet .di-week{background:#F4F8F6;border:1px solid #E4ECEA;border-radius:16px;
@@ -785,6 +977,12 @@ function _diMarkHandled(aid,name,sku,skuName,gmv){
 }
 
 function _diListTitle(kind,d){
+  if(d.team&&kind.indexOf('kam:')===0){
+    const who=kind.slice(4);
+    const p=(d.people||[]).find(x=>(x.email||x.name)===who);
+    return {t:(p&&p.name)||'ร้านของ KAM',
+      s:((p&&p.total)||0)+' ร้าน'+(p&&p.lateBaht?' · ของค้าง '+_diBaht(p.lateBaht):'')};
+  }
   if(kind==='ahead')return {t:'ซื้อเพิ่มขึ้น',s:d.aheadShops+' ร้าน · +'+_diBaht(d.aheadBaht)};
   if(kind==='visit')return {t:'ยังไม่ได้ไปเยี่ยมไตรมาสนี้',s:((d.visitList||[]).length)+' ร้าน'};
   return {t:'ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
@@ -792,6 +990,34 @@ function _diListTitle(kind,d){
 }
 
 function _diListGroups(kind,d){
+  // จอ TL: 'kam:<email>' = ร้านของคนคนนั้น · overdue/ahead = ทั้งทีม
+  if(d.team){
+    let accts=[];
+    if(kind.indexOf('kam:')===0){
+      const who=kind.slice(4);
+      const p=(d.people||[]).find(x=>(x.email||x.name)===who);
+      accts=(p&&p.accounts)||[];
+    }else{
+      (d.people||[]).forEach(p=>{ accts=accts.concat(p.accounts||[]); });
+    }
+    const out=[];
+    accts.forEach(a=>{
+      let rows=null;
+      try{ rows=(typeof computeChurnRowsForAccount==='function')?computeChurnRowsForAccount(a.id):null; }catch(e){ rows=null; }
+      const late=rows?rows.filter(r=>r.type==='gone'||r.type==='near'):[];
+      if(kind==='ahead'){
+        const expected=(a.paceSignal||{}).expected||0;
+        const ahead=expected>0?((a.gmvToDate||0)-expected):0;
+        if(ahead>0)out.push({id:a.id,name:a.name||'—',baht:ahead,items:[],count:0});
+        return;
+      }
+      if(!late.length&&kind.indexOf('kam:')!==0)return;
+      late.sort((x,y)=>(y.gmv||0)-(x.gmv||0));
+      out.push({id:a.id,name:a.name||'—',count:late.length,items:late,
+        baht:late.reduce((t,r)=>t+(r.gmv||0),0)});
+    });
+    return out.sort((x,y)=>y.baht-x.baht);
+  }
   if(kind==='ahead')return (d.aheadTop||[]).slice();
   if(kind==='visit')return (d.visitList||[]).slice();
   const g=(d.overdueTop||[]).slice();
@@ -806,7 +1032,7 @@ function _diRenderList(kind,d){
   const groups=_diListGroups(kind,d);
   let h='';
 
-  if(kind==='overdue'){
+  if(kind==='overdue'&&!d.team){
     h+='<div class="di-tools">'
       +'<button data-sort="baht" class="'+(_diListSort==='baht'?'on':'')+'">เรียงตามเงิน</button>'
       +'<button data-sort="name" class="'+(_diListSort==='name'?'on':'')+'">เรียงตามร้าน</button>'
@@ -840,13 +1066,13 @@ function _diRenderList(kind,d){
     items.forEach(it=>{
       const skuId=(it.id!==undefined&&it.id!==null)?it.id:it.name;
       const isDone=kind==='overdue'&&done.has(_diDoneKey(g.id,skuId));
-      const sub=kind==='overdue'
+      const sub=(kind==='overdue'||d.team)
         ? 'ปกติสั่งทุก '+it.avgInterval+' วัน · เลยรอบมา '+it.daysLate+' วัน'
         : 'เดือน '+(g.mo||'')+' · ไม่เคยซื้อมาก่อน';
       h+='<button class="di-item'+(isDone?' di-done':'')+'"'
         +' data-shop="'+_diEsc(g.id)+'" data-shopname="'+_diEsc(g.name)+'"'
         +' data-sku="'+_diEsc(skuId)+'" data-skuname="'+_diEsc(it.name)+'"'
-        +' data-gmv="'+(it.gmv||0)+'"'+(kind==='overdue'?' data-markable="1"':'')+'>'
+        +' data-gmv="'+(it.gmv||0)+'"'+((kind==='overdue'&&!d.team)?' data-markable="1"':'')+'>'
         +'<span class="di-item-m">'
         +'<span class="di-item-n">'+_diEsc(it.name)+(it.isNew?'<span class="di-badge">ใหม่</span>':'')+'</span>'
         +'<span class="di-item-s">'+_diEsc(sub)+'</span>'
@@ -1042,13 +1268,47 @@ function _diWrapOpen(){
 // ═══════════════════════════════════════════════════════════════════════════
 let _diOpening=false;
 
+function _diBindBody(d){
+  const cta=document.getElementById('di-cta');
+  if(cta&&d.big&&d.big.shopId)cta.addEventListener('click',()=>_diGoToAccount(d.big.shopId));
+  const bind=(id,kind)=>{
+    const el=document.getElementById(id);
+    if(el)el.addEventListener('click',()=>_diOpenList(kind));
+  };
+  bind('di-row-overdue','overdue');
+  bind('di-row-ahead','ahead');
+  bind('di-row-visit','visit');
+  // แตะชื่อคน = เปิดรายการร้านของคนนั้น
+  document.querySelectorAll('#di-body .di-person').forEach(b=>{
+    b.addEventListener('click',()=>_diOpenList('kam:'+b.dataset.kam));
+  });
+}
+
+// ข้อมูลชั้น 3 มาทีหลัง ⇒ วาดเนื้อจอใหม่ทั้งก้อนแทนที่จะปล่อยให้ค้างเลขไม่ครบ
+function _diRefreshBody(){
+  const body=document.getElementById('di-body');
+  if(!body)return false;
+  const team=_diIsTeamMode();
+  let d=null;
+  try{ d=team?buildTeamInsight():buildDailyInsight(); }catch(e){ return false; }
+  if(!d)return false;
+  window._diLastData=d;
+  body.innerHTML=team?_diRenderTeamBody(d):_diRenderBody(d);
+  _diBindBody(d);
+  _diFillVisitRow();
+  if(!d.partial)_diMarkSeen();
+  return true;
+}
+
 function openDailyInsight(){
   if(_diOpening)return;
   if(document.getElementById('di-sheet'))return;   // เปิดอยู่แล้ว
   // ด่านสิทธิ์อยู่ตรงนี้ด้วย ไม่ใช่แค่ที่ทางเข้า — กันโค้ดในอนาคตเรียกตรงแล้วหลุด role
   if(!_diEligible())return;
+  const team=_diIsTeamMode();
   let d=null;
-  try{ d=buildDailyInsight(); }catch(e){ console.warn('buildDailyInsight failed',e); return; }
+  try{ d=team?buildTeamInsight():buildDailyInsight(); }
+  catch(e){ console.warn('build daily insight failed',e); return; }
   if(!d)return;
   window._diLastData=d;
 
@@ -1063,7 +1323,7 @@ function openDailyInsight(){
   sheet.innerHTML=
      '<div class="di-grab"><i></i></div>'
     +'<button class="di-close" id="di-close" aria-label="ปิด">ปิด</button>'
-    +'<div id="di-body">'+_diRenderBody(d)+'</div>'
+    +'<div id="di-body">'+(team?_diRenderTeamBody(d):_diRenderBody(d))+'</div>'
     +'<div id="di-list">'
       +'<div class="di-top">'
         +'<button class="di-back" id="di-list-back" aria-label="ย้อนกลับ">'
@@ -1080,7 +1340,10 @@ function openDailyInsight(){
       +'<p class="di-wtap">แตะขวาเพื่อไปต่อ · แตะซ้ายเพื่อย้อน</p>'
     +'</div>'
     +'<div id="di-spark"></div>'
-    +'<div id="di-boot"><span class="di-av">O</span><p>กำลังไล่ดู '+d.accountCount+' ร้านของคุณ'+_diEsc(_diMyName())+'...</p></div>';
+    +'<div id="di-boot"><span class="di-av">O</span><p>'
+      +(team?('กำลังไล่ดูทีม '+d.peopleCount+' คน '+d.shops+' ร้าน...')
+            :('กำลังไล่ดู '+d.accountCount+' ร้านของคุณ'+_diEsc(_diMyName())+'...'))
+    +'</p></div>';
   document.body.appendChild(sheet);
 
   requestAnimationFrame(()=>sheet.classList.add('di-on'));
@@ -1091,6 +1354,12 @@ function openDailyInsight(){
     sheet.classList.add('di-in');
     setTimeout(()=>{ const b=document.getElementById('di-boot'); if(b)b.remove(); },600);
     _diFillVisitRow();
+    // จอ TL: _buildKamGroups ใช้ target ในการคิด pace — target โหลดแบบ async
+    // ถ้ายังไม่มาตอนวาด denominator จะกลายเป็น baseline ค้างถาวร ⇒ โหลดแล้ววาดใหม่
+    if(team&&typeof _tgtLoaded!=='undefined'&&!_tgtLoaded
+       &&typeof loadTargets==='function'&&typeof _tgtCurrentQuarter==='function'){
+      try{ loadTargets(_tgtCurrentQuarter()).then(()=>{ _diRefreshBody(); }).catch(()=>{}); }catch(e){}
+    }
     // สรุปเดือนขึ้นก่อนจอรายวัน แล้วปิดแล้วเจอจอรายวันข้างล่าง — เดือนละครั้ง
     let wrapped=false;
     if(!_diWrapSeen()){
@@ -1116,16 +1385,7 @@ function openDailyInsight(){
     const r=wrap.getBoundingClientRect();
     _diWrapStep(ev.clientX-r.left < r.width*0.32 ? -1 : 1);
   });
-  const cta=document.getElementById('di-cta');
-  if(cta&&d.big&&d.big.shopId)cta.addEventListener('click',()=>_diGoToAccount(d.big.shopId));
-
-  const bind=(id,kind)=>{
-    const el=document.getElementById(id);
-    if(el)el.addEventListener('click',()=>_diOpenList(kind));
-  };
-  bind('di-row-overdue','overdue');
-  bind('di-row-ahead','ahead');
-  bind('di-row-visit','visit');
+  _diBindBody(d);
 
   // ── ปัดลงเพื่อปิด — ทำงานเมื่อเลื่อนอยู่บนสุดและไม่ได้เปิดหน้ารายการอยู่ ──
   const body=document.getElementById('di-body');
@@ -1151,8 +1411,27 @@ function openDailyInsight(){
     },{passive:true});
   }
   document.addEventListener('keydown',_diEscKey);
+  _diToggleLoadPill(true);
 
-  _diMarkSeen();
+  // ข้อมูลยังไม่ครบ = ยังไม่นับว่าอ่านแล้ว จะได้เด้งใหม่ให้ครบเมื่อข้อมูลมา
+  if(!d.partial)_diMarkSeen();
+  else _diSyncNavButton();
+}
+
+// #data-load-pill ของแอปอยู่ z-index 9999 = สูงกว่า sheet นี้ (9400)
+// เราเปิดจอตอน tier 3 ซึ่งช้ากว่าเดิม ⇒ แถบโหลดมีสิทธิ์ยังค้างอยู่แล้วมาทับเนื้อจอ
+// ขึ้นไปสูงกว่านี้ไม่ได้ เพราะ 9999 เป็นของ login overlay กับ Echo sheet ด้วย
+// ⇒ ซ่อนไว้ระหว่างจอนี้เปิด แล้วคืนค่าเดิมตอนปิด
+function _diToggleLoadPill(hide){
+  const el=document.getElementById('data-load-pill');
+  if(!el)return;
+  if(hide){
+    if(el._diPrev===undefined)el._diPrev=el.style.display;
+    el.style.display='none';
+  }else if(el._diPrev!==undefined){
+    el.style.display=el._diPrev;
+    delete el._diPrev;
+  }
 }
 
 function _diEscKey(e){
@@ -1165,6 +1444,7 @@ function _diEscKey(e){
 function closeDailyInsight(){
   const sheet=document.getElementById('di-sheet');
   document.removeEventListener('keydown',_diEscKey);
+  _diToggleLoadPill(false);
   _diOpening=false;
   if(!sheet)return;
   sheet.classList.remove('di-on');
@@ -1180,6 +1460,49 @@ function _diGoToAccount(accountId){
       if(accountId&&typeof portviewSelectAccount==='function')portviewSelectAccount(accountId);
     }catch(e){ console.warn('di: open account failed',e); }
   },220);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8b. โผล่ตอนเช็คอิน Echo — ข้อมูลชุดเดิม แค่มาโผล่ตอนที่ยืนอยู่หน้าร้านจริง
+// ═══════════════════════════════════════════════════════════════════════════
+// อ่านอย่างเดียว ไม่มีปุ่ม ไม่แตะค้าง — จอ Echo มีงานของมันอยู่แล้ว อย่าไปแย่ง
+// ไม่มีของค้าง = ไม่โชว์การ์ด · ข้อมูลยังไม่มา = ไม่โชว์เช่นกัน ไม่โชว์ศูนย์
+function renderCheckinOverdue(accountId){
+  try{
+    const host=document.getElementById('ci-visit-hero');
+    const old=document.getElementById('di-checkin-card');
+    if(old)old.remove();
+    if(!host||!accountId)return false;
+    if(!_diDataComplete())return false;
+
+    let rows=null;
+    try{ rows=(typeof computeChurnRowsForAccount==='function')?computeChurnRowsForAccount(accountId):null; }catch(e){ rows=null; }
+    if(!rows)return false;
+    const late=rows.filter(r=>r.type==='gone'||r.type==='near');
+    if(!late.length)return false;
+    late.sort((x,y)=>(y.gmv||0)-(x.gmv||0));
+    const baht=late.reduce((t,r)=>t+(r.gmv||0),0);
+
+    if(!document.getElementById('di-checkin-css')){
+      const st=document.createElement('style');
+      st.id='di-checkin-css';
+      st.textContent=
+        '#di-checkin-card{margin-bottom:10px;border-radius:14px;padding:12px 14px;'
+       +'background:rgba(255,102,0,.07);border:0.5px solid rgba(255,102,0,.24);'
+       +"font-family:'Noto Sans Thai',-apple-system,sans-serif}"
+       +'#di-checkin-card .t{font-size:13.5px;font-weight:700;color:#B34700;line-height:1.45}'
+       +'#di-checkin-card .l{font-size:12.5px;color:#8A6A55;margin-top:5px;line-height:1.55}';
+      document.head.appendChild(st);
+    }
+
+    const card=document.createElement('div');
+    card.id='di-checkin-card';
+    card.innerHTML='<div class="t">ร้านนี้มีของถึงรอบสั่งแล้ว '+late.length+' รายการ · '+_diBaht(baht)+'</div>'
+      +'<div class="l">'+late.slice(0,3).map(r=>_diEsc(r.name)).join(' · ')
+      +(late.length>3?' และอีก '+(late.length-3):'')+'</div>';
+    host.insertBefore(card,host.firstChild);
+    return true;
+  }catch(e){ return false; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1260,15 +1583,27 @@ function _diMaybeOpenOnBoot(){
 }
 
 (function _diInit(){
+  let opened=false;
+  const openOnce=()=>{
+    if(opened)return;
+    // เปิดไปแล้วแบบข้อมูลไม่ครบ → วาดใหม่ทับ ไม่ต้องเปิดซ้ำ
+    if(document.getElementById('di-sheet')){
+      if(_diDataComplete()&&(window._diLastData||{}).partial){ _diRefreshBody(); opened=true; }
+      return;
+    }
+    if(_diDataComplete())opened=true;
+    _diMaybeOpenOnBoot();
+  };
   const arm=()=>{
     if(!window.DataRegistry||typeof window.DataRegistry.onReady!=='function'){
       setTimeout(arm,400);
       return;
     }
-    window.DataRegistry.onReady(1,()=>{
-      // หน่วงอีกนิดให้ splash ปิดและ portview วาดเสร็จก่อน แล้วค่อยเด้ง
-      setTimeout(_diMaybeOpenOnBoot,700);
-    });
+    // ต้องรอชั้น 3 — ชั้น 1 มีแค่ portview/history ซึ่งไม่พอกับสิ่งที่จอนี้พูด
+    window.DataRegistry.onReady(3,()=>{ setTimeout(openOnce,700); });
+    // เพดานเวลา: ชั้น 3 อาจไม่มาเลย (เน็ตล่ม/ไฟล์พัง) — ยอมเปิดเท่าที่มี
+    // แต่ buildDailyInsight จะติดธง partial ให้เอง แล้วจะไม่ปั๊มว่าอ่านแล้ว
+    window.DataRegistry.onReady(1,()=>{ setTimeout(openOnce,DI_TIER_WAIT_MS); });
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',arm);
   else arm();

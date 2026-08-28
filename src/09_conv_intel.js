@@ -5051,6 +5051,10 @@ ${confBanner}
       const timeEl = document.getElementById('ci-checkin-time');
       if (timeEl) timeEl.textContent = _tStr + ' · ถึง ' + _expStr;
       if (pill) pill.style.display = 'flex';
+      // v_daily เฟส 4B: เช็คอินสำเร็จแล้วค่อยบอกว่าร้านนี้มีอะไรถึงรอบแล้วยังไม่สั่ง
+      // ข้อมูลชุดเดียวกับจอสรุปรายวัน แค่มาโผล่ตอนที่ยืนอยู่หน้าร้านจริง
+      // guard ไว้เพื่อให้ถอดโมดูลนั้นออกได้โดย Echo ไม่พัง
+      try { if (typeof renderCheckinOverdue === 'function') renderCheckinOverdue(_accountGuid); } catch(_) {}
 
       // Switch orb to mic — ทำก่อนรอ network เพื่อให้ UI ไม่ค้างบนเน็ตช้า
       _showMicOrb();
