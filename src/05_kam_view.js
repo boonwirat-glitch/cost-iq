@@ -160,6 +160,9 @@ function __legacyShowScreenFallback(name){
   if(_handle)_handle.style.display=(isKAM&&name==='overview')?'block':'none';
   if(name==='teamview'){
     teamviewKamFilter=null;renderTeamview();
+    // v_daily: teamview คือหน้าแรกของ TL — ปุ่ม "สรุปให้" ต้องอยู่ตรงนี้ด้วย
+    // ไม่งั้น TL ปัดปิดจอแล้วเปิดกลับไม่ได้เลย
+    if(typeof _diSyncNavButton==='function')_diSyncNavButton('teamview');
     // v687: sync first-card offset after teamview is visible and layout settles
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},300);
     setTimeout(function(){try{if(typeof _tvSyncListOffset==='function')_tvSyncListOffset();}catch(e){}},600);

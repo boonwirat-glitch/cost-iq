@@ -36,7 +36,11 @@ const DI_ROLES       = ['rep','tl','ad','pm','ad_tl'];   // admin ยังไ�
 const DI_TEAM_ROLES  = ['tl','ad_tl'];                   // role ที่เห็น "คนในทีม" แทน "ร้าน" 
 const DI_HOLD_MS     = 420;    // แตะค้างนานเท่าไหร่ถึงนับว่า "ทักแล้ว"
 const DI_MARK_KEEP   = 14;     // เก็บประวัติการทักย้อนหลังกี่วัน
-const DI_SIGNAL_KEEP = 600;    // จำ id สัญญาณที่เคยเห็นได้กี่ตัว (ไว้ติดป้าย "ใหม่")
+const DI_SIGNAL_KEEP = 4000;   // จำสัญญาณที่เคยเห็นได้กี่ตัว (ไว้ติดป้าย "ใหม่")
+                               // ของจริง: KAM ใหญ่สุด 140 ร้าน ถ้าร้านละ 6 รายการ = 840
+                               // เดิมตั้ง 600 แล้วรายการที่เกินโดนตัดทิ้งทุกวัน
+                               // ⇒ 240 รายการเดิมติดป้าย "ใหม่" ซ้ำทุกวันตลอดไป
+const DI_SIGNAL_VER  = 2;      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
 const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
 const DI_TIER_WAIT_MS= 8000;   // รอข้อมูลชั้น 3 นานสุดเท่าไหร่ก่อนยอมเปิดเท่าที่มี
 
@@ -153,13 +157,42 @@ function _diLoopClosure(){
 
 // ── ป้าย "ใหม่" — อันไหนเพิ่งโผล่ตั้งแต่ครั้งก่อนที่เปิดดู ────────────────────
 // เครื่องใหม่ต้อง seed เงียบๆ ครั้งแรก ไม่งั้นจะติดป้าย "ใหม่" ทั้งจอจนอ่านไม่รู้เรื่อง
-function _diFlagNew(ids){
+//
+// id เต็มคือ '<uuid>::<skuId>' ยาวเกือบ 50 ตัวอักษร เก็บหลายพันตัวแล้วกิน localStorage
+// ⇒ ย่อเป็นรหัส 32 บิต ชนกันได้บ้างแต่นี่คือ "ป้าย" ไม่ใช่ตัวเลขเงิน ยอมได้
+function _diSigHash(str){
+  let h=5381;
+  for(let i=0;i<str.length;i++)h=((h*33)^str.charCodeAt(i))>>>0;
+  return h.toString(36);
+}
+
+// เก็บผลของวันไว้ในหน่วยความจำ เพื่อให้วาดจอใหม่กลางวันแล้วป้ายไม่หาย
+let _diFreshDay='', _diFreshSet=null;
+
+function _diFlagNew(ids,complete){
+  // ข้อมูลยังไม่ครบ = ห้ามแตะ state เด็ดขาด
+  // ถ้าปล่อยให้ seed ตอนที่ยังไม่มีสัญญาณเลย พอข้อมูลมาจริงทุกอย่างจะกลายเป็น "ใหม่" ทั้งจอ
+  if(!complete)return new Set();
+
+  const today=_diToday();
   const st=_diLoadState();
+  const sigs=ids.map(_diSigHash);
   const known=new Set(st.seenSignals||[]);
-  const firstRun=!st.seeded;
-  const fresh=firstRun?new Set():new Set(ids.filter(id=>!known.has(id)));
-  const keep=Array.from(new Set(ids.concat(Array.from(known)))).slice(0,DI_SIGNAL_KEEP);
-  _diSaveState({seeded:true,seenSignals:keep});
+  // เครื่องใหม่ หรือของที่เก็บไว้เป็นรูปแบบเก่า → seed เงียบๆ ไม่ติดป้ายอะไรเลย
+  const firstRun=!st.seeded||st.sigv!==DI_SIGNAL_VER;
+  // มากเกินที่จำไหว → ไม่ติดป้ายดีกว่าติดผิด
+  const tooMany=sigs.length>DI_SIGNAL_KEEP;
+
+  let fresh;
+  if(firstRun||tooMany)fresh=new Set();
+  else fresh=new Set(sigs.filter((h,i)=>!known.has(h)).map((h,i)=>h));
+
+  // วาดใหม่ในวันเดียวกันต้องได้ป้ายชุดเดิม ไม่ใช่หายไปเพราะเพิ่ง seed ไปเมื่อกี้
+  if(_diFreshDay===today&&_diFreshSet)fresh=new Set([...(_diFreshSet),...fresh]);
+  _diFreshDay=today; _diFreshSet=fresh;
+
+  const keep=Array.from(new Set(sigs.concat(Array.from(known)))).slice(0,DI_SIGNAL_KEEP);
+  _diSaveState({seeded:true,sigv:DI_SIGNAL_VER,seenSignals:keep});
   return fresh;
 }
 
@@ -343,8 +376,9 @@ function buildDailyInsight(){
   aheadTop.sort((x,y)=>y.baht-x.baht);
   newFinds.sort((x,y)=>y.gmv-x.gmv);
 
-  const fresh=_diFlagNew(signalIds);
-  overdueTop.forEach(s=>{ s.items.forEach(r=>{ r.isNew=fresh.has(s.id+'::'+r.id); }); });
+  const complete=_diDataComplete();
+  const fresh=_diFlagNew(signalIds,complete);
+  overdueTop.forEach(s=>{ s.items.forEach(r=>{ r.isNew=fresh.has(_diSigHash(s.id+'::'+r.id)); }); });
 
   const won=_diLoopClosure();
   const weekly=_diWeekly(fresh.size);
@@ -397,7 +431,7 @@ function buildDailyInsight(){
     aheadShops, aheadBaht, newSkuBaht,
     overdueTop, aheadTop, newFinds,
     newCount:fresh.size,
-    partial:!_diDataComplete(),
+    partial:!complete,
     won, weekly, big,
     quiet:!big&&overdueItems===0
   };
@@ -1179,12 +1213,15 @@ function _diWrapSeen(){ return _diLoadState().wrapped===_diMonthKey(); }
 function _diBuildWrapSlides(w){
   const up=w.diff>=0;
   const out=[];
+  // TL เห็นเลขของทั้งทีม ไม่ใช่ของตัวเอง ⇒ คำต้องเปลี่ยนตาม ไม่งั้นอ่านแล้วเข้าใจผิด
+  const team=_diIsTeamMode();
   out.push({
     k:'สรุปเดือน '+w.label,
-    h:'เดือน '+w.label+'<br>พอร์ตคุณทำได้',
+    h:'เดือน '+w.label+'<br>'+(team?'ทีมคุณทำได้':'พอร์ตคุณทำได้'),
     v:_diBaht(w.total),
     p:(w.pct===null?'':'<b>'+(up?'+':'−')+_diBaht(Math.abs(w.diff))+'</b> จากเดือน '+w.prevLabel
-        +' ('+(up?'+':'')+w.pct+'%)<br>')+'จากทั้งหมด <b>'+w.shops+' ร้าน</b>ที่คุณดูแล'
+        +' ('+(up?'+':'')+w.pct+'%)<br>')+'จากทั้งหมด <b>'+w.shops+' ร้าน</b>'
+        +(team?'ที่ทีมดูแล':'ที่คุณดูแล')
   });
   if(w.grew){
     out.push({
@@ -1216,7 +1253,7 @@ function _diBuildWrapSlides(w){
     k:'เดือนใหม่',
     h:'เริ่มเดือนใหม่กันค่ะ',
     v:'',
-    p:'Olive จะคอยดูพอร์ต '+w.shops+' ร้านของคุณให้ทุกเช้าเหมือนเดิมนะคะ',
+    p:'Olive จะคอยดู'+(team?'ทีม ':'พอร์ต ')+w.shops+' ร้าน'+(team?'':'ของคุณ')+'ให้ทุกเช้าเหมือนเดิมนะคะ',
     cta:'ดูของวันนี้'
   });
   return out;
@@ -1524,7 +1561,10 @@ function _diSyncNavButton(screenName){
   if(!wrap||!lbl)return;
 
   const name=screenName||(document.querySelector('.scr.on')||{}).id||'';
-  const eligible=/portview/.test(name)&&_diEligible();
+  // TL บูตแล้วลงที่ teamview ไม่ใช่ portview — ถ้าเช็คแค่ portview
+  // TL จะปัดปิดจอแล้วเปิดกลับไม่ได้เลยทั้งวัน
+  const onHome=/portview/.test(name)||(/teamview/.test(name)&&_diIsTeamMode());
+  const eligible=onHome&&_diEligible();
 
   if(eligible){
     if(!btn._diOrig){ btn._diOrig={icon:wrap.innerHTML,label:lbl.textContent}; }

@@ -78,6 +78,7 @@ function makeSandbox(opts) {
     bulkSkuCurrentData: opts.skuCurrent || {},
     bulkHistoryData: opts.history || {},
     bulkSkusData: opts.skus || { seed: {} },
+    _tier3: opts.tier3,
     _buildKamGroups: () => opts.groups || [],
     bulkCurrentMonthData: opts.currentMonth || {},
     navigator: { vibrate() {} },
@@ -85,7 +86,7 @@ function makeSandbox(opts) {
   };
   sandbox.window = sandbox;
   sandbox.window.matchMedia = () => ({ matches: false });
-  sandbox.window.DataRegistry = { onReady() {} };
+  sandbox.window.DataRegistry = { onReady() {}, isReady: () => opts.tier3 !== false };
   vm.createContext(sandbox);
   vm.runInContext(DI, sandbox);
   return sandbox;
@@ -386,6 +387,10 @@ check('ปุ่มใน nav ดักคลิกแบบ capture (กัน 
   DI.includes("btn.addEventListener('click'") && /\},\s*true\);/.test(DI));
 check('ออกจาก portview แล้วคืนไอคอน/ป้ายเดิมให้ Profile',
   DI.includes('btn._diOrig') && DI.includes('wrap.innerHTML=btn._diOrig.icon'));
+check('TL เปิดจอกลับได้ — ปุ่มต้องขึ้นบน teamview ด้วย ไม่ใช่แค่ portview',
+  /teamview/.test((DI.match(/const onHome=[^;]+;/) || [''])[0]) &&
+  /_diSyncNavButton\('teamview'\)/.test(KV),
+  'TL บูตแล้วลงที่ teamview — ถ้าเช็คแค่ portview จะปัดปิดแล้วเปิดกลับไม่ได้ทั้งวัน');
 check('ตัวกระตุ้นผูกกับ DataRegistry.onReady(1) ไม่ใช่ตั้งเวลาเดาเอา',
   DI.includes('DataRegistry.onReady(1'));
 
@@ -497,13 +502,57 @@ console.log('\n── 13. ป้าย "ใหม่" ──');
 {
   const s = makeSandbox({});
   check('เครื่องใหม่: seed เงียบๆ ไม่ติดป้ายทั้งจอ',
-    s._diFlagNew(['a::1', 'a::2', 'a::3']).size === 0,
+    s._diFlagNew(['a::1', 'a::2', 'a::3'], true).size === 0,
     'ถ้าติดหมดตั้งแต่ครั้งแรก ป้ายจะไม่มีความหมายเลย');
   check('รอบถัดไป ติดป้ายเฉพาะอันที่เพิ่งโผล่',
-    (() => { const f = s._diFlagNew(['a::1', 'a::4']);
-      return f.size === 1 && f.has('a::4'); })());
-  check('อันที่เคยเห็นแล้วไม่ติดป้ายซ้ำ',
-    s._diFlagNew(['a::1']).size === 0);
+    (() => { const f = s._diFlagNew(['a::1', 'a::4'], true);
+      return f.size === 1 && f.has(s._diSigHash('a::4')); })());
+
+  // ── บั๊กที่เจอตอน review (28 ส.ค.) — ทั้งสองข้อรันซ้ำพิสูจน์แล้ว ──
+  check('ข้อมูลยังไม่ครบ: ห้ามแตะ state เลย (ไม่งั้นพอข้อมูลมาจะติดป้ายทั้งจอ)',
+    (() => {
+      const st = {};
+      const s1 = makeSandbox({ storage: st, tier3: false,
+        accounts: [{ id: 'A', name: 'r', paceSignal: {} }] });
+      s1.buildDailyInsight();
+      return !st.sense_daily_v1 || !JSON.parse(st.sense_daily_v1).seeded;
+    })(),
+    'รอบแรกที่เปิดตอนเน็ตช้าเคย seed ด้วยชุดว่าง แล้วรอบสองทุกอย่างกลายเป็น "ใหม่"');
+
+  check('รันจริง: partial แล้วข้อมูลมา → ต้องไม่มีป้ายสักอัน',
+    (() => {
+      const store = {};
+      const accounts = [{ id: 'A', name: 'r', paceSignal: {} }];
+      const churn = { A: [churnRow('x', 5000, 'gone')] };
+      makeSandbox({ storage: store, accounts, churn: {}, tier3: false }).buildDailyInsight();
+      Object.assign(store, {});
+      const d = makeSandbox({ storage: store, accounts, churn, tier3: true }).buildDailyInsight();
+      return d.overdueItems === 1 && d.newCount === 0;
+    })());
+
+  check('พอร์ตใหญ่ (840 สัญญาณ) ต้องไม่ติดป้ายผิดทุกวัน',
+    (() => {
+      const accounts = [], churn = {};
+      for (let i = 0; i < 140; i++) {
+        const id = 'a' + i;
+        accounts.push({ id, name: 'r', paceSignal: {} });
+        churn[id] = Array.from({ length: 6 }, (_, j) => churnRow('p' + j, 1000 + j, 'gone'));
+      }
+      const store = {};
+      makeSandbox({ storage: store, accounts, churn, tier3: true }).buildDailyInsight();
+      const day2 = makeSandbox({ storage: store, accounts, churn, tier3: true }).buildDailyInsight();
+      return day2.newCount === 0;
+    })(),
+    'เพดาน 600 ตัวเดิมตัดของที่เกินทิ้งทุกวัน ⇒ 240 รายการเดิมติดป้าย "ใหม่" ตลอดไป');
+
+  check('เพดานต้องสูงกว่าพอร์ตจริงที่ใหญ่ที่สุด (140 ร้าน × 6 = 840)',
+    (() => { const m = DI.match(/DI_SIGNAL_KEEP\s*=\s*(\d+)/); return m && parseInt(m[1]) >= 2000; })());
+  check('เก็บเป็นรหัสย่อ ไม่ใช่ id เต็ม (ไม่งั้นกิน localStorage เป็นร้อย KB)',
+    /function _diSigHash/.test(DI) && /sigs=ids\.map\(_diSigHash\)/.test(DI));
+  check('ของที่เก็บด้วยรูปแบบเก่าให้ seed ใหม่เงียบๆ ไม่ใช่ติดป้ายทั้งจอ',
+    /st\.sigv!==DI_SIGNAL_VER/.test(DI));
+  check('วาดจอใหม่กลางวันแล้วป้ายต้องไม่หาย',
+    /_diFreshDay===today&&_diFreshSet/.test(DI));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -689,6 +738,16 @@ console.log('\n── 17. สรุปเดือนแบบสไลด์ �
     'ได้ ' + slides.length + ' สไลด์');
   check('หน้าแรกพูดเรื่องยอดรวม ไม่ใช่เรื่องที่ต้องรีบ',
     /พอร์ตคุณทำได้/.test(slides[0].h));
+  check('TL เห็นคำว่า "ทีม" ไม่ใช่ "พอร์ตคุณ" — เพราะเป็นเลขของทั้งทีม',
+    (() => {
+      const st = makeSandbox({ profile: { email: 't@f.co', role: 'tl' },
+        accounts, currentMonth: { A: { month_label: 'ส.ค. 2569' } },
+        history: {
+          A: [{ m: 'มิ.ย. 2569', s: 100000 }, { m: 'ก.ค. 2569', s: 160000 }, { m: 'ส.ค. 2569', s: 1 }],
+          B: [{ m: 'มิ.ย. 2569', s: 90000 }, { m: 'ก.ค. 2569', s: 70000 }] } });
+      const sl = st._diBuildWrapSlides(st._diMonthlyWrap(accounts));
+      return /ทีมคุณทำได้/.test(sl[0].h) && /ที่ทีมดูแล/.test(sl[0].p);
+    })());
   check('เดือนที่ไม่มีของใหม่และไม่เคยทัก → สไลด์สั้นลงเอง ไม่มีหน้าเปล่า',
     (() => {
       const s2 = makeSandbox({
@@ -738,7 +797,7 @@ check('ยังมีเพดานเวลาเผื่อ tier 3 ไม�
 
 {
   const acct = [{ id: 'A', name: 'ร้าน', gmvToDate: 60000, paceSignal: { expected: 40000 } }];
-  const s = makeSandbox({ accounts: acct, skus: {} });   // bulkSkusData ว่าง = ชั้น 3 ยังไม่มา
+  const s = makeSandbox({ accounts: acct, skus: {}, tier3: false });   // ชั้น 3 ยังไม่มา
   const d = s.buildDailyInsight();
   check('รู้ตัวว่าข้อมูลยังไม่ครบ',
     d.partial === true);
@@ -841,7 +900,7 @@ console.log('\n── 20. การ์ดตอนเช็คอิน Echo ─
     s.renderCheckinOverdue('B') === false);
   check('ไม่ส่ง accountId มา → ไม่ทำอะไร', s.renderCheckinOverdue(null) === false);
   check('ข้อมูลชั้น 3 ยังไม่มา → ไม่โชว์ศูนย์',
-    makeSandbox({ skus: {}, elements: { 'ci-visit-hero': host },
+    makeSandbox({ skus: {}, tier3: false, elements: { 'ci-visit-hero': host },
       churn: { A: [churnRow('x', 1000, 'gone')] } }).renderCheckinOverdue('A') === false);
   check('การ์ดอ่านอย่างเดียว ไม่มีปุ่ม ไม่แตะค้าง',
     !/di-checkin-card[\s\S]{0,900}(<button|data-markable)/.test(DI));
