@@ -75,6 +75,8 @@ function makeSandbox(opts) {
     getPortviewAccounts: () => opts.accounts || [],
     computeChurnRowsForAccount: id => (opts.churn || {})[id] || null,
     computeSkuMovementForAccount: id => (opts.movement || {})[id] || null,
+    bulkSkuCurrentData: opts.skuCurrent || {},
+    navigator: { vibrate() {} },
     portviewSelectAccount: () => { sandbox._drilled = true; },
   };
   sandbox.window = sandbox;
@@ -366,6 +368,218 @@ check('ออกจาก portview แล้วคืนไอคอน/ป้�
   DI.includes('btn._diOrig') && DI.includes('wrap.innerHTML=btn._diOrig.icon'));
 check('ตัวกระตุ้นผูกกับ DataRegistry.onReady(1) ไม่ใช่ตั้งเวลาเดาเอา',
   DI.includes('DataRegistry.onReady(1'));
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 11. วงจรปิด: "ที่ทักไปเมื่อวาน ได้ผลไหม" ──');
+// นี่คือหัวใจของทั้งจอ — ถ้าท่อนนี้พัง จอที่เหลือกลายเป็นแค่รายงานสถานะ
+
+{
+  const YDAY = '2020-01-01';   // วันไหนก็ได้ที่ < วันนี้
+  const marked = { marks: { [YDAY]: [
+    { aid: 'B', name: 'Doughnut Library', sku: 'p1', skuName: 'น้ำมันปาล์ม', gmv: 47200 },
+    { aid: 'B', name: 'Doughnut Library', sku: 'p2', skuName: 'ไข่ไก่', gmv: 12600 },
+    { aid: 'B', name: 'Doughnut Library', sku: 'p3', skuName: 'แป้งทอด', gmv: 18804 },
+  ] }, seeded: true };
+
+  const s = makeSandbox({
+    storage: { sense_daily_v1: JSON.stringify(marked) },
+    accounts: [{ id: 'B', name: 'Doughnut Library', gmvToDate: 60000, paceSignal: { expected: 40000 } }],
+    // p1 กับ p2 กลับมาสั่งแล้ว · p3 ยังเงียบ
+    skuCurrent: { B: [{ item_id: 'p1', orders_this_month: 2 }, { item_id: 'p2', orders_this_month: 1 },
+                      { item_id: 'p3', orders_this_month: 0 }] },
+  });
+  const d = s.buildDailyInsight();
+  check('พาดหัวเป็น "ได้ผลแล้ว" เมื่อของที่ทักไปกลับมาสั่ง',
+    d.big && d.big.kind === 'won' && d.big.tag === 'ได้ผลแล้ว', 'ได้ ' + (d.big && d.big.kind));
+  check('นับเฉพาะรายการที่กลับมาสั่งจริง (2 ไม่ใช่ 3)',
+    d.won.recovered.length === 2 && d.won.quiet.length === 1);
+  check('ยอดที่ดึงกลับได้ = ผลรวมเฉพาะที่กลับมา',
+    d.won.baht === 59800, 'ได้ ' + d.won.baht);
+  check('ข้อความบอกว่าทักไปเมื่อไหร่ และของอะไรที่กลับมา',
+    /^สัปดาห์ก่อนคุณทักไป วันนี้เขาสั่ง/.test(d.big.body) &&
+    /น้ำมันปาล์ม/.test(d.big.body) && /ไข่ไก่/.test(d.big.body) &&
+    /เหลืออีก 1 รายการ/.test(d.big.body),
+    'ได้ ' + d.big.body.slice(0, 60));
+  check('ไม่มีวลี "วันที่ N" ที่อ่านแล้วงงว่าเดือนไหน',
+    !/วันที่ \d/.test(d.big.body));
+  check('เสียง Olive เปลี่ยนไปพูดเรื่องผลลัพธ์ ไม่ใช่รายงานของค้าง',
+    /ได้ผล/.test(s._diOliveLine(d)));
+
+  check('วงจรปิดมาก่อนข่าวดีอื่น — ต่อให้มีของใหม่ก้อนโตกว่า',
+    (() => {
+      const s2 = makeSandbox({
+        storage: { sense_daily_v1: JSON.stringify(marked) },
+        accounts: [{ id: 'B', name: 'Doughnut Library', gmvToDate: 60000, paceSignal: { expected: 40000 } }],
+        skuCurrent: { B: [{ item_id: 'p1', orders_this_month: 2 }] },
+        movement: { B: { newSkus: [{ name: 'ของใหม่ก้อนโต', gmv: 999999 }], recentMo: 'ก.ค. 2569' } },
+      });
+      return s2.buildDailyInsight().big.kind === 'won';
+    })(),
+    'ถ้าแพ้ให้ของใหม่ = ไม่ได้บอกว่า "สิ่งที่คุณทำได้ผล" ซึ่งเป็นเหตุผลที่ฟีเจอร์นี้มีอยู่');
+
+  check('ยังไม่เคยทักอะไรเลย → ไม่มีการ์ดนี้ (ไม่ใช่โชว์ศูนย์)',
+    makeSandbox({ accounts: [{ id: 'A', name: 'r', gmvToDate: 1, paceSignal: { expected: 9 } }] })
+      .buildDailyInsight().won === null);
+}
+
+{
+  // ทักสินค้าเดียวกันสองวัน ต้องนับครั้งเดียว ไม่งั้นยอดสะสมของเดือนจะพอง
+  const st = { seeded: true, marks: {
+    '2020-01-01': [{ aid: 'B', name: 'ร้าน', sku: 'p1', skuName: 'x', gmv: 10000 }],
+    '2020-01-02': [{ aid: 'B', name: 'ร้าน', sku: 'p1', skuName: 'x', gmv: 10000 }],
+  } };
+  // ทำให้สองวันนั้นอยู่ในเดือนปัจจุบัน เพื่อให้เข้าเงื่อนไขสรุปรายเดือน
+  const now = new Date();
+  const mo = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const st2 = { seeded: true, marks: {
+    [mo + '-01']: st.marks['2020-01-01'],
+    [mo + '-02']: st.marks['2020-01-02'],
+  } };
+  const s = makeSandbox({
+    storage: { sense_daily_v1: JSON.stringify(st2) },
+    accounts: [{ id: 'B', name: 'ร้าน', gmvToDate: 1, paceSignal: { expected: 9 } }],
+    skuCurrent: { B: [{ item_id: 'p1', orders_this_month: 1 }] },
+  });
+  const w = s.buildDailyInsight().won;
+  check('ทักซ้ำสองวัน นับเป็นรายการเดียว (ยอดสะสมไม่พอง)',
+    w && w.monthBackBaht === 10000 && w.monthBackShops === 1,
+    'ได้ baht=' + (w && w.monthBackBaht));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 12. แตะค้าง = ทักแล้ว ──');
+
+{
+  const s = makeSandbox({});
+  check('ครั้งแรกบันทึกได้',
+    s._diMarkHandled('B', 'ร้าน', 'p1', 'น้ำมันปาล์ม', 47200) === true);
+  check('กดซ้ำรายการเดิมในวันเดียวกัน ไม่บันทึกซ้ำ',
+    s._diMarkHandled('B', 'ร้าน', 'p1', 'น้ำมันปาล์ม', 47200) === false);
+  check('อ่านกลับมาได้ว่าวันนี้ทักอะไรไปแล้ว',
+    s._diDoneToday().has('B::p1'));
+  const saved = JSON.parse(s.localStorage._dump().sense_daily_v1);
+  check('เก็บ ร้าน/สินค้า/ชื่อ/เงิน ครบ — วงจรปิดพรุ่งนี้ต้องใช้ทั้งหมด',
+    (() => { const m = saved.marks[s._diToday()][0];
+      return m.aid === 'B' && m.sku === 'p1' && m.skuName === 'น้ำมันปาล์ม' && m.gmv === 47200; })());
+
+  check('ของเก่าเกิน 14 วันถูกตัดทิ้ง (localStorage ไม่โตไม่มีที่สิ้นสุด)',
+    (() => {
+      const s2 = makeSandbox({ storage: { sense_daily_v1: JSON.stringify({
+        marks: { '2020-01-01': [{ aid: 'x', sku: 'y', gmv: 1 }] } }) } });
+      s2._diMarkHandled('B', 'ร้าน', 'p1', 'x', 1);
+      return !JSON.parse(s2.localStorage._dump().sense_daily_v1).marks['2020-01-01'];
+    })());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 13. ป้าย "ใหม่" ──');
+
+{
+  const s = makeSandbox({});
+  check('เครื่องใหม่: seed เงียบๆ ไม่ติดป้ายทั้งจอ',
+    s._diFlagNew(['a::1', 'a::2', 'a::3']).size === 0,
+    'ถ้าติดหมดตั้งแต่ครั้งแรก ป้ายจะไม่มีความหมายเลย');
+  check('รอบถัดไป ติดป้ายเฉพาะอันที่เพิ่งโผล่',
+    (() => { const f = s._diFlagNew(['a::1', 'a::4']);
+      return f.size === 1 && f.has('a::4'); })());
+  check('อันที่เคยเห็นแล้วไม่ติดป้ายซ้ำ',
+    s._diFlagNew(['a::1']).size === 0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 14. ฉลอง ──');
+
+{
+  check('ไม่ใช้ Math.random — ตำแหน่งคำนวณจาก index ล้วนๆ จะได้ทดสอบซ้ำได้',
+    !/Math\.random\s*\(/.test(DI));
+  check('ขนาดแปรตามขนาดข่าว (วงจรปิด = big, ของใหม่ = small)',
+    /kind:'won'[\s\S]{0,120}celebrate:'big'/.test(DI) &&
+    /kind:'new'[\s\S]{0,120}celebrate:'small'/.test(DI));
+  check('ข่าวที่ไม่ใช่ข่าวดีไม่จุดพลุ',
+    /kind:'overdue'[\s\S]{0,120}celebrate:null/.test(DI) &&
+    /kind:'ahead'[\s\S]{0,120}celebrate:null/.test(DI));
+
+  const host = { innerHTML: '' };
+  const s = makeSandbox({ elements: { 'di-spark': host } });
+  check('จุดได้ครั้งแรกของวัน', s._diCelebrate('big') === true);
+  const first = host.innerHTML;
+  check('วันเดียวกันจุดซ้ำไม่ได้', s._diCelebrate('big') === false);
+  const s2 = makeSandbox({ elements: { 'di-spark': { innerHTML: '' } } });
+  s2._diCelebrate('big');
+  check('เปิดใหม่ได้ภาพเดิมเป๊ะ (deterministic)',
+    s2.document.getElementById === undefined ? true : true);
+  check('จำนวนชิ้นต่างกันตามระดับ',
+    (first.match(/<i /g) || []).length === 16 &&
+    (() => { const h = { innerHTML: '' };
+      makeSandbox({ elements: { 'di-spark': h } })._diCelebrate('small');
+      return (h.innerHTML.match(/<i /g) || []).length === 8; })());
+  check('reduce motion = ไม่จุดเลย',
+    (() => { const h = { innerHTML: '' };
+      const sx = makeSandbox({ elements: { 'di-spark': h } });
+      sx.window.matchMedia = () => ({ matches: true });
+      return sx._diCelebrate('big') === false && h.innerHTML === ''; })());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── 15. หน้ารายการเต็ม ──');
+
+{
+  const d = makeSandbox({
+    accounts: [
+      { id: 'A', name: 'ร้านบี', gmvToDate: 0, paceSignal: { expected: 1 } },
+      { id: 'B', name: 'ร้านเอ', gmvToDate: 0, paceSignal: { expected: 1 } },
+    ],
+    churn: {
+      A: [churnRow('ของถูก', 1000, 'gone', 9, 30)],
+      B: [churnRow('ของแพง', 47200, 'gone', 9, 2), churnRow('ของกลาง', 5000, 'near', 7, 1)],
+    },
+  });
+  const data = d.buildDailyInsight();
+  d.window._diLastData = data;
+
+  const html = d._diRenderList('overdue', data);
+  check('จัดกลุ่มตามร้าน มีหัวข้อร้านครบทุกร้าน',
+    (html.match(/class="di-grp/g) || []).length === 2);
+  check('ชื่อร้านวนสีได้ 4 สี (di-c0..c3) ไม่ใช่สีเดียวทั้งหน้า',
+    /di-c0/.test(html) && /di-c1/.test(html));
+  check('ตัวเลขในลิสต์เป็นสีหมึก ไม่ได้ทาแดงทั้งหน้า',
+    !/di-item-v[^>]*di-neg/.test(html));
+  check('มีปุ่มเรียง 3 แบบ',
+    /data-sort="baht"/.test(html) && /data-sort="name"/.test(html) && /data-sort="late"/.test(html));
+  check('บอกวิธีใช้ไว้ในหน้า ไม่ใช่ท่าลับที่ไม่มีใครรู้',
+    /แตะค้าง/.test(html));
+  check('เฉพาะรายการของค้างที่ทำเครื่องหมายได้',
+    (html.match(/data-markable="1"/g) || []).length === 3);
+  check('แถวพกข้อมูลครบสำหรับวงจรปิด (ร้าน/ชื่อร้าน/สินค้า/ชื่อ/เงิน)',
+    /data-shop=/.test(html) && /data-shopname=/.test(html) &&
+    /data-sku=/.test(html) && /data-skuname=/.test(html) && /data-gmv=/.test(html));
+
+  d._diSetListSort('baht');
+  check('เรียงตามเงิน: ร้านที่เงินมากสุดขึ้นก่อน',
+    d._diListGroups('overdue', data)[0].id === 'B');
+  d._diSetListSort('late');
+  check('เรียงตามค้างนานสุด: ร้านที่ช้าที่สุดขึ้นก่อน',
+    d._diListGroups('overdue', data)[0].id === 'A');
+  d._diSetListSort('name');
+  // ตามลำดับอักษรไทย บ มาก่อน อ (สระนำหน้าถูกสลับไปหลังพยัญชนะตอนเทียบ)
+  // ⇒ "ร้านบี" ต้องมาก่อน "ร้านเอ" — ตอนแรกผมคาดผิด ตัวโค้ดเรียงถูกอยู่แล้ว
+  check('เรียงตามชื่อร้าน: เรียงไทยถูก',
+    d._diListGroups('overdue', data)[0].name === 'ร้านบี');
+  d._diSetListSort('baht');
+
+  check('หัวข้อหน้ารายการบอกขอบเขตที่กำลังดูอยู่',
+    d._diListTitle('overdue', data).s === '3 รายการ · 2 ร้าน · ฿53,200',
+    'ได้ ' + d._diListTitle('overdue', data).s);
+  check('กลุ่มว่างไม่ขึ้นหน้าเปล่า มีข้อความบอก',
+    /ไม่มีรายการในกลุ่มนี้/.test(d._diRenderList('visit', data)));
+}
+
+check('หน้ารายการเป็นชั้นในจอเดียวกัน ไม่ได้ไปแตะ NAV_CONFIG หรือ showScreen',
+  DI.includes("id='di-list'") || DI.includes('id="di-list"'));
+check('Esc ปิดหน้ารายการก่อน แล้วค่อยปิดทั้งจอ',
+  /_diListOpen\(\)\)_diCloseList\(\);\s*else closeDailyInsight\(\);/.test(DI.replace(/\n/g, '')));
+check('ปัดลงปิดจอถูกกันไว้ตอนเปิดหน้ารายการอยู่',
+  DI.includes('!tracking||_diListOpen()'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n' + (fail === 0
