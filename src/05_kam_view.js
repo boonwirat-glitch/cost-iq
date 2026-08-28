@@ -144,6 +144,8 @@ function __legacyShowScreenFallback(name){
     // so it must stay tappable here.
     const _rb=document.getElementById('nav-restaurant');
     if(_rb)_rb.classList.add('nav-disabled');
+    // v_daily: ช่องนี้ตายอยู่แล้วบน portview — ให้ "Olive สรุปให้" มายืมใช้
+    if(typeof _diSyncNavButton==='function')_diSyncNavButton('portview');
   }
   // KAM account view: ร้าน active (user is "in" a store context), show drag handle
   if(isKAM&&name==='overview'){
@@ -151,6 +153,8 @@ function __legacyShowScreenFallback(name){
     const _rs=document.getElementById('nav-restaurant');
     if(_ov)_ov.classList.remove('on');
     if(_rs){_rs.classList.remove('nav-disabled');_rs.classList.add('on');}
+    // v_daily: ออกจาก portview แล้ว — คืนช่องนี้ให้ Profile เหมือนเดิม
+    if(typeof _diSyncNavButton==='function')_diSyncNavButton('overview');
   }
   const _handle=document.getElementById('kam-nav-handle');
   if(_handle)_handle.style.display=(isKAM&&name==='overview')?'block':'none';
@@ -237,18 +241,30 @@ function setKamModel(model){
 }
 
 // SECTION:KAM_ACCOUNT
+// v_daily: แกนกลางถูกแยกออกมาเป็น _skuMovementCore เพื่อให้ "หน้าสรุปรายวัน" ใช้นิยาม
+// เดียวกันได้กับทั้งพอร์ต (bulk) โดยไม่ต้องคัดลอกสูตรไปไว้อีกที่ — computeSkuMovement()
+// ยังทำงานเหมือนเดิมทุกประการ แค่ส่ง D เข้าไปแทน
 function computeSkuMovement(){
+  return _skuMovementCore(D.skus_monthly,(D.current_month||{}).month_label||'');
+}
+// เวอร์ชันรายบัญชี อ่านจาก bulk globals ที่โหลดไว้ตั้งแต่บูต (ไม่ต้องเปิดหน้าร้าน)
+function computeSkuMovementForAccount(accountId){
+  if(typeof bulkSkusData==='undefined')return null;
+  const cm=(typeof bulkCurrentMonthData!=='undefined'&&bulkCurrentMonthData[accountId])||{};
+  return _skuMovementCore(bulkSkusData[accountId],cm.month_label||'');
+}
+function _skuMovementCore(skusMonthly,curMonthLabel){
   // Sort months desc (newest first) — key insertion order is not guaranteed
-  const months=Object.keys(D.skus_monthly||{}).sort((a,b)=>{
+  const months=Object.keys(skusMonthly||{}).sort((a,b)=>{
     const toDate=m=>{const parts=m.split(' ');const mo=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return(parseInt(parts[1]||0)*12)+mo.indexOf(parts[0]);};return toDate(b)-toDate(a);});
   if(months.length<2)return null;
   // v156: exclude current MTD month — GMV not comparable to full months
-  const _cmLbl4=(D.current_month||{}).month_label||'';
+  const _cmLbl4=curMonthLabel||'';
   const closedMonths=months.filter(m=>m!==_cmLbl4);
   if(closedMonths.length<2)return null;
-  const recent=D.skus_monthly[closedMonths[0]]||[];
+  const recent=skusMonthly[closedMonths[0]]||[];
   const compareIdx=Math.min(1,closedMonths.length-1);
-  const older=D.skus_monthly[closedMonths[compareIdx]]||[];
+  const older=skusMonthly[closedMonths[compareIdx]]||[];
   const recentMap=new Map(recent.map(s=>[s.id,s]));
   const olderMap=new Map(older.map(s=>[s.id,s]));
   const recentTotal=recent.reduce((a,s)=>a+(s.gmv||s.s||0),0);

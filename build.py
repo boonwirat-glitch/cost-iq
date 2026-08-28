@@ -16,6 +16,7 @@ MAIN_MODULES = [
     '05_kam_view',
     '06_portview_teamview',
     '13_key_sku',
+    '14_daily_insight',
 ]
 
 def read(p):

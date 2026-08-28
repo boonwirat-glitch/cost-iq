@@ -172,7 +172,10 @@ function computeChurnSignals(){
 // ════════════════════════════════════════
 // INTERVAL-AWARE CHURN FOR PORTVIEW (per account, uses bulk globals)
 // ════════════════════════════════════════
-function computeChurnCountsForAccount(accountId){
+// v_daily: แยกตัวไล่ SKU ออกมาเป็น "แถว" เพื่อให้หน้าสรุปรายวันใช้ได้ด้วย
+// นับเลขเดิม (computeChurnCountsForAccount) ยังคำนวณจากแถวชุดเดียวกันนี้
+// ⇒ มีนิยามเดียว ไม่มีทางที่สองที่จะเพี้ยนจากกัน
+function computeChurnRowsForAccount(accountId){
   const cm=bulkCurrentMonthData[accountId];
   const skusMonthly=bulkSkusData[accountId]||{};
   const skuCurrentArr=bulkSkuCurrentData[accountId]||[];
@@ -187,18 +190,36 @@ function computeChurnCountsForAccount(accountId){
   const _lastClosed2b=months.find(m=>m!==_cmLbl2b)||months[0];
   const lastMonthSkus=(_lastClosed2b?skusMonthly[_lastClosed2b]:[])||[];
   const currentMap=new Map(skuCurrentArr.map(s=>[String(s.item_id||s.id),s]));
-  let gone=0,near=0,ordered=0,total=0;
+  const rows=[];
   for(const sku of lastMonthSkus){
     const orderCount=sku.order_count||0;
     if(orderCount<1)continue;
-    total++;
     const curr=currentMap.get(String(sku.id||sku.item_id));
-    if(curr&&(curr.orders_this_month||0)>0){ordered++;continue;} // ordered this month ✓
+    if(curr&&(curr.orders_this_month||0)>0){rows.push({type:'ordered'});continue;} // ordered this month ✓
     const outletCount=sku.outlet_count_sku||1;
     const avgInterval=daysInMonth/(orderCount/outletCount);
-    if(daysElapsed<avgInterval)continue;              // not_yet — skip
-    else if(daysElapsed<avgInterval*1.5)near++;       // near — เฝ้าดู
-    else gone++;                                       // gone — หาย
+    if(daysElapsed<avgInterval){rows.push({type:'not_yet'});continue;} // not_yet — ยังไม่ถึงรอบ
+    rows.push({
+      type:daysElapsed<avgInterval*1.5?'near':'gone',   // near = เพิ่งเลยรอบ · gone = เลยรอบมากแล้ว
+      id:String(sku.id||sku.item_id),
+      name:sku.n||sku.name||sku.item_name_th||'—',
+      dept:sku.d||sku.dept||'—',
+      gmv:sku.gmv||0,
+      avgInterval:Math.round(avgInterval),
+      daysLate:Math.max(0,Math.round(daysElapsed-avgInterval))
+    });
+  }
+  return rows;
+}
+function computeChurnCountsForAccount(accountId){
+  const rows=computeChurnRowsForAccount(accountId);
+  if(!rows)return null;
+  let gone=0,near=0,ordered=0,total=0;
+  for(const r of rows){
+    total++;
+    if(r.type==='ordered')ordered++;
+    else if(r.type==='near')near++;
+    else if(r.type==='gone')gone++;
   }
   return{gone,near,ordered,total};
 }
