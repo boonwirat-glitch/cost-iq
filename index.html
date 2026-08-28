@@ -1,4 +1,4 @@
-<!-- Freshket Sense v288: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
+<!-- Freshket Sense v289: ETag 0ms + _skuSnap + MAX_SHOW 8s + handover IDB + value guard nrrPct key. Rollback: sense_v224.html -->
 <!-- Freshket Sense v218 DATA GATE — Phase 4 architectural fix on v217 baseline.
      Goal: zero partial renders. refreshAll() fires ONCE per load cycle when ALL 6 FOREGROUND
            files are ready — not once per file callback. Eliminates 4-6 visible flashes on
@@ -1347,7 +1347,7 @@ body.kam-mode .ni.nav-home.on .nwrap{background:var(--tk-accent-dim-3);box-shado
     app: Object.freeze({
       name: 'Freshket Sense',
       shortName: 'Freshket',
-      version: 'v288',
+      version: 'v289',
       workingBaseline: 'v155-phase6.2-chat-grounding',
       themeColor: '#006050' /* retheme-target: update to #FFFFFF */,
       backgroundColor: '#006050' /* retheme-target: update to #FFFFFF */,
@@ -35266,7 +35266,11 @@ function renderKeySkuSplitButton() {
 // ── ค่าคงที่ที่ปรับได้ ──────────────────────────────────────────────────────
 const DI_STORE_KEY   = 'sense_daily_v1';
 const DI_GOOD_MIN    = 5000;   // ข่าวดีต้องมีมูลค่าอย่างน้อยเท่านี้ถึงจะขึ้นเป็นพาดหัว
-const DI_MAX_ACCOUNTS= 400;    // พอร์ตใหญ่กว่านี้ (admin ทั้งฐาน) ยังไม่รองรับ — ไม่เด้ง
+// เพดานกันข้อมูลบวมผิดปกติเท่านั้น ไม่ใช่กันความช้า — วัดของจริงในแอปที่ build แล้ว
+// 461 ร้าน = 40ms · 1,165 ร้าน (ทั้งฐาน) = 87ms · ตั้งไว้เหนือทั้งฐานพอมีที่เผื่อ
+// เดิมตั้ง 400 เพื่อกัน admin ตอนที่ยังไม่ได้วัด แล้วมันไปบัง TL จริงคนหนึ่ง
+// (พอร์ต 461 ร้าน) จนไม่เห็นจอเลย · admin ถูกกันด้วย role แล้ว เพดานจึงไม่ต้องเข้มขนาดนั้น
+const DI_MAX_ACCOUNTS= 1500;
 const DI_BOOT_MS     = 1100;   // บรรทัด "กำลังไล่ดู…" แสดงนานแค่ไหนก่อนเผยเนื้อหา
 const DI_ROLES       = ['rep','tl','ad','pm','ad_tl'];   // admin ยังไม่รองรับ (บุช 2026-08-28)
 const DI_TEAM_ROLES  = ['tl','ad_tl'];                   // role ที่เห็น "คนในทีม" แทน "ร้าน" 

@@ -229,9 +229,22 @@ console.log('\n── 4. ประตูวันละครั้ง ──');
 console.log('\n── 5. ขอบเขตและความปลอดภัย ──');
 
 {
-  check('พอร์ตใหญ่เกิน DI_MAX_ACCOUNTS → ไม่สร้างจอ (เฟส 1 ยังไม่รองรับ admin ทั้งฐาน)',
+  // เพดานต้องอยู่เหนือของจริงทั้งหมด: KAM ใหญ่สุด 140 ร้าน · TL ใหญ่สุด 461 ร้าน ·
+  // ทั้งฐาน 1,165 ร้าน (นับจาก portview.csv บน R2 เมื่อ 2026-08-28)
+  // เดิมตั้ง 400 แล้วไปบัง TL คนที่มี 461 ร้านจนไม่เห็นจอเลย
+  check('ทีมจริงที่ใหญ่ที่สุด (461 ร้าน) ต้องได้เห็นจอ',
     (() => {
-      const many = Array.from({ length: 401 }, (_, i) => ({ id: 'a' + i, name: 'r', paceSignal: {} }));
+      const many = Array.from({ length: 461 }, (_, i) => ({ id: 'a' + i, name: 'r', paceSignal: {} }));
+      return makeSandbox({ accounts: many }).buildDailyInsight() !== null;
+    })());
+  check('ทั้งฐาน (1,165 ร้าน) ก็ยังไหว — เพดานไม่ได้ตั้งไว้กันความช้า',
+    (() => {
+      const many = Array.from({ length: 1165 }, (_, i) => ({ id: 'a' + i, name: 'r', paceSignal: {} }));
+      return makeSandbox({ accounts: many }).buildDailyInsight() !== null;
+    })());
+  check('แต่ยังมีเพดานอยู่ กันข้อมูลบวมผิดปกติ',
+    (() => {
+      const many = Array.from({ length: 1501 }, (_, i) => ({ id: 'a' + i, name: 'r', paceSignal: {} }));
       return makeSandbox({ accounts: many }).buildDailyInsight() === null;
     })());
   check('ไม่มีร้านเลย → ไม่สร้างจอ',
