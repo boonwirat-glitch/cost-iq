@@ -85,6 +85,10 @@ function makeNrrCtx(rows, opts) {
   const fixtureMonth = opts.fixtureMonth || PREV_MONTH_LABEL;
   const ctx = { window: {}, console };
   vm.createContext(ctx);
+  // v_namefix (2026-08-27) เพิ่ม nrrDisplayName ใน nrr_logic.js แล้ว nrr_commission.js
+  // เรียกใช้ — sandbox นี้โหลดแค่ไฟล์เดียวเลยต้องมี stub (พฤติกรรม passthrough พอ
+  // เพราะเทสต์ชุดนี้วัดเงิน ไม่ได้วัดชื่อ)
+  vm.runInContext('function nrrDisplayName(n){return n||"(ไม่มีชื่อในข้อมูล)";}', ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../src/nrr/nrr_commission.js'), 'utf8'), ctx);
   setGlobal(ctx, 'nrrCommRatesCache', { loaded: true, byKey: { handover_params: TARGET_CONFIG } });
   ctx.window.bulkQnrrData = { byKamEmail: { 'kam@test.co': [{ latest_staff_owner: 'TestKam' }] } };
