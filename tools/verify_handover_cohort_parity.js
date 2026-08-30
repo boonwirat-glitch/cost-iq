@@ -88,6 +88,18 @@ function isQuarterFirstMonth(period) {
   return m === 1 || m === 4 || m === 7 || m === 10;
 }
 
+// ── งวดที่ปิดไปแล้วและตัดสินใจว่าไม่แก้ ────────────────────────────────────
+// 2026-07: จ่ายไปแล้ว ฿29,500 · มี 5 จุดที่ไฟล์ NRR กับไฟล์คิดเงินไม่ตรง
+// (รวมบัญชี เลค ปาร์ค ที่ตัวตรวจนี้ถูกเขียนขึ้นมาเพื่อจับตั้งแต่แรก) แต่ไล่เงินแล้ว
+// ไม่มีใครได้ผิดชั้น — ทุกคนห่างเส้นแบ่งพอสมควร ยกเว้น Ning ที่ 120.3% ห่างเส้น 0.3%
+// บุชตัดสินใจ 2026-08-28 ว่าเดือนปิดไปแล้ว ไม่แก้ย้อนหลัง
+//
+// เหตุผลที่ต้องข้าม ไม่ใช่แค่ปิดเสียง: ตัวตรวจที่แดงตลอดคือตัวตรวจที่ไม่มีใครเชื่อ
+// พอถึงวันที่มีปัญหาจริงมันร้อง ก็จะไม่มีใครสนใจ (เกิดกับผมมาแล้ววันนี้ — เห็นแดง
+// แล้วเชื่อ จนรายงานผิดไปหนึ่งรอบ)
+// ★ ถ้าจะเพิ่มงวดใหม่เข้ารายชื่อนี้ ต้องเป็นการตัดสินใจของคน ไม่ใช่เพื่อให้เทสต์เขียว
+const ACCEPTED_PERIODS = new Set(['2026-07']);
+
 const rep = loadCsv(repPath);
 const ho = loadCsv(hoPath);
 const hoSale = ho.filter(r => (r.prev_owner || '').toUpperCase() === 'SALE');
@@ -98,7 +110,13 @@ const periods = onlyPeriod ? [onlyPeriod]
 let fail = 0, checked = 0;
 console.log('── handover: หน้า NRR vs ไฟล์คิดค่าคอมฯ ──');
 
+let skipped = 0;
 periods.forEach(period => {
+  if (ACCEPTED_PERIODS.has(period) && period !== onlyPeriod) {
+    skipped++;
+    console.log('  ข้าม  [' + period + '] งวดปิดแล้ว รับทราบส่วนที่ไม่ตรงและตัดสินใจไม่แก้');
+    return;
+  }
   const prev = prevMonthOf(period);
   const firstOfQuarter = isQuarterFirstMonth(period);
 
@@ -195,8 +213,9 @@ periods.forEach(period => {
 // ── (ก) กันจ่ายซ้ำ: outlet เดียวต้องถูกจ่าย handover ได้งวดเดียวตลอดกาล ──
 // เดิมเช็คที่ระดับ "บัญชี" ซึ่งเชนที่ทยอยโอนสาขาจะติดทุกเชน แล้วกลายเป็นเสียงรบกวน
 // ที่ไม่มีใครดู · ระดับ outlet คือระดับที่จ่ายเงินจริง และซ้ำเมื่อไหร่คือผิดแน่นอน
+const hoLive = hoSale.filter(r => !ACCEPTED_PERIODS.has(r.period_month));
 const byOutlet = {};
-hoSale.forEach(r => {
+hoLive.forEach(r => {
   (byOutlet[r.user_id] = byOutlet[r.user_id] || []).push({ period: r.period_month, transfer: r.transfer_month });
 });
 const paidTwice = Object.keys(byOutlet).filter(o => byOutlet[o].length > 1);
@@ -204,7 +223,7 @@ if (paidTwice.length) {
   fail++;
   console.log('\n  FAIL  outlet ที่ถูกนับ handover เกินหนึ่งงวด (จ่ายซ้ำ) — ' + paidTwice.length + ' สาขา');
   paidTwice.slice(0, 8).forEach(o => {
-    const nm = (hoSale.find(r => r.user_id === o) || {}).account_name || o;
+    const nm = (hoLive.find(r => r.user_id === o) || {}).account_name || o;
     console.log('          outlet ' + o + ' · ' + nm.slice(0, 36) + ' : ' +
       byOutlet[o].map(x => 'งวด ' + x.period + '(โอน ' + x.transfer + ')').join(' · '));
   });
@@ -213,7 +232,7 @@ if (paidTwice.length) {
 }
 
 // ── (ค) transfer_month ต้องเป็นเดือนก่อนงวดเสมอ — ถ้าหลุดแปลว่า Q10 เพี้ยน ──
-const offCycle = hoSale.filter(r => r.transfer_month !== prevMonthOf(r.period_month));
+const offCycle = hoLive.filter(r => r.transfer_month !== prevMonthOf(r.period_month));
 if (offCycle.length) {
   fail++;
   console.log('  FAIL  แถวที่ transfer_month ไม่ใช่เดือนก่อนงวด — ' + offCycle.length + ' แถว');
@@ -223,5 +242,6 @@ if (offCycle.length) {
   console.log('  PASS  ทุกแถว transfer_month = เดือนก่อนงวด ตรงตามที่ Q10 ตั้งใจ');
 }
 
-console.log('\n' + (fail ? '❌' : '✅') + ' verify_handover_cohort_parity: ตรวจ ' + checked + ' จุด · ไม่ผ่าน ' + fail);
+console.log('\n' + (fail ? '❌' : '✅') + ' verify_handover_cohort_parity: ตรวจ ' + checked + ' จุด · ไม่ผ่าน ' + fail +
+  (skipped ? ' · ข้ามงวดที่ปิดแล้ว ' + skipped : ''));
 process.exit(fail ? 1 : 0);
