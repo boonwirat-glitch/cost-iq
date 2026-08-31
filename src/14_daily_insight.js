@@ -374,7 +374,7 @@ function buildDailyInsight(){
   let overdueItems=0, overdueShops=0, overdueBaht=0;
   let aheadShops=0, aheadBaht=0, newSkuBaht=0;
   const overdueTop=[];   // ร้านที่มีของเลยรอบ เรียงตามเงิน
-  const aheadTop=[];     // ร้านที่ซื้อเร็วกว่าเดือนก่อน (พร้อมของใหม่ถ้ามี)
+  const aheadTop=[];     // ร้านที่ซื้อเยอะกว่าเดิม (พร้อมของใหม่ถ้ามี)
   const newFinds=[];     // ร้านที่เริ่มซื้อของที่ไม่เคยซื้อ
   const signalIds=[];
 
@@ -399,7 +399,7 @@ function buildDailyInsight(){
       }
     }
 
-    // ── ซื้อเร็วกว่าเดือนที่แล้ว (เทียบวันต่อวัน ไม่ใช่เทียบยอดเต็มเดือน) ──
+    // ── ซื้อเยอะกว่าเดิม (เทียบวันต่อวัน ไม่ใช่เทียบยอดเต็มเดือน) ──
     // paceSignal.expected = อัตราต่อวันของเดือนที่แล้ว × จำนวนวันที่ผ่านไปของเดือนนี้
     const expected=(a.paceSignal||{}).expected||0;
     const ahead=expected>0?((a.gmvToDate||0)-expected):0;
@@ -414,9 +414,9 @@ function buildDailyInsight(){
       newFinds.push({id:a.id,name:a.name||'—',sku:news[0].name,gmv:news[0].gmv||0,mo:sm.recentMo});
     }
     if(ahead>0||news){
-      // เร็วกว่าจังหวะเดือนที่แล้วกี่ % — เทียบถึงวันเดียวกัน ไม่ใช่เทียบยอดเต็มเดือน
-      const pct=expected>0?Math.round((a.gmvToDate||0)/expected*100)-100:0;
-      aheadTop.push({id:a.id,name:a.name||'—',baht:ahead,pct:pct>0?pct:0,
+      // เก็บยอดจริงของเดือนนี้ไว้ด้วย — ตัวเลข +฿ ที่โชว์เป็น "ส่วนต่าง"
+      // ไม่ใช่ยอดซื้อ และไม่ใช่ยอดคาดการณ์สิ้นเดือน ต้องมีตัวเทียบให้เห็นด้วย
+      aheadTop.push({id:a.id,name:a.name||'—',baht:ahead,now:a.gmvToDate||0,
         items:news||[],mo:(sm&&sm.recentMo)||''});
     }
   });
@@ -466,7 +466,7 @@ function buildDailyInsight(){
   } else if(aheadShops>0&&aheadBaht>=DI_GOOD_MIN){
     big={kind:'ahead',shopId:null,celebrate:null,
       tag:'Olive เจอมาให้',
-      head:'เดือนนี้พอร์ตคุณ<br>ซื้อเร็วกว่าเดือนที่แล้ว',
+      head:'เดือนนี้พอร์ตคุณ<br>ซื้อเยอะกว่าเดิม',
       value:aheadBaht,
       body:'<b>'+aheadShops+' ร้าน</b> จากทั้งหมด '+accounts.length+' ร้าน ซื้อมากกว่าจังหวะของเดือนที่แล้ว '
           +'เมื่อเทียบถึงวันเดียวกัน',
@@ -537,7 +537,7 @@ function _diPickShopWorthMention(accounts){
     const ahead=expected>0?((a.gmvToDate||0)-expected):0;
     if(ahead>0&&(!bestAhead||ahead>bestAhead.baht))
       bestAhead={kind:'ahead',id:a.id,name:a.name||'—',baht:ahead,
-        why:'ซื้อเร็วกว่าเดือนที่แล้ว'};
+        why:'ซื้อเยอะกว่าเดิม'};
   });
 
   if(bestNew&&bestNew.baht>=DI_GOOD_MIN)return bestNew;
@@ -594,7 +594,7 @@ function buildTeamInsight(){
     big={kind:'team-'+m.kind,shopId:m.id,celebrate:m.kind==='new'?'small':null,
       tag:isGood?'Olive เจอมาให้':'คุยกับทีมวันนี้ยังทัน',
       head:_diEsc(lead.name)+'<br>'+_diEsc(m.name)+' '+(m.kind==='new'?'เริ่มซื้อของที่ไม่เคยซื้อ'
-        :m.kind==='late'?'มีของถึงรอบสั่งแล้ว':'ซื้อเร็วกว่าเดือนที่แล้ว'),
+        :m.kind==='late'?'มีของถึงรอบสั่งแล้ว':'ซื้อเยอะกว่าเดิม'),
       value:m.baht,
       body:'<b>'+_diEsc(lead.name)+'</b> ดูแล '+lead.total+' ร้าน · '+_diEsc(m.why),
       cta:'เปิดดู '+m.name};
@@ -1043,7 +1043,7 @@ function _diAheadBlock(d){
 
   all.slice(0,DI_AHEAD_SHOW).forEach((sh,i)=>{
     const bits=[];
-    if(sh.pct)bits.push('เร็วกว่าเดือนที่แล้ว '+sh.pct+'%');
+    if(sh.now)bits.push('เดือนนี้ซื้อไปแล้ว '+_diBaht(sh.now));
     if(sh.items&&sh.items.length)bits.push('ของที่ไม่เคยซื้อ '+sh.items.length+' รายการ');
     h+='<button class="di-shop di-c'+(i%4)+'" data-shop="'+_diEsc(sh.id)+'">'
       +'<i></i><span class="di-shop-m">'
@@ -1105,7 +1105,7 @@ function _diRenderBody(d){
     h+='<span class="di-tag di-calm">วันนี้ยังไม่มีอะไรใหม่</span>';
     h+='<p class="di-head">วันนี้ไม่มีอะไรต้องรีบค่ะ</p>';
     h+='<p class="di-value"><span id="di-value">'+d.aheadShops+'</span><small> จาก '+d.accountCount+' ร้าน</small></p>';
-    h+='<p class="di-p">ซื้อเร็วกว่าจังหวะของเดือนที่แล้ว เมื่อเทียบถึงวันเดียวกัน<br>'
+    h+='<p class="di-p">ซื้อเยอะกว่าที่ร้านเคยซื้อในเดือนที่แล้ว<br>'
       +'พอร์ตอยู่ในทรงที่ดี ที่ทำอยู่มาถูกทางแล้วค่ะ</p>';
   }
   h+='</div>';
@@ -1124,7 +1124,9 @@ function _diRenderBody(d){
     +'หรือเงียบเป็นเงินเกิน '+_diBaht(DI_CONCERN_BAHT)+' ต่อเดือน — ร้านที่เหลือยังอยู่ในรายการ '
     +'แค่ยังไม่ถึงขั้นน่าห่วง · '
     +'<b>เงียบ</b> = เลยรอบที่ควรสั่งมาแล้ว แต่ตั้งแต่ต้นเดือนถึง '+win.days+' '+win.cur+' ยังไม่มีคำสั่งซื้อ · '
-    +'<b>ซื้อเพิ่มขึ้น</b> = ยอด '+win.range+' มากกว่ายอด '+win.prevRange+' · '
+    +'<b>ซื้อเพิ่มขึ้น</b> = เอายอดเฉลี่ยต่อวันของเดือนที่แล้วมาคูณ '+win.days+' วัน '
+    +'แล้วดูว่าเดือนนี้ซื้อมากกว่านั้นเท่าไร · ตัวเลข + ที่เห็นคือส่วนต่าง ไม่ใช่ยอดซื้อ '
+    +'และไม่ใช่ยอดคาดการณ์สิ้นเดือน · '
     +'<b>ของที่ไม่เคยซื้อ</b> เทียบกับสองเดือนที่ปิดไปแล้ว</p>';
   return h;
 }
@@ -1142,9 +1144,9 @@ function _diOliveLine(d){
     return 'ที่ทักไปได้ผลแล้ว <b>'+d.won.recovered.length+' รายการ</b>กลับมาสั่งค่ะ'
       +(n?' เหลืออีก <b>'+n+' ร้าน</b>ที่น่าเป็นห่วง':'');
   if(n===0&&d.aheadShops>0)
-    return 'วันนี้ไม่มีร้านไหนน่าเป็นห่วงเลยค่ะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้วด้วย';
+    return 'วันนี้ไม่มีร้านไหนน่าเป็นห่วงเลยค่ะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเยอะกว่าเดิมด้วย';
   if(n>0&&d.aheadShops>0)
-    return '<b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้ว ส่วนที่น่าเป็นห่วงมี <b>'+n+' ร้าน</b> '
+    return '<b>'+d.aheadShops+' ร้าน</b>ซื้อเยอะกว่าเดิม ส่วนที่น่าเป็นห่วงมี <b>'+n+' ร้าน</b> '
       +_diBaht(d.concernBaht)+' ต่อเดือน'
       +(d.worstShop?' เริ่มที่ '+_diEsc(_diClip(d.worstShop.name,20))+' ก่อนได้ค่ะ':' ทักวันนี้ยังทันค่ะ');
   if(n>0)
