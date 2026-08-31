@@ -488,7 +488,25 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     { key: 'transfer_out', label: 'Transfer out', cls: 'mv-clay', negative: true }
   ];
   var colCount = columns.length + 1;
-  var theadHtml = '<tr><th>Movement</th>' + columns.map(function (c) { return '<th>' + nrrEsc(c.label) + '</th>'; }).join('') + '</tr>';
+  // v_daybasis (2026-08-31): บุชถามว่า "฿215.1M ของ ส.ค. คือเลข 30 วันหรือ 31 วัน"
+  // คำตอบคือ **ทุกคอลัมน์ถูกปรับเป็นเต็มเดือนเสมอ** (_nrrActualizeResult คูณ
+  // days_in_month/30) เดือนที่ข้อมูลครบก็เท่ากับยอดจริง เดือนที่ยังไม่ครบจะถูก
+  // คูณขึ้น — ซึ่งเดิมไม่มีอะไรบนจอบอกเลย · เขียนใต้ชื่อเดือนไปเลยว่าอิงกี่วัน
+  var theadHtml = '<tr><th>Movement</th>' + columns.map(function (c) {
+    var basis = '';
+    if (!c.isBase && c.month) {
+      var bmH = result.by_month[c.month];
+      if (bmH && bmH.days_in_month) {
+        basis = bmH.is_partial
+          ? '<span class="nrr-daybasis part">ข้อมูล ' + bmH.curr_days + ' จาก ' + bmH.days_in_month +
+            ' วัน · เลขปรับเป็นเต็มเดือน</span>'
+          : '<span class="nrr-daybasis">ยอดจริงครบ ' + bmH.days_in_month + ' วัน</span>';
+      }
+    } else if (c.isBase && result.base_month) {
+      basis = '<span class="nrr-daybasis">ยอดจริงครบ ' + nrrDaysIn(result.base_month) + ' วัน</span>';
+    }
+    return '<th>' + nrrEsc(c.label) + basis + '</th>';
+  }).join('') + '</tr>';
 
   function simpleRowHtml(row) {
     var cells = columns.map(function (c) {

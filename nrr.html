@@ -840,6 +840,13 @@ html, body {
   text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 1px solid var(--line);
   user-select: none;
 }
+/* v_daybasis: บอกใต้ชื่อเดือนว่าเลขในคอลัมน์นั้นอิงข้อมูลกี่วัน — ตัวเล็ก ไม่ใช่
+   ตัวพิมพ์ใหญ่เหมือนหัวตาราง เพราะเป็นคำอธิบาย ไม่ใช่ชื่อคอลัมน์ */
+.nrr-daybasis {
+  display: block; margin-top: 3px; font-size: 10.5px; font-weight: 500;
+  text-transform: none; letter-spacing: 0; color: var(--ink3); white-space: nowrap;
+}
+.nrr-daybasis.part { color: var(--sun-deep); font-weight: 600; }
 .nrr-table td { padding: 12px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
 .nrr-table tbody tr { transition: background 120ms ease; }
 #nrr-kams-tbody tr,
@@ -2837,7 +2844,12 @@ function _qnrrCompute(kamEmail, scope, opts) {
 
     var monthParts  = month.split('-');
     var daysInMonth = new Date(parseInt(monthParts[0], 10), parseInt(monthParts[1], 10), 0).getDate();
-    var isPartial   = curr_days > 0 && curr_days < daysInMonth - 2;
+    // v_daybasis (2026-08-31): เดิมผ่อนให้ 2 วัน — เดือนที่ข้อมูลขาดไป 1-2 วันจึงถูก
+    // นับว่า "จบเดือนแล้ว" ทั้งที่เลขบนจอถูกคูณขึ้นเป็นเต็มเดือน (ดู _nrrActualizeResult)
+    // เคสจริง ส.ค. 2026: ข้อมูล 30 วัน เดือนมี 31 วัน ⇒ 30 < 29 เป็นเท็จ ⇒ ไม่ขึ้นลายเฉียง
+    // แล้วจอโชว์ ฿215.1M ซึ่งบวกไปแล้ว 3.3% จากยอดที่เกิดขึ้นจริง โดยไม่บอกใคร
+    // ขาดวันไหนก็คือยังไม่จบเดือน ไม่มีเหตุผลให้ผ่อน
+    var isPartial   = curr_days > 0 && curr_days < daysInMonth;
 
     by_month[month] = {
       nrr_pct: nrr_pct, base_norm_m: base_norm_m,
@@ -3066,7 +3078,12 @@ function nrrComputeRowsPool(bucketRows, bucketLabel) {
     var curr_days = curr_days_sample ? curr_days_sample.curr_days : 30;
     var monthParts = month.split('-');
     var daysInMonth = new Date(parseInt(monthParts[0], 10), parseInt(monthParts[1], 10), 0).getDate();
-    var isPartial = curr_days > 0 && curr_days < daysInMonth - 2;
+    // v_daybasis (2026-08-31): เดิมผ่อนให้ 2 วัน — เดือนที่ข้อมูลขาดไป 1-2 วันจึงถูก
+    // นับว่า "จบเดือนแล้ว" ทั้งที่เลขบนจอถูกคูณขึ้นเป็นเต็มเดือน (ดู _nrrActualizeResult)
+    // เคสจริง ส.ค. 2026: ข้อมูล 30 วัน เดือนมี 31 วัน ⇒ 30 < 29 เป็นเท็จ ⇒ ไม่ขึ้นลายเฉียง
+    // แล้วจอโชว์ ฿215.1M ซึ่งบวกไปแล้ว 3.3% จากยอดที่เกิดขึ้นจริง โดยไม่บอกใคร
+    // ขาดวันไหนก็คือยังไม่จบเดือน ไม่มีเหตุผลให้ผ่อน
+    var isPartial = curr_days > 0 && curr_days < daysInMonth;
 
     by_month[month] = {
       nrr_pct: nrr_pct, base_norm_m: base_norm_m,
@@ -12125,7 +12142,25 @@ function nrrRenderMovementChart(chartContainerId, tableContainerId, result, opts
     { key: 'transfer_out', label: 'Transfer out', cls: 'mv-clay', negative: true }
   ];
   var colCount = columns.length + 1;
-  var theadHtml = '<tr><th>Movement</th>' + columns.map(function (c) { return '<th>' + nrrEsc(c.label) + '</th>'; }).join('') + '</tr>';
+  // v_daybasis (2026-08-31): บุชถามว่า "฿215.1M ของ ส.ค. คือเลข 30 วันหรือ 31 วัน"
+  // คำตอบคือ **ทุกคอลัมน์ถูกปรับเป็นเต็มเดือนเสมอ** (_nrrActualizeResult คูณ
+  // days_in_month/30) เดือนที่ข้อมูลครบก็เท่ากับยอดจริง เดือนที่ยังไม่ครบจะถูก
+  // คูณขึ้น — ซึ่งเดิมไม่มีอะไรบนจอบอกเลย · เขียนใต้ชื่อเดือนไปเลยว่าอิงกี่วัน
+  var theadHtml = '<tr><th>Movement</th>' + columns.map(function (c) {
+    var basis = '';
+    if (!c.isBase && c.month) {
+      var bmH = result.by_month[c.month];
+      if (bmH && bmH.days_in_month) {
+        basis = bmH.is_partial
+          ? '<span class="nrr-daybasis part">ข้อมูล ' + bmH.curr_days + ' จาก ' + bmH.days_in_month +
+            ' วัน · เลขปรับเป็นเต็มเดือน</span>'
+          : '<span class="nrr-daybasis">ยอดจริงครบ ' + bmH.days_in_month + ' วัน</span>';
+      }
+    } else if (c.isBase && result.base_month) {
+      basis = '<span class="nrr-daybasis">ยอดจริงครบ ' + nrrDaysIn(result.base_month) + ' วัน</span>';
+    }
+    return '<th>' + nrrEsc(c.label) + basis + '</th>';
+  }).join('') + '</tr>';
 
   function simpleRowHtml(row) {
     var cells = columns.map(function (c) {

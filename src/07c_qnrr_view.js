@@ -457,7 +457,12 @@ function _qnrrCompute(kamEmail, scope, opts) {
 
     var monthParts  = month.split('-');
     var daysInMonth = new Date(parseInt(monthParts[0]), parseInt(monthParts[1]), 0).getDate();
-    var isPartial   = curr_days > 0 && curr_days < daysInMonth - 2;
+    // v_daybasis (2026-08-31): เดิมผ่อนให้ 2 วัน — เดือนที่ข้อมูลขาดไป 1-2 วันจึงถูก
+    // นับว่า "จบเดือนแล้ว" ทั้งที่เลขบนจอถูกคูณขึ้นเป็นเต็มเดือน (ดู _nrrActualizeResult)
+    // เคสจริง ส.ค. 2026: ข้อมูล 30 วัน เดือนมี 31 วัน ⇒ 30 < 29 เป็นเท็จ ⇒ ไม่ขึ้นลายเฉียง
+    // แล้วจอโชว์ ฿215.1M ซึ่งบวกไปแล้ว 3.3% จากยอดที่เกิดขึ้นจริง โดยไม่บอกใคร
+    // ขาดวันไหนก็คือยังไม่จบเดือน ไม่มีเหตุผลให้ผ่อน
+    var isPartial   = curr_days > 0 && curr_days < daysInMonth;
 
     by_month[month] = {
       nrr_pct:        nrr_pct,
