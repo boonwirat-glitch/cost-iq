@@ -1242,7 +1242,7 @@ console.log('\n── 24. ฝั่งข่าวดีและความส
     /เดือนนี้ซื้อไปแล้ว ฿400,000/.test(html), 'ได้ ' + (/(เดือนนี้ซื้อไปแล้ว [^<·]*)/.exec(html) || [])[1]);
   check('ไม่ใช้คำว่า "เร็วกว่า" ที่ไหนอีก', DI.indexOf('เร็วกว่า') === -1);
   check('ไม่โชว์ % ที่อ่านแล้วงงในแถวข่าวดี', !/เร็วกว่าเดือนที่แล้ว \d+%/.test(html));
-  check('ร้านที่มีของไม่เคยซื้อ บอกจำนวนด้วย', /ของที่ไม่เคยซื้อ 2 รายการ/.test(html));
+  check('ร้านที่มีสินค้าใหม่ บอกจำนวนด้วย', /สินค้าใหม่ 2 รายการ/.test(html));
   check('ปุ่มดูทั้งหมดฝั่งข่าวดีเปิดหน้ารายการเดิม',
     /class="di-allbtn" id="di-row-ahead"/.test(html));
   check('ทั้งสองฝั่งใช้โครงแถวเดียวกัน จะได้อ่านคู่กันได้',
@@ -1265,6 +1265,77 @@ console.log('\n── 24. ฝั่งข่าวดีและความส
   check('ไม่มีบรรทัดหน่วยใต้ตัวเลขในแต่ละแถวแล้ว', !/\.di-shop-v small/.test(DI));
   const nm = /\.di-shop-n\{[^}]*font-size:([\d.]+)px/.exec(DI);
   check('ชื่อร้านไม่ใหญ่เกินจนกินความสูง (≤ 14px)', nm && Number(nm[1]) <= 14, 'ได้ ' + (nm && nm[1]));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 25. พาดหัวข่าวดีต้องหมุนไปทีละร้านตามวัน ไม่ค้างร้านเดิมทั้งเดือน
+// ─────────────────────────────────────────────────────────────────────────────
+// ข้อมูลชุดนี้เทียบจากเดือนที่ปิดแล้ว ไม่ขยับรายวัน ⇒ เดิมพาดหัวค้างอยู่ร้านเดียว
+// ทั้งเดือน ทั้งที่พอร์ตของ Ning มีข่าวดีเข้าเกณฑ์ถึง 11 ร้าน
+console.log('\n── 25. พาดหัวหมุนตามวัน ──');
+
+{
+  const accounts = [], movement = {};
+  // 4 ร้านมีสินค้าใหม่เข้าเกณฑ์ (เงินไล่ลง) + 1 ร้านต่ำกว่าเกณฑ์ ต้องไม่ถูกหมุนถึง
+  [40000, 30000, 20000, 10000, 900].forEach((g, i) => {
+    const id = 'N' + (i + 1);
+    accounts.push({ id, name: 'ร้านใหม่ ' + (i + 1), gmvToDate: 0, lastGmv: 0,
+      paceSignal: { expected: 0 } });
+    movement[id] = { recentMo: 'ก.ค. 2569',
+      newSkus: [{ id: 's' + i, name: 'ของ ' + i, gmv: g }] };
+  });
+  const s = makeSandbox({ accounts, movement });
+
+  // คุมวันที่เอง แล้วดูว่าพาดหัวเปลี่ยนร้านจริงไหม
+  const headFor = (day) => {
+    vmRun(s, 'function _diDayNumber(){ return ' + day + '; }');
+    const d = s.buildDailyInsight();
+    return d.big && d.big.shopId;
+  };
+  const seq = [0, 1, 2, 3, 4, 5].map(headFor);
+  check('วันติดกันได้คนละร้าน', seq[0] !== seq[1] && seq[1] !== seq[2] && seq[2] !== seq[3],
+    'ได้ ' + seq.join(','));
+  check('ครบ 4 ร้านแล้ววนกลับมาเริ่มใหม่', seq[4] === seq[0] && seq[5] === seq[1],
+    'ได้ ' + seq.join(','));
+  check('หมุนครบทุกร้านที่เข้าเกณฑ์ ไม่ข้ามใคร',
+    new Set(seq).size === 4, 'ได้ ' + new Set(seq).size + ' ร้าน');
+  check('ร้านที่เงินต่ำกว่าเกณฑ์ไม่ถูกหยิบมาพาดหัว', !seq.includes('N5'));
+
+  // วันเดิม = ร้านเดิมเสมอ (เปิดสองรอบในวันเดียวกันต้องไม่สลับ)
+  check('วันเดียวกันได้ร้านเดิมทุกครั้ง', headFor(7) === headFor(7));
+
+  vmRun(s, 'function _diDayNumber(){ return 0; }');
+  const d0 = s.buildDailyInsight();
+  check('พาดหัวเป็นร้านที่เงินมากสุดในวันแรกของรอบ', d0.big.shopId === 'N1');
+  check('บอกด้วยว่ายังมีอีกกี่ร้าน', /ยังมีอีก <b>3 ร้าน<\/b>/.test(d0.big.body));
+  check('บอกว่าพรุ่งนี้จะเปลี่ยนร้าน', /พรุ่งนี้ Olive จะหยิบร้านถัดไป/.test(d0.big.body));
+
+  // มีร้านเดียว = ไม่ต้องเขียนว่ายังมีอีก 0 ร้าน
+  const one = makeSandbox({
+    accounts: [accounts[0]], movement: { N1: movement.N1 },
+  });
+  vmRun(one, 'function _diDayNumber(){ return 3; }');
+  check('มีร้านเดียว → ไม่เขียนว่ายังมีอีก 0 ร้าน',
+    !/ยังมีอีก/.test(one.buildDailyInsight().big.body));
+}
+
+{
+  const dayFn = DI.slice(DI.indexOf('function _diDayNumber'),
+                         DI.indexOf('function _diReduceMotion'));
+  check('เลขลำดับวันมาจากวันที่ ไม่ใช่เวลาหรือการสุ่ม',
+    /Date\.UTC\(/.test(dayFn) && /getDate\(\)/.test(dayFn) && /86400000/.test(dayFn)
+    && !/Math\.random/.test(dayFn) && !/getHours|getTime\(\)|Date\.now/.test(dayFn),
+    'ได้ ' + dayFn.replace(/\s+/g, ' ').slice(0, 120));
+  check('พาดหัวเลือกด้วยเลขวัน ไม่ใช่หยิบตัวแรกเสมอ',
+    /goodFinds\[_diDayNumber\(\)%goodFinds\.length\]/.test(DI));
+  check('ยังคัดด้วยเกณฑ์เงินก่อนหมุน', /newFinds\.filter\(f=>f\.gmv>=DI_GOOD_MIN\)/.test(DI));
+}
+
+{
+  check('เรียกว่า "สินค้าใหม่" เหมือนกันทั้งจอ',
+    /เริ่มซื้อสินค้าใหม่/.test(DI) && /'สินค้าใหม่ '\+sh\.items\.length/.test(DI));
+  check('หมายเหตุกันเข้าใจผิดว่าเป็นสินค้าที่เราเพิ่งมีขาย',
+    /ไม่ใช่สินค้าที่เราเพิ่งมีขาย/.test(DI));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

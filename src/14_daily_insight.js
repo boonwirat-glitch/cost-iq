@@ -134,6 +134,13 @@ function _diClip(str,n){
   const t=String(str||'');
   return t.length>n?t.slice(0,n-1)+'…':t;
 }
+// เลขลำดับวัน (นับจากวันที่ ไม่ใช่เวลา) — พาดหัวหมุนด้วยตัวนี้
+// ใช้วันที่แทนการสุ่ม เพราะทุกเครื่องต้องเห็นร้านเดียวกันในวันเดียวกัน
+// และเทสต์ต้องรันซ้ำได้ผลเดิม (บทเรียนเดียวกับที่ห้าม Math.random ในเอฟเฟกต์ฉลอง)
+function _diDayNumber(){
+  const d=new Date();
+  return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000);
+}
 function _diReduceMotion(){
   try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
 }
@@ -375,7 +382,7 @@ function buildDailyInsight(){
   let aheadShops=0, aheadBaht=0, newSkuBaht=0;
   const overdueTop=[];   // ร้านที่มีของเลยรอบ เรียงตามเงิน
   const aheadTop=[];     // ร้านที่ซื้อเยอะกว่าเดิม (พร้อมของใหม่ถ้ามี)
-  const newFinds=[];     // ร้านที่เริ่มซื้อของที่ไม่เคยซื้อ
+  const newFinds=[];     // ร้านที่เริ่มซื้อสินค้าใหม่ (ใหม่สำหรับร้านนั้น ไม่ใช่สินค้าที่เราเพิ่งมีขาย)
   const signalIds=[];
 
   accounts.forEach(a=>{
@@ -405,7 +412,7 @@ function buildDailyInsight(){
     const ahead=expected>0?((a.gmvToDate||0)-expected):0;
     if(ahead>0){ aheadShops++; aheadBaht+=ahead; }
 
-    // ── ของที่ร้านไม่เคยซื้อมาก่อน (นิยามของ Sense: newSkus) ──
+    // ── สินค้าใหม่ของร้านนั้น (นิยามของ Sense: newSkus) ──
     let sm=null;
     try{ sm=(typeof computeSkuMovementForAccount==='function')?computeSkuMovementForAccount(a.id):null; }catch(e){ sm=null; }
     const news=(sm&&sm.newSkus&&sm.newSkus.length)?sm.newSkus:null;
@@ -443,6 +450,8 @@ function buildDailyInsight(){
   // ── เลือก "เรื่องใหญ่ของวันนี้" ──
   // ลำดับนี้ไม่ใช่เรื่องรสนิยม: วงจรปิดมาก่อนเพราะมันบอกว่า "สิ่งที่คุณทำได้ผล"
   // ตามด้วยข่าวดีอื่น · รายการถึงรอบขึ้นพาดหัวได้ต่อเมื่อไม่มีข่าวดีจริงๆ เท่านั้น
+  // ข่าวดีที่คุ้มค่าพาดหัว — เรียงด้วยเงินไว้แล้ว ลำดับคงที่ทุกเครื่อง
+  const goodFinds=newFinds.filter(f=>f.gmv>=DI_GOOD_MIN);
   let big=null;
   if(won&&won.recovered.length){
     const r=won.recovered;
@@ -454,14 +463,21 @@ function buildDailyInsight(){
           +r.slice(0,2).map(m=>_diEsc(m.skuName)).join('</b> กับ <b>')+'</b> กลับมาแล้วค่ะ'
           +(won.quiet.length?'<br>เหลืออีก '+won.quiet.length+' รายการที่ยังไม่ได้สั่ง':''),
       cta:'เปิดดู '+r[0].name};
-  } else if(newFinds.length&&newFinds[0].gmv>=DI_GOOD_MIN){
-    const f=newFinds[0];
+  } else if(goodFinds.length){
+    // เดิมหยิบร้านที่เงินมากสุดอันเดียว ⇒ พาดหัวค้างอยู่ร้านเดิมทั้งเดือน
+    // เพราะข้อมูลชุดนี้เทียบจากเดือนที่ปิดแล้ว ไม่ได้ขยับรายวัน
+    // ของ Ning มีข่าวดีเข้าเกณฑ์ 11 ร้าน แต่จอโชว์ร้านเดียวตลอด 30 เช้า
+    // ⇒ หมุนไปทีละร้านตามวันที่ ครบรอบแล้ววนกลับมาเริ่มใหม่
+    const f=goodFinds[_diDayNumber()%goodFinds.length];
+    const others=goodFinds.length-1;
     big={kind:'new',shopId:f.id,celebrate:'small',
       tag:'Olive เจอมาให้',
-      head:_diEsc(f.name)+'<br>เริ่มซื้อของที่ไม่เคยซื้อ',
+      head:_diEsc(f.name)+'<br>เริ่มซื้อสินค้าใหม่',
       value:f.gmv,
       body:'เดือน '+_diEsc(f.mo||'')+' '+_diEsc(f.name)+' เริ่มสั่ง <b>'+_diEsc(f.sku)+'</b> '
-          +'ซึ่งไม่เคยซื้อกับเรามาก่อนเลย',
+          +'ซึ่งไม่เคยซื้อกับเรามาก่อนเลย'
+          +(others?'<br>เดือนนี้ยังมีอีก <b>'+others+' ร้าน</b>ที่เริ่มซื้อสินค้าใหม่ '
+                  +'พรุ่งนี้ Olive จะหยิบร้านถัดไปมาให้ค่ะ':''),
       cta:'เปิดดู '+f.name};
   } else if(aheadShops>0&&aheadBaht>=DI_GOOD_MIN){
     big={kind:'ahead',shopId:null,celebrate:null,
@@ -517,7 +533,7 @@ function _diPickShopWorthMention(accounts){
       const top=sm.newSkus[0];
       if(!bestNew||(top.gmv||0)>bestNew.baht)
         bestNew={kind:'new',id:a.id,name:a.name||'—',baht:top.gmv||0,
-          why:'เริ่มซื้อ '+(top.name||'ของที่ไม่เคยซื้อ')};
+          why:'เริ่มซื้อ '+(top.name||'สินค้าใหม่')};
     }
 
     let rows=null;
@@ -593,7 +609,7 @@ function buildTeamInsight(){
     const isGood=(m.kind!=='late');
     big={kind:'team-'+m.kind,shopId:m.id,celebrate:m.kind==='new'?'small':null,
       tag:isGood?'Olive เจอมาให้':'คุยกับทีมวันนี้ยังทัน',
-      head:_diEsc(lead.name)+'<br>'+_diEsc(m.name)+' '+(m.kind==='new'?'เริ่มซื้อของที่ไม่เคยซื้อ'
+      head:_diEsc(lead.name)+'<br>'+_diEsc(m.name)+' '+(m.kind==='new'?'เริ่มซื้อสินค้าใหม่'
         :m.kind==='late'?'มีของถึงรอบสั่งแล้ว':'ซื้อเยอะกว่าเดิม'),
       value:m.baht,
       body:'<b>'+_diEsc(lead.name)+'</b> ดูแล '+lead.total+' ร้าน · '+_diEsc(m.why),
@@ -1044,7 +1060,7 @@ function _diAheadBlock(d){
   all.slice(0,DI_AHEAD_SHOW).forEach((sh,i)=>{
     const bits=[];
     if(sh.now)bits.push('เดือนนี้ซื้อไปแล้ว '+_diBaht(sh.now));
-    if(sh.items&&sh.items.length)bits.push('ของที่ไม่เคยซื้อ '+sh.items.length+' รายการ');
+    if(sh.items&&sh.items.length)bits.push('สินค้าใหม่ '+sh.items.length+' รายการ');
     h+='<button class="di-shop di-c'+(i%4)+'" data-shop="'+_diEsc(sh.id)+'">'
       +'<i></i><span class="di-shop-m">'
       +'<span class="di-shop-n">'+_diEsc(sh.name)+'</span>'
@@ -1127,7 +1143,8 @@ function _diRenderBody(d){
     +'<b>ซื้อเพิ่มขึ้น</b> = เอายอดเฉลี่ยต่อวันของเดือนที่แล้วมาคูณ '+win.days+' วัน '
     +'แล้วดูว่าเดือนนี้ซื้อมากกว่านั้นเท่าไร · ตัวเลข + ที่เห็นคือส่วนต่าง ไม่ใช่ยอดซื้อ '
     +'และไม่ใช่ยอดคาดการณ์สิ้นเดือน · '
-    +'<b>ของที่ไม่เคยซื้อ</b> เทียบกับสองเดือนที่ปิดไปแล้ว</p>';
+    +'<b>สินค้าใหม่</b> = สินค้าที่ร้านนั้นไม่เคยสั่งกับเรามาก่อน ไม่ใช่สินค้าที่เราเพิ่งมีขาย '
+    +'ดูจากสองเดือนที่ปิดไปแล้ว</p>';
   return h;
 }
 
@@ -1420,7 +1437,7 @@ function _diBuildWrapSlides(w){
   }
   if(w.newSkus){
     out.push({
-      k:'ของที่ไม่เคยซื้อ',
+      k:'สินค้าใหม่',
       h:'มีของใหม่เข้าพอร์ต<br><b>'+w.newSkus+' รายการ</b>',
       v:_diBaht(w.newBaht),
       p:w.newTop.length?('ก้อนใหญ่ที่สุดคือ <b>'+_diEsc(w.newTop[0].sku)+'</b><br>ที่ '
