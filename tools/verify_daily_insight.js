@@ -630,19 +630,22 @@ console.log('\n── 15. หน้ารายการเต็ม ──');
   d._diSetListSort('baht');
   check('เรียงตามเงิน: ร้านที่เงินมากสุดขึ้นก่อน',
     d._diListGroups('overdue', data)[0].id === 'B');
+  // A ค้างนานกว่า (30 วัน) และชื่อมาก่อนตามอักษรไทย แต่ B เป็นร้านที่น่าห่วง
+  // ⇒ ทั้งสองแบบการเรียง B ต้องอยู่บนเสมอ ความน่าห่วงมาก่อนวิธีเรียงที่เลือก
   d._diSetListSort('late');
-  check('เรียงตามค้างนานสุด: ร้านที่ช้าที่สุดขึ้นก่อน',
-    d._diListGroups('overdue', data)[0].id === 'A');
+  check('ค้างนานสุด: ร้านน่าห่วงยังอยู่บน ถึงอีกร้านจะค้างนานกว่า',
+    d._diListGroups('overdue', data)[0].id === 'B');
   d._diSetListSort('name');
-  // ตามลำดับอักษรไทย บ มาก่อน อ (สระนำหน้าถูกสลับไปหลังพยัญชนะตอนเทียบ)
-  // ⇒ "ร้านบี" ต้องมาก่อน "ร้านเอ" — ตอนแรกผมคาดผิด ตัวโค้ดเรียงถูกอยู่แล้ว
-  check('เรียงตามชื่อร้าน: เรียงไทยถูก',
-    d._diListGroups('overdue', data)[0].name === 'ร้านบี');
+  check('เรียงตามชื่อ: ร้านน่าห่วงยังอยู่บน ถึงอีกร้านชื่อมาก่อน',
+    d._diListGroups('overdue', data)[0].id === 'B');
   d._diSetListSort('baht');
 
-  check('หัวข้อหน้ารายการบอกขอบเขตที่กำลังดูอยู่',
-    d._diListTitle('overdue', data).s === '3 รายการ · 2 ร้าน · ฿53,200',
+  check('หัวข้อหน้ารายการบอกว่ากี่ร้านน่าห่วง และที่เหลืออีกกี่ร้าน',
+    d._diListTitle('overdue', data).s ===
+      '1 ร้านน่าห่วง ฿52,200/ด. · อีก 1 ร้านมีของเลยรอบบ้างแต่ยังไม่น่าห่วง',
     'ได้ ' + d._diListTitle('overdue', data).s);
+  check('บรรทัดร้านในลิสต์บอกเงินต่อเดือนก่อน ไม่ใช่จำนวนรายการก่อน',
+    /฿52,200\/ด\./.test(html) && html.indexOf('฿52,200/ด.') < html.indexOf('2 รายการ'));
   check('กลุ่มว่างไม่ขึ้นหน้าเปล่า มีข้อความบอก',
     /ไม่มีรายการในกลุ่มนี้/.test(d._diRenderList('visit', data)));
 }
@@ -971,7 +974,8 @@ console.log('\n── 21. ชื่อที่เรียก ช่วงเ�
   check('ป้ายมีสีของตัวเอง ไม่ใช่ div เปล่า', /#di-sheet \.di-scope\{/.test(DI));
   check('หัวข้อกลุ่มบอกช่วงเวลา ไม่ใช่ "วันนี้ยังมี"',
     /di-rest-k">ภาพรวม '\s*\+\s*_diEsc\(win\.range\)/.test(DI) && !/วันนี้ยังมี/.test(DI));
-  check('แถวถึงรอบสั่งบอกว่านับถึงวันไหน', /' ร้าน · นับถึง '\+win\.days/.test(DI));
+  check('หมายเหตุบอกว่า "เงียบ" นับถึงวันไหน',
+    /ยังไม่มีคำสั่งซื้อ/.test(DI) && /win\.days\+' '\+win\.cur\+' ยังไม่มีคำสั่งซื้อ/.test(DI));
   check('แถวซื้อเพิ่มขึ้นบอกช่วงทั้งสองฝั่ง ไม่ใช่ "เทียบวันต่อวัน"',
     /win\.range\+' เทียบ '\+win\.prevRange/.test(DI) && !/เทียบวันต่อวันกับเดือนที่แล้ว/.test(DI));
   check('จอ TL ก็บอกช่วงเวลาเหมือนกัน',
@@ -981,10 +985,161 @@ console.log('\n── 21. ชื่อที่เรียก ช่วงเ�
 {
   // "ของค้าง" เป็นคำที่ตั้งขึ้นเอง ฟังเหมือนของเหลือในสต็อก ไม่ใช่ของที่ยังไม่ได้สั่ง
   check('ไม่มีคำว่า "ของค้าง" หลงเหลือในโมดูล', DI.indexOf('ของค้าง') === -1);
-  check('หมายเหตุท้ายจออธิบายด้วยประโยคเต็ม ไม่ใช่ศัพท์ที่ตั้งเอง',
-    /สินค้าที่ร้านเคยสั่งประจำ เลยรอบที่ควรสั่งมาแล้ว/.test(DI));
+  check('หมายเหตุท้ายจออธิบายเกณฑ์ "น่าเป็นห่วง" ด้วยตัวเลขจริง',
+    /ร้านที่ของซึ่งเคยสั่งประจำเงียบไปเกิน '\+DI_CONCERN_SHARE\+'% ของยอดร้าน/.test(DI) &&
+    /_diBaht\(DI_CONCERN_BAHT\)/.test(DI));
+  check('หมายเหตุบอกด้วยว่าร้านที่เหลือไม่ได้ถูกซ่อน',
+    /ร้านที่เหลือยังอยู่ในรายการ/.test(DI));
   check('หมายเหตุอธิบาย "ซื้อเพิ่มขึ้น" ด้วยช่วงเวลาจริง',
     /ยอด '\+win\.range\+' มากกว่ายอด '\+win\.prevRange/.test(DI));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 22. "ร้านไหนน่าเป็นห่วง" ต้องคัดจริง ไม่ใช่ยกมาทั้งพอร์ต
+// ─────────────────────────────────────────────────────────────────────────────
+// เกณฑ์เดิม "มีของเลยรอบอย่างน้อย 1 ตัว" เข้าเกือบทุกร้านเสมอ — พอร์ตของ Ning
+// เข้าครบ 29 จาก 29 ⇒ จออ่านเหมือนทุกอย่างพัง และไม่บอกว่าควรเริ่มที่ร้านไหน
+console.log('\n── 22. คัดร้านที่น่าเป็นห่วง ──');
+
+{
+  const s = makeSandbox({
+    accounts: [
+      // เงินก้อนใหญ่ แต่เป็นสัดส่วนน้อยของร้าน — ต้องติด เพราะเงินเยอะจริง
+      { id: 'BIG',   name: 'ร้านใหญ่',  gmvToDate: 0, lastGmv: 3900000, paceSignal: { expected: 1, lastGmv: 3900000 } },
+      // เงินน้อยกว่า แต่หายไปครึ่งร้าน — ต้องติด และต้องเป็น "หนักสุด"
+      { id: 'HALF',  name: 'ร้านครึ่ง', gmvToDate: 0, lastGmv: 110000,  paceSignal: { expected: 1, lastGmv: 110000 } },
+      // เล็กทั้งเงินและสัดส่วน — ต้องไม่ติด แต่ต้องยังอยู่ในลิสต์
+      { id: 'SMALL', name: 'ร้านเล็ก',  gmvToDate: 0, lastGmv: 200000,  paceSignal: { expected: 1, lastGmv: 200000 } },
+    ],
+    churn: {
+      BIG:   [churnRow('ของใหญ่', 115000, 'gone', 9, 5)],   // 2.9% ของร้าน · ฿115,000
+      HALF:  [churnRow('ของครึ่ง', 54000, 'gone', 9, 20)],  // 49.1% ของร้าน · ฿54,000
+      SMALL: [churnRow('ของเล็ก', 4000, 'gone', 9, 4)],     // 2% ของร้าน · ฿4,000
+    },
+  });
+  const data = s.buildDailyInsight();
+
+  check('มีของเลยรอบครบ 3 ร้าน แต่น่าห่วงจริงแค่ 2',
+    data.overdueShops === 3 && data.concernShops === 2, 'ได้ ' + data.concernShops);
+  check('เงินก้อนใหญ่ติด ถึงจะเป็นสัดส่วนน้อยของร้าน',
+    data.overdueTop.find(x => x.id === 'BIG').concern === true);
+  check('ร้านที่หายไปครึ่งร้านติด ถึงเงินจะน้อยกว่า',
+    data.overdueTop.find(x => x.id === 'HALF').concern === true);
+  check('ร้านที่เล็กทั้งเงินและสัดส่วนไม่ติด',
+    data.overdueTop.find(x => x.id === 'SMALL').concern === false);
+  check('เงินที่รายงานคือของเฉพาะร้านที่น่าห่วง ไม่ใช่ทั้งพอร์ต',
+    data.concernBaht === 169000, 'ได้ ' + data.concernBaht);
+  check('"หนักสุด" ดูจากสัดส่วนที่หายไป ไม่ใช่เงินมากสุด',
+    data.worstShop && data.worstShop.id === 'HALF',
+    'ได้ ' + (data.worstShop && data.worstShop.id));
+  check('คิดสัดส่วนจากยอดร้านเดือนที่ปิดแล้ว',
+    data.overdueTop.find(x => x.id === 'HALF').share === 49.1);
+
+  // ไม่ซ่อนร้านไหน — ร้านที่ไม่น่าห่วงต้องยังอยู่ในลิสต์ ใต้เส้นคั่น
+  s.window._diLastData = data;
+  const html = s._diRenderList('overdue', data);
+  check('ร้านที่ไม่น่าห่วงยังอยู่ในลิสต์ ไม่ถูกซ่อน', /ร้านเล็ก/.test(html));
+  check('มีเส้นคั่นบอกว่าเส้นแบ่งอยู่ตรงไหน', /di-split/.test(html));
+  check('เส้นคั่นมาก่อนร้านที่ไม่น่าห่วง ไม่ใช่หลัง',
+    html.indexOf('di-split') < html.indexOf('ร้านเล็ก'));
+  check('เส้นคั่นขึ้นครั้งเดียว', (html.match(/di-split/g) || []).length === 1);
+  check('บรรทัดร้านบอกสัดส่วนที่เงียบไปด้วย', /49\.1% ของร้าน/.test(html));
+
+  // ทุกร้านน่าห่วงหมด = ต้องไม่มีเส้นคั่นค้างอยู่
+  const allBad = makeSandbox({
+    accounts: [{ id: 'X', name: 'ร้านเอ็กซ์', gmvToDate: 0, lastGmv: 100000, paceSignal: { expected: 1, lastGmv: 100000 } }],
+    churn: { X: [churnRow('ของ', 50000, 'gone', 9, 5)] },
+  });
+  const ad = allBad.buildDailyInsight();
+  allBad.window._diLastData = ad;
+  check('ทุกร้านน่าห่วง → ไม่มีเส้นคั่นค้าง',
+    !/di-split/.test(allBad._diRenderList('overdue', ad)));
+
+  // ไม่มียอดเดือนก่อน (ร้านใหม่) = หารไม่ได้ ต้องไม่พังและต้องไม่แกล้งเป็น 0%
+  const noBase = makeSandbox({
+    accounts: [{ id: 'N', name: 'ร้านใหม่', gmvToDate: 0, lastGmv: 0, paceSignal: { expected: 1 } }],
+    churn: { N: [churnRow('ของ', 40000, 'gone', 9, 5)] },
+  });
+  const nd = noBase.buildDailyInsight();
+  check('ร้านที่ไม่มียอดเดือนก่อน → ยังติดได้ด้วยเกณฑ์เงิน ไม่พัง',
+    nd.concernShops === 1 && nd.overdueTop[0].share === 0);
+}
+
+{
+  const S = /const DI_CONCERN_SHARE = (\d+)/.exec(DI);
+  const B = /const DI_CONCERN_BAHT  = (\d+)/.exec(DI);
+  check('เกณฑ์ทั้งสองตัวอยู่ที่เดียว แก้ที่เดียวจบ', !!S && !!B);
+  check('แถวบนจอเริ่มจากร้าน ไม่ใช่จำนวนรายการ',
+    /_diRowHtml\('di-row-overdue','ร้านที่น่าเป็นห่วง'/.test(DI) &&
+    (DI.match(/ร้านที่น่าเป็นห่วง/g) || []).length >= 2);
+  check('แถวบอกเงินต่อเดือน ไม่ใช่เงินลอยๆ', /_diBaht\(d\.concernBaht\)\+'\/ด\.'/.test(DI));
+  check('แถวยกร้านที่หนักสุดขึ้นมาให้เห็นชื่อ', /d\.worstShop\.share\+'% ของร้าน'/.test(DI));
+  check('ชื่อร้านยาวถูกตัด ไม่ดันแถวจนล้น', /_diClip\(d\.worstShop\.name,20\)/.test(DI));
+}
+
+{
+  const s = makeSandbox({
+    accounts: [
+      { id: 'P', name: 'ร้านพี', gmvToDate: 0, lastGmv: 100000, paceSignal: { expected: 1, lastGmv: 100000 } },
+      { id: 'Q', name: 'ร้านคิว', gmvToDate: 0, lastGmv: 900000, paceSignal: { expected: 1, lastGmv: 900000 } },
+      { id: 'R', name: 'ร้านอาร์', gmvToDate: 900, lastGmv: 500000, paceSignal: { expected: 100, lastGmv: 500000 } },
+    ],
+    churn: { P: [churnRow('a', 60000, 'gone', 9, 5)],     // 60% → น่าห่วง
+             Q: [churnRow('b', 900, 'gone', 9, 5)],        // 0.1% ฿900 → ไม่น่าห่วง
+             R: [churnRow('c', 800, 'gone', 9, 5)] },      // 0.16% ฿800 → ไม่น่าห่วง
+  });
+  const data = s.buildDailyInsight();
+  const line = s._diOliveLine(data);
+  check('Olive พูดเลขเดียวกับแถว ไม่ใช่จำนวนร้านทั้งพอร์ต',
+    /<b>1 ร้าน<\/b>/.test(line) && !/3 ร้าน/.test(line), 'ได้ ' + line);
+  check('Olive บอกเงินต่อเดือน ไม่ใช่ตัวเลขลอยๆ', /ต่อเดือน/.test(line));
+  check('Olive ชี้ว่าเริ่มที่ร้านไหน', /ร้านพี/.test(line));
+  check('ไม่มีร้านน่าห่วงเลย → Olive ไม่ขู่',
+    /ไม่มีร้านไหนน่าเป็นห่วงเลย/.test(makeSandbox({
+      accounts: [{ id: 'Z', name: 'z', gmvToDate: 500, lastGmv: 100, paceSignal: { expected: 1, lastGmv: 100 } }],
+      churn: { Z: [{ type: 'ordered' }] },
+    })._diOliveLine({ concernShops: 0, aheadShops: 1, accountCount: 1 })));
+}
+
+{
+  // บั๊กที่เจอตอนเปิดดูจริง: เรียงด้วยเงินอย่างเดียว ร้านเล็กที่เงียบไปครึ่งร้าน
+  // จมอยู่ท้ายลิสต์ใต้เส้นคั่น — เส้นคั่นเลยโกหกว่า "ข้างล่างไม่น่าห่วง"
+  const s = makeSandbox({
+    accounts: [
+      { id: 'BIG',  name: 'ร้านเงินเยอะ', gmvToDate: 0, lastGmv: 4000000, paceSignal: { expected: 1, lastGmv: 4000000 } },
+      { id: 'MID',  name: 'ร้านกลาง',    gmvToDate: 0, lastGmv: 600000,  paceSignal: { expected: 1, lastGmv: 600000 } },
+      { id: 'TINY', name: 'ร้านเล็กหนัก', gmvToDate: 0, lastGmv: 50000,   paceSignal: { expected: 1, lastGmv: 50000 } },
+    ],
+    churn: {
+      BIG:  [churnRow('a', 115000, 'gone', 9, 5)],   // 2.9% · ฿115,000 → ห่วง (เกณฑ์เงิน)
+      MID:  [churnRow('b', 25000, 'gone', 9, 40)],   // 4.2% · ฿25,000  → ไม่ห่วง
+      TINY: [churnRow('c', 7500, 'gone', 9, 5)],     // 15%  · ฿7,500   → ห่วง (เกณฑ์สัดส่วน)
+    },
+  });
+  const data = s.buildDailyInsight();
+  s.window._diLastData = data;
+
+  s._diSetListSort('baht');
+  let g = s._diListGroups('overdue', data);
+  check('เรียงตามเงิน: ร้านน่าห่วงอยู่บนสุดทั้งกลุ่ม ไม่จมท้ายลิสต์',
+    g[0].id === 'BIG' && g[1].id === 'TINY' && g[2].id === 'MID',
+    'ได้ ' + g.map(x => x.id).join(','));
+
+  s._diSetListSort('late');
+  g = s._diListGroups('overdue', data);
+  check('เรียงตามค้างนานสุด: ร้านน่าห่วงก็ยังอยู่บน (MID ค้าง 40 วันแต่ไม่น่าห่วง)',
+    g[0].concern === true && g[1].concern === true && g[2].id === 'MID',
+    'ได้ ' + g.map(x => x.id).join(','));
+
+  s._diSetListSort('name');
+  g = s._diListGroups('overdue', data);
+  check('เรียงตามชื่อ: ร้านน่าห่วงก็ยังอยู่บน',
+    g[0].concern === true && g[1].concern === true && g[2].concern === false);
+
+  s._diSetListSort('baht');
+  const html = s._diRenderList('overdue', data);
+  const iTiny = html.indexOf('ร้านเล็กหนัก'), iSplit = html.indexOf('di-split'), iMid = html.indexOf('ร้านกลาง');
+  check('ไม่มีร้านน่าห่วงตกไปอยู่ใต้เส้นคั่น', iTiny < iSplit && iSplit < iMid);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -40,7 +40,14 @@ const DI_SIGNAL_KEEP = 4000;   // จำสัญญาณที่เคยเ�
                                // ของจริง: KAM ใหญ่สุด 140 ร้าน ถ้าร้านละ 6 รายการ = 840
                                // เดิมตั้ง 600 แล้วรายการที่เกินโดนตัดทิ้งทุกวัน
                                // ⇒ 240 รายการเดิมติดป้าย "ใหม่" ซ้ำทุกวันตลอดไป
-const DI_SIGNAL_VER  = 2;      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
+const DI_SIGNAL_VER  = 2;
+// เกณฑ์ "ร้านน่าเป็นห่วง" — เกณฑ์เดิมคือ "มีของเลยรอบอย่างน้อย 1 ตัว" ซึ่งเกือบทุกร้าน
+// เข้าเสมอ (พอร์ตของ Ning เข้าครบ 29 จาก 29) จอเลยอ่านเหมือนทุกอย่างพัง ทั้งที่เงิน
+// กระจุกอยู่ไม่กี่ร้าน · ต้องใช้สองเกณฑ์คู่กัน เพราะแต่ละตัวเดี่ยวๆ ทิ้งของสำคัญไป:
+//   เอาแต่สัดส่วน → ทิ้งร้านใหญ่ที่เงียบ ฿115,399 (เป็นแค่ 3% ของร้าน)
+//   เอาแต่เงินก้อน → ทิ้งร้านที่เงียบไปครึ่งร้าน แต่เป็นเงิน ฿54,166
+const DI_CONCERN_SHARE = 10;      // % ของยอดร้านต่อเดือนที่เงียบไป
+const DI_CONCERN_BAHT  = 30000;   // หรือเป็นเงินก้อนเกินนี้ต่อเดือน      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
 const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
 const DI_TIER_WAIT_MS= 8000;   // รอข้อมูลชั้น 3 นานสุดเท่าไหร่ก่อนยอมเปิดเท่าที่มี
 
@@ -120,6 +127,10 @@ function _diWindow(){
     cur:DI_MO_TH[lag.getMonth()], prev:DI_MO_TH[prevMo.getMonth()],
     range:'1–'+days+' '+DI_MO_TH[lag.getMonth()],
     prevRange:'1–'+Math.min(days,prevDays)+' '+DI_MO_TH[prevMo.getMonth()]};
+}
+function _diClip(str,n){
+  const t=String(str||'');
+  return t.length>n?t.slice(0,n-1)+'…':t;
 }
 function _diReduceMotion(){
   try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
@@ -378,7 +389,10 @@ function buildDailyInsight(){
         late.forEach(r=>signalIds.push(a.id+'::'+r.id));
         const baht=late.reduce((t,r)=>t+(r.gmv||0),0);
         overdueItems+=late.length; overdueShops++; overdueBaht+=baht;
+        // lastGmv = ยอดของร้านในเดือนที่ปิดแล้ว ใช้เทียบว่าที่เงียบไปคิดเป็นสัดส่วนเท่าไร
+        const lastGmv=(a.paceSignal||{}).lastGmv||a.lastGmv||0;
         overdueTop.push({id:a.id,name:a.name||'—',count:late.length,baht,items:late,top:late[0],
+          lastGmv:lastGmv, share:lastGmv>0?Math.round(baht/lastGmv*1000)/10:0,
           worstLate:late.reduce((m,r)=>Math.max(m,r.daysLate||0),0)});
       }
     }
@@ -403,6 +417,14 @@ function buildDailyInsight(){
   });
 
   overdueTop.sort((x,y)=>y.baht-x.baht);
+  // เรียงด้วยเงินเหมือนเดิม เพราะเงินคือสิ่งที่ต้องตัดสินใจ · ส่วนความหนักเบาบอกด้วย
+  // สัดส่วนบนบรรทัดเดียวกัน จะได้เห็นว่าร้านที่เงินน้อยกว่าอาจอาการหนักกว่า
+  overdueTop.forEach(sh=>{ sh.concern=(sh.share>=DI_CONCERN_SHARE||sh.baht>=DI_CONCERN_BAHT); });
+  const concernList=overdueTop.filter(sh=>sh.concern);
+  const concernBaht=concernList.reduce((t,sh)=>t+sh.baht,0);
+  // "หนักสุด" = สัดส่วนที่หายไปมากสุด ไม่ใช่เงินมากสุด — ร้านเล็กที่หายครึ่งร้าน
+  // ต้องรีบกว่าร้านใหญ่ที่หาย 3% เสมอ
+  const worstShop=concernList.slice().sort((x,y)=>y.share-x.share)[0]||null;
   aheadTop.sort((x,y)=>y.baht-x.baht);
   newFinds.sort((x,y)=>y.gmv-x.gmv);
 
@@ -458,6 +480,7 @@ function buildDailyInsight(){
   return {
     accountCount:accounts.length,
     overdueItems, overdueShops, overdueBaht,
+    concernShops:concernList.length, concernBaht, worstShop,
     aheadShops, aheadBaht, newSkuBaht,
     overdueTop, aheadTop, newFinds,
     newCount:fresh.size,
@@ -622,9 +645,9 @@ function _diRenderTeamBody(d){
   h+='</div>';
 
   h+='<div class="di-rest di-rise di-d4"><p class="di-rest-k">รวมทั้งทีม '+_diEsc(win.range)+'</p>';
-  h+=_diRowHtml('di-row-overdue','ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
-      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน · นับถึง '+win.days+' '+win.cur,
-      d.overdueItems?_diBaht(d.overdueBaht):'', 'di-neg', d.overdueItems===0);
+  h+=_diRowHtml('di-row-overdue','ร้านที่น่าเป็นห่วง',
+      d.concernShops+' จาก '+d.overdueShops+' ร้าน',
+      d.concernShops?_diBaht(d.concernBaht)+'/ด.':'', 'di-neg', d.concernShops===0);
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
       d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange,
       d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
@@ -669,7 +692,9 @@ async function _diFillVisitRow(){
     // ในนั้นมีกี่ร้านที่มีของถึงรอบแล้วด้วย — ทำให้แถวนี้บอกลำดับความสำคัญได้ ไม่ใช่แค่จำนวน
     const d=window._diLastData||{};
     const bahtBy={};
-    (d.overdueTop||[]).forEach(s=>{ bahtBy[String(s.id)]=s.baht; });
+    (d.overdueTop||[]).forEach(s=>{ if(s.concern)bahtBy[String(s.id)]=s.baht; });
+    // นับเฉพาะร้านที่น่าห่วง ไม่ใช่ทุกร้านที่มีของเลยรอบสักตัว (เกือบทุกร้านเข้าเกณฑ์นั้น
+    // ⇒ เดิมเขียนว่า "ใน 29 ร้านมีของถึงรอบด้วย" ซึ่งเท่ากับทั้งพอร์ตพอดี ไม่ได้บอกอะไร)
     const both=notVisited.filter(a=>bahtBy[String(a.id)]>0).length;
     d.visitList=notVisited
       .map(a=>({id:a.id,name:a.name||'—',baht:bahtBy[String(a.id)]||0,items:[]}))
@@ -677,7 +702,7 @@ async function _diFillVisitRow(){
     const qLabel='Q'+(Math.floor(now.getMonth()/3)+1);
     el.querySelector('.di-row-title').textContent='ยังไม่ได้ไปเยี่ยมใน '+qLabel;
     el.querySelector('.di-row-sub').textContent=
-      notVisited.length+' ร้าน'+(both?' · ใน '+both+' ร้านมีของที่ถึงรอบสั่งแล้วด้วย':'');
+      notVisited.length+' ร้าน'+(both?' · ใน '+both+' ร้านน่าเป็นห่วงด้วย':'');
     el.style.display='';
   }catch(e){ /* เงียบไว้ — แถวนี้เป็นของแถม ไม่ใช่เนื้อหาหลัก */ }
 }
@@ -715,6 +740,8 @@ function _diInjectStyles(){
 #di-sheet .di-scope{font-size:12.5px;color:#6B8788;margin-top:6px;line-height:1.5;
   background:#F2F7F4;border:1px solid #DCE8E1;border-radius:10px;padding:7px 11px;display:inline-block}
 #di-sheet .di-scope b{color:#1D4849;font-weight:700}
+#di-sheet .di-split{font-size:12.5px;color:#7D9494;margin:22px 0 10px;padding-top:14px;
+  border-top:1px dashed #DCE8E1}
 #di-sheet .di-rise{opacity:0;transform:translateY(14px)}
 #di-sheet.di-in .di-rise{opacity:1;transform:none;
   transition:opacity .5s cubic-bezier(.16,1,.3,1),transform .5s cubic-bezier(.16,1,.3,1)}
@@ -985,10 +1012,10 @@ function _diRenderBody(d){
   h+='</div>';
 
   h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ภาพรวม '+_diEsc(win.range)+'</p>';
-  h+=_diRowHtml('di-row-overdue','ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
-      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน · นับถึง '+win.days+' '+win.cur
-        +(d.newCount?' · เพิ่งถึงรอบ '+d.newCount:''),
-      d.overdueItems?_diBaht(d.overdueBaht):'', 'di-neg', d.overdueItems===0);
+  h+=_diRowHtml('di-row-overdue','ร้านที่น่าเป็นห่วง',
+      d.concernShops+' จาก '+d.overdueShops+' ร้าน'
+        +(d.worstShop?' · หนักสุด '+_diClip(d.worstShop.name,20)+' เงียบไป '+d.worstShop.share+'% ของร้าน':''),
+      d.concernShops?_diBaht(d.concernBaht)+'/ด.':'', 'di-neg', d.concernShops===0);
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
       d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange
         +(d.newSkuBaht?' · ในนั้นเป็นของที่ไม่เคยซื้อ '+_diBaht(d.newSkuBaht):''),
@@ -999,8 +1026,10 @@ function _diRenderBody(d){
 
   h+='<div class="di-olive di-rise di-d4"><span class="di-av">O</span><p>'+_diOliveLine(d)+'</p></div>';
   h+='<p class="di-method di-rise di-d4">'
-    +'<b>ถึงรอบสั่งแล้วแต่ยังไม่สั่ง</b> = สินค้าที่ร้านเคยสั่งประจำ เลยรอบที่ควรสั่งมาแล้ว '
-    +'แต่ตั้งแต่ต้นเดือนถึง '+win.days+' '+win.cur+' ยังไม่มีคำสั่งซื้อ · '
+    +'<b>น่าเป็นห่วง</b> = ร้านที่ของซึ่งเคยสั่งประจำเงียบไปเกิน '+DI_CONCERN_SHARE+'% ของยอดร้านต่อเดือน '
+    +'หรือเงียบเป็นเงินเกิน '+_diBaht(DI_CONCERN_BAHT)+' ต่อเดือน — ร้านที่เหลือยังอยู่ในรายการ '
+    +'แค่ยังไม่ถึงขั้นน่าห่วง · '
+    +'<b>เงียบ</b> = เลยรอบที่ควรสั่งมาแล้ว แต่ตั้งแต่ต้นเดือนถึง '+win.days+' '+win.cur+' ยังไม่มีคำสั่งซื้อ · '
     +'<b>ซื้อเพิ่มขึ้น</b> = ยอด '+win.range+' มากกว่ายอด '+win.prevRange+' · '
     +'<b>ของที่ไม่เคยซื้อ</b> เทียบกับสองเดือนที่ปิดไปแล้ว</p>';
   return h;
@@ -1008,20 +1037,24 @@ function _diRenderBody(d){
 
 // เสียง Olive — ข้อความเขียนตายตัวจากตัวเลขจริง ไม่ได้เรียก AI
 function _diOliveLine(d){
+  // เลขที่ Olive พูดต้องเป็นเลขเดียวกับแถวด้านบน — พูด 29 ในขณะที่แถวบอก 9
+  // คือทำให้จอขัดกันเอง และเลข 29 ก็คือทั้งพอร์ตซึ่งไม่ได้ช่วยตัดสินใจอะไร
+  const n=d.concernShops||0;
   if(d.won&&d.won.monthBackShops)
     return 'ที่ทักไปเดือนนี้ได้ผล <b>'+d.won.monthBackShops+' จาก '+d.won.monthShops+' ร้าน</b>นะคะ'
-      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ของถึงรอบแล้วยังไม่สั่ง':'');
+      +(n?' เหลืออีก <b>'+n+' ร้าน</b>ที่น่าเป็นห่วง':'');
   // ทักข้ามเดือน: ยอดสะสมของเดือนนี้ยังเป็นศูนย์ แต่ของกลับมาสั่งแล้วจริง
   if(d.won&&d.won.recovered.length)
     return 'ที่ทักไปได้ผลแล้ว <b>'+d.won.recovered.length+' รายการ</b>กลับมาสั่งค่ะ'
-      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ของถึงรอบแล้วยังไม่สั่ง':'');
-  if(d.overdueItems===0&&d.aheadShops>0)
-    return 'วันนี้ไม่มีร้านไหนที่ของถึงรอบแล้วยังไม่สั่งเลยค่ะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้วด้วย';
-  if(d.overdueShops>0&&d.aheadShops>0)
-    return '<b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้ว ส่วนอีก <b>'+d.overdueShops+' ร้าน</b>'
-      +'มีของถึงรอบแล้วยังไม่สั่ง ทักวันนี้ยังทันค่ะ';
-  if(d.overdueShops>0)
-    return 'มี <b>'+d.overdueShops+' ร้าน</b>ที่ของถึงรอบแล้วยังไม่สั่ง รวม '+_diBaht(d.overdueBaht)+' ค่ะ';
+      +(n?' เหลืออีก <b>'+n+' ร้าน</b>ที่น่าเป็นห่วง':'');
+  if(n===0&&d.aheadShops>0)
+    return 'วันนี้ไม่มีร้านไหนน่าเป็นห่วงเลยค่ะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้วด้วย';
+  if(n>0&&d.aheadShops>0)
+    return '<b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้ว ส่วนที่น่าเป็นห่วงมี <b>'+n+' ร้าน</b> '
+      +_diBaht(d.concernBaht)+' ต่อเดือน'
+      +(d.worstShop?' เริ่มที่ '+_diEsc(_diClip(d.worstShop.name,20))+' ก่อนได้ค่ะ':' ทักวันนี้ยังทันค่ะ');
+  if(n>0)
+    return 'มี <b>'+n+' ร้าน</b>ที่น่าเป็นห่วง รวม '+_diBaht(d.concernBaht)+' ต่อเดือนค่ะ';
   return 'พอร์ต '+d.accountCount+' ร้านของคุณวันนี้เรียบร้อยดีค่ะ';
 }
 
@@ -1064,8 +1097,9 @@ function _diListTitle(kind,d){
   }
   if(kind==='ahead')return {t:'ซื้อเพิ่มขึ้น',s:d.aheadShops+' ร้าน · +'+_diBaht(d.aheadBaht)};
   if(kind==='visit')return {t:'ยังไม่ได้ไปเยี่ยมไตรมาสนี้',s:((d.visitList||[]).length)+' ร้าน'};
-  return {t:'ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
-    s:d.overdueItems+' รายการ · '+d.overdueShops+' ร้าน · '+_diBaht(d.overdueBaht)};
+  return {t:'ร้านที่น่าเป็นห่วง',
+    s:d.concernShops+' ร้านน่าห่วง '+_diBaht(d.concernBaht)+'/ด. · อีก '
+      +Math.max(0,d.overdueShops-d.concernShops)+' ร้านมีของเลยรอบบ้างแต่ยังไม่น่าห่วง'};
 }
 
 function _diListGroups(kind,d){
@@ -1100,9 +1134,18 @@ function _diListGroups(kind,d){
   if(kind==='ahead')return (d.aheadTop||[]).slice();
   if(kind==='visit')return (d.visitList||[]).slice();
   const g=(d.overdueTop||[]).slice();
-  if(_diListSort==='name')g.sort((x,y)=>String(x.name).localeCompare(String(y.name),'th'));
-  else if(_diListSort==='late')g.sort((x,y)=>(y.worstLate||0)-(x.worstLate||0));
-  else g.sort((x,y)=>y.baht-x.baht);
+  const within=(x,y)=>{
+    if(_diListSort==='name')return String(x.name).localeCompare(String(y.name),'th');
+    if(_diListSort==='late')return (y.worstLate||0)-(x.worstLate||0);
+    return y.baht-x.baht;
+  };
+  // ร้านที่น่าห่วงต้องอยู่บนสุดเสมอ แล้วค่อยเรียงตามที่เลือกภายในแต่ละกลุ่ม
+  // ถ้าเรียงด้วยเงินอย่างเดียว ร้านเล็กที่เงียบไปครึ่งร้านจะจมอยู่ท้ายลิสต์:
+  // ของ Ning มีสองร้าน (เงียบ 10.6% และ 15%) ตกไปอยู่อันดับ 20-21 ใต้ร้านที่ไม่น่าห่วง 13 ร้าน
+  g.sort((x,y)=>{
+    if(!!x.concern!==!!y.concern)return x.concern?-1:1;
+    return within(x,y);
+  });
   return g;
 }
 
@@ -1124,10 +1167,16 @@ function _diRenderList(kind,d){
     return h;
   }
 
+  let dividerDone=false;
   groups.forEach((g,gi)=>{
+    // ร้านที่เหลือยังอยู่ครบ แค่แยกให้เห็นว่าเส้นแบ่งอยู่ตรงไหน — ไม่ซ่อนร้านไหนทั้งนั้น
+    if(kind==='overdue'&&!d.team&&!dividerDone&&g.concern===false&&gi>0){
+      dividerDone=true;
+      h+='<p class="di-split">ที่เหลือมีของเลยรอบบ้าง แต่ยังไม่ถึงขั้นน่าห่วง</p>';
+    }
     const items=g.items||[];
     const cnt=kind==='overdue'
-      ? g.count+' รายการ · '+_diBaht(g.baht)
+      ? _diBaht(g.baht)+'/ด.'+(g.share?' · '+g.share+'% ของร้าน':'')+' · '+g.count+' รายการ'
       : (kind==='ahead'
           ? ((g.baht>0?'+'+_diBaht(g.baht):'')+(items.length?' · ของใหม่ '+items.length:''))
           : (g.baht>0?'ถึงรอบแล้วยังไม่สั่ง '+_diBaht(g.baht):''));
