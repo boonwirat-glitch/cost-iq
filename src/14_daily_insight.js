@@ -48,7 +48,8 @@ const DI_SIGNAL_VER  = 2;
 //   เอาแต่เงินก้อน → ทิ้งร้านที่เงียบไปครึ่งร้าน แต่เป็นเงิน ฿54,166
 const DI_CONCERN_SHARE = 10;      // % ของยอดร้านต่อเดือนที่เงียบไป
 const DI_CONCERN_BAHT  = 30000;   // หรือเป็นเงินก้อนเกินนี้ต่อเดือน
-const DI_CONCERN_SHOW  = 6;       // โชว์ชื่อร้านกี่ร้านบนจอแรก ที่เหลือกดดูต่อ      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
+const DI_CONCERN_SHOW  = 6;       // โชว์ชื่อร้านกี่ร้านบนจอแรก ที่เหลือกดดูต่อ
+const DI_AHEAD_SHOW    = 4;       // ฝั่งข่าวดีโชว์กี่ร้าน      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
 const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
 const DI_TIER_WAIT_MS= 8000;   // รอข้อมูลชั้น 3 นานสุดเท่าไหร่ก่อนยอมเปิดเท่าที่มี
 
@@ -413,7 +414,10 @@ function buildDailyInsight(){
       newFinds.push({id:a.id,name:a.name||'—',sku:news[0].name,gmv:news[0].gmv||0,mo:sm.recentMo});
     }
     if(ahead>0||news){
-      aheadTop.push({id:a.id,name:a.name||'—',baht:ahead,items:news||[],mo:(sm&&sm.recentMo)||''});
+      // เร็วกว่าจังหวะเดือนที่แล้วกี่ % — เทียบถึงวันเดียวกัน ไม่ใช่เทียบยอดเต็มเดือน
+      const pct=expected>0?Math.round((a.gmvToDate||0)/expected*100)-100:0;
+      aheadTop.push({id:a.id,name:a.name||'—',baht:ahead,pct:pct>0?pct:0,
+        items:news||[],mo:(sm&&sm.recentMo)||''});
     }
   });
 
@@ -775,7 +779,8 @@ function _diInjectStyles(){
 #di-sheet .di-won span.s{display:block;font-size:13.5px;color:#48696A;margin-top:2px;line-height:1.5}
 
 #di-sheet .di-rest{margin-top:30px;border-top:1px solid #E4ECEA}
-#di-sheet .di-rest-k{font-size:13px;color:#7D9494;margin:16px 0 2px}
+#di-sheet .di-rest-k{font-size:13px;color:#7D9494;margin:16px 0 4px}
+#di-sheet .di-rest-k b{color:#1D4849;font-weight:700}
 #di-sheet .di-row{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;
   font-family:inherit;text-align:left;padding:15px 0;cursor:pointer;color:#1D4849;
   border-bottom:1px solid #E4ECEA}
@@ -796,19 +801,19 @@ function _diInjectStyles(){
 /* แถวร้านบนจอแรก — ชื่อร้านกับยอดของร้านนั้น ไม่ใช่ยอดรวมก้อนเดียว
    จุดสีคือสีประจำร้าน ใช้ชุดเดียวกับหน้ารายการ จะได้จำร้านจากสีได้
    ชื่อร้านเป็นสีหมึก ไม่ทาสีตาม เพราะหกร้านสีจัดบนจอเช้าอ่านแล้วล้า */
-#di-sheet .di-shop{display:flex;align-items:flex-start;gap:11px;width:100%;background:none;
-  border:none;font-family:inherit;text-align:left;padding:14px 0;cursor:pointer;color:#1D4849;
-  border-bottom:1px solid #E4ECEA}
+#di-sheet .di-shop{display:flex;align-items:flex-start;gap:10px;width:100%;background:none;
+  border:none;font-family:inherit;text-align:left;padding:9px 0;cursor:pointer;color:#1D4849;
+  border-bottom:1px solid #EDF3F0}
 #di-sheet .di-shop:active{transform:scale(.985)}
-#di-sheet .di-shop i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;margin-top:6px;font-style:normal}
+#di-sheet .di-shop i{width:8px;height:8px;border-radius:2.5px;flex:0 0 auto;margin-top:5px;font-style:normal}
 #di-sheet .di-shop-m{flex:1;min-width:0}
-#di-sheet .di-shop-n{display:block;font-size:14.5px;font-weight:600;line-height:1.45;overflow-wrap:anywhere}
-#di-sheet .di-shop-s{display:block;font-size:12.5px;color:#48696A;margin-top:3px;line-height:1.45}
-#di-sheet .di-shop-v{flex:0 0 auto;font-size:14.5px;font-weight:700;text-align:right;
-  font-variant-numeric:tabular-nums}
-#di-sheet .di-shop-v small{display:block;font-size:10.5px;font-weight:500;color:#7D9494;margin-top:1px}
+#di-sheet .di-shop-n{display:block;font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+#di-sheet .di-shop-s{display:block;font-size:12px;color:#5D7C7A;margin-top:1px;line-height:1.4}
+#di-sheet .di-shop-v{flex:0 0 auto;font-size:14px;font-weight:700;text-align:right;
+  font-variant-numeric:tabular-nums;padding-top:1px}
+#di-sheet .di-shop-v.di-pos{color:#008065}
 #di-sheet .di-allbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
-  margin-top:14px;background:#F4F8F6;border:1px solid #E4ECEA;border-radius:12px;color:#006650;
+  margin-top:12px;background:#F4F8F6;border:1px solid #E4ECEA;border-radius:12px;color:#006650;
   font-family:inherit;font-size:13.5px;font-weight:600;padding:11px 14px;cursor:pointer}
 #di-sheet .di-allbtn:active{transform:scale(.985)}
 #di-sheet .di-allbtn svg{width:15px;height:15px}
@@ -994,8 +999,10 @@ function _diRowHtml(id,title,sub,value,cls,hidden,unit){
 // ถึงจะรู้ว่าเช้านี้ควรโทรหาใคร · โชว์ DI_CONCERN_SHOW ร้านแรก ที่เหลือกดดูต่อ
 function _diConcernBlock(d,win){
   const all=(d.overdueTop||[]).filter(x=>x.concern);
-  let h='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ร้านที่น่าเป็นห่วง · '
-    +_diEsc(win.range)+'</p>';
+  // หน่วยเขียนที่หัวข้อครั้งเดียว ไม่ต้องแปะใต้ตัวเลขทุกแถว — แถวจะได้เตี้ยลง
+  // เห็นได้หลายร้านขึ้นในหนึ่งหน้าจอ
+  let h='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ร้านที่น่าเป็นห่วง '
+    +'<b>'+all.length+' ร้าน</b>'+(all.length?' · ยอดต่อเดือนที่หายไป':'')+'</p>';
 
   if(!all.length){
     h+='<p class="di-calmline">วันนี้ไม่มีร้านไหนน่าเป็นห่วงค่ะ</p></div>';
@@ -1006,13 +1013,13 @@ function _diConcernBlock(d,win){
     // สัดส่วนปัดเป็นจำนวนเต็ม — ทศนิยมบนจอเช้าไม่ได้ช่วยตัดสินใจอะไร
     const pct=Math.round(sh.share||0);
     const bits=[];
-    if(pct>0)bits.push('หายไป '+pct+'% ของยอดร้าน');
+    if(pct>0)bits.push('หายไป '+pct+'% ของร้าน');
     bits.push(sh.count+' รายการ');
     h+='<button class="di-shop di-c'+(i%4)+'" data-shop="'+_diEsc(sh.id)+'">'
       +'<i></i><span class="di-shop-m">'
       +'<span class="di-shop-n">'+_diEsc(sh.name)+'</span>'
       +'<span class="di-shop-s">'+_diEsc(bits.join(' · '))+'</span></span>'
-      +'<span class="di-shop-v">'+_diEsc(_diBaht(sh.baht))+'<small>ต่อเดือน</small></span>'
+      +'<span class="di-shop-v">'+_diEsc(_diBaht(sh.baht))+'</span>'
       +'</button>';
   });
 
@@ -1023,6 +1030,36 @@ function _diConcernBlock(d,win){
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
     +'</button>';
   h+='</div>';
+  return h;
+}
+
+// ฝั่งข่าวดีเคยเป็นแถวเดียวมียอดรวมก้อนเดียว อ่านแล้วไม่รู้ว่าใครทำได้ดี
+// ใช้โครงเดียวกับฝั่งน่าห่วง จะได้อ่านคู่กันได้โดยไม่ต้องเปลี่ยนวิธีอ่าน
+function _diAheadBlock(d){
+  const all=(d.aheadTop||[]).filter(x=>x.baht>0);
+  if(!all.length)return '';
+  let h='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ซื้อเพิ่มขึ้น '
+    +'<b>'+all.length+' ร้าน</b> · รวม +'+_diEsc(_diBaht(d.aheadBaht))+'</p>';
+
+  all.slice(0,DI_AHEAD_SHOW).forEach((sh,i)=>{
+    const bits=[];
+    if(sh.pct)bits.push('เร็วกว่าเดือนที่แล้ว '+sh.pct+'%');
+    if(sh.items&&sh.items.length)bits.push('ของที่ไม่เคยซื้อ '+sh.items.length+' รายการ');
+    h+='<button class="di-shop di-c'+(i%4)+'" data-shop="'+_diEsc(sh.id)+'">'
+      +'<i></i><span class="di-shop-m">'
+      +'<span class="di-shop-n">'+_diEsc(sh.name)+'</span>'
+      +(bits.length?'<span class="di-shop-s">'+_diEsc(bits.join(' · '))+'</span>':'')
+      +'</span>'
+      +'<span class="di-shop-v di-pos">+'+_diEsc(_diBaht(sh.baht))+'</span>'
+      +'</button>';
+  });
+
+  const rest=all.length-DI_AHEAD_SHOW;
+  h+='<button class="di-allbtn" id="di-row-ahead">'
+    +(rest>0?'ดูอีก '+rest+' ร้าน · ทั้งหมด '+all.length+' ร้าน'
+            :'เปิดดูทั้ง '+all.length+' ร้าน')
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
+    +'</button></div>';
   return h;
 }
 
@@ -1074,13 +1111,10 @@ function _diRenderBody(d){
   h+='</div>';
 
   h+=_diConcernBlock(d,win);
+  h+=_diAheadBlock(d);
 
-  h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ภาพรวม '+_diEsc(win.range)+'</p>';
-  h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
-      d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange
-        +(d.newSkuBaht?' · ในนั้นเป็นของที่ไม่เคยซื้อ '+_diBaht(d.newSkuBaht):''),
-      d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
   // แถวการไปเยี่ยม: ซ่อนไว้ก่อน แล้วให้ _diFillVisitRow เปิดถ้า Supabase ตอบ
+  h+='<div class="di-rest di-rise di-d3">';
   h+=_diRowHtml('di-row-visit','ยังไม่ได้ไปเยี่ยมไตรมาสนี้','', '', '', true);
   h+='</div>';
 
