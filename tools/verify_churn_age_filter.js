@@ -103,6 +103,20 @@ console.log('\n── ตัวกรองต้องมีผลจริง 
     'ถ้าไปกรองตอนวาดจออย่างเดียว ไฟล์จะได้ทั้ง 517 ร้านทั้งที่จอโชว์ 251');
 }
 
+console.log('\n── จอกับไฟล์ต้องใช้ตัวกรองชุดเดียวกัน ──');
+// บั๊กที่บุชเจอ 2026-08-31: ปุ่มขึ้นแต่กดแล้วจอไม่เปลี่ยน เพราะ nrrRenderSlideoverBody
+// มีสำเนาตรรกะกรองของตัวเอง ส่วนปุ่มใหม่ถูกใส่ไว้ที่ nrrSlideoverVisibleOutlets
+// (ชุดที่ export ใช้) เท่านั้น · ถ้าปล่อยให้มีสองชุด มันจะเพี้ยนจากกันอีกแน่นอน
+check('จอเรียก nrrSlideoverVisibleOutlets ไม่ได้กรองเอง',
+  /var filtered = nrrSlideoverVisibleOutlets\(\);/.test(V),
+  'ปุ่มจะขึ้นแต่กดไม่มีผล — อาการเดิมที่เพิ่งแก้');
+check('ไม่มีสำเนาตรรกะกรองชุดที่สองเหลืออยู่',
+  (V.match(/st\.movementFilter !== 'all' && o\.movement !== st\.movementFilter/g) || []).length === 1,
+  'เจอมากกว่า 1 จุด = มีสองชุดอีกแล้ว');
+check('สร้าง index เดือนก่อนครั้งเดียว ไม่ใช่ทุกแถว',
+  /var churnSplit = \(st\.churnAgeFilter/.test(grab('nrrSlideoverVisibleOutlets')),
+  '517 แถว × สแกนทั้งชุดทุกแถว = ค้าง');
+
 console.log('\n── ผูกเข้าหน้าจอแล้วจริง ──');
 check('มีที่วางปุ่มในแผง', /id="nrr-slideover-churnage-chips"/.test(V));
 check('เปิดแผงใหม่แล้วตัวกรองรีเซ็ตเป็นทั้งหมด', /churnAgeFilter: 'all',\s*\/\/ v_churnage/.test(V));

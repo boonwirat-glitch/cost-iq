@@ -18590,14 +18590,13 @@ function _nrrSlideoverChurnSplit() {
 // มาจากฟังก์ชันเดียวกันเสมอ · ถ้าแยกกันเขียน วันหนึ่งมันจะไม่ตรงกันแน่นอน
 function nrrSlideoverVisibleOutlets() {
   var st = nrrSlideoverState;
+  // คิดครั้งเดียวนอกลูป — ถ้าเรียกในลูปจะสแกนแถวทั้งชุดใหม่ทุกแถว (517 แถวก็ช้าทันที)
+  var churnSplit = (st.churnAgeFilter && st.churnAgeFilter !== 'all') ? _nrrSlideoverChurnSplit() : null;
   return nrrSlideoverOutlets.filter(function (o) {
     if (st.movementFilter !== 'all' && o.movement !== st.movementFilter) return false;
     if (st.momentumFilter && st.momentumFilter !== 'all' && _nrrSlideoverRowMomentum(o.row).cls !== st.momentumFilter) return false;
     if (st.kamFilter && st.kamFilter !== 'all' && (o.row.latest_staff_owner || '—') !== st.kamFilter) return false;
-    if (st.churnAgeFilter && st.churnAgeFilter !== 'all') {
-      var _split = _nrrSlideoverChurnSplit();
-      if (_split && _nrrChurnAge(o.row, st.period, _split.prevIdx) !== st.churnAgeFilter) return false;
-    }
+    if (churnSplit && _nrrChurnAge(o.row, st.period, churnSplit.prevIdx) !== st.churnAgeFilter) return false;
     if (st.search) {
       var hay = ((o.row.account_name || '') + ' ' + (o.row.res_name || '') + ' ' + (o.row.latest_staff_owner || '')).toLowerCase();
       if (hay.indexOf(st.search) === -1) return false;
@@ -18707,16 +18706,13 @@ window.nrrExportSlideover = nrrExportSlideover;
 function nrrRenderSlideoverBody() {
   var body = document.getElementById('nrr-slideover-body');
   var st = nrrSlideoverState;
-  var filtered = nrrSlideoverOutlets.filter(function (o) {
-    if (st.movementFilter !== 'all' && o.movement !== st.movementFilter) return false;
-    if (st.momentumFilter && st.momentumFilter !== 'all' && _nrrSlideoverRowMomentum(o.row).cls !== st.momentumFilter) return false;
-    if (st.kamFilter && st.kamFilter !== 'all' && (o.row.latest_staff_owner || '—') !== st.kamFilter) return false;
-    if (st.search) {
-      var hay = ((o.row.account_name || '') + ' ' + (o.row.res_name || '') + ' ' + (o.row.latest_staff_owner || '')).toLowerCase();
-      if (hay.indexOf(st.search) === -1) return false;
-    }
-    return true;
-  });
+  // v_churnage bugfix (2026-08-31): ตรงนี้เคยมีสำเนาตรรกะกรองของตัวเอง คนละชุดกับ
+  // nrrSlideoverVisibleOutlets ที่ export ใช้ · พอเพิ่มปุ่มใหม่เข้าไปที่ชุดเดียว
+  // ปุ่มก็กดแล้วไม่มีอะไรเกิดขึ้นบนจอ — อาการที่บุชเจอ
+  // คอมเมนต์เหนือ nrrSlideoverVisibleOutlets เตือนเรื่องนี้ไว้แล้วตอน v_slideexport
+  // ("ถ้าแยกกันเขียน วันหนึ่งมันจะไม่ตรงกันแน่นอน") แต่ตอนนั้นแยกมาเฉพาะฝั่ง export
+  // ไม่ได้ย้ายฝั่งจอมาใช้ด้วย · ตอนนี้เหลือชุดเดียวจริงๆ แล้ว
+  var filtered = nrrSlideoverVisibleOutlets();
 
   if (!filtered.length) {
     body.innerHTML = '<div class="micro" style="padding:16px 0">ไม่มีร้านค้าตรงกับตัวกรอง</div>';
