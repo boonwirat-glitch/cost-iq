@@ -647,7 +647,7 @@ function _diRenderTeamBody(d){
   h+='<div class="di-rest di-rise di-d4"><p class="di-rest-k">รวมทั้งทีม '+_diEsc(win.range)+'</p>';
   h+=_diRowHtml('di-row-overdue','ร้านที่น่าเป็นห่วง',
       d.concernShops+' จาก '+d.overdueShops+' ร้าน',
-      d.concernShops?_diBaht(d.concernBaht)+'/ด.':'', 'di-neg', d.concernShops===0);
+      d.concernShops?_diBaht(d.concernBaht):'', 'di-neg', d.concernShops===0, 'ต่อเดือน');
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
       d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange,
       d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
@@ -783,7 +783,11 @@ function _diInjectStyles(){
 #di-sheet .di-row-m{flex:1;min-width:0}
 #di-sheet .di-row-title{display:block;font-size:15px;font-weight:600;line-height:1.4}
 #di-sheet .di-row-sub{display:block;font-size:13.5px;color:#48696A;margin-top:2px;line-height:1.45}
-#di-sheet .di-row-v{flex:0 0 auto;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+#di-sheet .di-row-v{flex:0 0 auto;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;
+  text-align:right}
+/* หน่วยเป็นบรรทัดเล็กใต้ตัวเลข — เขียน "/ด." ต่อท้ายไม่ใช่ภาษาที่คนพูดกัน */
+#di-sheet .di-row-v small{display:block;font-size:11px;font-weight:500;color:#7D9494;
+  margin-top:1px;letter-spacing:0}
 #di-sheet .di-row-v.di-neg{color:#B3261E}
 #di-sheet .di-row-v.di-pos{color:#008065}
 #di-sheet .di-chev{flex:0 0 auto;width:15px;height:15px;color:#7D9494}
@@ -955,11 +959,12 @@ function _diCelebrate(level){
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. เนื้อหาจอสรุป
 // ═══════════════════════════════════════════════════════════════════════════
-function _diRowHtml(id,title,sub,value,cls,hidden){
+function _diRowHtml(id,title,sub,value,cls,hidden,unit){
   return '<button class="di-row" id="'+id+'"'+(hidden?' style="display:none"':'')+'>'
     +'<span class="di-row-m"><span class="di-row-title">'+_diEsc(title)+'</span>'
     +'<span class="di-row-sub">'+_diEsc(sub)+'</span></span>'
-    +(value?'<span class="di-row-v '+(cls||'')+'">'+_diEsc(value)+'</span>':'')
+    +(value?'<span class="di-row-v '+(cls||'')+'">'+_diEsc(value)
+        +(unit?'<small>'+_diEsc(unit)+'</small>':'')+'</span>':'')
     +'<svg class="di-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
     +'</button>';
 }
@@ -1015,7 +1020,7 @@ function _diRenderBody(d){
   h+=_diRowHtml('di-row-overdue','ร้านที่น่าเป็นห่วง',
       d.concernShops+' จาก '+d.overdueShops+' ร้าน'
         +(d.worstShop?' · หนักสุด '+_diClip(d.worstShop.name,20)+' เงียบไป '+d.worstShop.share+'% ของร้าน':''),
-      d.concernShops?_diBaht(d.concernBaht)+'/ด.':'', 'di-neg', d.concernShops===0);
+      d.concernShops?_diBaht(d.concernBaht):'', 'di-neg', d.concernShops===0, 'ต่อเดือน');
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
       d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange
         +(d.newSkuBaht?' · ในนั้นเป็นของที่ไม่เคยซื้อ '+_diBaht(d.newSkuBaht):''),
@@ -1098,7 +1103,7 @@ function _diListTitle(kind,d){
   if(kind==='ahead')return {t:'ซื้อเพิ่มขึ้น',s:d.aheadShops+' ร้าน · +'+_diBaht(d.aheadBaht)};
   if(kind==='visit')return {t:'ยังไม่ได้ไปเยี่ยมไตรมาสนี้',s:((d.visitList||[]).length)+' ร้าน'};
   return {t:'ร้านที่น่าเป็นห่วง',
-    s:d.concernShops+' ร้านน่าห่วง '+_diBaht(d.concernBaht)+'/ด. · อีก '
+    s:d.concernShops+' ร้านน่าห่วง เดือนละ '+_diBaht(d.concernBaht)+' · อีก '
       +Math.max(0,d.overdueShops-d.concernShops)+' ร้านมีของเลยรอบบ้างแต่ยังไม่น่าห่วง'};
 }
 
@@ -1176,7 +1181,7 @@ function _diRenderList(kind,d){
     }
     const items=g.items||[];
     const cnt=kind==='overdue'
-      ? _diBaht(g.baht)+'/ด.'+(g.share?' · '+g.share+'% ของร้าน':'')+' · '+g.count+' รายการ'
+      ? 'เดือนละ '+_diBaht(g.baht)+(g.share?' · '+g.share+'% ของร้าน':'')+' · '+g.count+' รายการ'
       : (kind==='ahead'
           ? ((g.baht>0?'+'+_diBaht(g.baht):'')+(items.length?' · ของใหม่ '+items.length:''))
           : (g.baht>0?'ถึงรอบแล้วยังไม่สั่ง '+_diBaht(g.baht):''));
