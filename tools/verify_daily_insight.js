@@ -193,8 +193,11 @@ console.log('\n── 3. พอร์ตเงียบ: ต้องได้�
     html.includes('วันนี้ไม่มีอะไรต้องรีบ'));
   check('การ์ดเงียบพูดเชิงให้กำลังใจ ไม่ใช่รายงานว่าไม่มีข้อมูล',
     html.includes('ที่ทำอยู่มาถูกทางแล้ว'));
-  check('แถวที่ไม่มีของถูกซ่อน ไม่ใช่โชว์เลข 0',
-    (html.match(/id="di-row-overdue" style="display:none"/) || []).length === 1);
+  // ไม่มีร้านน่าห่วง → บล็อกร้านต้องพูดว่าไม่มี ไม่ใช่หายไปเฉยๆ หรือโชว์เลข 0
+  check('ไม่มีร้านน่าห่วง → เขียนบอก ไม่ใช่ปล่อยว่าง',
+    /วันนี้ไม่มีร้านไหนน่าเป็นห่วง/.test(html));
+  check('ไม่มีร้านน่าห่วง → ไม่มีปุ่มดูทั้งหมดค้างอยู่',
+    !/di-allbtn/.test(html));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1077,8 +1080,9 @@ console.log('\n── 22. คัดร้านที่น่าเป็นห
     /'ต่อเดือน'\)/.test(DI) && DI.replace(/\/\*[\s\S]*?\*\//g, '').indexOf('/ด.') === -1);
   check('หน่วยเป็นบรรทัดเล็กใต้ตัวเลข ไม่ต่อท้ายจนอ่านยาก',
     /\.di-row-v small\{display:block/.test(DI));
-  check('แถวยกร้านที่หนักสุดขึ้นมาให้เห็นชื่อ', /d\.worstShop\.share\+'% ของร้าน'/.test(DI));
-  check('ชื่อร้านยาวถูกตัด ไม่ดันแถวจนล้น', /_diClip\(d\.worstShop\.name,20\)/.test(DI));
+  check('จอแรกวางชื่อร้านออกมาเลย ไม่ใช่ยอดรวมก้อนเดียว',
+    /function _diConcernBlock/.test(DI) && /_diConcernBlock\(d,win\)/.test(DI));
+  check('มีเพดานว่าโชว์กี่ร้านบนจอแรก แก้ที่เดียว', /const DI_CONCERN_SHOW  = \d+/.test(DI));
 }
 
 {
@@ -1144,6 +1148,60 @@ console.log('\n── 22. คัดร้านที่น่าเป็นห
   const html = s._diRenderList('overdue', data);
   const iTiny = html.indexOf('ร้านเล็กหนัก'), iSplit = html.indexOf('di-split'), iMid = html.indexOf('ร้านกลาง');
   check('ไม่มีร้านน่าห่วงตกไปอยู่ใต้เส้นคั่น', iTiny < iSplit && iSplit < iMid);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 23. จอแรกต้องวางชื่อร้านกับยอดของร้านนั้น ไม่ใช่ยอดรวมก้อนเดียว
+// ─────────────────────────────────────────────────────────────────────────────
+// "9 ร้าน ฿353,714 ต่อเดือน" ไม่ได้บอกว่าเช้านี้ควรโทรหาใคร
+console.log('\n── 23. ชื่อร้านอยู่บนจอแรก ──');
+
+{
+  const mk = (n, last, gone) => ({
+    id: 'S' + n, name: 'ร้านที่ ' + n, gmvToDate: 0, lastGmv: last,
+    paceSignal: { expected: 1, lastGmv: last },
+  });
+  const accounts = [], churn = {};
+  // 8 ร้านน่าห่วง (เงินไล่ลง) + 1 ร้านไม่น่าห่วง
+  [90000, 80000, 70000, 60000, 50000, 45000, 42000, 40000].forEach((g, i) => {
+    accounts.push(mk(i + 1, 200000));
+    churn['S' + (i + 1)] = [churnRow('sku' + i, g, 'gone', 9, 5)];
+  });
+  accounts.push(mk(9, 900000));
+  churn.S9 = [churnRow('tiny', 900, 'gone', 9, 5)];
+
+  const s = makeSandbox({ accounts, churn });
+  const data = s.buildDailyInsight();
+  const html = s._diRenderBody(data);
+
+  check('มีร้านน่าห่วง 8 ร้าน', data.concernShops === 8, 'ได้ ' + data.concernShops);
+  check('จอแรกโชว์ชื่อร้านจริง ไม่ใช่แค่ตัวเลขรวม',
+    /ร้านที่ 1/.test(html) && /ร้านที่ 2/.test(html));
+  check('โชว์ตามเพดาน 6 ร้าน ไม่ใช่เทมาทั้งหมด',
+    (html.match(/class="di-shop /g) || []).length === 6);
+  check('ร้านที่เกินเพดานไม่โผล่บนจอแรก', !/ร้านที่ 7/.test(html) && !/ร้านที่ 8/.test(html));
+  check('บอกตรงๆ ว่ายังมีอีกกี่ร้าน', /ดูอีก 2 ร้าน · ทั้งหมด 8 ร้าน/.test(html));
+  check('ร้านที่ไม่น่าห่วงไม่ปนขึ้นมา', !/ร้านที่ 9/.test(html));
+
+  check('แต่ละร้านมียอดเงินของตัวเอง', /฿90,000/.test(html) && /฿80,000/.test(html));
+  check('ยอดบอกหน่วยว่าต่อเดือน', /<small>ต่อเดือน<\/small>/.test(html));
+  check('แต่ละร้านบอกสัดส่วนที่หายไปของร้านนั้น', /หายไป 45% ของยอดร้าน/.test(html));
+  check('สัดส่วนปัดเป็นจำนวนเต็ม ไม่มีทศนิยมบนจอเช้า',
+    !/หายไป \d+\.\d+% ของยอดร้าน/.test(html));
+  check('แต่ละร้านบอกจำนวนรายการด้วย', /· 1 รายการ/.test(html));
+  check('แตะร้านได้ — มี data-shop ครบทุกแถว',
+    (html.match(/class="di-shop [^"]*" data-shop="S\d"/g) || []).length === 6);
+  check('ปุ่มดูทั้งหมดยังเป็นตัวเปิดหน้ารายการเดิม',
+    /class="di-allbtn" id="di-row-overdue"/.test(html));
+  check('เรียงร้านด้วยเงิน ร้านใหญ่สุดอยู่บน',
+    html.indexOf('ร้านที่ 1') < html.indexOf('ร้านที่ 2'));
+
+  // ร้านน่าห่วงพอดีเพดาน = ต้องไม่เขียนว่า "ดูอีก 0 ร้าน"
+  const six = { accounts: accounts.slice(0, 6), churn: {} };
+  accounts.slice(0, 6).forEach((a, i) => { six.churn[a.id] = churn[a.id]; });
+  const h6 = (() => { const t = makeSandbox(six); return t._diRenderBody(t.buildDailyInsight()); })();
+  check('ร้านพอดีเพดาน → ไม่เขียนว่าดูอีก 0 ร้าน',
+    !/ดูอีก 0 ร้าน/.test(h6) && /เปิดดูทั้ง 6 ร้าน/.test(h6));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

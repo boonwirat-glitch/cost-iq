@@ -47,7 +47,8 @@ const DI_SIGNAL_VER  = 2;
 //   เอาแต่สัดส่วน → ทิ้งร้านใหญ่ที่เงียบ ฿115,399 (เป็นแค่ 3% ของร้าน)
 //   เอาแต่เงินก้อน → ทิ้งร้านที่เงียบไปครึ่งร้าน แต่เป็นเงิน ฿54,166
 const DI_CONCERN_SHARE = 10;      // % ของยอดร้านต่อเดือนที่เงียบไป
-const DI_CONCERN_BAHT  = 30000;   // หรือเป็นเงินก้อนเกินนี้ต่อเดือน      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
+const DI_CONCERN_BAHT  = 30000;   // หรือเป็นเงินก้อนเกินนี้ต่อเดือน
+const DI_CONCERN_SHOW  = 6;       // โชว์ชื่อร้านกี่ร้านบนจอแรก ที่เหลือกดดูต่อ      // เปลี่ยนวิธีเก็บเป็นรหัสย่อ — ของเวอร์ชันเก่าให้ seed ใหม่เงียบๆ
 const DI_WEEK_DAY    = 1;      // วันจันทร์ = วันที่โชว์บล็อกสรุปสัปดาห์
 const DI_TIER_WAIT_MS= 8000;   // รอข้อมูลชั้น 3 นานสุดเท่าไหร่ก่อนยอมเปิดเท่าที่มี
 
@@ -792,6 +793,26 @@ function _diInjectStyles(){
 #di-sheet .di-row-v.di-pos{color:#008065}
 #di-sheet .di-chev{flex:0 0 auto;width:15px;height:15px;color:#7D9494}
 
+/* แถวร้านบนจอแรก — ชื่อร้านกับยอดของร้านนั้น ไม่ใช่ยอดรวมก้อนเดียว
+   จุดสีคือสีประจำร้าน ใช้ชุดเดียวกับหน้ารายการ จะได้จำร้านจากสีได้
+   ชื่อร้านเป็นสีหมึก ไม่ทาสีตาม เพราะหกร้านสีจัดบนจอเช้าอ่านแล้วล้า */
+#di-sheet .di-shop{display:flex;align-items:flex-start;gap:11px;width:100%;background:none;
+  border:none;font-family:inherit;text-align:left;padding:14px 0;cursor:pointer;color:#1D4849;
+  border-bottom:1px solid #E4ECEA}
+#di-sheet .di-shop:active{transform:scale(.985)}
+#di-sheet .di-shop i{width:9px;height:9px;border-radius:3px;flex:0 0 auto;margin-top:6px;font-style:normal}
+#di-sheet .di-shop-m{flex:1;min-width:0}
+#di-sheet .di-shop-n{display:block;font-size:14.5px;font-weight:600;line-height:1.45;overflow-wrap:anywhere}
+#di-sheet .di-shop-s{display:block;font-size:12.5px;color:#48696A;margin-top:3px;line-height:1.45}
+#di-sheet .di-shop-v{flex:0 0 auto;font-size:14.5px;font-weight:700;text-align:right;
+  font-variant-numeric:tabular-nums}
+#di-sheet .di-shop-v small{display:block;font-size:10.5px;font-weight:500;color:#7D9494;margin-top:1px}
+#di-sheet .di-allbtn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+  margin-top:14px;background:#F4F8F6;border:1px solid #E4ECEA;border-radius:12px;color:#006650;
+  font-family:inherit;font-size:13.5px;font-weight:600;padding:11px 14px;cursor:pointer}
+#di-sheet .di-allbtn:active{transform:scale(.985)}
+#di-sheet .di-allbtn svg{width:15px;height:15px}
+#di-sheet .di-calmline{font-size:14.5px;color:#48696A;padding:14px 0 2px;line-height:1.6}
 #di-sheet .di-olive{display:flex;gap:12px;align-items:flex-start;margin-top:26px;padding-top:20px;
   border-top:1px solid #E4ECEA}
 #di-sheet .di-av{width:30px;height:30px;border-radius:50%;flex:0 0 auto;color:#fff;
@@ -969,6 +990,42 @@ function _diRowHtml(id,title,sub,value,cls,hidden,unit){
     +'</button>';
 }
 
+// ยอดรวมก้อนเดียวไม่ได้บอกอะไร — คนอ่านต้องได้ชื่อร้านกับยอดของร้านนั้นเลย
+// ถึงจะรู้ว่าเช้านี้ควรโทรหาใคร · โชว์ DI_CONCERN_SHOW ร้านแรก ที่เหลือกดดูต่อ
+function _diConcernBlock(d,win){
+  const all=(d.overdueTop||[]).filter(x=>x.concern);
+  let h='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ร้านที่น่าเป็นห่วง · '
+    +_diEsc(win.range)+'</p>';
+
+  if(!all.length){
+    h+='<p class="di-calmline">วันนี้ไม่มีร้านไหนน่าเป็นห่วงค่ะ</p></div>';
+    return h;
+  }
+
+  all.slice(0,DI_CONCERN_SHOW).forEach((sh,i)=>{
+    // สัดส่วนปัดเป็นจำนวนเต็ม — ทศนิยมบนจอเช้าไม่ได้ช่วยตัดสินใจอะไร
+    const pct=Math.round(sh.share||0);
+    const bits=[];
+    if(pct>0)bits.push('หายไป '+pct+'% ของยอดร้าน');
+    bits.push(sh.count+' รายการ');
+    h+='<button class="di-shop di-c'+(i%4)+'" data-shop="'+_diEsc(sh.id)+'">'
+      +'<i></i><span class="di-shop-m">'
+      +'<span class="di-shop-n">'+_diEsc(sh.name)+'</span>'
+      +'<span class="di-shop-s">'+_diEsc(bits.join(' · '))+'</span></span>'
+      +'<span class="di-shop-v">'+_diEsc(_diBaht(sh.baht))+'<small>ต่อเดือน</small></span>'
+      +'</button>';
+  });
+
+  const rest=all.length-DI_CONCERN_SHOW;
+  h+='<button class="di-allbtn" id="di-row-overdue">'
+    +(rest>0?'ดูอีก '+rest+' ร้าน · ทั้งหมด '+all.length+' ร้าน'
+            :'เปิดดูทั้ง '+all.length+' ร้าน')
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>'
+    +'</button>';
+  h+='</div>';
+  return h;
+}
+
 function _diRenderBody(d){
   const name=_diMyName();
   let h='';
@@ -1016,11 +1073,9 @@ function _diRenderBody(d){
   }
   h+='</div>';
 
+  h+=_diConcernBlock(d,win);
+
   h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ภาพรวม '+_diEsc(win.range)+'</p>';
-  h+=_diRowHtml('di-row-overdue','ร้านที่น่าเป็นห่วง',
-      d.concernShops+' จาก '+d.overdueShops+' ร้าน'
-        +(d.worstShop?' · หนักสุด '+_diClip(d.worstShop.name,20)+' เงียบไป '+d.worstShop.share+'% ของร้าน':''),
-      d.concernShops?_diBaht(d.concernBaht):'', 'di-neg', d.concernShops===0, 'ต่อเดือน');
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
       d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange
         +(d.newSkuBaht?' · ในนั้นเป็นของที่ไม่เคยซื้อ '+_diBaht(d.newSkuBaht):''),
@@ -1414,6 +1469,7 @@ function _diBindBody(d){
   bind('di-row-overdue','overdue');
   bind('di-row-ahead','ahead');
   bind('di-row-visit','visit');
+  _diBindShopRows();
   // แตะชื่อคน = เปิดรายการร้านของคนนั้น
   document.querySelectorAll('#di-body .di-person').forEach(b=>{
     b.addEventListener('click',()=>_diOpenList('kam:'+b.dataset.kam));
@@ -1586,6 +1642,17 @@ function closeDailyInsight(){
   sheet.classList.remove('di-on');
   setTimeout(()=>{ if(sheet&&sheet.parentNode)sheet.parentNode.removeChild(sheet); },360);
   _diSyncNavButton();
+}
+
+// เรียกจาก _diBindBody ที่เดียว ซึ่งทำงานทั้งตอนเปิดจอและตอนวาดใหม่ตอนข้อมูลมาครบ
+function _diBindShopRows(){
+  const body=document.getElementById('di-body');
+  if(!body)return;
+  body.querySelectorAll('.di-shop[data-shop]').forEach(b=>{
+    if(b._diBound)return;
+    b._diBound=true;
+    b.addEventListener('click',()=>_diGoToAccount(b.dataset.shop));
+  });
 }
 
 function _diGoToAccount(accountId){
