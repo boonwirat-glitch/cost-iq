@@ -12629,7 +12629,7 @@ var nrrState = {
   // v28: company/sales moved to their own views (#/company, #/sales) —
   // their state lives in nrrCompanyState (nrr_company.js).
 };
-var nrrSlideoverState = { mode: 'kam', movementFilter: 'all', momentumFilter: 'all', kamFilter: 'all', search: '' };
+var nrrSlideoverState = { mode: 'kam', movementFilter: 'all', momentumFilter: 'all', kamFilter: 'all', churnAgeFilter: 'all', search: '' };
 var nrrSlideoverOutlets = [];
 var nrrLastComparison = null;
 var nrrLastKamRows = null;
@@ -14211,6 +14211,8 @@ function nrrOpenAccountStatDrawer(key, row, kamEmail) {
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
+  var _caEl = document.getElementById('nrr-slideover-churnage-chips');
+  if (_caEl) { _caEl.style.display = 'none'; _caEl.innerHTML = ''; }
 
   // v63 fix: the AOV/หมวดสินค้า/สาขา STAT TILES already respected a selected
   // trend-chart month (nrrAccountStatRowHtml), but opening the drawer behind
@@ -14378,6 +14380,8 @@ function nrrOpenPriceDrawer(accountId, kamEmail, targetMonth) {
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
+  var _caEl = document.getElementById('nrr-slideover-churnage-chips');
+  if (_caEl) { _caEl.style.display = 'none'; _caEl.innerHTML = ''; }
   document.getElementById('nrr-slideover-title').textContent = 'ราคาสินค้าที่ร้านนี้ซื้อ';
   var body = document.getElementById('nrr-slideover-body');
   var backdrop = document.getElementById('nrr-slideover-backdrop');
@@ -14764,6 +14768,9 @@ function nrrShellHtml() {
     '  <div style="padding:12px 22px 0;display:flex;gap:8px;align-items:center"><input class="nrr-search" id="nrr-slideover-search" placeholder="ค้นหาร้านค้า/account..." style="flex:1;min-width:0"><span id="nrr-slideover-kamwrap" style="display:none"></span></div>' +
     '  <div style="padding:10px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-chips"></div></div>' +
     '  <div style="padding:6px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-momentum-chips" style="display:none"></div></div>' +
+    // v_churnage: ปุ่มแยก "เพิ่งหลุดเดือนนี้" / "เงียบต่อเนื่อง" — ขึ้นเฉพาะแผงที่
+    // ทุกแถวเป็น churn และมีเดือนก่อนหน้าให้เทียบ (ดู _nrrSlideoverChurnSplit)
+    '  <div style="padding:6px 22px 0"><div class="nrr-chip-row" id="nrr-slideover-churnage-chips" style="display:none"></div></div>' +
     '  <div class="nrr-slideover-body" id="nrr-slideover-body"></div>' +
     '</div>' +
     // Floating per-outlet tooltip (Account view, Phase C) — sibling of the
@@ -17993,6 +18000,8 @@ function nrrOpenCommissionDrawer(kamEmail, kamName, period) {
   document.getElementById('nrr-slideover-search').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-chips').parentElement.style.display = 'none';
   document.getElementById('nrr-slideover-momentum-chips').style.display = 'none';
+  var _caEl = document.getElementById('nrr-slideover-churnage-chips');
+  if (_caEl) { _caEl.style.display = 'none'; _caEl.innerHTML = ''; }
   document.getElementById('nrr-slideover-body').innerHTML = '<div class="nrr-comm-ds" id="nrr-comm-drawer-body"></div>';
   nrrRenderCommissionDrawerBody(kamEmail, period);
   document.getElementById('nrr-slideover-backdrop').classList.add('on');
@@ -18373,6 +18382,7 @@ function _nrrOpenSlideover(cfg) {
   nrrSlideoverOutlets = cfg.outlets;
   nrrSlideoverState = {
     mode: cfg.mode, period: cfg.period, movementFilter: 'all', kamFilter: 'all', search: '',
+    churnAgeFilter: 'all',   // v_churnage: เปิดแผงใหม่ต้องเริ่มที่ "ทั้งหมด" เสมอ
     showKam: cfg.showKam, negative: cfg.negative || false
   };
   document.getElementById('nrr-slideover-search').parentElement.style.display = '';
@@ -18466,6 +18476,34 @@ function nrrRenderSlideoverChips(showMv, showKamChips, showMomentum) {
     momEl.style.display = 'none'; momEl.innerHTML = '';
   }
 
+  // ── v_churnage: แยกร้านที่เพิ่งหลุดเดือนนี้ ออกจากร้านที่เงียบมาก่อนแล้ว ──
+  // ขึ้นเฉพาะแผงที่ทุกแถวเป็น churn · เดือนแรกของไตรมาสไม่มีเดือนก่อนให้เทียบ
+  // ⇒ ไม่ขึ้นปุ่ม (ดีกว่าขึ้นปุ่มที่กดแล้วได้เท่าเดิม)
+  var caEl = document.getElementById('nrr-slideover-churnage-chips');
+  if (caEl) {
+    var split = _nrrSlideoverChurnSplit();
+    if (split) {
+      caEl.style.display = '';
+      caEl.innerHTML =
+        '<button class="nrr-chip" data-ca="all">ทั้งหมด ' + (split.fresh + split.ongoing) + '</button>' +
+        '<button class="nrr-chip" data-ca="new"><span style="color:var(--coral)">●</span> เพิ่งหลุดเดือนนี้ ' + split.fresh + '</button>' +
+        '<button class="nrr-chip" data-ca="ongoing">เงียบต่อเนื่องจาก ' + nrrEsc(split.prevLabel) + ' ' + split.ongoing + '</button>';
+      var caOn = caEl.querySelector('[data-ca="' + nrrSlideoverState.churnAgeFilter + '"]');
+      (caOn || caEl.querySelector('[data-ca="all"]')).classList.add('on');
+      caEl.querySelectorAll('.nrr-chip').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          caEl.querySelectorAll('.nrr-chip').forEach(function (b) { b.classList.remove('on'); });
+          btn.classList.add('on');
+          nrrSlideoverState.churnAgeFilter = btn.dataset.ca;
+          nrrRenderSlideoverBody();
+        });
+      });
+    } else {
+      caEl.style.display = 'none'; caEl.innerHTML = '';
+      nrrSlideoverState.churnAgeFilter = 'all';
+    }
+  }
+
   // v5: KAM filter as a dropdown beside the search box (chips wasted a
   // whole wrapping row for 8+ names).
   if (showKamChips) {
@@ -18487,6 +18525,67 @@ function nrrRenderSlideoverChips(showMv, showKamChips, showMomentum) {
   } else { kamWrap.style.display = 'none'; kamWrap.innerHTML = ''; }
 }
 
+// ── v_churnage (2026-08-31): แยก "เพิ่งหลุดเดือนนี้" ออกจาก "เงียบต่อเนื่อง" ──
+//
+// เลข churn ของแต่ละเดือนวัดเทียบเดือนฐานอย่างเป็นอิสระ ⇒ ร้านที่เงียบสองเดือนติด
+// ถูกนับทั้งสองเดือน · ส.ค. 2026 ของจริง: 517 ร้าน = เงียบต่อเนื่องจาก ก.ค. 263 ร้าน
+// + เพิ่งหลุดเดือนนี้ 251 ร้าน · สองกลุ่มนี้ต้องทำคนละอย่าง (เพิ่งหลุด = รีบทักยังทัน ·
+// เงียบสองเดือน = ต้องตัดสินใจว่าจะเอายังไงต่อ) แต่ปนกันอยู่ในลิสต์เดียว 517 รายการ
+// จนไล่ไม่ไหว — บุชขอให้แยก 2026-08-31
+//
+// เดือนก่อนหน้าหาจาก QNRR_CFG.q_months (ไตรมาสเดียวกันเท่านั้น) · เดือนแรกของ
+// ไตรมาสไม่มีเดือนก่อนหน้าให้เทียบ ⇒ คืน null แล้วปุ่มจะไม่ขึ้น ไม่ใช่ขึ้นแบบเปล่าๆ
+function _nrrPrevQuarterMonth(period) {
+  var ms = (QNRR_CFG && QNRR_CFG.q_months) || [];
+  var i = ms.indexOf(period);
+  return i > 0 ? ms[i - 1] : null;
+}
+
+// คืน 'new' = เพิ่งเงียบเดือนนี้ · 'ongoing' = เงียบมาตั้งแต่เดือนก่อน · null = เทียบไม่ได้
+function _nrrChurnAge(row, period, prevIdx) {
+  if (!prevIdx || !row || !row.outlet_id) return null;
+  var prev = prevIdx[row.outlet_id];
+  if (!prev) return 'new';                       // เดือนก่อนไม่มีแถวนี้เลย = เพิ่งเข้ามาแล้วเงียบ
+  var wasChurn = prev.movement_type === 'core_nrr' && (parseFloat(prev.curr_gmv) || 0) === 0;
+  return wasChurn ? 'ongoing' : 'new';
+}
+
+// index ของเดือนก่อนหน้า: outlet_id → แถว · รวมทุก pool เหมือน export เพราะแผงนี้
+// เปิดได้จากหลายทาง (KAM / ทีม / ช่องในกราฟ / ภาพรวมบริษัท) ซึ่งโหลดคนละ pool
+function _nrrPrevMonthIndex(period) {
+  var prevM = _nrrPrevQuarterMonth(period);
+  if (!prevM) return null;
+  var idx = {}, found = false;
+  function feed(rows) {
+    (rows || []).forEach(function (r) {
+      if (!r || !r.outlet_id || r.period_month !== prevM) return;
+      found = true;
+      if (!idx[r.outlet_id]) idx[r.outlet_id] = r;
+    });
+  }
+  try { feed(window.bulkQnrrData && window.bulkQnrrData.allRows); } catch (e) {}
+  ['bulkVpData', 'bulkAdminData', 'bulkPmData'].forEach(function (n) {
+    try { if (window[n] && window[n].loaded) feed(window[n].allRows); } catch (e) {}
+  });
+  return found ? idx : null;
+}
+
+// แผงนี้ควรมีปุ่มแยกไหม — เฉพาะตอนที่ทุกแถวเป็น churn (แผงที่เปิดจากช่อง Churn)
+// ถ้าเอาไปใส่ในแผงที่มีหลายประเภทปนกัน ความหมายของปุ่มจะกำกวมทันที
+function _nrrSlideoverChurnSplit() {
+  var outs = nrrSlideoverOutlets || [];
+  if (!outs.length) return null;
+  if (!outs.every(function (o) { return o.movement === 'core_nrr_churn'; })) return null;
+  var prevIdx = _nrrPrevMonthIndex(nrrSlideoverState.period);
+  if (!prevIdx) return null;
+  var fresh = 0, ongoing = 0;
+  outs.forEach(function (o) {
+    (_nrrChurnAge(o.row, nrrSlideoverState.period, prevIdx) === 'ongoing' ? ongoing++ : fresh++);
+  });
+  return { prevIdx: prevIdx, fresh: fresh, ongoing: ongoing,
+           prevLabel: (QNRR_CFG.months_th[_nrrPrevQuarterMonth(nrrSlideoverState.period)] || '') };
+}
+
 // v_slideexport: แยกตรรกะกรองออกมา เพื่อให้ "สิ่งที่เห็น" กับ "สิ่งที่ export"
 // มาจากฟังก์ชันเดียวกันเสมอ · ถ้าแยกกันเขียน วันหนึ่งมันจะไม่ตรงกันแน่นอน
 function nrrSlideoverVisibleOutlets() {
@@ -18495,6 +18594,10 @@ function nrrSlideoverVisibleOutlets() {
     if (st.movementFilter !== 'all' && o.movement !== st.movementFilter) return false;
     if (st.momentumFilter && st.momentumFilter !== 'all' && _nrrSlideoverRowMomentum(o.row).cls !== st.momentumFilter) return false;
     if (st.kamFilter && st.kamFilter !== 'all' && (o.row.latest_staff_owner || '—') !== st.kamFilter) return false;
+    if (st.churnAgeFilter && st.churnAgeFilter !== 'all') {
+      var _split = _nrrSlideoverChurnSplit();
+      if (_split && _nrrChurnAge(o.row, st.period, _split.prevIdx) !== st.churnAgeFilter) return false;
+    }
     if (st.search) {
       var hay = ((o.row.account_name || '') + ' ' + (o.row.res_name || '') + ' ' + (o.row.latest_staff_owner || '')).toLowerCase();
       if (hay.indexOf(st.search) === -1) return false;
