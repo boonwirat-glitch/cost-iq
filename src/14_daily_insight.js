@@ -89,7 +89,37 @@ function _diGreeting(){
 }
 function _diMyName(){
   const p=(typeof currentUserProfile!=='undefined'&&currentUserProfile)||{};
-  return (p.kam_name||p.full_name||'').split(' ')[0]||'';
+  const full=p.kam_name||p.full_name||'';
+  if(!full)return '';
+  // ชื่อในระบบเป็นรูปแบบ "Duangruedee (Ning) Bulalom" — เอาชื่อในวงเล็บซึ่งเป็น
+  // ชื่อที่ทุกคนเรียกกันจริง ใช้ helper กลางตัวเดียวกับ Echo (01_core.js)
+  try{ if(typeof senseNickname==='function')return senseNickname(full)||''; }catch(e){}
+  return String(full).split(' ')[0]||'';
+}
+// "คุณสมชาย" เขียนติดกันถูก แต่ "คุณNing" ผิด ⇒ เว้นวรรคเมื่อชื่อไม่ใช่อักษรไทย
+function _diHonorific(name){
+  if(!name)return '';
+  return ' คุณ'+(/^[\u0E00-\u0E7F]/.test(name)?'':' ')+name;
+}
+const DI_MO_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function _diWindow(){
+  let days=0;
+  try{
+    if(typeof bulkCurrentMonthData!=='undefined'&&bulkCurrentMonthData){
+      for(const k in bulkCurrentMonthData){
+        const v=bulkCurrentMonthData[k];
+        if(v&&v.days_elapsed>days)days=v.days_elapsed;
+      }
+    }
+  }catch(e){}
+  const lag=new Date(); lag.setDate(lag.getDate()-1);
+  if(!days)days=lag.getDate();
+  const prevMo=new Date(lag.getFullYear(),lag.getMonth()-1,1);
+  const prevDays=new Date(lag.getFullYear(),lag.getMonth(),0).getDate();
+  return {days:days,
+    cur:DI_MO_TH[lag.getMonth()], prev:DI_MO_TH[prevMo.getMonth()],
+    range:'1–'+days+' '+DI_MO_TH[lag.getMonth()],
+    prevRange:'1–'+Math.min(days,prevDays)+' '+DI_MO_TH[prevMo.getMonth()]};
 }
 function _diReduceMotion(){
   try{ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; }
@@ -312,7 +342,7 @@ function _diMonthlyWrap(accounts){
 // ═══════════════════════════════════════════════════════════════════════════
 // ข้อมูลที่จอนี้ต้องใช้อยู่คนละชั้นกับตัวกระตุ้น:
 //   bulkSkuCurrentData = tier 2 · bulkSkusData = tier 3 · portview/paceSignal = tier 1
-// ถ้าเปิดตอนชั้น 3 ยังไม่มา ของค้างกับของใหม่จะหายเงียบๆ ทั้งที่มีจริง
+// ถ้าเปิดตอนชั้น 3 ยังไม่มา รายการถึงรอบและของใหม่จะหายเงียบๆ ทั้งที่มีจริง
 // ⇒ ต้องรู้ตัวว่าข้อมูลยังไม่ครบ แล้วห้ามปั๊มว่า "อ่านแล้ววันนี้"
 function _diDataComplete(){
   try{
@@ -385,7 +415,7 @@ function buildDailyInsight(){
 
   // ── เลือก "เรื่องใหญ่ของวันนี้" ──
   // ลำดับนี้ไม่ใช่เรื่องรสนิยม: วงจรปิดมาก่อนเพราะมันบอกว่า "สิ่งที่คุณทำได้ผล"
-  // ตามด้วยข่าวดีอื่น · ของค้างขึ้นพาดหัวได้ต่อเมื่อไม่มีข่าวดีจริงๆ เท่านั้น
+  // ตามด้วยข่าวดีอื่น · รายการถึงรอบขึ้นพาดหัวได้ต่อเมื่อไม่มีข่าวดีจริงๆ เท่านั้น
   let big=null;
   if(won&&won.recovered.length){
     const r=won.recovered;
@@ -554,8 +584,10 @@ function buildTeamInsight(){
 function _diRenderTeamBody(d){
   const name=_diMyName();
   let h='';
+  const win=_diWindow();
   h+='<p class="di-eyebrow di-rise di-d1">'+_diEsc(_diDateLabel())+'</p>';
-  h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting())+(name?' คุณ'+_diEsc(name):'')+'</p>';
+  h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting()+_diHonorific(name))+'</p>';
+  h+='<p class="di-scope di-rise di-d1">ตัวเลขในจอนี้เป็นยอดรวม <b>'+_diEsc(win.range)+'</b> ไม่ใช่ของวันนี้วันเดียว</p>';
 
   h+='<div class="di-find di-rise di-d2">';
   if(d.big){
@@ -589,18 +621,18 @@ function _diRenderTeamBody(d){
   });
   h+='</div>';
 
-  h+='<div class="di-rest di-rise di-d4"><p class="di-rest-k">รวมทั้งทีม</p>';
+  h+='<div class="di-rest di-rise di-d4"><p class="di-rest-k">รวมทั้งทีม '+_diEsc(win.range)+'</p>';
   h+=_diRowHtml('di-row-overdue','ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
-      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน',
+      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน · นับถึง '+win.days+' '+win.cur,
       d.overdueItems?_diBaht(d.overdueBaht):'', 'di-neg', d.overdueItems===0);
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
-      d.aheadShops+' ร้าน · เทียบวันต่อวันกับเดือนที่แล้ว',
+      d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange,
       d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
   h+='</div>';
 
   h+='<p class="di-method di-rise di-d4">'
     +'"ร้านที่ควรพูดถึง" เลือกให้คนละหนึ่งร้าน — ของที่ร้านเพิ่งเริ่มซื้อมาก่อน '
-    +'ถ้าไม่มีจึงเป็นร้านที่ของค้างมากที่สุด · แตะชื่อคนเพื่อดูร้านที่เหลือ</p>';
+    +'ถ้าไม่มีจึงเป็นร้านที่ถึงรอบสั่งแล้วยังไม่สั่งมากที่สุด · แตะชื่อคนเพื่อดูร้านที่เหลือ</p>';
   return h;
 }
 
@@ -679,6 +711,10 @@ function _diInjectStyles(){
 
 #di-sheet .di-eyebrow{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#7D9494}
 #di-sheet .di-greet{font-size:15px;color:#48696A;margin-top:8px}
+/* ป้ายบอกช่วงเวลา — จอเปิดทุกเช้าแต่เลขเป็นยอดสะสมทั้งเดือน ต้องเขียนไว้ให้เห็น */
+#di-sheet .di-scope{font-size:12.5px;color:#6B8788;margin-top:6px;line-height:1.5;
+  background:#F2F7F4;border:1px solid #DCE8E1;border-radius:10px;padding:7px 11px;display:inline-block}
+#di-sheet .di-scope b{color:#1D4849;font-weight:700}
 #di-sheet .di-rise{opacity:0;transform:translateY(14px)}
 #di-sheet.di-in .di-rise{opacity:1;transform:none;
   transition:opacity .5s cubic-bezier(.16,1,.3,1),transform .5s cubic-bezier(.16,1,.3,1)}
@@ -904,8 +940,10 @@ function _diRowHtml(id,title,sub,value,cls,hidden){
 function _diRenderBody(d){
   const name=_diMyName();
   let h='';
+  const win=_diWindow();
   h+='<p class="di-eyebrow di-rise di-d1">'+_diEsc(_diDateLabel())+'</p>';
-  h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting())+(name?' คุณ'+_diEsc(name):'')+'</p>';
+  h+='<p class="di-greet di-rise di-d1">'+_diEsc(_diGreeting()+_diHonorific(name))+'</p>';
+  h+='<p class="di-scope di-rise di-d1">ตัวเลขในจอนี้เป็นยอดรวม <b>'+_diEsc(win.range)+'</b> ไม่ใช่ของวันนี้วันเดียว</p>';
 
   // วันจันทร์: วางสรุปสัปดาห์ไว้บนสุด เพราะเป็นสิ่งที่ต่างจากทุกวัน
   if(d.weekly){
@@ -946,12 +984,13 @@ function _diRenderBody(d){
   }
   h+='</div>';
 
-  h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">วันนี้ยังมี</p>';
+  h+='<div class="di-rest di-rise di-d3"><p class="di-rest-k">ภาพรวม '+_diEsc(win.range)+'</p>';
   h+=_diRowHtml('di-row-overdue','ถึงรอบสั่งแล้วแต่ยังไม่สั่ง',
-      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน'+(d.newCount?' · เพิ่งโผล่ '+d.newCount:''),
+      d.overdueItems+' รายการ ใน '+d.overdueShops+' ร้าน · นับถึง '+win.days+' '+win.cur
+        +(d.newCount?' · เพิ่งถึงรอบ '+d.newCount:''),
       d.overdueItems?_diBaht(d.overdueBaht):'', 'di-neg', d.overdueItems===0);
   h+=_diRowHtml('di-row-ahead','ซื้อเพิ่มขึ้น',
-      d.aheadShops+' ร้าน · เทียบวันต่อวันกับเดือนที่แล้ว'
+      d.aheadShops+' ร้าน · '+win.range+' เทียบ '+win.prevRange
         +(d.newSkuBaht?' · ในนั้นเป็นของที่ไม่เคยซื้อ '+_diBaht(d.newSkuBaht):''),
       d.aheadShops?'+'+_diBaht(d.aheadBaht):'', 'di-pos', d.aheadShops===0);
   // แถวการไปเยี่ยม: ซ่อนไว้ก่อน แล้วให้ _diFillVisitRow เปิดถ้า Supabase ตอบ
@@ -960,8 +999,10 @@ function _diRenderBody(d){
 
   h+='<div class="di-olive di-rise di-d4"><span class="di-av">O</span><p>'+_diOliveLine(d)+'</p></div>';
   h+='<p class="di-method di-rise di-d4">'
-    +'"ถึงรอบแต่ยังไม่สั่ง" ดูจากรอบสั่งจริงของเดือนนี้ · "ซื้อเพิ่มขึ้น" เทียบถึงวันเดียวกันของเดือนที่แล้ว · '
-    +'"ของที่ไม่เคยซื้อ" เทียบเดือนที่ปิดแล้วสองเดือน</p>';
+    +'<b>ถึงรอบสั่งแล้วแต่ยังไม่สั่ง</b> = สินค้าที่ร้านเคยสั่งประจำ เลยรอบที่ควรสั่งมาแล้ว '
+    +'แต่ตั้งแต่ต้นเดือนถึง '+win.days+' '+win.cur+' ยังไม่มีคำสั่งซื้อ · '
+    +'<b>ซื้อเพิ่มขึ้น</b> = ยอด '+win.range+' มากกว่ายอด '+win.prevRange+' · '
+    +'<b>ของที่ไม่เคยซื้อ</b> เทียบกับสองเดือนที่ปิดไปแล้ว</p>';
   return h;
 }
 
@@ -969,13 +1010,13 @@ function _diRenderBody(d){
 function _diOliveLine(d){
   if(d.won&&d.won.monthBackShops)
     return 'ที่ทักไปเดือนนี้ได้ผล <b>'+d.won.monthBackShops+' จาก '+d.won.monthShops+' ร้าน</b>นะคะ'
-      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ยังมีของค้างรอบอยู่':'');
+      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ของถึงรอบแล้วยังไม่สั่ง':'');
   // ทักข้ามเดือน: ยอดสะสมของเดือนนี้ยังเป็นศูนย์ แต่ของกลับมาสั่งแล้วจริง
   if(d.won&&d.won.recovered.length)
     return 'ที่ทักไปได้ผลแล้ว <b>'+d.won.recovered.length+' รายการ</b>กลับมาสั่งค่ะ'
-      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ยังมีของค้างรอบอยู่':'');
+      +(d.overdueShops?' เหลืออีก <b>'+d.overdueShops+' ร้าน</b>ที่ของถึงรอบแล้วยังไม่สั่ง':'');
   if(d.overdueItems===0&&d.aheadShops>0)
-    return 'วันนี้ไม่มีของค้างรอบเลยสักร้านนะคะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้วด้วย';
+    return 'วันนี้ไม่มีร้านไหนที่ของถึงรอบแล้วยังไม่สั่งเลยค่ะ <b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้วด้วย';
   if(d.overdueShops>0&&d.aheadShops>0)
     return '<b>'+d.aheadShops+' ร้าน</b>ซื้อเร็วกว่าเดือนที่แล้ว ส่วนอีก <b>'+d.overdueShops+' ร้าน</b>'
       +'มีของถึงรอบแล้วยังไม่สั่ง ทักวันนี้ยังทันค่ะ';
@@ -1019,7 +1060,7 @@ function _diListTitle(kind,d){
     const who=kind.slice(4);
     const p=(d.people||[]).find(x=>(x.email||x.name)===who);
     return {t:(p&&p.name)||'ร้านของ KAM',
-      s:((p&&p.total)||0)+' ร้าน'+(p&&p.lateBaht?' · ของค้าง '+_diBaht(p.lateBaht):'')};
+      s:((p&&p.total)||0)+' ร้าน'+(p&&p.lateBaht?' · ถึงรอบยังไม่สั่ง '+_diBaht(p.lateBaht):'')};
   }
   if(kind==='ahead')return {t:'ซื้อเพิ่มขึ้น',s:d.aheadShops+' ร้าน · +'+_diBaht(d.aheadBaht)};
   if(kind==='visit')return {t:'ยังไม่ได้ไปเยี่ยมไตรมาสนี้',s:((d.visitList||[]).length)+' ร้าน'};
@@ -1089,7 +1130,7 @@ function _diRenderList(kind,d){
       ? g.count+' รายการ · '+_diBaht(g.baht)
       : (kind==='ahead'
           ? ((g.baht>0?'+'+_diBaht(g.baht):'')+(items.length?' · ของใหม่ '+items.length:''))
-          : (g.baht>0?'มีของค้าง '+_diBaht(g.baht):''));
+          : (g.baht>0?'ถึงรอบแล้วยังไม่สั่ง '+_diBaht(g.baht):''));
     h+='<p class="di-grp di-c'+(gi%4)+'" data-shop="'+_diEsc(g.id)+'">'
       +'<i></i><b>'+_diEsc(g.name)+'</b><span>'+_diEsc(cnt)+'</span></p>';
 
@@ -1507,7 +1548,7 @@ function _diGoToAccount(accountId){
 // 8b. โผล่ตอนเช็คอิน Echo — ข้อมูลชุดเดิม แค่มาโผล่ตอนที่ยืนอยู่หน้าร้านจริง
 // ═══════════════════════════════════════════════════════════════════════════
 // อ่านอย่างเดียว ไม่มีปุ่ม ไม่แตะค้าง — จอ Echo มีงานของมันอยู่แล้ว อย่าไปแย่ง
-// ไม่มีของค้าง = ไม่โชว์การ์ด · ข้อมูลยังไม่มา = ไม่โชว์เช่นกัน ไม่โชว์ศูนย์
+// ไม่มีรายการถึงรอบ = ไม่โชว์การ์ด · ข้อมูลยังไม่มา = ไม่โชว์เช่นกัน ไม่โชว์ศูนย์
 function renderCheckinOverdue(accountId){
   try{
     const host=document.getElementById('ci-visit-hero');

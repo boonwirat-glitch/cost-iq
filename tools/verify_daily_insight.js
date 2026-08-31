@@ -83,6 +83,10 @@ function makeSandbox(opts) {
     bulkCurrentMonthData: opts.currentMonth || {},
     navigator: { vibrate() {} },
     portviewSelectAccount: () => { sandbox._drilled = true; },
+    senseNickname: (n) => {
+      const m = String(n || '').match(/\(([^)]+)\)/);
+      return m ? m[1].trim() : (String(n || '').split(/\s+/)[0] || String(n || ''));
+    },
   };
   sandbox.window = sandbox;
   sandbox.window.matchMedia = () => ({ matches: false });
@@ -916,6 +920,71 @@ console.log('\n── 20. การ์ดตอนเช็คอิน Echo ─
     /typeof renderCheckinOverdue === 'function'/.test(CI));
   check('แตะไฟล์ Echo แค่จุดเดียว',
     (CI.match(/renderCheckinOverdue/g) || []).length === 2);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 21. ชื่อที่เรียก · ช่วงเวลาที่ตัวเลขคิดมา · คำที่ไม่ได้ตั้งขึ้นเอง
+// ─────────────────────────────────────────────────────────────────────────────
+// บุชอ่านจอวันที่ 31 ส.ค. แล้วงงสามเรื่อง: จอบอกวันแต่เลขเป็นทั้งเดือน,
+// "ของค้าง" เป็นคำที่ไม่มีใครใช้จริง, และทักเธอว่า "คุณDuangruedee" แทนชื่อที่ทุกคนเรียก
+console.log('\n── 21. ชื่อที่เรียก ช่วงเวลา และคำที่ใช้ ──');
+
+{
+  const s = makeSandbox({ profile: { email: 'x@freshket.co', kam_name: 'Duangruedee (Ning) Bulalom', role: 'rep' } });
+  check('เรียกด้วยชื่อเล่นในวงเล็บ ไม่ใช่ชื่อจริงที่ไม่มีใครใช้', s._diMyName() === 'Ning');
+  check('ชื่อโรมันต้องเว้นวรรคหลัง "คุณ"', s._diHonorific('Ning') === ' คุณ Ning');
+  check('ชื่อไทยเขียนติดกันเหมือนเดิม', s._diHonorific('เมย์') === ' คุณเมย์');
+  check('ไม่มีชื่อ = ไม่ขึ้นคำว่าคุณลอยๆ', s._diHonorific('') === '');
+
+  const th = makeSandbox({ profile: { kam_name: 'สมชาย ใจดี', role: 'rep' } });
+  check('ชื่อไทยไม่มีวงเล็บ → ใช้คำแรก', th._diMyName() === 'สมชาย');
+
+  check('helper ชื่อเล่นตัวจริงยังอยู่ที่ 01_core (guard ไม่ตายเงียบ)',
+    /function senseNickname\(/.test(R('src/01_core.js')));
+  check('ทั้งสองจอ (KAM + TL) ทักทายผ่าน helper ตัวเดียวกัน',
+    (DI.match(/_diGreeting\(\)\+_diHonorific\(name\)/g) || []).length === 2);
+  check('ไม่มีที่ไหนต่อคำว่าคุณเองแบบเดิมอีก', !/' คุณ'\s*\+\s*_diEsc/.test(DI));
+}
+
+{
+  // days_elapsed มาจากไฟล์ข้อมูล ไม่ใช่ปฏิทินเครื่อง — ข้อมูลตามหลังปฏิทินเสมอ
+  // เขียน "1–31 ส.ค." ทั้งที่ข้อมูลถึงแค่วันที่ 30 คือบอกเลขที่ไม่มีจริง
+  const s = makeSandbox({ currentMonth: { A: { days_elapsed: 30, days_in_month: 31 },
+                                          B: { days_elapsed: 30, days_in_month: 31 } } });
+  const w = s._diWindow();
+  check('จำนวนวันมาจากไฟล์ข้อมูล ไม่ใช่ปฏิทินเครื่อง', w.days === 30);
+  check('ช่วงเวลาเขียนเป็น 1–<วัน> <เดือน>', /^1–30 [ก-ฮ]/.test(w.range));
+  check('มีช่วงของเดือนก่อนไว้เทียบ', /^1–\d+ [ก-ฮ]/.test(w.prevRange));
+
+  const prevLen = new Date(new Date().getFullYear(), new Date().getMonth(), 0).getDate();
+  const prevDay = parseInt(w.prevRange.replace('1–', ''), 10);
+  check('ช่วงเดือนก่อนไม่เกินจำนวนวันที่เดือนนั้นมีจริง', prevDay <= prevLen && prevDay <= w.days);
+
+  // ไม่มีข้อมูลเลย = ต้องไม่คืน 0 วัน (จะได้ "1–0 ส.ค." ซึ่งไม่มีความหมาย)
+  const empty = makeSandbox({ currentMonth: {} })._diWindow();
+  check('ไม่มีข้อมูล → ยังคืนจำนวนวันที่อ่านได้ ไม่ใช่ศูนย์', empty.days >= 1);
+}
+
+{
+  check('มีป้ายบนจอบอกว่าเลขเป็นยอดรวมของช่วงไหน', /di-scope/.test(DI));
+  check('ป้ายบอกตรงๆ ว่าไม่ใช่เลขของวันเดียว', /ไม่ใช่ของวันนี้วันเดียว/.test(DI));
+  check('ป้ายมีสีของตัวเอง ไม่ใช่ div เปล่า', /#di-sheet \.di-scope\{/.test(DI));
+  check('หัวข้อกลุ่มบอกช่วงเวลา ไม่ใช่ "วันนี้ยังมี"',
+    /di-rest-k">ภาพรวม '\s*\+\s*_diEsc\(win\.range\)/.test(DI) && !/วันนี้ยังมี/.test(DI));
+  check('แถวถึงรอบสั่งบอกว่านับถึงวันไหน', /' ร้าน · นับถึง '\+win\.days/.test(DI));
+  check('แถวซื้อเพิ่มขึ้นบอกช่วงทั้งสองฝั่ง ไม่ใช่ "เทียบวันต่อวัน"',
+    /win\.range\+' เทียบ '\+win\.prevRange/.test(DI) && !/เทียบวันต่อวันกับเดือนที่แล้ว/.test(DI));
+  check('จอ TL ก็บอกช่วงเวลาเหมือนกัน',
+    (DI.match(/_diWindow\(\)/g) || []).length >= 3);
+}
+
+{
+  // "ของค้าง" เป็นคำที่ตั้งขึ้นเอง ฟังเหมือนของเหลือในสต็อก ไม่ใช่ของที่ยังไม่ได้สั่ง
+  check('ไม่มีคำว่า "ของค้าง" หลงเหลือในโมดูล', DI.indexOf('ของค้าง') === -1);
+  check('หมายเหตุท้ายจออธิบายด้วยประโยคเต็ม ไม่ใช่ศัพท์ที่ตั้งเอง',
+    /สินค้าที่ร้านเคยสั่งประจำ เลยรอบที่ควรสั่งมาแล้ว/.test(DI));
+  check('หมายเหตุอธิบาย "ซื้อเพิ่มขึ้น" ด้วยช่วงเวลาจริง',
+    /ยอด '\+win\.range\+' มากกว่ายอด '\+win\.prevRange/.test(DI));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
