@@ -916,10 +916,13 @@ window.nrrAdminResult = nrrAdminResult;
 
 // ── v5: VP pooled result — ALL portfolios as one book ────────────────────
 // Same formula as the buckets (nrrComputeRowsPool), no bucket filter.
-function nrrVpResult() {
+// bucket: 'all' (ค่าตั้งต้น เหมือนเดิมทุกประการ) | 'chain' | 'sa_mc'
+// vp_view.csv มีคอลัมน์ account_type อยู่แล้ว จึงใช้ตัวแบ่งกลุ่มตัวเดียวกับ PM/Admin ได้
+function nrrVpResult(bucket) {
   var vd = window.bulkVpData;
   if (!vd || !vd.loaded || !vd.allRows.length) return null;
-  return _nrrActualizeResult(nrrComputeRowsPool(vd.allRows, 'vp'));
+  if (!bucket || bucket === 'all') return _nrrActualizeResult(nrrComputeRowsPool(vd.allRows, 'vp'));
+  return _nrrActualizeResult(nrrComputeBucket(vd.allRows, bucket));
 }
 window.nrrVpResult = nrrVpResult;
 

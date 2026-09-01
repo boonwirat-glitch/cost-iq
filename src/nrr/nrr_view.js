@@ -13,7 +13,8 @@ var nrrState = {
     portfolio: null,   // 'vp' | 'kam' | 'pm' | 'admin' (null = pick default on first render)
     kamKey: 'org',     // 'org' | 'tl:<email>' | 'kam:<email>' (KAM tab)
     pmBucket: 'chain',
-    adminBucket: 'chain'
+    adminBucket: 'chain',
+    vpBucket: 'all'    // ภาพรวม: 'all' | 'chain' | 'sa_mc' ('all' = พฤติกรรมเดิม)
   }
   // v28: company/sales moved to their own views (#/company, #/sales) —
   // their state lives in nrrCompanyState (nrr_company.js).
@@ -2072,9 +2073,14 @@ function nrrShellHtml() {
     '  <div class="nrr-section" id="nrr-sec-pulse" style="animation-delay:.02s"><div class="nrr-panel-body" id="nrr-pulse-body"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-teams" style="animation-delay:.06s"><div class="nrr-takeaway micro" id="nrr-teams-takeaway"></div><div class="nrr-team-cards" id="nrr-team-cards"></div></div>' +
     '  <div class="nrr-section" id="nrr-sec-movement" style="animation-delay:.10s"><div class="nrr-panel-body">' +
-    '    <div class="nrr-panel-head"><div class="h2" id="nrr-movement-title">Outlet Movement</div>' +
-    '    <div class="nrr-mv-switch"><div class="seg" id="nrr-mv-portfolio-seg"></div><span id="nrr-mv-secondary"></span>' +
-    '    <button class="btn-secondary" id="nrr-mv-export" style="margin-left:8px;display:none">Export CSV</button></div></div>' +
+    // v_mvhead: แท็บต้องอยู่ตำแหน่งเดิมเสมอ ไม่ว่าจะเลือกอะไร — เดิมตัวเลือกย่อย
+    // ของแท็บ KAM (select ยาว 220px) อยู่แถวเดียวกับแท็บ พอเลือก KAM ทั้งแถวก็ตก
+    // ลงไปอีกบรรทัด แท็บเลยขยับที่ทุกครั้งที่สลับ · แยกเป็นสองแถวถาวร:
+    // แถวบน = ชื่อ + แท็บ + Export (ห้าม wrap) · แถวล่าง = ตัวเลือกย่อยของแท็บนั้น
+    '    <div class="nrr-panel-head nrr-mv-head"><div class="h2" id="nrr-movement-title">Outlet Movement</div>' +
+    '    <div class="nrr-mv-switch"><div class="seg" id="nrr-mv-portfolio-seg"></div>' +
+    '    <button class="btn-secondary" id="nrr-mv-export" style="display:none">Export CSV</button></div></div>' +
+    '    <div class="nrr-mv-sub" id="nrr-mv-secondary"></div>' +
     '    <div class="nrr-takeaway micro" id="nrr-movement-takeaway"></div>' +
     // v_segfilter: BOTH candidate homes for the segment tile strip exist as
     // stable, permanent containers; NRR_SEG_STRIP_PLACEMENT decides which one
@@ -2388,7 +2394,11 @@ function nrrMovementViewModel() {
   if (!isAdmin && mv.portfolio === 'kam' && mv.kamKey === 'org') mv.kamKey = 'tl:' + nrrProfile.email;
 
   if (mv.portfolio === 'vp') {
-    return { result: nrrVpResult(), scopeCtx: { scope: 'bucket' }, showKam: false, title: 'Outlet Movement — ภาพรวมทุก Portfolio' };
+    var vb = mv.vpBucket || 'all';
+    return {
+      result: nrrVpResult(vb), scopeCtx: { scope: 'bucket' }, showKam: false,
+      title: 'Outlet Movement — ภาพรวมทุก Portfolio' + (vb === 'all' ? '' : ' · ' + (vb === 'chain' ? 'Chain' : 'SA/MC'))
+    };
   }
   if (mv.portfolio === 'pm' || mv.portfolio === 'admin') {
     var bucket = isAdmin ? (mv.portfolio === 'pm' ? mv.pmBucket : mv.adminBucket) : nrrBucketForTl(nrrProfile.email);
@@ -2456,10 +2466,27 @@ function nrrRenderMovementSwitcher() {
         return '<option value="' + nrrEsc(v) + '"' + (mv.kamKey === v ? ' selected' : '') + '>' + nrrEsc(k.name) + '</option>';
       }).join('') + '</optgroup>';
     }).join('');
-    secondary.innerHTML = '<select class="nrr-search" id="nrr-mv-kam-select">' + optHtml + '</select>';
+    // ทรงเดียวกับ .seg ที่แท็บอื่นใช้ (ขอบ hairline, มุมกลม, ตัวอักษรชุดเดียวกัน)
+    // ยังเป็น select เพราะมีทั้งองค์กร/ทีม/ราย KAM รวมกันเกิน 20 ตัวเลือก
+    // ทำเป็นชิปเรียงกันจะยาวเกินจอ
+    secondary.innerHTML = '<span class="nrr-pick"><select id="nrr-mv-kam-select">' + optHtml + '</select></span>';
     document.getElementById('nrr-mv-kam-select').addEventListener('change', function (e) {
       nrrState.mvView.kamKey = e.target.value;
       nrrRenderMovementSection();
+    });
+  } else if (mv.portfolio === 'vp') {
+    // ภาพรวมมี "ทั้งหมด" เป็นค่าตั้งต้น — ถ้ามีแค่ Chain กับ SA/MC ร้านที่ไม่เข้า
+    // สองกลุ่มนี้ (account_type = Unknown/Enduser) จะหายไปเงียบๆ
+    var vb = mv.vpBucket || 'all';
+    secondary.innerHTML = '<div class="seg">' +
+      '<button' + (vb === 'all' ? ' class="on"' : '') + ' data-vpbucket="all">ทั้งหมด</button>' +
+      '<button' + (vb === 'chain' ? ' class="on"' : '') + ' data-vpbucket="chain">Chain</button>' +
+      '<button' + (vb === 'sa_mc' ? ' class="on"' : '') + ' data-vpbucket="sa_mc">SA/MC</button></div>';
+    secondary.querySelectorAll('[data-vpbucket]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        nrrState.mvView.vpBucket = b.dataset.vpbucket;
+        nrrRenderMovementSection();
+      });
     });
   } else if ((mv.portfolio === 'pm' || mv.portfolio === 'admin') && isAdmin) {
     var cur = mv.portfolio === 'pm' ? mv.pmBucket : mv.adminBucket;

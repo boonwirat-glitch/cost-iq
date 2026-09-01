@@ -460,18 +460,19 @@ console.log('\n── 11. วงจรปิด: "ที่ทักไปเม
     '2020-01-01': [{ aid: 'B', name: 'ร้าน', sku: 'p1', skuName: 'x', gmv: 10000 }],
     '2020-01-02': [{ aid: 'B', name: 'ร้าน', sku: 'p1', skuName: 'x', gmv: 10000 }],
   } };
-  // ทำให้สองวันนั้นอยู่ในเดือนปัจจุบัน เพื่อให้เข้าเงื่อนไขสรุปรายเดือน
-  const now = new Date();
-  const mo = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  // เดิมผูกวันที่ไว้กับ "วันที่ 1 และ 2 ของเดือนปัจจุบัน" ซึ่งพังเองทุกวันที่ 1-2
+  // ของทุกเดือน (วันที่ 1 = วันนี้ ไม่ใช่อดีต · วันที่ 2 = อนาคต) เจอตอนเช้าวันที่
+  // 1 ก.ย. ⇒ ตรึงวันที่เอง แล้ววางเครื่องหมายเป็นเมื่อวานกับวันก่อนหน้า
   const st2 = { seeded: true, marks: {
-    [mo + '-01']: st.marks['2020-01-01'],
-    [mo + '-02']: st.marks['2020-01-02'],
+    '2026-08-20': st.marks['2020-01-01'],
+    '2026-08-21': st.marks['2020-01-02'],
   } };
   const s = makeSandbox({
     storage: { sense_daily_v1: JSON.stringify(st2) },
     accounts: [{ id: 'B', name: 'ร้าน', gmvToDate: 1, paceSignal: { expected: 9 } }],
     skuCurrent: { B: [{ item_id: 'p1', orders_this_month: 1 }] },
   });
+  vmRun(s, "function _diToday(){ return '2026-08-22'; }");
   const w = s.buildDailyInsight().won;
   check('ทักซ้ำสองวัน นับเป็นรายการเดียว (ยอดสะสมไม่พอง)',
     w && w.monthBackBaht === 10000 && w.monthBackShops === 1,
